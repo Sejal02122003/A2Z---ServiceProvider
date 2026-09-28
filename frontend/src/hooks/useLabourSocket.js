@@ -4,6 +4,9 @@ import { useSelector } from 'react-redux'
 
 const BACKEND_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5005/api/v1').replace('/api/v1', '')
 
+let currentSocket = null
+let currentToken = null
+
 export function useLabourSocket() {
   const { token } = useSelector((state) => state.auth)
   const [socketStatus, setSocketStatus] = useState('disconnected')
@@ -11,37 +14,71 @@ export function useLabourSocket() {
   const socketRef = useRef(null)
 
   useEffect(() => {
-    if (!token) return
+    if (!token) {
+      if (currentSocket) {
+        currentSocket.disconnect()
+        currentSocket = null
+        currentToken = null
+      }
+      setSocketStatus('disconnected')
+      return
+    }
 
-    const socket = io(BACKEND_URL, {
-      auth: { token },
-      transports: ['websocket'],
-    })
+    if (currentSocket && currentToken === token) {
+      socketRef.current = currentSocket
+      setSocketStatus(currentSocket.connected ? 'connected' : 'disconnected')
+    } else {
+      if (currentSocket) {
+        currentSocket.disconnect()
+      }
+
+      const socket = io(BACKEND_URL, {
+        auth: { token },
+        transports: ['websocket'],
+      })
+      
+      currentSocket = socket
+      currentToken = token
+      socketRef.current = socket
+    }
+
+    const socket = currentSocket
+
+    const onConnect = () => setSocketStatus('connected')
+    const onDisconnect = () => setSocketStatus('disconnected')
+    const onConnectError = (err) => console.error('Socket error:', err)
     
-    socketRef.current = socket
-
-    socket.on('connect', () => setSocketStatus('connected'))
-    socket.on('disconnect', () => setSocketStatus('disconnected'))
-    socket.on('connect_error', (err) => console.error('Socket error:', err))
-
     // Flash Broadcast Received
-    socket.on('BOOKING_RECEIVED', (data) => {
-      // Add a timestamp so we can track the 60s timeout locally if needed,
-      // though the server will also send an EXPIRED event.
+    const onBookingReceived = (data) => {
       setLiveOffers((prev) => {
-        // Prevent duplicates just in case
         if (prev.find(o => o.bookingId === data.bookingId)) return prev
         return [...prev, { ...data, receivedAt: Date.now() }]
       })
-    })
+    }
 
     // Broadcast expired or accepted by someone else
-    socket.on('BOOKING_EXPIRED', (data) => {
+    const onBookingExpired = (data) => {
       setLiveOffers((prev) => prev.filter(o => o.bookingId !== data.bookingId))
-    })
+    }
+
+    socket.on('connect', onConnect)
+    socket.on('disconnect', onDisconnect)
+    socket.on('connect_error', onConnectError)
+    socket.on('BOOKING_RECEIVED', onBookingReceived)
+    socket.on('BOOKING_EXPIRED', onBookingExpired)
+
+    // Trigger connect if already connected
+    if (socket.connected) {
+      onConnect()
+    }
 
     return () => {
-      socket.disconnect()
+      socket.off('connect', onConnect)
+      socket.off('disconnect', onDisconnect)
+      socket.off('connect_error', onConnectError)
+      socket.off('BOOKING_RECEIVED', onBookingReceived)
+      socket.off('BOOKING_EXPIRED', onBookingExpired)
+      // Do not disconnect the socket here to avoid React Strict Mode closing it
     }
   }, [token])
 

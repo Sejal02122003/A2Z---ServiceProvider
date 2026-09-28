@@ -341,7 +341,7 @@ export const getBookingStatus = asyncHandler(async (req, res) => {
     // Only hide if the requesting user is the labourer. If it's the contractor, they SHOULD see the OTPs to share with labourer or verify?
     // Wait, the contractor IS the customer in this scenario. The contractor role acts as the buyer. 
     // If the req.user._id matches booking.userId, they are the customer, they should see OTPs.
-    if (String(req.user._id) !== String(booking.userId._id || booking.userId)) {
+    if (String(req.user._id) !== String(booking.userId?._id || booking.userId)) {
       delete booking.startOtp
       delete booking.completionOtp
       if (booking.assignments) {
@@ -387,7 +387,7 @@ export const getMyBookings = asyncHandler(async (req, res) => {
 
   bookings.forEach(b => {
     // Hide OTPs if the requesting user is NOT the customer
-    if (String(_id) !== String(b.userId._id || b.userId)) {
+    if (String(_id) !== String(b.userId?._id || b.userId)) {
       delete b.startOtp
       delete b.completionOtp
       if (b.assignments) {
@@ -563,6 +563,36 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
         const lid = typeof a.labourId === 'object' ? a.labourId._id : a.labourId;
         if (lid) emitToUser(lid, 'BOOKING_STATUS_UPDATE', { bookingId: booking._id, status })
       });
+    }
+  }).catch(err => console.error(err))
+
+  // Also send Push Notification
+  import('../utils/pushNotificationHelper.js').then(({ sendNotificationToUser }) => {
+    // To Customer
+    sendNotificationToUser(booking.userId, {
+      title: 'Booking Update',
+      body: `Your booking status is now ${status}`,
+      data: { type: 'booking_update', bookingId: String(booking._id) }
+    })
+    
+    // To Labourers
+    if (booking.assignments && booking.assignments.length > 0) {
+      booking.assignments.forEach(a => {
+        const lid = typeof a.labourId === 'object' ? a.labourId._id : a.labourId;
+        if (lid) {
+          sendNotificationToUser(lid, {
+            title: 'Job Status Update',
+            body: `The job status has been updated to ${status}`,
+            data: { type: 'booking_update', bookingId: String(booking._id) }
+          })
+        }
+      });
+    } else if (booking.laborId) {
+      sendNotificationToUser(booking.laborId, {
+        title: 'Job Status Update',
+        body: `The job status has been updated to ${status}`,
+        data: { type: 'booking_update', bookingId: String(booking._id) }
+      })
     }
   }).catch(err => console.error(err))
 

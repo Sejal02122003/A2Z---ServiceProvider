@@ -6,14 +6,32 @@ const SocketContext = createContext(null)
 
 const SOCKET_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5005/api/v1').replace('/api/v1', '')
 
+let currentSocket = null
+let currentToken = null
+
 export function SocketProvider({ children }) {
   const token = useSelector((s) => s.auth.token)
   const [socket, setSocket] = useState(null)
 
   useEffect(() => {
     if (!token) {
+      if (currentSocket) {
+        currentSocket.disconnect()
+        currentSocket = null
+        currentToken = null
+      }
       setSocket(null)
       return
+    }
+
+    // Reuse existing socket if token hasn't changed (prevents React Strict Mode from closing and reopening)
+    if (currentSocket && currentToken === token) {
+      setSocket(currentSocket)
+      return
+    }
+
+    if (currentSocket) {
+      currentSocket.disconnect()
     }
 
     const newSocket = io(SOCKET_URL, {
@@ -31,10 +49,14 @@ export function SocketProvider({ children }) {
       console.warn('[Socket] Connection error:', err.message)
     })
 
+    currentSocket = newSocket
+    currentToken = token
+
     setSocket(newSocket)
 
     return () => {
-      newSocket.close()
+      // In React Strict Mode, we intentionally do not disconnect here.
+      // Disconnection will happen when the token becomes null or changes.
     }
   }, [token])
 

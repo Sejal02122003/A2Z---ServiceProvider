@@ -5,6 +5,7 @@ import { SystemSetting } from '../models/SystemSetting.js'
 import { getRoadDistances } from '../utils/googleMapsDistance.js'
 import { UserSubscription } from '../models/UserSubscription.js'
 import { Review } from '../models/Review.js'
+import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
 
 export const BROADCAST_TIMEOUT_MS = 300000 // 5 minutes flash broadcast timeout
 
@@ -342,6 +343,12 @@ export async function startBroadcastCycle(bookingId) {
             estimatedEarnings: bestEarning,
             timeoutMs: BROADCAST_TIMEOUT_MS
           })
+          
+          sendNotificationToUser(labor._id, {
+            title: 'New Job Offer!',
+            body: `New ${servicesPayload.length === 1 ? servicesPayload[0].name : 'Multiple Services'} job available near you. Estimated earnings: ₹${bestEarning}`,
+            data: { type: 'booking_received', bookingId: String(booking._id) }
+          })
         } else {
           // Single-service booking
           const singleShare = booking.laborShare || booking.basePrice || 0
@@ -358,6 +365,12 @@ export async function startBroadcastCycle(bookingId) {
             approximateDistance: labor.approximateDistance,
             estimatedEarnings: singleShare,
             timeoutMs: BROADCAST_TIMEOUT_MS
+          })
+          
+          sendNotificationToUser(labor._id, {
+            title: 'New Job Offer!',
+            body: `New ${singleServiceName} job available near you. Estimated earnings: ₹${singleShare}`,
+            data: { type: 'booking_received', bookingId: String(booking._id) }
           })
         }
         
