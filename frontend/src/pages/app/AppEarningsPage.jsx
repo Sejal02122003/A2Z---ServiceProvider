@@ -339,7 +339,7 @@ export function AppEarningsPage() {
               </div>
             </div>
 
-            <div className="mt-8 grid grid-cols-4 gap-2 divide-x divide-white/20 rounded-2xl bg-black/20 p-4 backdrop-blur-md border border-white/10">
+            <div className="mt-6 grid grid-cols-4 gap-2 divide-x divide-white/20 rounded-2xl bg-black/20 p-3 backdrop-blur-md border border-white/10">
               <div className="flex flex-col items-center">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200 text-center">Online<br/>Earning</p>
                 {loading ? (
@@ -386,8 +386,8 @@ export function AppEarningsPage() {
             </div>
             
             {/* Cash Earnings Section */}
-            <div className="mt-4 rounded-2xl bg-black/20 p-4 border border-white/10 backdrop-blur-md">
-              <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-4">
+            <div className="mt-3 rounded-2xl bg-black/20 p-3 border border-white/10 backdrop-blur-md">
+              <div className="flex items-center justify-between mb-2">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-amber-200">Total Cash Booking Earning</p>
                   {loading ? (
@@ -401,7 +401,7 @@ export function AppEarningsPage() {
               </div>
 
               {/* Stats Row */}
-              <div className="mt-8 grid grid-cols-2 gap-4 border-t border-white/10 pt-4">
+              <div className="mt-3 grid grid-cols-2 gap-4 border-t border-white/10 pt-3">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Total Earned</p>
                   {loading ? (
@@ -426,7 +426,7 @@ export function AppEarningsPage() {
             </div>
               
               {(adminDues > 0 || !loading) && (
-                <div className="flex items-center justify-between gap-4 rounded-xl bg-linear-to-br from-rose-500/10 to-rose-900/20 p-5 border border-rose-500/20 shadow-inner mt-2">
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-linear-to-br from-rose-500/10 to-rose-900/20 p-3 border border-rose-500/20 shadow-inner mt-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-[11px] font-extrabold uppercase tracking-widest text-rose-300 truncate">
                       Admin Dues (Cash)
@@ -434,7 +434,7 @@ export function AppEarningsPage() {
                     <p className="mt-1 text-[10px] font-medium text-rose-300/60 truncate">
                       Remaining amount to be paid
                     </p>
-                    <p className="mt-2 font-mono text-2xl font-black tracking-tight text-rose-400 drop-shadow-sm">
+                    <p className="mt-1 font-mono text-xl font-black tracking-tight text-rose-400 drop-shadow-sm">
                       ₹{adminDues.toLocaleString('en-IN')}
                     </p>
                   </div>
