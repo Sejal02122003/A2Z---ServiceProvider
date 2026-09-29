@@ -142,6 +142,25 @@ export function JobTracking() {
     )
   }
 
+  if (booking.status === 'FAILED' || booking.status === 'CANCELLED') {
+    return (
+      <div className="space-y-4">
+        <AppStackScreenHeader title="Tracking" backTo="/app" />
+        <GlassPanel className="p-6 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 mb-4">
+            <span className="text-2xl font-black text-rose-600">!</span>
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 mb-2">Booking {booking.status === 'FAILED' ? 'Failed' : 'Cancelled'}</h3>
+          <p className="text-sm text-slate-500">
+            {booking.status === 'FAILED' 
+              ? 'No labourers were available to accept this booking. Please try booking again at a different time.' 
+              : 'This booking has been cancelled.'}
+          </p>
+        </GlassPanel>
+      </div>
+    )
+  }
+
   const labor = booking.laborId || (booking.assignments && booking.assignments[0]?.labourId)
   
   const displayStartOtp = booking.assignments?.length > 0 ? booking.assignments[0].startOtp : booking.startOtp

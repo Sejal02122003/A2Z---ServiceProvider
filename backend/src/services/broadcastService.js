@@ -328,20 +328,22 @@ export async function startBroadcastCycle(bookingId) {
           // Show highest earning as the headline earnings figure
           const bestEarning = servicesPayload.reduce((max, s) => Math.max(max, s.estimatedEarnings), 0)
 
-          emitToUser(labor._id, 'BOOKING_RECEIVED', {
-            bookingId: booking._id,
-            customerName: booking.userId?.fullName || 'Customer',
-            serviceName: servicesPayload.length === 1 ? servicesPayload[0].name : 'Multiple Services',
-            services: servicesPayload,          // <-- array so frontend can show service picker
-            isContractorBooking: true,
-            requiresServiceSelection: servicesPayload.length > 1,
-            date: booking.scheduledAt || booking.createdAt,
-            time: booking.timeSlot || 'Earliest available',
-            duration: bookingHours,
-            customerLocation: booking.address?.locationText || 'Service Location',
-            approximateDistance: labor.approximateDistance,
-            estimatedEarnings: bestEarning,
-            timeoutMs: BROADCAST_TIMEOUT_MS
+          import('../socket.js').then(({ emitToUser }) => {
+            emitToUser(labor._id, 'BOOKING_RECEIVED', {
+              bookingId: booking._id,
+              customerName: booking.userId?.fullName || 'Customer',
+              serviceName: servicesPayload.length === 1 ? servicesPayload[0].name : 'Multiple Services',
+              services: servicesPayload,
+              isContractorBooking: true,
+              requiresServiceSelection: servicesPayload.length > 1,
+              date: booking.scheduledAt || booking.createdAt,
+              time: booking.timeSlot || 'Earliest available',
+              duration: bookingHours,
+              customerLocation: booking.address?.locationText || 'Service Location',
+              approximateDistance: labor.approximateDistance,
+              estimatedEarnings: bestEarning,
+              timeoutMs: BROADCAST_TIMEOUT_MS
+            })
           })
           
           sendNotificationToUser(labor._id, {
@@ -352,19 +354,21 @@ export async function startBroadcastCycle(bookingId) {
         } else {
           // Single-service booking
           const singleShare = booking.laborShare || booking.basePrice || 0
-          emitToUser(labor._id, 'BOOKING_RECEIVED', {
-            bookingId: booking._id,
-            customerName: booking.userId?.fullName || 'Customer',
-            serviceName: singleServiceName,
-            isContractorBooking: false,
-            requiresServiceSelection: false,
-            date: booking.scheduledAt || booking.createdAt,
-            time: booking.timeSlot || 'Earliest available',
-            duration: bookingHours,
-            customerLocation: booking.address?.locationText || 'Service Location',
-            approximateDistance: labor.approximateDistance,
-            estimatedEarnings: singleShare,
-            timeoutMs: BROADCAST_TIMEOUT_MS
+          import('../socket.js').then(({ emitToUser }) => {
+            emitToUser(labor._id, 'BOOKING_RECEIVED', {
+              bookingId: booking._id,
+              customerName: booking.userId?.fullName || 'Customer',
+              serviceName: singleServiceName,
+              isContractorBooking: false,
+              requiresServiceSelection: false,
+              date: booking.scheduledAt || booking.createdAt,
+              time: booking.timeSlot || 'Earliest available',
+              duration: bookingHours,
+              customerLocation: booking.address?.locationText || 'Service Location',
+              approximateDistance: labor.approximateDistance,
+              estimatedEarnings: singleShare,
+              timeoutMs: BROADCAST_TIMEOUT_MS
+            })
           })
           
           sendNotificationToUser(labor._id, {
