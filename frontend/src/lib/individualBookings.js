@@ -163,6 +163,17 @@ export function formatInr(amount) {
   }).format(Math.round(amount || 0))
 }
 
+/**
+ * Format a duration (in hours) as a human-readable string.
+ * Supports fractional hours: 0.5 → "30 Minutes", 1 → "1 Hour", etc.
+ * @param {number} hours
+ */
+export function formatDuration(hours) {
+  const h = parseFloat(hours) || 0
+  if (h === 0.5) return '30 Minutes'
+  return `${h} ${h === 1 ? 'Hour' : 'Hours'}`
+}
+
 export function bookingStatusToUi(status) {
   const s = String(status || '').toLowerCase()
   if (s === 'pending_review') {

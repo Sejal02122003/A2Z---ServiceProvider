@@ -12,7 +12,8 @@ import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { parseISTDateTime } from '../utils/dateHelper.js'
 
 export const calculateBill = asyncHandler(async (req, res) => {
-  const { serviceId, hours = 1, quantity = 1, address, contractorServices } = req.body
+  const { serviceId, hours: rawHours = 1, quantity = 1, address, contractorServices } = req.body
+  const hours = parseFloat(rawHours) || 1 // supports 0.5 = 30 min
 
   let matchedZone = null
   if (address) {
@@ -152,7 +153,8 @@ export const calculateBill = asyncHandler(async (req, res) => {
 })
 
 export const createBooking = asyncHandler(async (req, res) => {
-  const { serviceId, type, scheduledAt, timeSlot, endTime, locationText, lat, lng, paymentMethod, notes, hours = 1, quantity = 1, imageNames = [], contractorInfo } = req.body
+  const { serviceId, type, scheduledAt, timeSlot, endTime, locationText, lat, lng, paymentMethod, notes, hours: rawHours = 1, quantity = 1, imageNames = [], contractorInfo } = req.body
+  const hours = parseFloat(rawHours) || 1 // supports 0.5 = 30 min
 
   if (!serviceId || !type || !locationText || !paymentMethod) {
     return sendError(res, { message: 'Missing required fields', statusCode: HTTP_STATUS.BAD_REQUEST })
@@ -679,10 +681,11 @@ export const confirmCashPayment = asyncHandler(async (req, res) => {
 
 export const addExtraTime = asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { extraHours, assignmentId } = req.body
+  const { extraHours: rawExtra, assignmentId } = req.body
+  const extraHours = parseFloat(rawExtra) || 0 // supports 0.5 = 30 min
 
-  if (extraHours <= 0) {
-    return sendError(res, { message: 'Extra hours must be greater than 0', statusCode: HTTP_STATUS.BAD_REQUEST })
+  if (extraHours < 0.5) {
+    return sendError(res, { message: 'Extra time must be at least 30 minutes (0.5)', statusCode: HTTP_STATUS.BAD_REQUEST })
   }
 
   const booking = await Booking.findById(id)

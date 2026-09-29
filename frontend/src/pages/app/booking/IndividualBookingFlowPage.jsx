@@ -52,6 +52,7 @@ import {
   PAYMENT_METHODS,
   durationKindLabel,
   durationKindToDays,
+  formatDuration,
   formatInr,
   todayISODate,
   maxISODate,
@@ -332,7 +333,7 @@ export function IndividualBookingFlowPage() {
                 ...s, 
                 categoryName: c.name, 
                 groupName: g.name,
-                label: `${s.name} - ₹${s.hourlyPrice || s.basePrice || 0}`,
+                label: `${s.name} - ₹${s.minHours === 0.5 ? Math.round((s.hourlyPrice || s.basePrice || 0) / 2) + '/30min' : (s.hourlyPrice || s.basePrice || 0) + '/hr'}`,
                 value: String(s._id)
               })
             }
@@ -1109,7 +1110,9 @@ export function IndividualBookingFlowPage() {
                   <div className="flex justify-between">
                     <span className="lc-booking-flow-muted">Duration</span>
                     <span className="font-bold text-black">
-                      {booking?.duration ? `${booking.duration} Hour${booking.duration > 1 ? 's' : ''}` : 'Few hours'}
+                      {booking?.duration != null || booking?.hours != null
+                        ? formatDuration(booking.duration ?? booking.hours)
+                        : 'Few hours'}
                     </span>
                   </div>
 
@@ -1619,16 +1622,23 @@ export function IndividualBookingFlowPage() {
                 <FieldLabel>Required Duration</FieldLabel>
                 <div className="relative">
                   <AppSearchableSelect
-                    value={draft.hours || draft.minHours || 1}
-                    onChange={(val) => syncDraft({ hours: parseInt(val, 10) || draft.minHours || 1 })}
+                    value={parseFloat(draft.hours) || parseFloat(draft.minHours) || 1}
+                    onChange={(val) => syncDraft({ hours: parseFloat(val) || parseFloat(draft.minHours) || 1 })}
                     hideSearch
-                    options={Array.from(
-                      { length: (draft.maxHours || 24) - (draft.minHours || 1) + 1 },
-                      (_, i) => i + (draft.minHours || 1)
-                    ).map(num => ({
-                      value: num,
-                      label: `${num} ${num === 1 ? 'Hour' : 'Hours'}`
-                    }))}
+                    options={(() => {
+                      const min = parseFloat(draft.minHours) || 1
+                      const max = draft.maxHours || 24
+                      const opts = []
+                      // 30-min option only when the service explicitly allows it
+                      if (min <= 0.5) {
+                        opts.push({ value: 0.5, label: '30 Minutes' })
+                      }
+                      const startHour = min <= 0.5 ? 1 : Math.ceil(min)
+                      for (let h = startHour; h <= max; h++) {
+                        opts.push({ value: h, label: `${h} ${h === 1 ? 'Hour' : 'Hours'}` })
+                      }
+                      return opts
+                    })()}
                   />
                 </div>
               </motion.div>
@@ -1728,7 +1738,7 @@ export function IndividualBookingFlowPage() {
                   <span className="lc-booking-flow-muted">Duration</span>
                   <span className="font-bold text-black">
                     {draft.bookingType === 'instant'
-                      ? `${draft.hours || draft.minHours || 1} Hour${(draft.hours || draft.minHours || 1) > 1 ? 's' : ''}`
+                      ? formatDuration(parseFloat(draft.hours) || parseFloat(draft.minHours) || 1)
                       : durationKindLabel(draft.durationKind)}
                   </span>
                 </div>
@@ -1752,7 +1762,7 @@ export function IndividualBookingFlowPage() {
                         <span className="flex flex-col">
                           <span>{item.name || 'Service fee'}</span>
                           <span className="text-[11px] text-slate-500 font-medium">
-                            {`Hourly rate (${formatInr(item.hourlyRate)}/hr) × ${item.hours} hrs${item.quantity > 1 ? ` × ${item.quantity} workers` : ''}`}
+                            {`Hourly rate (${formatInr(item.hourlyRate)}/hr) × ${item.hours === 0.5 ? '30 min' : `${item.hours} hrs`}${item.quantity > 1 ? ` × ${item.quantity} workers` : ''}`}
                           </span>
                         </span>
                         <span>{formatInr(item.subTotal)}</span>
@@ -1764,13 +1774,14 @@ export function IndividualBookingFlowPage() {
                         <span>Service fee</span>
                         <span className="text-[11px] text-slate-500 font-medium">
                           {(() => {
-                            const h = draft.durationKind === 'few_hours' ? (draft.hours || draft.minHours || 1) : 
+                            const h = draft.durationKind === 'few_hours' ? (parseFloat(draft.hours) || parseFloat(draft.minHours) || 1) : 
                                      draft.durationKind === 'half_day' ? 4 : 
                                      draft.durationKind === 'full_day' ? 8 : 
                                      draft.durationKind === 'multi_day' ? ((draft.durationDays || 1) * 8) : 
-                                     (draft.hours || draft.minHours || 1);
+                                     (parseFloat(draft.hours) || parseFloat(draft.minHours) || 1);
                             const q = draft.quantity || 1;
-                            return `Hourly rate (${formatInr((calculatedBill.subTotal || calculatedBill.basePrice) / (h * q))}/hr) × ${h} hrs${q > 1 ? ` × ${q} workers` : ''}`;
+                            const hLabel = h === 0.5 ? '30 min' : `${h} hrs`
+                            return `Hourly rate (${formatInr((calculatedBill.subTotal || calculatedBill.basePrice) / (h * q))}/hr) × ${hLabel}${q > 1 ? ` × ${q} workers` : ''}`;
                           })()}
                         </span>
                       </span>

@@ -150,7 +150,7 @@ export function ServiceCatalog() {
                                     <p className="text-sm font-semibold text-slate-800">{sub.name}</p>
                                   </div>
                                   <span className="shrink-0 rounded-lg bg-brand/10 px-2.5 py-1 text-xs font-bold text-brand">
-                                    ₹{sub.hourlyPrice}/hr
+                                    {sub.minHours === 0.5 ? `₹${Math.round(sub.hourlyPrice / 2)}/30min` : `₹${sub.hourlyPrice}/hr`}
                                   </span>
                                 </button>
                               ))

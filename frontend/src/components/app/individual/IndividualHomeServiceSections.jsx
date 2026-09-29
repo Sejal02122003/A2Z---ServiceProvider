@@ -127,7 +127,7 @@ function ListLayout({ categories, onQuickBook }) {
                 </span>
               </span>
               <span className="shrink-0 text-sm font-bold text-blue-600">
-                ₹{svc.hourlyPrice}/hr
+                {svc.minHours === 0.5 ? `₹${Math.round(svc.hourlyPrice / 2)}/30min` : `₹${svc.hourlyPrice}/hr`}
               </span>
               <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 ml-2" aria-hidden />
             </button>

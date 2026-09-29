@@ -43,7 +43,7 @@ const labourServiceSchema = new mongoose.Schema(
     minHours: {
       type: Number,
       default: 1,
-      min: 1,
+      min: 0.5, // supports 30-min bookings
     },
     maxHours: {
       type: Number,

@@ -87,7 +87,7 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
         description: description.trim(),
         basePrice: Number(hourlyPrice), // Keep schema happy with basePrice = hourlyPrice
         hourlyPrice: Number(hourlyPrice),
-        minHours: Number(minHours),
+        minHours: parseFloat(minHours) || 0.5,
         maxHours: Number(maxHours),
         discountType,
         discountValue: Number(discountValue),
@@ -170,12 +170,13 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
             </div>
 
             <div>
-              <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Min Hours</label>
+              <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Min Hours <span className="normal-case font-normal text-slate-400">(0.5 = 30 min)</span></label>
               <input
                 type="number"
-                min="1"
+                min="0.5"
+                step="0.5"
                 value={minHours}
-                onChange={(e) => setMinHours(e.target.value)}
+                onChange={(e) => setMinHours(parseFloat(e.target.value) || 0.5)}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
               />
             </div>
@@ -417,7 +418,7 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
         description: description.trim(),
         basePrice: Number(hourlyPrice), // Keep schema happy
         hourlyPrice: Number(hourlyPrice),
-        minHours: Number(minHours),
+        minHours: parseFloat(minHours) || 0.5,
         maxHours: Number(maxHours),
         discountType,
         discountValue: Number(discountValue),
@@ -500,12 +501,13 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
             </div>
 
             <div>
-              <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Min Hours</label>
+              <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Min Hours <span className="normal-case font-normal text-slate-400">(0.5 = 30 min)</span></label>
               <input
                 type="number"
-                min="1"
+                min="0.5"
+                step="0.5"
                 value={minHours}
-                onChange={(e) => setMinHours(e.target.value)}
+                onChange={(e) => setMinHours(parseFloat(e.target.value) || 0.5)}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
               />
             </div>
@@ -984,25 +986,38 @@ export function AdminServicesPage() {
         </GlassPanel>
       </div>
 
-      <GlassPanel className="relative z-20 p-4 md:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-sm flex-1">
+
+      <GlassPanel className="relative z-20 p-4 md:p-5 space-y-3">
+        {/* Search bar — full width */}
+        <div className="relative w-full">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search services..."
-            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+            placeholder="Search services by name, sub-category or description..."
+            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
+
+        {/* Filters row */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="w-[180px]">
+          <div className="w-[190px]">
             <SearchableSelect
               value={zoneFilter}
               onChange={setZoneFilter}
               options={[{ value: 'all', label: 'All Zones (Global)' }, ...activeZones.map(z => ({ value: z._id, label: z.name }))]}
             />
           </div>
-          <div className="w-[200px]">
+          <div className="w-[210px]">
             <SearchableSelect
               value={subcategoryFilter}
               onChange={setSubcategoryFilter}
@@ -1027,6 +1042,18 @@ export function AdminServicesPage() {
             <option value={20}>20 / page</option>
             <option value={50}>50 / page</option>
           </select>
+
+          {/* Active filter indicators */}
+          {(search || subcategoryFilter !== 'all' || zoneFilter !== 'all' || statusFilter !== 'all') && (
+            <button
+              type="button"
+              onClick={() => { setSearch(''); setSubcategoryFilter('all'); setZoneFilter('all'); setStatusFilter('all') }}
+              className="ml-auto flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 transition"
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear filters
+            </button>
+          )}
         </div>
       </GlassPanel>
 

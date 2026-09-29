@@ -52,7 +52,8 @@ const bookingSchema = new mongoose.Schema(
     },
     hours: {
       type: Number,
-      default: 1
+      default: 1,
+      min: 0.5 // supports 30-min (0.5) bookings
     },
     extraHours: {
       type: Number,

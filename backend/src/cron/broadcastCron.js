@@ -19,8 +19,8 @@ export function initBroadcastCron() {
         { $set: { status: 'FAILED' } }
       )
 
-      // 60 mins (1 hour) from now
-      const sixtyMinsFromNow = new Date(now.getTime() + 60 * 60 * 1000)
+      // 61 mins from now (gives a 1-minute buffer so it reliably triggers before or exactly at the 1-hour mark)
+      const sixtyMinsFromNow = new Date(now.getTime() + 61 * 60 * 1000)
       
       // Find all scheduled bookings that are in CREATED status
       // where the scheduledAt is <= exactly 60 mins from now, but > now

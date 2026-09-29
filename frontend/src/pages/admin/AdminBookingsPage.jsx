@@ -550,7 +550,13 @@ function BookingDetailsModal({ booking, onClose }) {
             </div>
             <div>
               <p className="text-slate-500 text-xs">Duration</p>
-              <p className="font-semibold">{booking.durationDays} {booking.durationKind}</p>
+              <p className="font-semibold">
+                {booking.hours === 0.5
+                  ? '30 Minutes'
+                  : booking.hours
+                  ? `${booking.hours} ${booking.hours === 1 ? 'Hour' : 'Hours'}`
+                  : `${booking.durationDays || ''} ${booking.durationKind || ''}`.trim() || 'N/A'}
+              </p>
             </div>
             <div>
               <p className="text-slate-500 text-xs">Scheduled At</p>

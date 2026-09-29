@@ -16,6 +16,7 @@ export function SearchableSelect({
     function handleClickOutside(event) {
       if (containerRef.current && !containerRef.current.contains(event.target)) {
         setIsOpen(false);
+        setQuery('');
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -32,7 +33,10 @@ export function SearchableSelect({
     <div ref={containerRef} className={`relative ${className}`}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen(prev => !prev);
+          if (isOpen) setQuery('');
+        }}
         className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
       >
         <span className={selectedOption ? 'text-slate-900' : 'text-slate-500'}>
@@ -42,7 +46,10 @@ export function SearchableSelect({
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg flex flex-col">
+        <div
+          className="absolute z-50 mt-1 max-h-60 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg flex flex-col"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           <div className="bg-white px-2 py-2 border-b border-slate-100 shrink-0">
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
@@ -53,7 +60,6 @@ export function SearchableSelect({
                 placeholder="Search..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
               />
             </div>
           </div>

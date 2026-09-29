@@ -165,7 +165,9 @@ export function AppSubCategoryServicePage() {
                       <div className="shrink-0 text-right flex items-center gap-2 pr-1">
                         <div>
                           <p className="text-[10px] font-bold uppercase text-slate-400">Price</p>
-                          <p className="font-mono text-sm font-bold text-blue-600 mt-0.5">₹{service.hourlyPrice}/hr</p>
+                          <p className="font-mono text-sm font-bold text-blue-600 mt-0.5">
+                            {service.minHours === 0.5 ? `₹${Math.round(service.hourlyPrice / 2)}/30min` : `₹${service.hourlyPrice}/hr`}
+                          </p>
                         </div>
                         <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                       </div>

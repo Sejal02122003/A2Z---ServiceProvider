@@ -29,6 +29,7 @@ export function BroadcastPopup() {
     if (!socket || !isWorkerOrContractor) return
 
     const handleBroadcast = (data) => {
+      console.log('--- BOOKING_RECEIVED EVENT ---', data);
       const timeout = Math.floor((data.timeoutMs || 30000) / 1000)
       setIncoming(data)
       setTimeLeft(timeout)

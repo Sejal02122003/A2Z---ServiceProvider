@@ -114,7 +114,26 @@ export function ActiveJob() {
 
     const handleStatusUpdate = (data) => {
       if (data.bookingId === bookingId) {
-        setBooking((prev) => prev ? { ...prev, status: data.status, paymentStatus: data.paymentStatus || prev.paymentStatus } : prev)
+        setBooking((prev) => {
+          if (!prev) return prev
+          const newBooking = { ...prev, status: data.status, paymentStatus: data.paymentStatus || prev.paymentStatus }
+          if (data.status === 'STARTED' && !newBooking.startedAt) {
+            newBooking.startedAt = new Date().toISOString()
+          }
+          if (newBooking.assignments && newBooking.assignments.length > 0 && user) {
+            const myIdx = newBooking.assignments.findIndex(a => {
+              const aId = typeof a.labourId === 'object' ? a.labourId._id : a.labourId
+              return String(aId) === String(user._id)
+            })
+            if (myIdx !== -1) {
+              newBooking.assignments[myIdx].status = data.status
+              if (data.status === 'STARTED' && !newBooking.assignments[myIdx].startedAt) {
+                newBooking.assignments[myIdx].startedAt = new Date().toISOString()
+              }
+            }
+          }
+          return newBooking
+        })
         if (data.paymentStatus === 'PAID') {
           setShowPaymentWaiting(true)
         }
@@ -153,6 +172,9 @@ export function ActiveJob() {
       setBooking((prev) => {
         if (!prev) return prev
         const newBooking = { ...prev, status: nextStatus }
+        if (nextStatus === 'STARTED' && !newBooking.startedAt) {
+          newBooking.startedAt = res.data?.booking?.startedAt || new Date().toISOString()
+        }
         if (newBooking.assignments && newBooking.assignments.length > 0 && user) {
           const myIdx = newBooking.assignments.findIndex(a => {
             const aId = typeof a.labourId === 'object' ? a.labourId._id : a.labourId
@@ -160,6 +182,9 @@ export function ActiveJob() {
           })
           if (myIdx !== -1) {
             newBooking.assignments[myIdx].status = nextStatus
+            if (nextStatus === 'STARTED' && !newBooking.assignments[myIdx].startedAt) {
+              newBooking.assignments[myIdx].startedAt = res.data?.booking?.assignments?.[myIdx]?.startedAt || new Date().toISOString()
+            }
           }
         }
         return newBooking
