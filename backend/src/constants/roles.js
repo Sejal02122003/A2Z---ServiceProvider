@@ -11,7 +11,6 @@ export const ROLE_LIST = Object.values(USER_ROLES)
 /** Roles that use mobile-first app experience (not web-admin focused) */
 export const APP_ROLES = [
   USER_ROLES.CUSTOMER,
-  USER_ROLES.CONTRACTOR,
   USER_ROLES.LABOUR,
 ]
 

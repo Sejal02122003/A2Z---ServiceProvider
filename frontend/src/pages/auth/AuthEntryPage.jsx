@@ -27,17 +27,12 @@ const ROLE_OPTIONS = [
   {
     role: USER_ROLES.CUSTOMER,
     icon: Home,
-    desc: 'Hire verified labour for your home or renovation',
-  },
-  {
-    role: USER_ROLES.CONTRACTOR,
-    icon: Building2,
-    desc: 'Bulk workforce for sites and projects',
+    desc: 'Hire verified experts for salon, home appliances & repairs',
   },
   {
     role: USER_ROLES.LABOUR,
     icon: HardHat,
-    desc: 'Get matched to jobs near you',
+    desc: 'Get matched to service requests and earn money',
   },
 ]
 

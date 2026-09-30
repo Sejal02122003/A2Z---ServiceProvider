@@ -20,7 +20,7 @@ import { USER_ROLES } from '../constants/userRoles.js'
 /** @type {Record<string, { headerTagline: string, bottomNav: object[], drawerNav: object[] }>} */
 const byRole = {
   [USER_ROLES.CUSTOMER]: {
-    headerTagline: 'Hire labour for your home or small site',
+    headerTagline: 'Book Salon, Home Appliances & Repair Services',
     bottomNav: [
       { id: 'home', to: '/app', label: 'Home', icon: Home, end: true },
       { id: 'book', to: '/app/my-bookings', label: 'Bookings', icon: CalendarClock },
@@ -29,31 +29,9 @@ const byRole = {
     ],
     drawerNav: [
       { id: 'home', to: '/app', label: 'Home', icon: Home, end: true },
-      { id: 'search', to: '/app/search', label: 'Search skills', icon: Search },
+      { id: 'search', to: '/app/search', label: 'Search services', icon: Search },
       { id: 'billing', to: '/app/billing', label: 'Invoice & Billing', icon: FileText },
       { id: 'book', to: '/app/my-bookings', label: 'My bookings', icon: ClipboardList },
-      { id: 'support', to: '/app/support', label: 'Support & issues', icon: LifeBuoy },
-      { id: 'privacy', to: '/app/privacy-policy', label: 'Privacy Policy', icon: FileText },
-      { id: 'terms', to: '/app/terms-conditions', label: 'Terms & Conditions', icon: FileText },
-      { id: 'faqs', to: '/app/faqs', label: 'FAQs', icon: FileText },
-      { id: 'cancellation', to: '/app/cancellation-policy', label: 'Cancellation Policy', icon: FileText },
-      { id: 'refund', to: '/app/refund-policy', label: 'Refund Policy', icon: FileText },
-      { id: 'profile', to: '/app/profile', label: 'Profile & settings', icon: UserRound },
-    ],
-  },
-  [USER_ROLES.CONTRACTOR]: {
-    headerTagline: 'Hire bulk labour for your projects',
-    bottomNav: [
-      { id: 'home', to: '/app', label: 'Home', icon: Home, end: true },
-      { id: 'book', to: '/app/my-bookings', label: 'Bookings', icon: CalendarClock },
-      { id: 'search', to: '/app/search', label: 'Search', icon: Search },
-      { id: 'profile', to: '/app/profile', label: 'Profile', icon: UserRound },
-    ],
-    drawerNav: [
-      { id: 'home', to: '/app', label: 'Home', icon: Home, end: true },
-      { id: 'search', to: '/app/search', label: 'Search skills', icon: Search },
-      { id: 'book', to: '/app/my-bookings', label: 'Bookings & requests', icon: ClipboardList },
-      { id: 'billing', to: '/app/billing', label: 'Invoice & Billing', icon: FileText },
       { id: 'support', to: '/app/support', label: 'Support & issues', icon: LifeBuoy },
       { id: 'privacy', to: '/app/privacy-policy', label: 'Privacy Policy', icon: FileText },
       { id: 'terms', to: '/app/terms-conditions', label: 'Terms & Conditions', icon: FileText },
