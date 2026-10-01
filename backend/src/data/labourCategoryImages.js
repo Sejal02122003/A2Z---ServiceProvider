@@ -1,104 +1,27 @@
-
 const u = (id) =>
   `https://images.unsplash.com/photo-${id}?w=600&h=450&fit=crop&q=80&auto=format`
 
 export const LABOUR_CATEGORY_IMAGES = {
-  // Profile — construction workforce
-  skilledLabor: u('1504307651254-35680f356dfd'),
-  semiSkilledLabor: u('1581094794329-c8112a89af12'),
-  unskilledLabor: u('1595846519845-68bb3376c517'),
+  // Salon
+  salonCategory: u('1560066984-138dadb4c035'),
+  salonWomen: u('1560066984-138dadb4c035'),
+  salonMen: u('1503951914875-452162b0f3f1'),
+  facialSpa: u('1570172619644-dfd03ed5d881'),
+  hairStyling: u('1522337360788-8b13dee7a37e'),
+  manicurePedicure: u('1604654894610-df63bc536371'),
+  makeupBridal: u('1487412720507-e7ab37603c6f'),
+  kidsHaircut: u('1596464716127-f2a829822301'),
+  salonProducts: u('1527799820374-dcf8d9d4a388'),
 
-  // Profile — government & legal
-  organizedSector: u('1586528111869-77e4a7d0d5c5'),
-  unorganizedSector: u('1541888946425-d81bb19240f5'),
-  contractLabor: u('1454165804606-c3d57bc86b40'),
-  migrantWorker: u('1521791136064-7986c2920216'),
-
-  // Profile — HR & contractor
-  blueCollar: u('1504917595217-0f660d5950e7'),
-  whiteCollar: u('1497366216548-37526070297c'),
-  greyCollar: u('1621905251189-08b45d6a269e'),
-
-  // Trades — construction & technical
-  plumber: u('1558618666-fcd25c85f268'),
-  electrician: u('1621905251189-08b45d6a269e'),
-  carpenter: u('1503387762-592deb58ef4e'),
-  mason: u('1541888946425-d81bb19240f5'),
-  tileInstaller: u('1581578731548-7f23fd20fb2a'),
-  painter: u('1562259949-e8e7689d3270'),
-  welder: u('1504917595217-0f660d5950e7'),
-  fabricator: u('1504917595217-0f660d5950e7'),
-  barBender: u('1504307651254-35680f356dfd'),
-  shutteringCarpenter: u('1541974231534-cbb7c38d5c53'),
-  popWorker: u('1600585154340-be6161a56a0c'),
-  waterproofing: u('1541888946425-d81bb19240f5'),
-  hvacTechnician: u('1581094794329-c8112a89af12'),
-  elevatorTechnician: u('1486406146926-c627a92fd1b3'),
-  solarTechnician: u('1509391366360-2e959784a276'),
-
-  // Heavy work & site
-  generalHelper: u('1595846519845-68bb3376c517'),
-  constructionHelper: u('1504307651254-35680f356dfd'),
-  loader: u('1586528111869-77e4a7d0d5c5'),
-  scaffolding: u('1541974231534-cbb7c38d5c53'),
-  demolition: u('1503387762-592deb58ef4e'),
-  roadConstruction: u('1513828583688-c52646d9d3ba'),
-  asphalt: u('1558618666-fcd25c85f268'),
-  concreteMixer: u('1581094794329-c8112a89af12'),
-  drillOperator: u('1621905252507-b35492cc74b4'),
-
-  // Machine operators
-  jcbOperator: u('1581091225360-592a4b0a6a0c'),
-  craneOperator: u('1541888946425-d81bb19240f5'),
-  forkliftOperator: u('1586528111869-77e4a7d0d5c5'),
-  excavatorOperator: u('1581094794329-c8112a89af12'),
-  bulldozerOperator: u('1513828583688-c52646d9d3ba'),
-  dumperDriver: u('1601581875070-1f899aa1cb2f'),
-  tractorOperator: u('1625246333198-78c963c3609e'),
-
-  // Home services
-  acTechnician: u('1581094794329-c8112a89af12'),
-  refrigeratorTechnician: u('1581578731548-7f23fd20fb2a'),
-  washingMachineTechnician: u('1558618666-fcd25c85f268'),
-  roTechnician: u('1625246333198-78c963c3609e'),
-  cctvInstaller: u('1621905251189-08b45d6a269e'),
-  applianceRepair: u('1581094794329-c8112a89af12'),
-  pestControl: u('1595846519845-68bb3376c517'),
-
-  // Automobile
-  mechanic2w: u('1486262715619-67b85e0b08d3'),
-  mechanic4w: u('1486262715619-67b85e0b08d3'),
-  dieselMechanic: u('1486262715619-67b85e0b08d3'),
-  autoElectrician: u('1621905251189-08b45d6a269e'),
-  tyreRepair: u('1486262715619-67b85e0b08d3'),
-  carWasher: u('1486262715619-67b85e0b08d3'),
-
-  // Cleaning & maintenance
-  housekeeping: u('1581578731548-7f23fd20fb2a'),
-  officeCleaner: u('1497366216548-37526070297c'),
-  industrialCleaner: u('1581094794329-c8112a89af12'),
-  garbageCollector: u('1595846519845-68bb3376c517'),
-  drainCleaner: u('1558618666-fcd25c85f268'),
-  sweeper: u('1595846519845-68bb3376c517'),
-
-  // Hospitality
-  cook: u('1556910103-1c02745aae4d'),
-  helperCook: u('1556910103-1c02745aae4d'),
-  waiter: u('1414235077428-338989a2e8c0'),
-  dishwasher: u('1556910103-1c02745aae4d'),
-  deliveryBoy: u('1601581875070-1f899aa1cb2f'),
-
-  // Specialized finishing
-  interiorHelper: u('1618221195710-e72f35f65e7f'),
-  glassInstaller: u('1600585154340-be6161a56a0c'),
-  aluminiumWorker: u('1504917595217-0f660d5950e7'),
-  falseCeiling: u('1600607687939-ce8a6c25118c'),
-  modularKitchen: u('1618221195710-e72f35f65e7f'),
-
-  // Outdoor & misc
-  gardener: u('1416879595882-3373a0480b5b'),
-  securityGuard: u('1557804506-669a77945c8c'),
-  driverLight: u('1449965408869-eaa3f725e40e'),
-  driverHeavy: u('1601581875070-1f899aa1cb2f'),
-  moverPacker: u('1601581875070-1f899aa1cb2f'),
+  // Home Appliances
+  homeAppliancesCategory: u('1581092160607-ee22621dd758'),
+  acTechnician: u('1621905251189-08b45d6a269e'),
+  refrigeratorTechnician: u('1584269600464-37b1b58a9fe7'),
+  washingMachineTechnician: u('1626806787461-102c1bfaaea1'),
+  roTechnician: u('1585832770485-e68a5dbfad52'),
+  microwaveTechnician: u('1585659722983-3a675dabf23d'),
+  geyserTechnician: u('1584622650111-993a426fbf0a'),
+  tvTechnician: u('1593359677879-a4bb92f829d1'),
+  chimneyTechnician: u('1556911220-e15b29be8c8f'),
+  applianceProducts: u('1581092160607-ee22621dd758'),
 }

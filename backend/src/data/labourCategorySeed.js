@@ -2,310 +2,147 @@ import { LABOUR_CATEGORY_IMAGES as IMG } from './labourCategoryImages.js'
 
 export const LABOUR_CATEGORY_SEED_V2 = [
   {
-    category: "Construction",
-    subtitle: "Building, masonry, and finishing experts",
+    category: "Salon",
+    subtitle: "Beauty, grooming & spa at your doorstep",
+    imageUrl: IMG.salonCategory,
     subcategories: [
       {
-        name: "Civil & Structural Work",
-        description: "Experts in structural construction, masonry, carpentry, and reinforcement work.",
-        image: IMG.mason,
+        name: "Women's Salon & Spa",
+        description: "Professional hair, skincare, waxing, and beauty therapies for women.",
+        image: IMG.salonWomen,
         services: [
-          { name: "Mason (Raj Mistri)", basePrice: 800, description: "Professional masonry, bricklaying, and plastering work." },
-          { name: "Carpenter", basePrice: 700, description: "Expert woodwork, furniture assembly, and repair." },
-          { name: "Shuttering Carpenter", basePrice: 750, description: "Formwork and shuttering for concrete pouring." },
-          { name: "Bar Bender (Steel Fixer)", basePrice: 700, description: "Steel reinforcement cutting, bending, and fixing." },
-          { name: "Tile Installer", basePrice: 800, description: "Floor and wall tiling with precision and finishing." },
-          { name: "POP Worker", basePrice: 600, description: "Plaster of Paris work, false ceilings, and cornices." },
-          { name: "Waterproofing Worker", basePrice: 750, description: "Surface treatments to prevent water leakage and damage." }
-        ]
-      },
-
-      {
-        name: "Plumbing & Electrical",
-        description: "Professionals for plumbing, electrical, HVAC, and utility installations.",
-        image: IMG.electrician,
-        services: [
-          { name: "Plumber", basePrice: 600, description: "Pipe installation, leak repair, and bathroom fittings." },
-          { name: "Electrician", basePrice: 650, description: "Wiring, switchboard installation, and fault repair." },
-          { name: "HVAC Technician", basePrice: 800, description: "Heating, ventilation, and AC ducting installation." },
-          { name: "Elevator Technician", basePrice: 1200, description: "Lift installation, maintenance, and troubleshooting." },
-          { name: "Solar Panel Technician", basePrice: 900, description: "Solar panel mounting and electrical integration." }
+          { name: "Haircut & Blowdry", basePrice: 499, description: "Precision haircut, hair wash, and blowdry styling." },
+          { name: "Facial & Cleanup", basePrice: 799, description: "Deep pore cleansing, fruit/gold facial, and skin glow therapy." },
+          { name: "Waxing & Threading", basePrice: 399, description: "Smooth body waxing and eyebrow/upper lip threading." },
+          { name: "Manicure & Pedicure", basePrice: 699, description: "Complete nail grooming, scrub, polish, and foot massage." },
+          { name: "Hair Spa & Nourishing Treatment", basePrice: 899, description: "Intense hair spa, scalp massage, and deep conditioning." },
+          { name: "Bridal & Party Makeup", basePrice: 2499, description: "HD party and bridal makeup with saree/attire draping." },
+          { name: "Hair Coloring & Highlights", basePrice: 1199, description: "Global hair color, grey coverage, and streak highlights." }
         ]
       },
       {
-        name: "Metal & Fabrication",
-        description: "Skilled workers for welding, fabrication, and metal structure work.",
-        image: IMG.welder,
+        name: "Men's Salon & Grooming",
+        description: "Expert haircut, beard grooming, facials, and massages for men.",
+        image: IMG.salonMen,
         services: [
-          { name: "Welder", basePrice: 700, description: "Arc, MIG, and TIG welding for metal structures." },
-          { name: "Fabricator", basePrice: 800, description: "Metal cutting, shaping, and assembly work." }
+          { name: "Men's Haircut & Styling", basePrice: 249, description: "Trend haircut, styling, and scalp wash." },
+          { name: "Beard Trimming & Shaping", basePrice: 149, description: "Precision beard shaping, line-up, and razor styling." },
+          { name: "Men's Charcoal Facial", basePrice: 599, description: "Deep cleansing facial to remove dirt, oil, and dead skin." },
+          { name: "Head Massage & Hair Spa", basePrice: 349, description: "Relaxing oil head massage and hair conditioning." },
+          { name: "Hair Color & Grey Coverage", basePrice: 399, description: "Natural ammonia-free grey hair coloring." },
+          { name: "De-tan Pack & Face Scrub", basePrice: 299, description: "Instant sun damage repair and face skin brightening." }
         ]
       },
       {
-        name: "Finishing Work",
-        description: "Specialists in painting and surface finishing.",
-        image: IMG.painter,
+        name: "Kids Haircut & Styling",
+        description: "Gentle and patient haircut & styling for children.",
+        image: IMG.kidsHaircut,
         services: [
-          { name: "Painter", basePrice: 500, description: "Interior and exterior wall painting and texturing." }
+          { name: "Kids Haircut & Styling", basePrice: 199, description: "Safe and comfortable haircut for young kids." }
+        ]
+      },
+      {
+        name: "Salon & Beauty Products",
+        description: "Premium hair care, skin care, and grooming kits.",
+        image: IMG.salonProducts,
+        services: [
+          { name: "Hair Care & Styling Kit", basePrice: 599, description: "Herbal shampoo, conditioner, and nourishing hair serum." },
+          { name: "Glow Skin Care Combo", basePrice: 799, description: "Face wash, scrubbing gel, toner, and hydrating cream." },
+          { name: "Beard Care & Oil Combo", basePrice: 449, description: "Organic beard growth oil, balm, and wooden styling comb." }
         ]
       }
     ]
   },
   {
-    category: "Site Labour",
-    subtitle: "Reliable helpers and site operations support",
+    category: "Home Appliances",
+    subtitle: "Installation, repair, and maintenance for household appliances",
+    imageUrl: IMG.homeAppliancesCategory,
     subcategories: [
       {
-        name: "General Labour",
-        description: "Reliable helpers for daily construction and manual tasks.",
-        image: IMG.generalHelper,
-        services: [
-          { name: "General Labor / Helper", basePrice: 400, description: "Assistance with general site tasks and manual work." },
-          { name: "Construction Helper", basePrice: 450, description: "Support for masons and specialized construction workers." },
-          { name: "Loader / Unloader", basePrice: 500, description: "Loading and unloading of construction materials." }
-        ]
-      },
-      {
-        name: "Site Operations",
-        description: "Workers supporting construction site operations and groundwork.",
-        image: IMG.scaffolding,
-        services: [
-          { name: "Scaffolding Worker", basePrice: 600, description: "Erecting and dismantling scaffolding structures safely." },
-          { name: "Demolition Worker", basePrice: 550, description: "Safe breaking and removal of old structures." },
-          { name: "Road Construction Worker", basePrice: 500, description: "Asphalt laying and road surface preparation." },
-          { name: "Asphalt Worker", basePrice: 550, description: "Specialized in applying and leveling asphalt." }
-        ]
-      },
-      {
-        name: "Equipment Support",
-        description: "Operators assisting with construction tools and machinery.",
-        image: IMG.concreteMixer,
-        services: [
-          { name: "Concrete Mixer Operator", basePrice: 600, description: "Operating and maintaining concrete mixing machines." },
-          { name: "Drill Machine Operator", basePrice: 600, description: "Heavy-duty drilling and surface breaking." }
-        ]
-      }
-    ]
-  },
-  {
-    category: "Machine Operators",
-    subtitle: "Certified operators for heavy equipment",
-    subcategories: [
-      {
-        name: "Earth Moving Equipment",
-        description: "Operators for excavation and earthmoving machinery.",
-        image: IMG.excavatorOperator,
-        services: [
-          { name: "JCB Operator", basePrice: 1000, description: "Experienced operator for JCB backhoe loaders." },
-          { name: "Excavator Operator", basePrice: 1200, description: "Operating heavy excavators for digging and trenching." },
-          { name: "Bulldozer Operator", basePrice: 1200, description: "Operating bulldozers for site clearing and grading." }
-        ]
-      },
-      {
-        name: "Lifting Equipment",
-        description: "Certified operators for cranes and material lifting equipment.",
-        image: IMG.craneOperator,
-        services: [
-          { name: "Crane Operator", basePrice: 1500, description: "Operating mobile and tower cranes for heavy lifting." },
-          { name: "Forklift Operator", basePrice: 800, description: "Operating forklifts for material handling." }
-        ]
-      },
-      {
-        name: "Transport Equipment",
-        description: "Operators for construction transport and heavy vehicles.",
-        image: IMG.dumperDriver,
-        services: [
-          { name: "Dumper Driver", basePrice: 900, description: "Driving dumper trucks for transporting loose materials." },
-          { name: "Tractor Operator", basePrice: 700, description: "Operating tractors for agricultural or site haulage." }
-        ]
-      }
-    ]
-  },
-  {
-    category: "Home Services",
-    subtitle: "Appliance repair, cooling, and security",
-    subcategories: [
-      {
-        name: "HVAC & Cooling",
-        description: "Installation and repair of air conditioning and cooling systems.",
+        name: "AC Services & Repair",
+        description: "Air conditioner servicing, gas charging, and installation.",
         image: IMG.acTechnician,
         services: [
-          { name: "AC Technician", basePrice: 500, description: "Air conditioner servicing, repair, and gas refilling." },
-          { name: "Refrigerator Technician", basePrice: 450, description: "Fridge repair and compressor troubleshooting." }
+          { name: "AC Jet Pump Deep Cleaning", basePrice: 499, description: "Foam jet wash for indoor cooling coils and outdoor unit." },
+          { name: "AC Installation / Uninstallation", basePrice: 799, description: "Wall bracket mounting, pipe connection, and full testing." },
+          { name: "AC Gas Leak Repair & Refill", basePrice: 1299, description: "Leak detection, nitrogen testing, and pure gas charging." },
+          { name: "AC PCB & Circuit Repair", basePrice: 899, description: "Electronic motherboard diagnosis and part replacement." }
         ]
       },
       {
-        name: "Home Appliances",
-        description: "Repair and maintenance of household appliances.",
+        name: "Refrigerator Services",
+        description: "Cooling diagnostics, compressor, and gas refill for all fridge models.",
+        image: IMG.refrigeratorTechnician,
+        services: [
+          { name: "Refrigerator Inspection & Servicing", basePrice: 299, description: "Complete cooling check, condenser cleaning, and temperature tuning." },
+          { name: "Refrigerator Gas Charging & Repair", basePrice: 1199, description: "Compressor servicing, gas top-up, and seal check." },
+          { name: "Refrigerator Thermostat & Sensor Repair", basePrice: 499, description: "Defrost timer, temperature sensor, and relay replacement." }
+        ]
+      },
+      {
+        name: "Washing Machine Services",
+        description: "Front load, top load, and semi-automatic washing machine repair.",
         image: IMG.washingMachineTechnician,
         services: [
-          { name: "Washing Machine Technician", basePrice: 400, description: "Repair and servicing for washing machines." },
-          { name: "RO Technician", basePrice: 350, description: "Water purifier filter replacement and repair." },
-          { name: "Home Appliance Repair Technician", basePrice: 400, description: "General repair for microwaves, geysers, and other appliances." }
+          { name: "Washing Machine Servicing & Descaling", basePrice: 299, description: "Drum scale removal, lint filter cleaning, and cycle diagnostics." },
+          { name: "Washing Machine Drum & Motor Repair", basePrice: 799, description: "Motor capacitor, spin belt, and suspension repair." },
+          { name: "Washing Machine Water Inlet & Drain Repair", basePrice: 449, description: "Inlet valve replacement, drain pipe cleaning, and pump repair." }
         ]
       },
       {
-        name: "Security & Automation",
-        description: "Installation of CCTV and home security systems.",
-        image: IMG.cctvInstaller,
+        name: "Water Purifier (RO) Services",
+        description: "RO water purifier filter replacement, installation, and pump repair.",
+        image: IMG.roTechnician,
         services: [
-          { name: "CCTV Installer", basePrice: 600, description: "Security camera installation and DVR setup." }
+          { name: "RO Filter Replacement & Servicing", basePrice: 399, description: "Sediment filter, carbon block, and RO membrane replacement." },
+          { name: "RO Complete Installation / Shift", basePrice: 499, description: "Mounting, water line connection, and TDS level adjustment." },
+          { name: "RO Booster Pump & SMPS Repair", basePrice: 599, description: "Booster pump motor and power adapter replacement." }
         ]
       },
       {
-        name: "Pest Control",
-        description: "Safe and effective pest management services.",
-        image: IMG.pestControl,
+        name: "Microwave & Oven Services",
+        description: "Heating issues, keypad errors, and electrical fixes for microwaves.",
+        image: IMG.microwaveTechnician,
         services: [
-          { name: "Pest Control Worker", basePrice: 700, description: "Treatment for termites, cockroaches, and rodents." }
-        ]
-      }
-    ]
-  },
-  {
-    category: "Automobile Services",
-    subtitle: "Vehicle repair and maintenance professionals",
-    subcategories: [
-      {
-        name: "Vehicle Repair",
-        description: "Professional repair services for two-wheelers and four-wheelers.",
-        image: IMG.mechanic4w,
-        services: [
-          { name: "Mechanic (2-Wheeler)", basePrice: 300, description: "Bike and scooter servicing and engine repair." },
-          { name: "Mechanic (4-Wheeler)", basePrice: 500, description: "Car servicing, diagnostics, and mechanical repairs." },
-          { name: "Diesel Mechanic", basePrice: 600, description: "Specialized repair for diesel engines and heavy vehicles." },
-          { name: "Auto Electrician", basePrice: 450, description: "Vehicle wiring, battery, and electrical troubleshooting." }
+          { name: "Microwave Servicing & Heating Repair", basePrice: 399, description: "Magnetron testing, high voltage diode, and fuse check." },
+          { name: "Microwave Touchpad & Door Switch Repair", basePrice: 449, description: "Keypad membrane replacement and safety door interlock repair." }
         ]
       },
       {
-        name: "Vehicle Maintenance",
-        description: "Tyre repair, cleaning, and routine vehicle maintenance.",
-        image: IMG.carWasher,
+        name: "Geyser & Water Heater Services",
+        description: "Fast heating element, thermostat, and leakage fixes.",
+        image: IMG.geyserTechnician,
         services: [
-          { name: "Tyre Repair Worker", basePrice: 150, description: "Puncture repair, wheel balancing, and tyre changes." },
-          { name: "Car Washer", basePrice: 250, description: "Exterior washing and interior detailing for cars." }
-        ]
-      }
-    ]
-  },
-  {
-    category: "Cleaning Services",
-    subtitle: "Residential, commercial, and public cleaning",
-    subcategories: [
-      {
-        name: "Residential Cleaning",
-        description: "Cleaning services for homes and residential spaces.",
-        image: IMG.housekeeping,
-        services: [
-          { name: "Housekeeping Staff", basePrice: 300, description: "Daily sweeping, mopping, and home tidying." }
+          { name: "Geyser Installation & Uninstallation", basePrice: 399, description: "Safe wall mounting and inlet/outlet plumbing hookup." },
+          { name: "Geyser Heating Coil & Thermostat Repair", basePrice: 499, description: "Heating element descaling and thermostat replacement." }
         ]
       },
       {
-        name: "Commercial Cleaning",
-        description: "Cleaning solutions for offices, shops, and industries.",
-        image: IMG.officeCleaner,
+        name: "TV & LED Repair",
+        description: "Smart TV wall mounting, display panel, and sound repairs.",
+        image: IMG.tvTechnician,
         services: [
-          { name: "Office Cleaner", basePrice: 350, description: "Maintenance and cleaning of office premises." },
-          { name: "Industrial Cleaner", basePrice: 500, description: "Deep cleaning for factories and industrial spaces." }
+          { name: "TV Wall Mounting & Setup", basePrice: 349, description: "Standard / swivel bracket wall mount and cable management." },
+          { name: "LED TV Backlight & Mainboard Repair", basePrice: 899, description: "LED backlight strip replacement and motherboard diagnosis." }
         ]
       },
       {
-        name: "Public Cleaning",
-        description: "Public sanitation, waste collection, and area maintenance.",
-        image: IMG.garbageCollector,
+        name: "Kitchen Chimney & Hob Services",
+        description: "Deep degreasing, motor repair, and duct fitting.",
+        image: IMG.chimneyTechnician,
         services: [
-          { name: "Garbage Collector", basePrice: 200, description: "Waste collection and disposal services." },
-          { name: "Drain Cleaner", basePrice: 400, description: "Unclogging and cleaning of drainage systems." },
-          { name: "Sweeper", basePrice: 250, description: "Street and public area sweeping." }
-        ]
-      }
-    ]
-  },
-  {
-    category: "Hospitality",
-    subtitle: "Food services, restaurant staff, and delivery",
-    subcategories: [
-      {
-        name: "Food Services",
-        description: "Skilled professionals for cooking and kitchen assistance.",
-        image: IMG.cook,
-        services: [
-          { name: "Cook / Chef", basePrice: 600, description: "Preparation of meals for homes or events." },
-          { name: "Helper Cook", basePrice: 400, description: "Assisting chefs with chopping and prep work." }
+          { name: "Kitchen Chimney Deep Degreasing", basePrice: 599, description: "Heavy oil/grease removal, baffle filter cleaning, and blower wash." },
+          { name: "Chimney & Gas Hob Installation / Repair", basePrice: 699, description: "Exhaust duct installation, motor capacitor, and burner repair." }
         ]
       },
       {
-        name: "Restaurant Staff",
-        description: "Staff for serving customers and restaurant operations.",
-        image: IMG.waiter,
+        name: "Appliance Care Products & Spares",
+        description: "Essential care kits and universal spare accessories.",
+        image: IMG.applianceProducts,
         services: [
-          { name: "Waiter", basePrice: 350, description: "Serving food and beverages to guests." },
-          { name: "Dishwasher", basePrice: 300, description: "Washing dishes and maintaining kitchen hygiene." }
-        ]
-      },
-      {
-        name: "Delivery",
-        description: "Fast and reliable delivery service professionals.",
-        image: IMG.deliveryBoy,
-        services: [
-          { name: "Delivery Boy", basePrice: 400, description: "Door-to-door delivery of goods and food." }
-        ]
-      }
-    ]
-  },
-  {
-    category: "Interior & Finishing",
-    subtitle: "Interior installation and finishing works",
-    subcategories: [
-      {
-        name: "Interior Installation",
-        description: "Experts in interior fixtures, ceilings, glass, and modular installations.",
-        image: IMG.modularKitchen,
-        services: [
-          { name: "Interior Designer Helper", basePrice: 500, description: "Assisting with interior design executions." },
-          { name: "Glass Installer", basePrice: 600, description: "Cutting and fitting glass panels and windows." },
-          { name: "Aluminium Worker", basePrice: 650, description: "Fabricating and installing aluminium frames and partitions." },
-          { name: "False Ceiling Worker", basePrice: 700, description: "Installation of gypsum and POP false ceilings." },
-          { name: "Modular Kitchen Installer", basePrice: 800, description: "Assembly and fitting of modular kitchen cabinets." }
-        ]
-      }
-    ]
-  },
-  {
-    category: "Outdoor Services",
-    subtitle: "Gardening, security, and transportation",
-    subcategories: [
-      {
-        name: "Gardening",
-        description: "Garden maintenance and landscaping services.",
-        image: IMG.gardener,
-        services: [
-          { name: "Gardener / Mali", basePrice: 350, description: "Plant care, pruning, and lawn maintenance." }
-        ]
-      },
-      {
-        name: "Security",
-        description: "Professional security and guarding services.",
-        image: IMG.securityGuard,
-        services: [
-          { name: "Security Guard", basePrice: 400, description: "Premises guarding and visitor logging." }
-        ]
-      },
-      {
-        name: "Transportation",
-        description: "Experienced drivers for personal and commercial transport.",
-        image: IMG.driverHeavy,
-        services: [
-          { name: "Driver (Light Vehicle)", basePrice: 500, description: "Driving cars and light commercial vehicles." },
-          { name: "Driver (Heavy Vehicle)", basePrice: 800, description: "Operating trucks and heavy transport vehicles." }
-        ]
-      },
-      {
-        name: "Packing & Moving",
-        description: "Safe packing, loading, and relocation assistance.",
-        image: IMG.moverPacker,
-        services: [
-          { name: "Mover & Packer Worker", basePrice: 500, description: "Careful packing and loading of household items." }
+          { name: "Washing Machine Descaler Powder (3-Pack)", basePrice: 199, description: "Universal anti-scaling and odor removal formula." },
+          { name: "Universal RO Cartridge Replacement Set", basePrice: 699, description: "5-stage sediment and pre-carbon replacement filter pack." },
+          { name: "Universal AC Remote Controller", basePrice: 299, description: "Pre-programmed remote compatible with all major AC brands." }
         ]
       }
     ]

@@ -12,15 +12,15 @@ async function run() {
   if (!uri) throw new Error('MONGODB_URI required')
   await mongoose.connect(uri)
 
-  // Clear out old categories to only show the requested ones
+  // Clear out old category groups to only show the requested ones
   await LabourCategoryGroup.updateMany({}, { isActive: false })
   
-  // Actually delete the existing tree for a clean slate
+  // Clean slate for categories, subcategories, and services
   await LabourCategory.deleteMany({})
   await LabourSubcategory.deleteMany({})
   await LabourService.deleteMany({})
 
-  console.log('Seeding the new 3-level hierarchy...')
+  console.log('Seeding Salon & Home Appliances categories, subcategories, and services/products...')
 
   let catSort = 10
   for (const cat of LABOUR_CATEGORY_SEED_V2) {
@@ -28,6 +28,7 @@ async function run() {
       name: cat.category,
       subtitle: cat.subtitle || '',
       slug: slugify(cat.category),
+      imageUrl: cat.imageUrl || '',
       sortOrder: catSort,
       isActive: true,
     })
@@ -42,31 +43,33 @@ async function run() {
         isActive: true,
       })
       
-      // Update Category image with first subcategory image if missing
       if (!categoryDoc.imageUrl && sub.image) {
-        categoryDoc.imageUrl = sub.image;
-        await categoryDoc.save();
+        categoryDoc.imageUrl = sub.image
+        await categoryDoc.save()
       }
 
       for (const svc of sub.services) {
-        // If svc is a string (fallback), create an object; otherwise use the object directly
         const serviceData = typeof svc === 'string' 
           ? { name: svc, basePrice: 0, description: '' } 
-          : svc;
+          : svc
+
+        const price = serviceData.basePrice || 0
 
         await LabourService.create({
           subcategoryId: subcategoryDoc._id,
           name: serviceData.name,
           description: serviceData.description || '',
           isActive: true,
-          basePrice: serviceData.basePrice || 0,
-          estimatedDurationMins: 60
+          basePrice: price,
+          hourlyPrice: price,
+          estimatedDurationMins: 60,
+          isAllZones: true,
         })
       }
     }
   }
 
-  console.log('Successfully seeded exactly to the requested Category -> Sub-category -> Services tree!')
+  console.log('Successfully seeded Salon & Home Appliances categories, subcategories, and services!')
   await mongoose.disconnect()
 }
 

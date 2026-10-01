@@ -52,18 +52,24 @@ export function enrichDiscoverLabourUi(labour) {
 
 /** Synthetic demo row when API returns no workers (UI preview). */
 export function createDemoLabour(index) {
-  const names = ['Ramesh K.', 'Suresh P.', 'Vikram S.', 'Anil M.', 'Deepak R.', 'Mohit T.']
+  const names = ['Ramesh K.', 'Priya S.', 'Vikram S.', 'Ananya M.', 'Deepak R.', 'Pooja T.']
   const id = `demo-${index}`
   const displayName = names[index % names.length]
+  const isSalon = index % 2 === 0
   const base = {
     id,
     displayName,
     kycVerified: index % 3 !== 1,
     kycStatus: index % 3 === 1 ? 'pending' : 'verified',
-    tradeCategories: [
-      { _id: `d${index}-1`, name: 'Masonry helper', subtitle: 'Brick & block work', groupName: 'Civil' },
-      { _id: `d${index}-2`, name: 'Loading / unloading', subtitle: 'Site logistics', groupName: 'General' },
-    ],
+    tradeCategories: isSalon
+      ? [
+          { _id: `d${index}-1`, name: "Salon & Grooming Expert", subtitle: 'Hair, beauty & spa', groupName: 'Salon' },
+          { _id: `d${index}-2`, name: "Skin & Facial Specialist", subtitle: 'Skincare therapies', groupName: 'Salon' },
+        ]
+      : [
+          { _id: `d${index}-1`, name: 'AC & Appliance Technician', subtitle: 'Deep servicing & repair', groupName: 'Home Appliances' },
+          { _id: `d${index}-2`, name: 'Washing Machine & RO Expert', subtitle: 'Installation & parts fix', groupName: 'Home Appliances' },
+        ],
     memberSinceYear: 2021 + (index % 4),
   }
   return base
