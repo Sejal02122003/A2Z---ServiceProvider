@@ -66,7 +66,7 @@ export function buildAssignmentDetailSnapshot(entries, job, rawJob = null) {
     timeline.push({
       at: rawJob.acceptedAt,
       title: 'Assignment accepted',
-      body: 'You joined this project on KaamExpert (demo).',
+      body: 'You joined this service on A2Z.',
     })
   }
   timeline.push({

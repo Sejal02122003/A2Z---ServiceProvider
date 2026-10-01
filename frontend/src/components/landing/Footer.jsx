@@ -27,9 +27,9 @@ function IconInstagram(props) {
 }
 
 const social = [
-  { Icon: IconLinkedIn, href: 'https://www.linkedin.com/company/kaamexpert', label: 'LinkedIn' },
-  { Icon: IconX, href: 'https://twitter.com/kaamexpert', label: 'X (Twitter)' },
-  { Icon: IconInstagram, href: 'https://www.instagram.com/kaamexpert', label: 'Instagram' },
+  { Icon: IconLinkedIn, href: 'https://www.linkedin.com/company/a2zservices', label: 'LinkedIn' },
+  { Icon: IconX, href: 'https://twitter.com/a2zservices', label: 'X (Twitter)' },
+  { Icon: IconInstagram, href: 'https://www.instagram.com/a2zservices', label: 'Instagram' },
 ]
 
 export function Footer() {

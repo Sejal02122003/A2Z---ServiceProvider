@@ -869,7 +869,7 @@ export const testNotification = asyncHandler(async (req, res) => {
       token,
       notification: {
         title: title || 'Test Notification',
-        body: body || 'This is a test notification from KaamExpert backend.',
+        body: body || 'This is a test notification from A2Z backend.',
       },
     });
     return sendSuccess(res, { message: 'Notification sent successfully', data: { messageId: response } });

@@ -157,7 +157,7 @@ export const uploadBranding = asyncHandler(async (req, res) => {
   const uploadResult = await uploadBufferToCloudinary({
     buffer: req.file.buffer,
     mimetype: req.file.mimetype,
-    folder: `kaamexpert/branding/${type}`,
+    folder: `a2z/branding/${type}`,
     userId: req.user?._id,
     originalName: req.file.originalname,
   })

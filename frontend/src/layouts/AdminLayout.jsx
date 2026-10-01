@@ -102,7 +102,7 @@ export function AdminLayout() {
           className={`relative z-10 flex min-w-0 items-center gap-2.5 rounded-xl px-1.5 py-1.5 font-extrabold tracking-tight text-white transition hover:bg-white/10 hover:shadow-sm active:scale-95 ${collapsed ? 'md:justify-center' : ''}`}
           title="Dashboard"
         >
-          <img src="/logo-transparent.png" alt="KaamExpert" className="h-8 w-auto brightness-0 invert" />
+          <img src="/logo-transparent.png" alt="A2Z" className="h-8 w-auto brightness-0 invert" />
           <span className={`min-w-0 truncate ${collapsed ? 'md:sr-only' : ''}`}>
             <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
               Control panel

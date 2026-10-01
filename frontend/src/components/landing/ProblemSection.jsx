@@ -65,7 +65,7 @@ export function ProblemSection() {
                 <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-brand/15 blur-3xl" />
                 <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-brand px-3 py-1 text-xs font-semibold text-white shadow-sm">
                   <CheckCircle2 className="h-3.5 w-3.5 text-white" aria-hidden />
-                  With KaamExpert
+                  With A2Z
                 </div>
                 <ul className="relative space-y-3 text-sm text-slate-600">
                   {comparisonRows.map((row) => (

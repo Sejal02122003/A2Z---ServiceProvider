@@ -10,7 +10,7 @@ import { USER_ROLES } from '../../constants/userRoles.js'
 import { writeBootRole } from '../../lib/bootPersona.js'
 
 const links = [
-  { href: '#problem', label: 'Why KaamExpert' },
+  { href: '#problem', label: 'Why A2Z' },
   { href: '#how-it-works', label: 'How it works' },
   { href: '#services', label: 'Services' },
   { href: '#features', label: 'Trust' },

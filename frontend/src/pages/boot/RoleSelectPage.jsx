@@ -97,7 +97,7 @@ export function RoleSelectPage() {
             <span className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-[1.15rem] bg-white/15 ring-1 ring-white/25">
               <HardHat className="h-7 w-7" strokeWidth={2} aria-hidden />
             </span>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/80">KaamExpert</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/80">A2Z</p>
             <h1 className="mt-2 text-[1.75rem] font-black leading-tight tracking-tight sm:text-[2rem]">
               Continue as
             </h1>

@@ -88,7 +88,7 @@ export function LaborWallet() {
         amount: order.amount,
         currency: order.currency || 'INR',
         order_id: order.id,
-        name: 'KaamExpert',
+        name: 'A2Z',
         description: 'Clear wallet dues',
         handler: async function (response) {
           try {

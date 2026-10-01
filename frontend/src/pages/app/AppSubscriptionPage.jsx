@@ -147,7 +147,7 @@ export function AppSubscriptionPage() {
         key: keyId,
         amount: order.amount,
         currency: order.currency,
-        name: 'KaamExpert',
+        name: 'A2Z',
         description: planId ? `Marketplace Subscription Access (₹${price})` : `Daily Marketplace Access (₹${price})`,
         order_id: order.id,
         handler: async (response) => {
@@ -614,7 +614,7 @@ export function AppSubscriptionPage() {
               <p className="mt-1 text-xs text-blue-800 leading-relaxed">
                 If you pay the daily subscription but receive <strong>zero bookings</strong> during the{' '}
                 {formatHour(subscriptionStartHour)}–{formatHour(subscriptionEndHour)} window,
-                your ₹{dailySubscriptionPrice} will be automatically refunded to your KaamExpert wallet.
+                your ₹{dailySubscriptionPrice} will be automatically refunded to your A2Z wallet.
               </p>
               <p className="mt-1.5 text-xs text-blue-700">
                 Refund is processed at <strong>{formatHour(subscriptionEndHour)}</strong> daily.

@@ -28,7 +28,7 @@ export function HowItWorks() {
           titleId="how-heading"
           eyebrow="How it works"
           title="From first tap to boots on your site"
-          subtitle="Whether you are staffing a high-rise pour or picking up daily helper shifts near home, KaamExpert keeps the journey simple and documented."
+          subtitle="Whether you need emergency appliance repair or want to offer your professional salon services, A2Z keeps the journey simple and documented."
           align="center"
         />
 

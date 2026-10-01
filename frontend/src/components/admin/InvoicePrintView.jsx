@@ -21,7 +21,7 @@ export default function InvoicePrintView({ data }) {
           <p className="text-sm text-gray-500">Date: {date}</p>
         </div>
         <div className="text-right">
-          <h2 className="text-xl font-bold text-gray-800">Kaam Expert Platform</h2>
+          <h2 className="text-xl font-bold text-gray-800">A2Z Platform</h2>
           <p className="text-sm text-gray-600 mt-1">123 Tech Park, Phase 1</p>
           <p className="text-sm text-gray-600">Mumbai, Maharashtra 400001</p>
           <p className="text-sm text-gray-600">GSTIN: 27AABCT1234F1Z5</p>

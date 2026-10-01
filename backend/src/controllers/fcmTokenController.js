@@ -59,7 +59,7 @@ export const testNotification = asyncHandler(async (req, res) => {
   // This will send to all tokens registered for this user
   await sendNotificationToUser(userId, {
     title: 'Test Notification',
-    body: 'This is a test notification from KaamExpert backend.',
+    body: 'This is a test notification from A2Z backend.',
     data: {
       type: 'test',
       link: '/'

@@ -95,7 +95,7 @@ export function AppHomePage() {
             ) : kycStatus === KYC_STATUS.FAILED ? (
               "We were unable to verify your submitted documents. Please visit your profile to review the feedback and resubmit your details."
             ) : (
-              "To access the KaamExpert contractor dashboard and hire bulk labour, you must complete your business verification. Please navigate to your profile to upload the required documents."
+              "To access the A2Z contractor dashboard and services, you must complete your business verification. Please navigate to your profile to upload the required documents."
             )}
           </p>
           

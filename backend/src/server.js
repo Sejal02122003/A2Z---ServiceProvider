@@ -31,7 +31,7 @@ async function main() {
   })
 
   server.listen(port, () => {
-    console.log(`KaamExpert API listening on :${port}`)
+    console.log(`A2Z API listening on :${port}`)
   })
 }
 

@@ -79,9 +79,7 @@ export function Hero() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.55, delay: 0.12 }}
             >
-              KaamExpert connects homeowners, contractors, and enterprises with Aadhaar-verified
-              skilled & unskilled workers—transparent pricing, digital payments, and backup support
-              when your site cannot wait.
+              A2Z connects customers and businesses with verified salon & home appliance experts—transparent pricing, digital payments, and instant booking when you need it most.
             </motion.p>
           </div>
 

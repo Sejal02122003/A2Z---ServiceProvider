@@ -19,7 +19,7 @@ export function UserTypesSection() {
           titleId="users-heading"
           eyebrow="Who it’s for"
           title="One ecosystem—many stakeholders"
-          subtitle="KaamExpert aligns incentives: faster hiring for clients, fair visibility for workers, and cleaner records for everyone in between."
+          subtitle="A2Z aligns incentives: faster hiring for clients, fair visibility for workers, and cleaner records for everyone in between."
           align="center"
         />
 

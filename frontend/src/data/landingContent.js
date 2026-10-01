@@ -1,10 +1,10 @@
-/** Dummy marketing copy & structured content for KaamExpert landing */
+/** Dummy marketing copy & structured content for A2Z landing */
 
 export const SITE = {
-  name: 'KaamExpert',
-  tagline: 'India’s trusted on-demand construction workforce',
-  url: 'https://kaamexpert.com',
-  contactEmail: 'hello@kaamexpert.com',
+  name: 'A2Z',
+  tagline: 'India’s trusted on-demand salon & home appliance services',
+  url: 'https://a2zservices.com',
+  contactEmail: 'hello@a2zservices.com',
   phone: '+91 98765 43210',
 }
 
@@ -295,7 +295,7 @@ export const testimonials = [
     name: 'Ananya Sharma',
     role: 'Homeowner, Gurugram',
     quote:
-      'We needed masons and helpers for a 10-day renovation. Booking on KaamExpert took minutes and the crew showed up on time—something that rarely happened with our old contacts.',
+      'We needed appliance servicing and salon packages at home. Booking on A2Z took minutes and the experts showed up on time.',
     rating: 5,
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ananya',
   },

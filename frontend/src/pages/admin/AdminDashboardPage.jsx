@@ -80,7 +80,7 @@ export function AdminDashboardPage() {
       >
         <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 md:text-3xl">Control centre</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 md:text-base">
-          Super panel for KaamExpert — users, workforce, bookings, allocation, attendance, billing, and analytics per
+          Super panel for A2Z — users, workforce, bookings, allocation, attendance, billing, and analytics per
           your Work Scope. Use the sidebar to jump into each module.
         </p>
       </motion.div>

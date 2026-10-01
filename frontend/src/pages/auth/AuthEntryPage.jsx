@@ -291,7 +291,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
 
         <div className="mt-4 flex flex-col items-center relative z-10">
           <div className="flex justify-center mb-0">
-             <img src={logoUrl} alt="KaamExpert" className="h-32 sm:h-36 w-auto drop-shadow-sm object-contain" />
+             <img src={logoUrl} alt="A2Z" className="h-32 sm:h-36 w-auto drop-shadow-sm object-contain" />
           </div>
         </div>
       </div>
@@ -301,7 +301,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
           {step === 'otp' ? 'Verify OTP' : mode === 'login' ? 'Welcome back !' : 'Welcome !'}
         </h1>
         <p className="mt-1.5 text-sm font-medium text-slate-500">
-          {step === 'otp' ? 'Secure verification' : mode === 'login' ? 'Sign in to continue' : 'Join KaamExpert today'}
+          {step === 'otp' ? 'Secure verification' : mode === 'login' ? 'Sign in to continue' : 'Join A2Z today'}
         </p>
       </div>
 

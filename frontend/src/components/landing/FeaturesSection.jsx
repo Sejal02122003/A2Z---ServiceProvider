@@ -18,7 +18,7 @@ export function FeaturesSection() {
       <Container className="relative">
         <SectionHeading
           titleId="features-heading"
-          eyebrow="Why KaamExpert"
+          eyebrow="Why A2Z"
           title="Trust, speed, and clarity—by design"
           subtitle="We built verification, tracking, and payments into the core flow so contractors can focus on execution—not chasing people."
           align="center"

@@ -603,7 +603,7 @@ export function IndividualBookingFlowPage() {
         amount: order.amount,
         currency: order.currency || 'INR',
         order_id: order.id,
-        name: 'KaamExpert',
+        name: 'A2Z',
         description: `Payment for Booking`,
         prefill: {
           name: realUser?.fullName || '',

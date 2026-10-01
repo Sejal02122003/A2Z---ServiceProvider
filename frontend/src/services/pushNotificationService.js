@@ -132,7 +132,7 @@ export function setupForegroundNotificationHandler(handler) {
     
     if ('Notification' in window && Notification.permission === 'granted') {
       try {
-        new Notification(payload?.notification?.title || 'KaamExpert Notification', {
+        new Notification(payload?.notification?.title || 'A2Z Notification', {
           body: payload?.notification?.body || '',
           icon: payload?.notification?.icon || '/favicon.ico',
           data: payload?.data
