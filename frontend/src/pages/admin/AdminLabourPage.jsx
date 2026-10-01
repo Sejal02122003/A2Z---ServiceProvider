@@ -8,6 +8,7 @@ import {
   IdCard,
   Layers,
   Loader2,
+  Package,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -20,10 +21,18 @@ import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { KYC_STATUS, USER_ROLES } from '../../constants/userRoles.js'
 import { formatLastLoginDisplay } from '../../lib/formatAdminLastLogin.js'
+import { KitStatusBadge } from '../../components/admin/welcomeKit/KitStatusBadge.jsx'
+import { WelcomeKitModal } from '../../components/admin/welcomeKit/WelcomeKitModal.jsx'
 
 function readInitialKyc(sp) {
   const k = sp.get('kyc')?.toLowerCase()
   if (k === KYC_STATUS.PENDING || k === KYC_STATUS.VERIFIED || k === KYC_STATUS.FAILED) return k
+  return 'all'
+}
+
+function readInitialKit(sp) {
+  const k = sp.get('kit')?.toLowerCase()
+  if (k === 'complete' || k === 'partial' || k === 'not_issued') return k
   return 'all'
 }
 
@@ -94,6 +103,7 @@ export function AdminLabourPage() {
   const [searchInput, setSearchInput] = useState(() => searchParams.get('search')?.trim() || '')
   const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('search')?.trim() || '')
   const [kycFilter, setKycFilter] = useState(() => readInitialKyc(searchParams))
+  const [kitFilter, setKitFilter] = useState(() => readInitialKit(searchParams))
   const [status, setStatus] = useState(() => readInitialStatus(searchParams))
   const [locationFilter, setLocationFilter] = useState(() => searchParams.get('location') || '')
   const [debouncedLocation, setDebouncedLocation] = useState(() => searchParams.get('location') || '')
@@ -108,6 +118,7 @@ export function AdminLabourPage() {
   const [error, setError] = useState('')
   const [kycStats, setKycStats] = useState(null)
   const [reviewUserId, setReviewUserId] = useState(null)
+  const [kitModalUser, setKitModalUser] = useState(null)
   const [detailUser, setDetailUser] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
@@ -126,18 +137,19 @@ export function AdminLabourPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch, debouncedLocation, kycFilter, status, activeTab])
+  }, [debouncedSearch, debouncedLocation, kycFilter, kitFilter, status, activeTab])
 
   useEffect(() => {
     const next = new URLSearchParams()
     if (debouncedSearch) next.set('search', debouncedSearch)
     if (kycFilter !== 'all') next.set('kyc', kycFilter)
+    if (kitFilter !== 'all') next.set('kit', kitFilter)
     if (status !== 'all') next.set('status', status)
     if (debouncedLocation) next.set('location', debouncedLocation)
     if (activeTab === 'contractor') next.set('tab', 'contractor')
     if (page > 1) next.set('page', String(page))
     setSearchParams(next, { replace: true })
-  }, [debouncedSearch, debouncedLocation, kycFilter, status, activeTab, page, setSearchParams])
+  }, [debouncedSearch, debouncedLocation, kycFilter, kitFilter, status, activeTab, page, setSearchParams])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -148,6 +160,7 @@ export function AdminLabourPage() {
         role: activeTab === 'contractor' ? USER_ROLES.CONTRACTOR : USER_ROLES.LABOUR,
         status,
         kycStatus: kycFilter,
+        kitStatus: kitFilter,
         location: debouncedLocation,
         page,
         limit,
@@ -159,12 +172,11 @@ export function AdminLabourPage() {
     } catch (e) {
       setItems([])
       setKycStats(null)
-      setKycStats(null)
       setError(e instanceof ApiError ? e.message : 'Could not load roster')
     } finally {
       setLoading(false)
     }
-  }, [debouncedSearch, kycFilter, status, debouncedLocation, page, limit, activeTab])
+  }, [debouncedSearch, kycFilter, kitFilter, status, debouncedLocation, page, limit, activeTab])
 
   useEffect(() => {
     load()
@@ -370,7 +382,7 @@ export function AdminLabourPage() {
       </div>
 
       <GlassPanel className="p-4 md:p-5">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
           <div className="lg:col-span-2">
             <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Search</label>
             <div className="relative">
@@ -415,6 +427,26 @@ export function AdminLabourPage() {
             </div>
           </div>
           <div>
+            <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Welcome Kit</label>
+            <div className="relative">
+              <select
+                value={kitFilter}
+                onChange={(e) => setKitFilter(e.target.value)}
+                className="w-full appearance-none rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 pr-10 text-sm shadow-sm outline-none focus:ring-2 focus:ring-brand/35"
+              >
+                <option value="all">All Kit States</option>
+                <option value="complete">Complete (All Issued)</option>
+                <option value="partial">Partially Issued</option>
+                <option value="not_issued">Not Issued</option>
+              </select>
+              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+                <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div>
             <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Account</label>
             <div className="relative">
               <select
@@ -446,12 +478,13 @@ export function AdminLabourPage() {
 
       <GlassPanel className="hidden overflow-hidden p-0 md:block">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1020px] text-left text-sm">
+          <table className="w-full min-w-[1100px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200/80 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Phone</th>
                 <th className="px-4 py-3">KYC</th>
+                <th className="px-4 py-3">Welcome Kit</th>
                 {activeTab !== 'contractor' && <th className="px-4 py-3">Skill</th>}
                 <th className="px-4 py-3">Location</th>
                 <th className="px-4 py-3">Review</th>
@@ -463,7 +496,7 @@ export function AdminLabourPage() {
               {loading
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i} className="border-b border-slate-100">
-                      {Array.from({ length: activeTab === 'contractor' ? 7 : 8 }).map((__, j) => (
+                      {Array.from({ length: activeTab === 'contractor' ? 8 : 9 }).map((__, j) => (
                         <td key={j} className="px-4 py-3">
                           <div className="h-4 animate-pulse rounded bg-slate-200/80" />
                         </td>
@@ -481,6 +514,19 @@ export function AdminLabourPage() {
                       </td>
                       <td className="px-4 py-3">
                         <KycPill status={(u.contractorProfile || u.labourProfile)?.kycStatus} submittedAt={(u.contractorProfile || u.labourProfile)?.kycSubmittedAt} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <KitStatusBadge welcomeKit={u.welcomeKit} showItems={true} />
+                          <button
+                            type="button"
+                            onClick={() => setKitModalUser(u)}
+                            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition"
+                            title="Update Kit"
+                          >
+                            Edit
+                          </button>
+                        </div>
                       </td>
                       {activeTab !== 'contractor' && (
                         <td className="max-w-[280px] px-4 py-3 text-xs text-slate-600">
@@ -521,7 +567,7 @@ export function AdminLabourPage() {
           <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
             <Users className="h-10 w-10 text-slate-300" aria-hidden />
             <p className="font-semibold text-slate-700">No labour accounts match</p>
-            <p className="max-w-sm text-xs text-slate-500">Try clearing search or widening KYC / account filters.</p>
+            <p className="max-w-sm text-xs text-slate-500">Try clearing search or widening KYC / kit / account filters.</p>
           </div>
         ) : null}
       </GlassPanel>
@@ -547,6 +593,20 @@ export function AdminLabourPage() {
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <KycPill status={(u.contractorProfile || u.labourProfile)?.kycStatus} submittedAt={(u.contractorProfile || u.labourProfile)?.kycSubmittedAt} />
                   <span className="text-[11px] text-slate-500">Last: {formatLastLoginDisplay(u.lastLoginAt) || '—'}</span>
+                </div>
+                <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
+                    <Package className="h-3.5 w-3.5 text-slate-400" />
+                    <span>Kit:</span>
+                    <KitStatusBadge welcomeKit={u.welcomeKit} showItems={false} />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setKitModalUser(u)}
+                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                  >
+                    Manage Kit
+                  </button>
                 </div>
                 {(u.contractorProfile || u.labourProfile)?.kycStatus === KYC_STATUS.PENDING && (u.contractorProfile || u.labourProfile)?.kycSubmittedAt ? (
                   <button
@@ -713,6 +773,20 @@ export function AdminLabourPage() {
           </motion.div>
         </div>
       ) : null}
+
+      {kitModalUser && (
+        <WelcomeKitModal
+          user={kitModalUser}
+          onClose={() => setKitModalUser(null)}
+          onSuccess={(updatedKit) => {
+            setItems((prev) =>
+              prev.map((item) =>
+                item._id === kitModalUser._id ? { ...item, welcomeKit: updatedKit } : item
+              )
+            )
+          }}
+        />
+      )}
     </div>
   )
 }

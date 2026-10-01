@@ -121,6 +121,16 @@ const contractorProfileSchema = new mongoose.Schema(
   { _id: false },
 )
 
+const welcomeKitSchema = new mongoose.Schema(
+  {
+    uniformIssued: { type: Boolean, default: false },
+    idCardIssued: { type: Boolean, default: false },
+    bagIssued: { type: Boolean, default: false },
+    issuedAt: { type: Date, default: null },
+  },
+  { _id: false },
+)
+
 const userSchema = new mongoose.Schema(
   {
     phone: {
@@ -168,6 +178,15 @@ const userSchema = new mongoose.Schema(
     fcmTokenMobile: {
       type: [String],
       default: []
+    },
+    welcomeKit: {
+      type: welcomeKitSchema,
+      default: () => ({
+        uniformIssued: false,
+        idCardIssued: false,
+        bagIssued: false,
+        issuedAt: null,
+      }),
     },
     labourProfile: labourProfileSchema,
     contractorProfile: contractorProfileSchema,

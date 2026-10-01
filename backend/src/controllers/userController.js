@@ -414,7 +414,7 @@ function mergeAnd(base, extraClauses) {
 
 /** Admin: list users with search, role, active/inactive, optional labour KYC filter, pagination */
 export const listUsers = asyncHandler(async (req, res) => {
-  const { search, role, status, kycStatus, freeTrialStatus, categoryId, location, page = 1, limit = 20 } = req.query
+  const { search, role, status, kycStatus, freeTrialStatus, categoryId, location, kitStatus, page = 1, limit = 20 } = req.query
   const q = {}
   const andParts = []
 
@@ -551,6 +551,45 @@ export const listUsers = asyncHandler(async (req, res) => {
     andParts.push({ $or: [{ city: locRegex }, { currentLocation: locRegex }] })
   }
 
+  if (kitStatus && kitStatus !== 'all') {
+    if (kitStatus === 'complete') {
+      andParts.push({
+        'welcomeKit.uniformIssued': true,
+        'welcomeKit.idCardIssued': true,
+        'welcomeKit.bagIssued': true,
+      })
+    } else if (kitStatus === 'not_issued') {
+      andParts.push({
+        $or: [
+          { welcomeKit: { $exists: false } },
+          {
+            'welcomeKit.uniformIssued': { $ne: true },
+            'welcomeKit.idCardIssued': { $ne: true },
+            'welcomeKit.bagIssued': { $ne: true },
+          },
+        ],
+      })
+    } else if (kitStatus === 'partial') {
+      andParts.push({
+        $and: [
+          {
+            $or: [
+              { 'welcomeKit.uniformIssued': true },
+              { 'welcomeKit.idCardIssued': true },
+              { 'welcomeKit.bagIssued': true },
+            ],
+          },
+          {
+            $or: [
+              { 'welcomeKit.uniformIssued': { $ne: true } },
+              { 'welcomeKit.idCardIssued': { $ne: true } },
+              { 'welcomeKit.bagIssued': { $ne: true } },
+            ],
+          },
+        ],
+      })
+    }
+  }
 
   if (andParts.length) {
     q.$and = andParts
@@ -871,3 +910,117 @@ export const deleteMe = asyncHandler(async (req, res) => {
 
   return sendSuccess(res, { message: 'Account deleted successfully' })
 })
+
+/**
+ * PATCH /api/service-partners/:partnerId/welcome-kit
+ * or PATCH /api/users/:id/welcome-kit
+ * Updates uniformIssued, idCardIssued, bagIssued and calculates issuedAt
+ */
+export const updatePartnerWelcomeKit = asyncHandler(async (req, res) => {
+  const partnerId = req.params.partnerId || req.params.id
+  if (!mongoose.Types.ObjectId.isValid(partnerId)) {
+    return sendError(res, {
+      message: 'Invalid service partner ID',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_ID',
+    })
+  }
+
+  const { uniformIssued, idCardIssued, bagIssued } = req.body
+
+  // Validation: must be strictly boolean
+  if (typeof uniformIssued !== 'boolean' || typeof idCardIssued !== 'boolean' || typeof bagIssued !== 'boolean') {
+    return sendError(res, {
+      message: 'uniformIssued, idCardIssued, and bagIssued must be boolean values (true or false)',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_BOOLEAN_FIELDS',
+    })
+  }
+
+  const user = await User.findById(partnerId)
+  if (!user) {
+    return sendError(res, {
+      message: 'Service partner not found',
+      statusCode: HTTP_STATUS.NOT_FOUND,
+      code: 'PARTNER_NOT_FOUND',
+    })
+  }
+
+  // Business Logic: Complete vs Partial / Not Issued
+  const isComplete = uniformIssued && idCardIssued && bagIssued
+  let issuedAt = null
+
+  if (isComplete) {
+    // Preserve existing issuedAt if already complete, otherwise set current timestamp
+    issuedAt = user.welcomeKit?.issuedAt || new Date()
+  } else {
+    issuedAt = null
+  }
+
+  user.welcomeKit = {
+    uniformIssued,
+    idCardIssued,
+    bagIssued,
+    issuedAt,
+  }
+
+  await user.save()
+
+  return sendSuccess(res, {
+    message: 'Welcome kit updated successfully',
+    data: {
+      uniformIssued: user.welcomeKit.uniformIssued,
+      idCardIssued: user.welcomeKit.idCardIssued,
+      bagIssued: user.welcomeKit.bagIssued,
+      issuedAt: user.welcomeKit.issuedAt,
+    },
+  })
+})
+
+/**
+ * GET /api/service-partners/welcome-kit-stats
+ * Dashboard stats for welcome kit distribution
+ */
+export const getPartnerWelcomeKitStats = asyncHandler(async (req, res) => {
+  const partners = await User.find({ role: USER_ROLES.LABOUR }).select('welcomeKit fullName phone').lean()
+
+  let total = partners.length
+  let complete = 0
+  let partial = 0
+  let notIssued = 0
+  let uniformCount = 0
+  let idCardCount = 0
+  let bagCount = 0
+
+  for (const p of partners) {
+    const kit = p.welcomeKit || {}
+    const u = Boolean(kit.uniformIssued)
+    const i = Boolean(kit.idCardIssued)
+    const b = Boolean(kit.bagIssued)
+
+    if (u) uniformCount++
+    if (i) idCardCount++
+    if (b) bagCount++
+
+    if (u && i && b) {
+      complete++
+    } else if (u || i || b) {
+      partial++
+    } else {
+      notIssued++
+    }
+  }
+
+  return sendSuccess(res, {
+    data: {
+      total,
+      complete,
+      partial,
+      notIssued,
+      uniformIssued: uniformCount,
+      idCardIssued: idCardCount,
+      bagIssued: bagCount,
+    },
+  })
+})
+

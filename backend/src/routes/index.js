@@ -4,6 +4,7 @@ import userRoutes from './userRoutes.js'
 import labourCategoryRoutes from './labourCategoryRoutes.js'
 import adminLabourCategoryRoutes from './adminLabourCategoryRoutes.js'
 
+import servicePartnerRoutes from './servicePartnerRoutes.js'
 import uploadRoutes from './uploadRoutes.js'
 import workforceRoutes from './workforceRoutes.js'
 import adminWorkforceRoutes from './adminWorkforceRoutes.js'
@@ -35,6 +36,7 @@ const router = Router()
 
 router.use('/auth', authRoutes)
 router.use('/users', userRoutes)
+router.use('/service-partners', servicePartnerRoutes)
 router.use('/uploads', uploadRoutes)
 router.use('/labour-categories', labourCategoryRoutes)
 

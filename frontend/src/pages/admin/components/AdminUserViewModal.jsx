@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { X, Loader2, User, Phone, Mail, Building2, MapPin, Briefcase, FileCheck, IndianRupee } from 'lucide-react'
 import { fetchAdminUserById } from '../../../api/adminUsersApi.js'
+import { WelcomeKitCard } from '../../../components/admin/welcomeKit/WelcomeKitCard.jsx'
 
 export function AdminUserViewModal({ userId, onClose }) {
   const [user, setUser] = useState(null)
@@ -133,6 +134,13 @@ export function AdminUserViewModal({ userId, onClose }) {
                     )}
                   </div>
                 </div>
+              )}
+
+              {user.role === 'labour' && (
+                <WelcomeKitCard
+                  user={user}
+                  onUpdate={(updatedKit) => setUser({ ...user, welcomeKit: updatedKit })}
+                />
               )}
             </div>
           )}

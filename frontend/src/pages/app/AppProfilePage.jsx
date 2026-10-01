@@ -20,6 +20,7 @@ import {
   Mail,
   MapPin,
   Menu,
+  Package,
   Pencil,
   Phone,
   ShieldCheck,
@@ -28,6 +29,7 @@ import {
   Trash2,
   AlertTriangle,
 } from 'lucide-react'
+import { KitStatusBadge } from '../../components/admin/welcomeKit/KitStatusBadge.jsx'
 import { BOOT_ROUTES } from '../../constants/bootFlow.js'
 import { useAuth } from '../../hooks/useAuth.js'
 import {
@@ -615,6 +617,29 @@ export function AppProfilePage() {
           </span>
           <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" aria-hidden />
         </Link>
+      ) : null}
+
+      {user?.role === USER_ROLES.LABOUR ? (
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-brand" />
+              <span className="text-sm font-bold text-slate-900">Welcome Kit & Uniform</span>
+            </div>
+            <KitStatusBadge welcomeKit={user?.welcomeKit} />
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            <div className={`p-2 rounded-xl border ${user?.welcomeKit?.uniformIssued ? 'border-emerald-200 bg-emerald-50 text-emerald-800 font-bold' : 'border-slate-100 bg-slate-50 text-slate-400'}`}>
+              Uniform {user?.welcomeKit?.uniformIssued ? '✓' : '✗'}
+            </div>
+            <div className={`p-2 rounded-xl border ${user?.welcomeKit?.idCardIssued ? 'border-emerald-200 bg-emerald-50 text-emerald-800 font-bold' : 'border-slate-100 bg-slate-50 text-slate-400'}`}>
+              ID Card {user?.welcomeKit?.idCardIssued ? '✓' : '✗'}
+            </div>
+            <div className={`p-2 rounded-xl border ${user?.welcomeKit?.bagIssued ? 'border-emerald-200 bg-emerald-50 text-emerald-800 font-bold' : 'border-slate-100 bg-slate-50 text-slate-400'}`}>
+              Bag {user?.welcomeKit?.bagIssued ? '✓' : '✗'}
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {user?.role === USER_ROLES.CONTRACTOR ? (

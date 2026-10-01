@@ -105,6 +105,19 @@ router.patch(
   user.reviewLabourKyc,
 )
 
+router.patch(
+  '/:id/welcome-kit',
+  restrictTo(USER_ROLES.ADMIN),
+  validateUserIdParam,
+  [
+    body('uniformIssued').isBoolean().withMessage('uniformIssued must be a boolean'),
+    body('idCardIssued').isBoolean().withMessage('idCardIssued must be a boolean'),
+    body('bagIssued').isBoolean().withMessage('bagIssued must be a boolean'),
+  ],
+  validateRequest,
+  user.updatePartnerWelcomeKit,
+)
+
 router.get('/:id', restrictTo(USER_ROLES.ADMIN), validateUserIdParam, validateRequest, user.getUserById)
 
 router.delete('/:id', restrictTo(USER_ROLES.ADMIN), validateUserIdParam, validateRequest, user.deleteUser)
