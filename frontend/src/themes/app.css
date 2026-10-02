@@ -4,19 +4,19 @@
 @layer utilities {
   .app-shadow-card {
     box-shadow:
-      0 8px 40px -12px rgb(0 43 92 / 0.1),
+      0 8px 40px -12px rgb(0 158 179 / 0.12),
       0 0 0 1px rgb(255 255 255 / 0.6) inset;
   }
 
   .app-shadow-elevated {
     box-shadow:
-      0 16px 48px -20px rgb(0 43 92 / 0.14),
+      0 16px 48px -20px rgb(0 158 179 / 0.16),
       0 8px 24px -12px rgb(15 23 42 / 0.06);
   }
 
   .app-shadow-nav {
     box-shadow:
-      0 12px 40px -12px rgb(0 43 92 / 0.16),
+      0 12px 40px -12px rgb(0 158 179 / 0.18),
       0 0 0 1px rgb(255 255 255 / 0.5) inset;
   }
 

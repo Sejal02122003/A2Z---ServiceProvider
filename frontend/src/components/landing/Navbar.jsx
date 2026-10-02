@@ -77,12 +77,10 @@ export function Navbar() {
       <Container className="flex h-16 items-center justify-between gap-4 md:h-[4.25rem]">
         <a
           href="#hero"
-          className="flex items-center gap-2 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          className="flex items-center gap-2.5 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-bright to-brand text-white shadow-[0_8px_30px_-8px_rgba(0,43,92,0.45)]">
-            <HardHat className="h-5 w-5" strokeWidth={2} aria-hidden />
-          </span>
-          <span className="text-sm font-extrabold tracking-tight text-slate-900 sm:text-base">
+          <img src="/logo.png" alt={SITE.name} className="h-10 sm:h-11 w-auto object-contain rounded-lg" />
+          <span className="text-base font-extrabold tracking-tight text-slate-900 sm:text-lg">
             {SITE.name}
           </span>
         </a>

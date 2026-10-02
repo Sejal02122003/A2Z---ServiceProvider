@@ -69,7 +69,7 @@ export function Hero() {
               transition={{ duration: 0.55, delay: 0.05 }}
             >
               Book Trusted Construction Labour{' '}
-              <span className="bg-gradient-to-r from-brand via-blue-600 to-teal-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-brand via-cyan-500 to-teal-600 bg-clip-text text-transparent">
                 in Minutes
               </span>
             </motion.h1>
@@ -79,7 +79,7 @@ export function Hero() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.55, delay: 0.12 }}
             >
-              A2Z connects customers and businesses with verified salon & home appliance experts—transparent pricing, digital payments, and instant booking when you need it most.
+              A2Z connects customers and businesses with verified salon, home appliances & on-demand experts—transparent pricing, digital payments, and instant booking when you need it most.
             </motion.p>
           </div>
 
@@ -111,7 +111,7 @@ export function Hero() {
                 initial={reduce ? false : { opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 + i * 0.05 }}
-                whileHover={reduce ? undefined : { y: -2, borderColor: 'rgba(0,43,92,0.45)' }}
+                whileHover={reduce ? undefined : { y: -2, borderColor: 'rgba(0,158,179,0.45)' }}
               >
                 <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand/12 text-brand">
                   <LandingIcon name={b.icon} className="h-4 w-4" />

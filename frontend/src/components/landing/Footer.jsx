@@ -38,10 +38,8 @@ export function Footer() {
       <Container>
         <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-4">
-            <div className="flex items-center gap-2 text-white">
-              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-bright to-brand text-white">
-                <HardHat className="h-5 w-5" aria-hidden />
-              </span>
+            <div className="flex items-center gap-2.5 text-white">
+              <img src="/logo.png" alt={SITE.name} className="h-10 w-auto object-contain rounded-lg bg-white/10 p-1" />
               <span className="text-lg font-extrabold tracking-tight">{SITE.name}</span>
             </div>
             <p className="text-sm leading-relaxed">

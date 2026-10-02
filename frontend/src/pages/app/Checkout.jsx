@@ -329,7 +329,7 @@ export function Checkout() {
             setSubmitting(false)
           },
         },
-        theme: { color: '#002b5c' },
+        theme: { color: '#009eb3' },
       }
 
       const rzp = new window.Razorpay(options)

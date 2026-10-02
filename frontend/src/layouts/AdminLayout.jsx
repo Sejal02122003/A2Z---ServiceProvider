@@ -102,9 +102,10 @@ export function AdminLayout() {
           className={`relative z-10 flex min-w-0 items-center gap-2.5 rounded-xl px-1.5 py-1.5 font-extrabold tracking-tight text-white transition hover:bg-white/10 hover:shadow-sm active:scale-95 ${collapsed ? 'md:justify-center' : ''}`}
           title="Dashboard"
         >
-          <img src="/logo-transparent.png" alt="A2Z" className="h-8 w-auto brightness-0 invert" />
+          <img src="/logo.png" alt="A2Z" className="h-9 w-auto rounded-lg bg-white/95 p-1 object-contain shadow-sm ring-1 ring-white/20" />
           <span className={`min-w-0 truncate ${collapsed ? 'md:sr-only' : ''}`}>
-            <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+            <span className="block text-sm font-black text-white">A2Z</span>
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/80">
               Control panel
             </span>
           </span>
@@ -183,7 +184,7 @@ export function AdminLayout() {
   )
 
   const sidebarClassName = `
-    flex h-dvh max-h-dvh shrink-0 flex-col overflow-hidden border-r border-blue-800/50 bg-gradient-to-b from-[#001a38] to-brand shadow-[6px_0_32px_-12px_rgba(37,99,235,0.3)] transition-[transform,width] duration-300 ease-out
+    flex h-dvh max-h-dvh shrink-0 flex-col overflow-hidden border-r border-cyan-900/40 bg-gradient-to-b from-[#021b24] via-[#003846] to-brand shadow-[6px_0_32px_-12px_rgba(0,158,179,0.3)] transition-[transform,width] duration-300 ease-out
     w-[min(18rem,88vw)] max-md:max-w-[18rem]
     ${collapsed ? 'md:w-19' : 'md:w-64'}
     fixed inset-y-0 left-0 z-50 md:relative md:z-20

@@ -2,10 +2,10 @@
 
 .lc-booking-highlight {
   border-radius: 1rem;
-  border: 1px solid rgb(0 43 92 / 0.25);
+  border: 1px solid rgb(0 158 179 / 0.25);
   border-left-width: 4px;
-  border-left-color: #002b5c;
-  background: #eff6ff;
+  border-left-color: #009eb3;
+  background: #e0f7fa;
   padding: 0.875rem 1rem;
 }
 
@@ -63,7 +63,7 @@
   justify-content: center;
   gap: 0.5rem;
   border-radius: 0.75rem;
-  background: #002b5c;
+  background: #009eb3;
   padding: 0.875rem 1rem;
   font-size: 0.875rem;
   font-weight: 700;
@@ -107,8 +107,8 @@
 }
 
 .lc-booking-chip[data-active='true'] {
-  background: #002b5c;
-  border-color: #002b5c;
+  background: #009eb3;
+  border-color: #009eb3;
   color: #ffffff;
 }
 
@@ -124,6 +124,6 @@
 }
 
 .lc-booking-slot[data-active='true'] {
-  border: 2px solid #002b5c;
-  background: #eff6ff;
+  border: 2px solid #009eb3;
+  background: #e0f7fa;
 }

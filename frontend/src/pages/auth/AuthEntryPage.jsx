@@ -296,9 +296,11 @@ export function AuthEntryPage({ authGroup = 'users' }) {
           </svg>
         </div>
 
-        <div className="mt-4 flex flex-col items-center relative z-10">
+        <div className="mt-2 flex flex-col items-center relative z-10">
           <div className="flex justify-center mb-0">
-             <img src={logoUrl} alt="A2Z" className="h-32 sm:h-36 w-auto drop-shadow-sm object-contain" />
+            <div className="rounded-3xl bg-white p-2 shadow-xl shadow-cyan-950/20 ring-4 ring-white/40">
+              <img src="/logo.png" alt="A2Z Services Hub" className="h-28 sm:h-32 w-auto object-contain" />
+            </div>
           </div>
         </div>
       </div>

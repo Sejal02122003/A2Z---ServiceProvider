@@ -779,7 +779,7 @@ export function LabourHomeScreen({ user }) {
         >
           <Link
             to="/app/subscription"
-            className="group relative flex items-center justify-between overflow-hidden rounded-2xl border border-blue-400/30 bg-gradient-to-r from-[#001a38] via-[#002b5c] to-brand p-3.5 text-white shadow-lg shadow-blue-950/25 transition hover:brightness-110 active:scale-[0.99]"
+            className="group relative flex items-center justify-between overflow-hidden rounded-2xl border border-cyan-400/30 bg-gradient-to-r from-[#002633] via-[#004e64] to-brand p-3.5 text-white shadow-lg shadow-cyan-950/25 transition hover:brightness-110 active:scale-[0.99]"
           >
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 backdrop-blur-md shadow-inner text-white">

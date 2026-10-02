@@ -1,5 +1,5 @@
 .lc-splash-page {
-  background-color: #002b5c;
+  background-color: #004e64;
   color: #ffffff;
 }
 
@@ -14,7 +14,7 @@
   background: #ffffff;
   font-size: 0.9375rem;
   font-weight: 700;
-  color: #002b5c;
+  color: #004e64;
   box-shadow: 0 12px 32px -8px rgb(0 0 0 / 0.22);
   transition:
     opacity 0.2s ease,
@@ -110,7 +110,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 1.125rem;
-  background-color: #002b5c;
+  background-color: #009eb3;
   color: #ffffff;
-  box-shadow: 0 8px 20px -8px rgb(0 43 92 / 0.55);
+  box-shadow: 0 8px 20px -8px rgb(0 158 179 / 0.55);
 }
