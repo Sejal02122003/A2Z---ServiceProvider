@@ -10,11 +10,10 @@ export function AppBottomNav({ items }) {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/90 bg-white print:hidden"
-      style={{ paddingBottom: 'max(0.5rem, env(safe-area-bottom))' }}
+      className="fixed inset-x-0 bottom-0 z-30 pointer-events-none px-3 sm:px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] print:hidden"
       aria-label="Bottom navigation"
     >
-      <div className="mx-auto flex w-full max-w-lg items-stretch justify-around px-1 pt-1.5">
+      <div className="pointer-events-auto mx-auto flex w-full max-w-lg items-stretch justify-around rounded-3xl border border-slate-200/90 bg-white/95 px-2 py-1.5 shadow-[0_10px_30px_-5px_rgba(0,0,0,0.12),0_4px_12px_rgba(0,0,0,0.06)] backdrop-blur-md">
         {items.map(({ id, to, end, label, icon: Icon, premium, center }) => (
           <NavLink
             key={`${id}-${to}`}
