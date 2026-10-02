@@ -142,7 +142,7 @@ export function LabourHomeScreen({ user }) {
   const [freeTrialMessage, setFreeTrialMessage] = useState('')
 
   const loadBookings = useCallback(() => {
-    if (!user || user.id === 'guest') return
+    if (!user || user.id === 'guest' || user._id === 'guest') return
     bookingsApi.getMyBookings().then(res => {
       setActiveBookings(res.data?.bookings || [])
     }).catch(err => {

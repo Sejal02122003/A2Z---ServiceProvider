@@ -49,6 +49,7 @@ import { LabourPublicDetailSheet } from '../labour/LabourPublicDetailSheet.jsx'
 import { enrichDiscoverLabourUi, DEMO_LABOUR_ROWS } from '../../../lib/discoverLabourDummyUi.js'
 import { displayBookingsList, loadIndividualBookings } from '../../../lib/individualBookings.js'
 import { buildBookingFlowPath } from '../../../lib/bookingFlowNavigation.js'
+import { useAuth } from '../../../hooks/useAuth.js'
 import heroImg from '../../../assets/hero.png'
 
 function formatBookingDay(serviceDate) {
@@ -233,9 +234,12 @@ export function IndividualHomeScreen({ user }) {
     return () => cancelAnimationFrame(id)
   }, [])
 
+  const { token, isGuest } = useAuth()
+
   useEffect(() => {
     let cancelled = false
-    if (!user) {
+    if (!token || isGuest || !user || user._id === 'guest') {
+      setBookings([])
       setBookingsLoading(false)
       return
     }
@@ -248,13 +252,15 @@ export function IndividualHomeScreen({ user }) {
       })
       .catch((err) => {
         if (!cancelled) {
-          console.error('Failed to load bookings', err)
+          if (err?.statusCode !== 401) {
+            console.error('Failed to load bookings', err)
+          }
           setBookings([])
           setBookingsLoading(false)
         }
       })
     return () => { cancelled = true }
-  }, [user])
+  }, [token, isGuest, user])
 
   useEffect(() => {
     let cancelled = false

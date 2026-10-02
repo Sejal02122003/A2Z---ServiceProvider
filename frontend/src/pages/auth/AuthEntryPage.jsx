@@ -187,10 +187,17 @@ export function AuthEntryPage({ authGroup = 'users' }) {
           : 'OTP sent. Check SMS — in development it may appear in the server terminal.',
       })
     } catch (e) {
-      setBanner({
-        variant: 'error',
-        message: e instanceof ApiError ? e.message : 'Could not send OTP. Try again.',
-      })
+      if (e instanceof ApiError && (e.code === 'USER_NOT_FOUND' || e.statusCode === 404)) {
+        setBanner({
+          variant: 'error',
+          message: 'No account found for this mobile number. Please tap "Register" above to create an account.',
+        })
+      } else {
+        setBanner({
+          variant: 'error',
+          message: e instanceof ApiError ? e.message : 'Could not send OTP. Try again.',
+        })
+      }
     } finally {
       setBusy(false)
     }
