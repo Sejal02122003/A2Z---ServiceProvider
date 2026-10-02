@@ -20,7 +20,7 @@ async function run() {
   await LabourSubcategory.deleteMany({})
   await LabourService.deleteMany({})
 
-  console.log('Seeding Salon & Home Appliances categories, subcategories, and services/products...')
+  console.log('Seeding Salon, Home Appliances, Caretaker & Nurse, and Services On Demand...')
 
   let catSort = 10
   for (const cat of LABOUR_CATEGORY_SEED_V2) {
@@ -69,7 +69,7 @@ async function run() {
     }
   }
 
-  console.log('Successfully seeded Salon & Home Appliances categories, subcategories, and services!')
+  console.log('Successfully seeded all 4 categories (Salon, Home Appliances, Caretaker & Nurse, Services On Demand)!')
   await mongoose.disconnect()
 }
 

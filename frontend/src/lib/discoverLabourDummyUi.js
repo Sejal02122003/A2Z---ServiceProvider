@@ -55,21 +55,31 @@ export function createDemoLabour(index) {
   const names = ['Ramesh K.', 'Priya S.', 'Vikram S.', 'Ananya M.', 'Deepak R.', 'Pooja T.']
   const id = `demo-${index}`
   const displayName = names[index % names.length]
-  const isSalon = index % 2 === 0
+  const catIdx = index % 4
+  const tradeMap = [
+    [
+      { _id: `d${index}-1`, name: "Women's Salon & Spa Expert", subtitle: 'Hair, beauty & facial therapies', groupName: 'Salon' },
+      { _id: `d${index}-2`, name: "Bridal Makeup & Skincare", subtitle: 'HD makeover & spa treatments', groupName: 'Salon' },
+    ],
+    [
+      { _id: `d${index}-1`, name: 'AC & Cooling Technician', subtitle: 'Deep jet cleaning & gas refill', groupName: 'Home Appliances' },
+      { _id: `d${index}-2`, name: 'Washing Machine & RO Expert', subtitle: 'Motor & filter replacement', groupName: 'Home Appliances' },
+    ],
+    [
+      { _id: `d${index}-1`, name: 'Certified Home Nurse', subtitle: 'Injections, IV drips & post-op care', groupName: 'Caretaker & Nurse' },
+      { _id: `d${index}-2`, name: 'Elderly & Patient Attendant', subtitle: 'Mobility, vitals & daily care', groupName: 'Caretaker & Nurse' },
+    ],
+    [
+      { _id: `d${index}-1`, name: 'Emergency Plumber & Electrician', subtitle: 'Fast pipe leaks, wiring & switches', groupName: 'Services On Demand' },
+      { _id: `d${index}-2`, name: 'Deep Cleaning & Pest Specialist', subtitle: 'Bathroom, kitchen & sanitization', groupName: 'Services On Demand' },
+    ],
+  ]
   const base = {
     id,
     displayName,
     kycVerified: index % 3 !== 1,
     kycStatus: index % 3 === 1 ? 'pending' : 'verified',
-    tradeCategories: isSalon
-      ? [
-          { _id: `d${index}-1`, name: "Salon & Grooming Expert", subtitle: 'Hair, beauty & spa', groupName: 'Salon' },
-          { _id: `d${index}-2`, name: "Skin & Facial Specialist", subtitle: 'Skincare therapies', groupName: 'Salon' },
-        ]
-      : [
-          { _id: `d${index}-1`, name: 'AC & Appliance Technician', subtitle: 'Deep servicing & repair', groupName: 'Home Appliances' },
-          { _id: `d${index}-2`, name: 'Washing Machine & RO Expert', subtitle: 'Installation & parts fix', groupName: 'Home Appliances' },
-        ],
+    tradeCategories: tradeMap[catIdx],
     memberSinceYear: 2021 + (index % 4),
   }
   return base

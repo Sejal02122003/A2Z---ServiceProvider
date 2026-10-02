@@ -24,4 +24,24 @@ export const LABOUR_CATEGORY_IMAGES = {
   tvTechnician: u('1593359677879-a4bb92f829d1'),
   chimneyTechnician: u('1556911220-e15b29be8c8f'),
   applianceProducts: u('1581092160607-ee22621dd758'),
+
+  // Caretaker & Nurse
+  careTakerCategory: u('1576765608535-5f04d1e3f289'),
+  elderlyCare: u('1576765608535-5f04d1e3f289'),
+  certifiedNurse: u('1584515979956-d9f6e5d09982'),
+  babyCareNanny: u('1544717302-de2939b7ef71'),
+  patientAttendant: u('1516549655169-df83a0774514'),
+  physiotherapy: u('1576091160550-2173dba999ef'),
+  medicalProducts: u('1583947215259-38e31be8751f'),
+
+  // Services On Demand
+  servicesOnDemandCategory: u('1581578731548-7f23fd20fb2a'),
+  emergencyPlumber: u('1558618666-fcd25c85f268'),
+  urgentElectrician: u('1621905251189-08b45d6a269e'),
+  carpenterRepair: u('1503387762-592deb58ef4e'),
+  deepCleaning: u('1581578731548-7f23fd20fb2a'),
+  pestControlOnDemand: u('1595846519845-68bb3376c517'),
+  housePainter: u('1562259949-e8e7689d3270'),
+  handymanLocksmith: u('1504148455328-c376907d081c'),
+  driverMover: u('1601581875070-1f899aa1cb2f'),
 }
