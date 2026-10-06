@@ -278,7 +278,27 @@ export const patchSubcategory = asyncHandler(async (req, res) => {
 })
 
 export const createService = asyncHandler(async (req, res) => {
-  const { subcategoryId, name, description = '', basePrice = 0, estimatedDurationMins = 60, iconUrl, hourlyPrice = 0, minHours = 1, maxHours = 24, discountType = 'PERCENTAGE', discountValue = 0, offerBadge = '', offerDescription = '', isAllZones = true, zones = [], isActive } = req.body
+  const {
+    subcategoryId,
+    name,
+    description = '',
+    basePrice = 0,
+    estimatedDurationMins = 60,
+    iconUrl,
+    hourlyPrice = 0,
+    minHours = 1,
+    maxHours = 24,
+    discountType = 'PERCENTAGE',
+    discountValue = 0,
+    offerBadge = '',
+    offerDescription = '',
+    isAllZones = true,
+    zones = [],
+    isActive,
+    chargeType = 'PER_HOUR',
+    unitName = '',
+    pricePerUnit = 0,
+  } = req.body
   const subcat = await LabourSubcategory.findById(subcategoryId)
   if (!subcat) {
     return sendError(res, { message: 'Subcategory not found', statusCode: HTTP_STATUS.NOT_FOUND, code: 'NOT_FOUND' })
@@ -303,10 +323,13 @@ export const createService = asyncHandler(async (req, res) => {
     subcategoryId: subcat._id,
     name: name.trim(),
     description,
-    basePrice: Number(basePrice),
+    basePrice: Number(basePrice || hourlyPrice || pricePerUnit),
     estimatedDurationMins: Number(estimatedDurationMins),
     iconUrl: image,
-    hourlyPrice: Number(hourlyPrice),
+    chargeType: ['PER_HOUR', 'UNIT_WISE', 'NONE'].includes(chargeType) ? chargeType : 'PER_HOUR',
+    unitName: String(unitName || '').trim(),
+    pricePerUnit: Number(pricePerUnit || 0),
+    hourlyPrice: Number(hourlyPrice || 0),
     minHours: Number(minHours),
     maxHours: Number(maxHours),
     discountType,
@@ -341,12 +364,15 @@ export const patchService = asyncHandler(async (req, res) => {
   if (!s) {
     return sendError(res, { message: 'Service not found', statusCode: HTTP_STATUS.NOT_FOUND, code: 'NOT_FOUND' })
   }
-  const { name, description, basePrice, estimatedDurationMins, isActive, iconUrl, hourlyPrice, minHours, maxHours, discountType, discountValue, offerBadge, offerDescription, isAllZones, zones } = req.body
+  const { name, description, basePrice, estimatedDurationMins, isActive, iconUrl, hourlyPrice, minHours, maxHours, discountType, discountValue, offerBadge, offerDescription, isAllZones, zones, chargeType, unitName, pricePerUnit } = req.body
   if (name != null) s.name = String(name).trim()
   if (description != null) s.description = String(description)
   if (basePrice != null) s.basePrice = Number(basePrice)
   if (estimatedDurationMins != null) s.estimatedDurationMins = Number(estimatedDurationMins)
   if (isActive != null) s.isActive = Boolean(isActive)
+  if (chargeType != null && ['PER_HOUR', 'UNIT_WISE', 'NONE'].includes(chargeType)) s.chargeType = chargeType
+  if (unitName !== undefined) s.unitName = String(unitName || '').trim()
+  if (pricePerUnit != null) s.pricePerUnit = Number(pricePerUnit)
   if (hourlyPrice != null) s.hourlyPrice = Number(hourlyPrice)
   if (minHours != null) s.minHours = Number(minHours)
   if (maxHours != null) s.maxHours = Number(maxHours)

@@ -35,6 +35,21 @@ const labourServiceSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    chargeType: {
+      type: String,
+      enum: ['PER_HOUR', 'UNIT_WISE', 'NONE'],
+      default: 'PER_HOUR',
+    },
+    unitName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    pricePerUnit: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     hourlyPrice: {
       type: Number,
       default: 0,

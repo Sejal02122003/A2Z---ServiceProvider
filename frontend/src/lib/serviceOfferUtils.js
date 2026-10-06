@@ -25,12 +25,30 @@ export function getServiceOfferDetails(service) {
     }
   }
 
-  const originalPrice = Number(service.hourlyPrice ?? service.basePrice ?? 0)
+  const chargeType = service.chargeType || 'PER_HOUR'
+  const unitName = service.unitName || ''
+
+  let originalPrice = 0
+  let unitLabel = ''
+  let unitDivider = 1
+  let isHalfHour = false
+
+  if (chargeType === 'UNIT_WISE') {
+    originalPrice = Number(service.pricePerUnit ?? service.basePrice ?? service.hourlyPrice ?? 0)
+    unitLabel = unitName ? `/${unitName}` : '/unit'
+  } else if (chargeType === 'NONE') {
+    originalPrice = Number(service.basePrice ?? service.hourlyPrice ?? service.pricePerUnit ?? 0)
+    unitLabel = ''
+  } else {
+    // PER_HOUR
+    originalPrice = Number(service.hourlyPrice ?? service.basePrice ?? 0)
+    isHalfHour = service.minHours === 0.5
+    unitLabel = isHalfHour ? '/30min' : '/hr'
+    unitDivider = isHalfHour ? 2 : 1
+  }
+
   const discountType = service.discountType || 'PERCENTAGE'
   const discountValue = Number(service.discountValue || 0)
-  const isHalfHour = service.minHours === 0.5
-  const unitLabel = isHalfHour ? '/30min' : '/hr'
-  const unitDivider = isHalfHour ? 2 : 1
 
   const hasOffer = discountValue > 0 && originalPrice > 0
 
@@ -62,6 +80,8 @@ export function getServiceOfferDetails(service) {
     savings,
     discountType,
     discountValue,
+    chargeType,
+    unitName,
     offerBadge: offerBadge || '',
     offerDescription: service.offerDescription || '',
     isHalfHour,

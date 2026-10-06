@@ -22,6 +22,10 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
   const [name, setName] = useState('')
   const [subcategoryId, setSubcategoryId] = useState('')
   const [description, setDescription] = useState('')
+  const [chargeType, setChargeType] = useState('PER_HOUR')
+  const [unitName, setUnitName] = useState('')
+  const [pricePerUnit, setPricePerUnit] = useState(0)
+  const [basePrice, setBasePrice] = useState(0)
   const [hourlyPrice, setHourlyPrice] = useState(0)
   const [minHours, setMinHours] = useState(1)
   const [maxHours, setMaxHours] = useState(24)
@@ -38,6 +42,10 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
       setName('')
       setSubcategoryId(subcategories[0]?._id ?? '')
       setDescription('')
+      setChargeType('PER_HOUR')
+      setUnitName('')
+      setPricePerUnit(0)
+      setBasePrice(0)
       setHourlyPrice(0)
       setMinHours(1)
       setMaxHours(24)
@@ -81,14 +89,31 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
     setError('')
     setBusy(true)
     try {
+      let resolvedBasePrice = 0
+      let resolvedHourlyPrice = 0
+      let resolvedPricePerUnit = 0
+
+      if (chargeType === 'PER_HOUR') {
+        resolvedHourlyPrice = Number(hourlyPrice) || 0
+        resolvedBasePrice = resolvedHourlyPrice
+      } else if (chargeType === 'UNIT_WISE') {
+        resolvedPricePerUnit = Number(pricePerUnit) || 0
+        resolvedBasePrice = resolvedPricePerUnit
+      } else {
+        resolvedBasePrice = Number(basePrice) || 0
+      }
+
       const payload = {
         name: name.trim(),
         subcategoryId,
         description: description.trim(),
-        basePrice: Number(hourlyPrice), // Keep schema happy with basePrice = hourlyPrice
-        hourlyPrice: Number(hourlyPrice),
-        minHours: parseFloat(minHours) || 0.5,
-        maxHours: Number(maxHours),
+        chargeType,
+        unitName: chargeType === 'UNIT_WISE' ? unitName.trim() : '',
+        pricePerUnit: resolvedPricePerUnit,
+        basePrice: resolvedBasePrice,
+        hourlyPrice: resolvedHourlyPrice,
+        minHours: chargeType === 'PER_HOUR' ? (parseFloat(minHours) || 0.5) : 1,
+        maxHours: chargeType === 'PER_HOUR' ? Number(maxHours || 24) : 24,
         discountType,
         discountValue: Number(discountValue),
         isAllZones: zones.length === activeZones.length,
@@ -158,39 +183,143 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
               />
             </div>
 
-            <div className="col-span-2 sm:col-span-1">
-              <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Price (₹)</label>
-              <input
-                type="number"
-                min="0"
-                value={hourlyPrice}
-                onChange={(e) => setHourlyPrice(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
-              />
+            {/* Charges Option: 3 options */}
+            <div className="col-span-2">
+              <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-500">Charges Option</label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setChargeType('PER_HOUR')}
+                  className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-2.5 text-center transition ${
+                    chargeType === 'PER_HOUR'
+                      ? 'border-brand bg-brand/5 text-brand ring-2 ring-brand/20 font-bold'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  <span className="text-base">⏱️</span>
+                  <span className="text-xs font-bold">Per Hour</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChargeType('UNIT_WISE')}
+                  className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-2.5 text-center transition ${
+                    chargeType === 'UNIT_WISE'
+                      ? 'border-brand bg-brand/5 text-brand ring-2 ring-brand/20 font-bold'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  <span className="text-base">📦</span>
+                  <span className="text-xs font-bold">Unit Wise</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChargeType('NONE')}
+                  className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-2.5 text-center transition ${
+                    chargeType === 'NONE'
+                      ? 'border-brand bg-brand/5 text-brand ring-2 ring-brand/20 font-bold'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  <span className="text-base">🏷️</span>
+                  <span className="text-xs font-bold">Fixed / Flat</span>
+                </button>
+              </div>
             </div>
 
-            <div>
-              <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Min Hours <span className="normal-case font-normal text-slate-400">(0.5 = 30 min)</span></label>
-              <input
-                type="number"
-                min="0.5"
-                step="0.5"
-                value={minHours}
-                onChange={(e) => setMinHours(parseFloat(e.target.value) || 0.5)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
-              />
-            </div>
+            {/* Dynamic Charge Inputs */}
+            {chargeType === 'PER_HOUR' && (
+              <>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Hourly Rate (₹/hr)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={hourlyPrice}
+                    onChange={(e) => setHourlyPrice(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+                  />
+                </div>
 
-            <div>
-              <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Max Hours</label>
-              <input
-                type="number"
-                min="1"
-                value={maxHours}
-                onChange={(e) => setMaxHours(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
-              />
-            </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Min Hours <span className="normal-case font-normal text-slate-400">(0.5 = 30 min)</span></label>
+                  <input
+                    type="number"
+                    min="0.5"
+                    step="0.5"
+                    value={minHours}
+                    onChange={(e) => setMinHours(parseFloat(e.target.value) || 0.5)}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Max Hours</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={maxHours}
+                    onChange={(e) => setMaxHours(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+                  />
+                </div>
+              </>
+            )}
+
+            {chargeType === 'UNIT_WISE' && (
+              <>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Unit Name</label>
+                  <input
+                    type="text"
+                    value={unitName}
+                    onChange={(e) => setUnitName(e.target.value)}
+                    placeholder="e.g. sq ft, piece, room, tap"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+                  />
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {['sq ft', 'piece', 'item', 'room', 'tap', 'point', 'appliance', 'kg'].map(chip => (
+                      <button
+                        key={chip}
+                        type="button"
+                        onClick={() => setUnitName(chip)}
+                        className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium transition ${
+                          unitName === chip ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">
+                    Price per {unitName || 'Unit'} (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={pricePerUnit}
+                    onChange={(e) => setPricePerUnit(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+                  />
+                </div>
+              </>
+            )}
+
+            {chargeType === 'NONE' && (
+              <div className="col-span-2">
+                <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Fixed / Flat Price (₹)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={basePrice}
+                  onChange={(e) => setBasePrice(e.target.value)}
+                  placeholder="0"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+                />
+              </div>
+            )}
 
             <div>
               <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Discount Type</label>
@@ -347,6 +476,10 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
   const [name, setName] = useState('')
   const [subcategoryId, setSubcategoryId] = useState('')
   const [description, setDescription] = useState('')
+  const [chargeType, setChargeType] = useState('PER_HOUR')
+  const [unitName, setUnitName] = useState('')
+  const [pricePerUnit, setPricePerUnit] = useState(0)
+  const [basePrice, setBasePrice] = useState(0)
   const [hourlyPrice, setHourlyPrice] = useState(0)
   const [minHours, setMinHours] = useState(1)
   const [maxHours, setMaxHours] = useState(24)
@@ -363,7 +496,11 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
       setName(service.name || '')
       setSubcategoryId(service.subcategoryId || (subcategories[0]?._id ?? ''))
       setDescription(service.description || '')
-      setHourlyPrice(service.hourlyPrice ?? 0)
+      setChargeType(service.chargeType || 'PER_HOUR')
+      setUnitName(service.unitName || '')
+      setPricePerUnit(service.pricePerUnit ?? service.basePrice ?? 0)
+      setBasePrice(service.basePrice ?? service.hourlyPrice ?? 0)
+      setHourlyPrice(service.hourlyPrice ?? service.basePrice ?? 0)
       setMinHours(service.minHours ?? 1)
       setMaxHours(service.maxHours ?? 24)
       setDiscountType(service.discountType ?? 'PERCENTAGE')
@@ -412,14 +549,31 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
     setError('')
     setBusy(true)
     try {
+      let resolvedBasePrice = 0
+      let resolvedHourlyPrice = 0
+      let resolvedPricePerUnit = 0
+
+      if (chargeType === 'PER_HOUR') {
+        resolvedHourlyPrice = Number(hourlyPrice) || 0
+        resolvedBasePrice = resolvedHourlyPrice
+      } else if (chargeType === 'UNIT_WISE') {
+        resolvedPricePerUnit = Number(pricePerUnit) || 0
+        resolvedBasePrice = resolvedPricePerUnit
+      } else {
+        resolvedBasePrice = Number(basePrice) || 0
+      }
+
       const payload = {
         name: name.trim(),
         subcategoryId,
         description: description.trim(),
-        basePrice: Number(hourlyPrice), // Keep schema happy
-        hourlyPrice: Number(hourlyPrice),
-        minHours: parseFloat(minHours) || 0.5,
-        maxHours: Number(maxHours),
+        chargeType,
+        unitName: chargeType === 'UNIT_WISE' ? unitName.trim() : '',
+        pricePerUnit: resolvedPricePerUnit,
+        basePrice: resolvedBasePrice,
+        hourlyPrice: resolvedHourlyPrice,
+        minHours: chargeType === 'PER_HOUR' ? (parseFloat(minHours) || 0.5) : 1,
+        maxHours: chargeType === 'PER_HOUR' ? Number(maxHours || 24) : 24,
         discountType,
         discountValue: Number(discountValue),
         isAllZones: zones.length === activeZones.length,
@@ -489,39 +643,143 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
               />
             </div>
 
-            <div className="col-span-2 sm:col-span-1">
-              <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Price (₹)</label>
-              <input
-                type="number"
-                min="0"
-                value={hourlyPrice}
-                onChange={(e) => setHourlyPrice(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
-              />
+            {/* Charges Option: 3 options */}
+            <div className="col-span-2">
+              <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-500">Charges Option</label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setChargeType('PER_HOUR')}
+                  className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-2.5 text-center transition ${
+                    chargeType === 'PER_HOUR'
+                      ? 'border-brand bg-brand/5 text-brand ring-2 ring-brand/20 font-bold'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  <span className="text-base">⏱️</span>
+                  <span className="text-xs font-bold">Per Hour</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChargeType('UNIT_WISE')}
+                  className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-2.5 text-center transition ${
+                    chargeType === 'UNIT_WISE'
+                      ? 'border-brand bg-brand/5 text-brand ring-2 ring-brand/20 font-bold'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  <span className="text-base">📦</span>
+                  <span className="text-xs font-bold">Unit Wise</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChargeType('NONE')}
+                  className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-2.5 text-center transition ${
+                    chargeType === 'NONE'
+                      ? 'border-brand bg-brand/5 text-brand ring-2 ring-brand/20 font-bold'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  <span className="text-base">🏷️</span>
+                  <span className="text-xs font-bold">Fixed / Flat</span>
+                </button>
+              </div>
             </div>
 
-            <div>
-              <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Min Hours <span className="normal-case font-normal text-slate-400">(0.5 = 30 min)</span></label>
-              <input
-                type="number"
-                min="0.5"
-                step="0.5"
-                value={minHours}
-                onChange={(e) => setMinHours(parseFloat(e.target.value) || 0.5)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
-              />
-            </div>
+            {/* Dynamic Charge Inputs */}
+            {chargeType === 'PER_HOUR' && (
+              <>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Hourly Rate (₹/hr)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={hourlyPrice}
+                    onChange={(e) => setHourlyPrice(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+                  />
+                </div>
 
-            <div>
-              <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Max Hours</label>
-              <input
-                type="number"
-                min="1"
-                value={maxHours}
-                onChange={(e) => setMaxHours(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
-              />
-            </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Min Hours <span className="normal-case font-normal text-slate-400">(0.5 = 30 min)</span></label>
+                  <input
+                    type="number"
+                    min="0.5"
+                    step="0.5"
+                    value={minHours}
+                    onChange={(e) => setMinHours(parseFloat(e.target.value) || 0.5)}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Max Hours</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={maxHours}
+                    onChange={(e) => setMaxHours(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+                  />
+                </div>
+              </>
+            )}
+
+            {chargeType === 'UNIT_WISE' && (
+              <>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Unit Name</label>
+                  <input
+                    type="text"
+                    value={unitName}
+                    onChange={(e) => setUnitName(e.target.value)}
+                    placeholder="e.g. sq ft, piece, room, tap"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+                  />
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {['sq ft', 'piece', 'item', 'room', 'tap', 'point', 'appliance', 'kg'].map(chip => (
+                      <button
+                        key={chip}
+                        type="button"
+                        onClick={() => setUnitName(chip)}
+                        className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium transition ${
+                          unitName === chip ? 'bg-brand text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">
+                    Price per {unitName || 'Unit'} (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={pricePerUnit}
+                    onChange={(e) => setPricePerUnit(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+                  />
+                </div>
+              </>
+            )}
+
+            {chargeType === 'NONE' && (
+              <div className="col-span-2">
+                <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Fixed / Flat Price (₹)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={basePrice}
+                  onChange={(e) => setBasePrice(e.target.value)}
+                  placeholder="0"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+                />
+              </div>
+            )}
 
             <div>
               <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Discount Type</label>
@@ -742,9 +1000,37 @@ function ViewServiceModal({ open, service, onClose }) {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-[10px] font-bold uppercase text-slate-400">Price</p>
-                    <p className="text-sm font-medium text-blue-600 font-mono">₹{displayData.hourlyPrice}</p>
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Charge Type</p>
+                    <p className="text-sm font-semibold text-slate-800">
+                      {displayData.chargeType === 'UNIT_WISE'
+                        ? '📦 Unit Wise'
+                        : displayData.chargeType === 'NONE'
+                        ? '🏷️ Fixed / Flat'
+                        : '⏱️ Per Hour'}
+                    </p>
                   </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Price / Rate</p>
+                    <p className="text-sm font-bold text-blue-600 font-mono">
+                      {displayData.chargeType === 'UNIT_WISE'
+                        ? `₹${displayData.pricePerUnit || displayData.basePrice || 0} / ${displayData.unitName || 'unit'}`
+                        : displayData.chargeType === 'NONE'
+                        ? `₹${displayData.basePrice || displayData.hourlyPrice || 0} (Fixed)`
+                        : `₹${displayData.hourlyPrice || displayData.basePrice || 0}/hr`}
+                    </p>
+                  </div>
+                  {displayData.chargeType === 'PER_HOUR' && (
+                    <>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400">Min Hours</p>
+                        <p className="text-sm font-medium text-slate-700">{displayData.minHours || 1} hr</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400">Max Hours</p>
+                        <p className="text-sm font-medium text-slate-700">{displayData.maxHours || 24} hrs</p>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div>
                   <p className="text-[10px] font-bold uppercase text-slate-400">Status</p>
@@ -1070,7 +1356,7 @@ export function AdminServicesPage() {
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Sub-Category</th>
                 <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3 text-right">Price</th>
+                <th className="px-4 py-3 text-right">Charges / Rate</th>
                 <th className="px-4 py-3 text-center">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -1110,34 +1396,43 @@ export function AdminServicesPage() {
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-sm text-slate-700">
                       {(() => {
-                        let displayPrice = s.hourlyPrice;
+                        const ct = s.chargeType || 'PER_HOUR';
+                        let displayPrice = ct === 'UNIT_WISE'
+                          ? (s.pricePerUnit || s.basePrice || s.hourlyPrice || 0)
+                          : ct === 'NONE'
+                          ? (s.basePrice || s.hourlyPrice || 0)
+                          : (s.hourlyPrice || s.basePrice || 0);
                         let isZonePrice = false;
                         if (zoneFilter !== 'all') {
                           const matchedZone = (s.zones || []).find(z => {
                             const zid = typeof z === 'string' ? z : (typeof z.zone === 'object' ? z.zone?._id : z.zone);
                             return String(zid) === zoneFilter;
                           });
-                          if (matchedZone) {
-                            if (typeof matchedZone === 'string') {
-                              // If it's a legacy string zone, it doesn't have a specific price override
-                              // But it IS in the zone, so we could show GLOBAL badge, or ZONE badge.
-                              // Let's stick with GLOBAL since there's no price override.
-                            } else if (typeof matchedZone.price === 'number') {
-                              displayPrice = matchedZone.price;
-                              isZonePrice = true;
-                            }
+                          if (matchedZone && typeof matchedZone.price === 'number') {
+                            displayPrice = matchedZone.price;
+                            isZonePrice = true;
                           }
                         }
                         return (
-                          <div className="flex flex-col items-end gap-0.5">
-                            <span>₹{displayPrice}</span>
-                            {zoneFilter !== 'all' ? (
-                              isZonePrice ? (
-                                <span className="rounded bg-brand/10 px-1 py-0.5 text-[9px] font-bold text-brand uppercase tracking-wider">Zone</span>
-                              ) : (
-                                <span className="rounded bg-slate-100 px-1 py-0.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">Global</span>
-                              )
-                            ) : null}
+                          <div className="flex flex-col items-end gap-1">
+                            <div className="font-bold text-slate-900">
+                              ₹{displayPrice}
+                              <span className="text-xs font-normal text-slate-500 ml-0.5">
+                                {ct === 'UNIT_WISE' ? `/${s.unitName || 'unit'}` : ct === 'NONE' ? ' (flat)' : '/hr'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">
+                                {ct === 'UNIT_WISE' ? '📦 Unit' : ct === 'NONE' ? '🏷️ Fixed' : '⏱️ Hourly'}
+                              </span>
+                              {zoneFilter !== 'all' ? (
+                                isZonePrice ? (
+                                  <span className="rounded bg-brand/10 px-1 py-0.5 text-[9px] font-bold text-brand uppercase tracking-wider">Zone</span>
+                                ) : (
+                                  <span className="rounded bg-slate-100 px-1 py-0.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider">Global</span>
+                                )
+                              ) : null}
+                            </div>
                           </div>
                         );
                       })()}
