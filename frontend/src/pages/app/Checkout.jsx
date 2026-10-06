@@ -361,10 +361,28 @@ export function Checkout() {
           <p className="mt-2 text-sm font-semibold text-rose-700">{billError}</p>
         ) : bill ? (
           <div className="mt-3 space-y-2 text-sm">
+            {bill.originalSubTotal && bill.serviceDiscount > 0 ? (
+              <div className="flex justify-between">
+                <span className="text-slate-600">Original Rate</span>
+                <span className="text-slate-400 line-through">{formatInr(bill.originalSubTotal)}</span>
+              </div>
+            ) : null}
             <div className="flex justify-between">
               <span className="text-slate-600">Base Price</span>
               <span className="font-bold text-slate-900">{formatInr(bill.basePrice)}</span>
             </div>
+            {bill.serviceDiscount > 0 && (
+              <div className="flex justify-between font-semibold text-emerald-600">
+                <span>Special Service Offer</span>
+                <span>-{formatInr(bill.serviceDiscount)}</span>
+              </div>
+            )}
+            {bill.maxHourDiscount > 0 && (
+              <div className="flex justify-between font-semibold text-emerald-600">
+                <span>Duration Discount</span>
+                <span>-{formatInr(bill.maxHourDiscount)}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-slate-600">Platform Fee</span>
               <span className="font-bold text-slate-900">{formatInr(bill.platformFee)}</span>
@@ -379,6 +397,11 @@ export function Checkout() {
               <span className="font-extrabold text-slate-900">Total</span>
               <span className="font-extrabold text-brand">{formatInr(bill.totalAmount)}</span>
             </div>
+            {(bill.totalSavings > 0 || bill.serviceDiscount > 0) && (
+              <div className="mt-2.5 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/80 p-2 text-center text-xs font-bold text-emerald-800">
+                🎉 You saved {formatInr(bill.totalSavings || bill.serviceDiscount)} on this booking!
+              </div>
+            )}
           </div>
         ) : null}
       </GlassPanel>

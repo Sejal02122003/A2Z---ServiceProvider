@@ -24,30 +24,48 @@ export const calculateBill = asyncHandler(async (req, res) => {
   const resolveHourlyRate = async (sId) => {
     const service = await LabourService.findById(sId)
     let hourlyRate = 0
+    let originalHourlyRate = 0
+    let discountType = 'PERCENTAGE'
+    let discountValue = 0
+    let offerBadge = ''
     let name = ''
     let categoryId = null
     if (service) {
-      hourlyRate = service.basePrice
+      originalHourlyRate = service.hourlyPrice || service.basePrice || 0
+      discountType = service.discountType || 'PERCENTAGE'
+      discountValue = Number(service.discountValue || 0)
+      offerBadge = service.offerBadge || ''
       name = service.name
       const sub = await LabourSubcategory.findById(service.subcategoryId)
       if (sub) categoryId = sub.categoryId
       if (matchedZone && service.zones && service.zones.length > 0) {
         const zonePricing = service.zones.find(z => String(z.zone) === String(matchedZone._id))
         if (zonePricing && typeof zonePricing.price === 'number') {
-          hourlyRate = zonePricing.price
+          originalHourlyRate = zonePricing.price
         }
+      }
+      if (discountValue > 0) {
+        if (discountType === 'PERCENTAGE') {
+          hourlyRate = Math.max(0, Math.round(originalHourlyRate * (1 - discountValue / 100)))
+        } else {
+          hourlyRate = Math.max(0, originalHourlyRate - discountValue)
+        }
+      } else {
+        hourlyRate = originalHourlyRate
       }
     } else {
       const subcategory = await LabourSubcategory.findById(sId)
       if (subcategory) {
-        hourlyRate = subcategory.basePrice || 800
+        originalHourlyRate = subcategory.basePrice || 800
+        hourlyRate = originalHourlyRate
         name = subcategory.name
         categoryId = subcategory.categoryId
       } else {
         const { LabourCategory } = await import('../models/LabourCategory.js')
         const category = await LabourCategory.findById(sId)
         if (category) {
-          hourlyRate = 800
+          originalHourlyRate = 800
+          hourlyRate = originalHourlyRate
           name = category.name
           categoryId = category._id
         } else {
@@ -55,10 +73,12 @@ export const calculateBill = asyncHandler(async (req, res) => {
         }
       }
     }
-    return { hourlyRate, name, categoryId }
+    return { hourlyRate, originalHourlyRate, discountType, discountValue, offerBadge, name, categoryId }
   }
 
   let subTotal = 0
+  let originalSubTotal = 0
+  let serviceDiscount = 0
   let breakdown = []
 
   const servicesToCalculate = contractorServices && contractorServices.length > 0 
@@ -68,20 +88,31 @@ export const calculateBill = asyncHandler(async (req, res) => {
   let primaryCategoryId = null
   for (const item of servicesToCalculate) {
     if (!item.serviceId) continue
-    const { hourlyRate, name, categoryId, error } = await resolveHourlyRate(item.serviceId)
+    const { hourlyRate, originalHourlyRate, discountType, discountValue, offerBadge, name, categoryId, error } = await resolveHourlyRate(item.serviceId)
     if (error) return sendError(res, { message: error, statusCode: HTTP_STATUS.NOT_FOUND })
     
     if (!primaryCategoryId && categoryId) primaryCategoryId = categoryId
 
-    const itemTotal = hourlyRate * hours * item.quantity
+    const itemOriginalTotal = (originalHourlyRate || hourlyRate) * hours * (item.quantity || 1)
+    const itemTotal = hourlyRate * hours * (item.quantity || 1)
+    const itemDiscount = Math.max(0, itemOriginalTotal - itemTotal)
+
+    originalSubTotal += itemOriginalTotal
     subTotal += itemTotal
+    serviceDiscount += itemDiscount
+
     breakdown.push({
       serviceId: item.serviceId,
       name,
+      originalHourlyRate: originalHourlyRate || hourlyRate,
       hourlyRate,
+      discountType,
+      discountValue,
+      offerBadge,
       hours,
-      quantity: item.quantity,
-      subTotal: itemTotal
+      quantity: item.quantity || 1,
+      subTotal: itemTotal,
+      savings: itemDiscount,
     })
   }
 
@@ -91,7 +122,6 @@ export const calculateBill = asyncHandler(async (req, res) => {
   }
 
   // Calculate Subtotal (Hourly Rate * Hours * Quantity)
-  // subTotal already calculated above
   let maxHourDiscount = 0
 
   if (hours >= 8 && settings.maxHourDiscountPercentage > 0) {
@@ -138,8 +168,11 @@ export const calculateBill = asyncHandler(async (req, res) => {
 
   return sendSuccess(res, {
     data: {
+      originalSubTotal,
+      serviceDiscount,
       subTotal,
       maxHourDiscount,
+      totalSavings: serviceDiscount + maxHourDiscount,
       basePrice,
       platformFee,
       taxes,
@@ -191,12 +224,21 @@ export const createBooking = asyncHandler(async (req, res) => {
     let hrRate = 0
     const srv = await LabourService.findById(sId)
     if (srv) {
-      hrRate = srv.basePrice
+      let baseRate = srv.hourlyPrice || srv.basePrice || 0
       if (matchingZone && srv.zones && srv.zones.length > 0) {
         const zonePricing = srv.zones.find(z => String(z.zone) === String(matchingZone._id))
         if (zonePricing && typeof zonePricing.price === 'number') {
-          hrRate = zonePricing.price
+          baseRate = zonePricing.price
         }
+      }
+      if (srv.discountValue > 0) {
+        if (srv.discountType === 'PERCENTAGE') {
+          hrRate = Math.max(0, Math.round(baseRate * (1 - srv.discountValue / 100)))
+        } else {
+          hrRate = Math.max(0, baseRate - srv.discountValue)
+        }
+      } else {
+        hrRate = baseRate
       }
     }
     return hrRate

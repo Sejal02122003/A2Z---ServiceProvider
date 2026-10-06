@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { ChevronRight, Loader2, Search, Sparkles } from 'lucide-react'
+import { ChevronRight, Loader2, Search, Sparkles, Tag } from 'lucide-react'
 import { fetchLabourCategoriesGrouped } from '../../api/labourCategoriesApi.js'
 import { readAppUserLocation } from '../../lib/appUserLocationStorage.js'
 import { ApiError } from '../../api/http.js'
@@ -9,6 +9,8 @@ import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { buildBookingFlowPath } from '../../lib/bookingFlowNavigation.js'
 import { readBookingDraft, writeBookingDraft } from '../../lib/individualBookingDraft.js'
+import { getServiceOfferDetails } from '../../lib/serviceOfferUtils.js'
+import { ServiceOfferBadge } from '../../components/app/services/ServiceOfferBadge.jsx'
 
 export function ServiceCatalog() {
   const navigate = useNavigate()
@@ -139,21 +141,40 @@ export function ServiceCatalog() {
                             {(category.services || []).length === 0 ? (
                               <p className="px-8 py-2 text-xs text-slate-500">No services</p>
                             ) : (
-                              (category.services || []).map((sub) => (
-                                <button
-                                  key={sub._id}
-                                  type="button"
-                                  onClick={() => handleSubcategorySelect(category, null, group)}
-                                  className="flex w-full items-center justify-between gap-3 px-8 py-2.5 text-left transition hover:bg-brand/5"
-                                >
-                                  <div>
-                                    <p className="text-sm font-semibold text-slate-800">{sub.name}</p>
-                                  </div>
-                                  <span className="shrink-0 rounded-lg bg-brand/10 px-2.5 py-1 text-xs font-bold text-brand">
-                                    {sub.minHours === 0.5 ? `₹${Math.round(sub.hourlyPrice / 2)}/30min` : `₹${sub.hourlyPrice}/hr`}
-                                  </span>
-                                </button>
-                              ))
+                              (category.services || []).map((sub) => {
+                                const offer = getServiceOfferDetails(sub)
+                                return (
+                                  <button
+                                    key={sub._id}
+                                    type="button"
+                                    onClick={() => handleSubcategorySelect(category, null, group)}
+                                    className="flex w-full items-center justify-between gap-3 px-8 py-2.5 text-left transition hover:bg-brand/5 group"
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <p className="text-sm font-semibold text-slate-800 group-hover:text-brand transition truncate">{sub.name}</p>
+                                      {offer.hasOffer && (
+                                        <ServiceOfferBadge label={offer.offerBadge} variant="compact" className="!text-[9px] !py-0" />
+                                      )}
+                                    </div>
+                                    <div className="shrink-0 text-right flex items-center gap-1.5">
+                                      {offer.hasOffer ? (
+                                        <>
+                                          <span className="text-xs text-slate-400 line-through">
+                                            {offer.displayOriginalPrice}
+                                          </span>
+                                          <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-600/20">
+                                            {offer.displayPrice}
+                                          </span>
+                                        </>
+                                      ) : (
+                                        <span className="rounded-lg bg-brand/10 px-2.5 py-1 text-xs font-bold text-brand">
+                                          {offer.displayPrice}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </button>
+                                )
+                              })
                             )}
                           </div>
                         )}

@@ -60,6 +60,16 @@ const labourServiceSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    offerBadge: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    offerDescription: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     isAllZones: {
       type: Boolean,
       default: true,

@@ -1788,9 +1788,18 @@ export function IndividualBookingFlowPage() {
                       <span>{formatInr(calculatedBill.subTotal || calculatedBill.basePrice)}</span>
                     </div>
                   )}
+                  {calculatedBill.serviceDiscount > 0 ? (
+                    <div className="mt-1.5 flex justify-between font-semibold text-emerald-600">
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+                        Special Service Offer
+                      </span>
+                      <span>-{formatInr(calculatedBill.serviceDiscount)}</span>
+                    </div>
+                  ) : null}
                   {calculatedBill.maxHourDiscount > 0 ? (
                     <div className="mt-1 flex justify-between font-semibold text-emerald-600">
-                      <span>Discount</span>
+                      <span>Duration Discount (8+ hrs)</span>
                       <span>-{formatInr(calculatedBill.maxHourDiscount)}</span>
                     </div>
                   ) : null}
@@ -1806,6 +1815,11 @@ export function IndividualBookingFlowPage() {
                     <span>Total</span>
                     <span>{formatInr(calculatedBill.totalAmount)}</span>
                   </div>
+                  {calculatedBill.totalSavings > 0 && (
+                    <div className="mt-2.5 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/80 p-2 text-center text-xs font-bold text-emerald-800">
+                      🎉 You saved {formatInr(calculatedBill.totalSavings)} on this booking!
+                    </div>
+                  )}
                 </div>
               </div>
 

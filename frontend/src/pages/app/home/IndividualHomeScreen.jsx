@@ -38,6 +38,7 @@ import { IndividualHomeHeroCarousel } from '../../../components/app/individual/I
 import { IndividualHomeRecentlyBooked } from '../../../components/app/individual/IndividualHomeRecentlyBooked.jsx'
 import { IndividualHomeWorkerCarousel } from '../../../components/app/individual/IndividualHomeWorkerCarousel.jsx'
 import { IndividualHomeServiceSections } from '../../../components/app/individual/IndividualHomeServiceSections.jsx'
+import { IndividualHomeServiceOffers } from '../../../components/app/individual/IndividualHomeServiceOffers.jsx'
 import { BookingModeSheet } from '../../../components/app/booking/BookingModeSheet.jsx'
 import { BookingTypeSheet } from '../../../components/app/booking/BookingTypeSheet.jsx'
 import { writeBookingDraft, readBookingDraft } from '../../../lib/individualBookingDraft.js'
@@ -352,6 +353,12 @@ export function IndividualHomeScreen({ user }) {
         />
 
         <IndividualHomeHeroCarousel onBook={goSearch} />
+
+        <IndividualHomeServiceOffers
+          tradeGroups={tradeGroups}
+          loading={groupsLoading}
+          onSelectService={(cat) => handleQuickBookCategory(cat)}
+        />
 
         <IndividualHomeServiceSections
           tradeGroups={tradeGroups}

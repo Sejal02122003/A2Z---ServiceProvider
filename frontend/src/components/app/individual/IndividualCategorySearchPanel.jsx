@@ -40,18 +40,28 @@ function SwiggyGroupTile({ label, imageSrc, active, onClick }) {
 
 function SkillCard({ category, active, showGroupName, onClick }) {
   const img = getCategoryImageUrl(category)
+  const hasOffers = (category.services || []).some(s => (s.discountValue || 0) > 0)
+  const maxDiscount = Math.max(0, ...(category.services || []).map(s => Number(s.discountValue || 0)))
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className="lc-search-skill-card"
+      className="lc-search-skill-card relative group"
       data-active={active ? 'true' : 'false'}
     >
-      <div className="relative aspect-[4/3] bg-slate-100">
-        <img src={img} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
+      <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden">
+        <img src={img} alt="" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" loading="lazy" decoding="async" />
+        {hasOffers && maxDiscount > 0 && (
+          <div className="absolute top-1 left-1">
+            <span className="rounded-full bg-rose-600 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-white shadow-sm">
+              Up to {maxDiscount}% OFF
+            </span>
+          </div>
+        )}
       </div>
       <div className="px-2.5 py-2">
-        <p className="line-clamp-2 text-xs font-bold leading-snug text-slate-900">{category.name}</p>
+        <p className="line-clamp-2 text-xs font-bold leading-snug text-slate-900 group-hover:text-brand transition">{category.name}</p>
         {showGroupName && category.groupName ? (
           <p className="mt-0.5 line-clamp-1 text-[10px] font-medium text-slate-500">{category.groupName}</p>
         ) : null}

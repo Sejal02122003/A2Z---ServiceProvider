@@ -1,6 +1,8 @@
-import { ChevronRight, Loader2, Wrench } from 'lucide-react'
+import { ChevronRight, Loader2, Wrench, Sparkles, Tag, Flame } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getCategoryImageUrl } from '../../../lib/labourCategoryDisplay.js'
+import { getServiceOfferDetails } from '../../../lib/serviceOfferUtils.js'
+import { ServiceOfferBadge } from '../services/ServiceOfferBadge.jsx'
 
 const LAYOUTS = [
   {
@@ -71,23 +73,44 @@ function CarouselLayout({ categories, onQuickBook }) {
   const items = categories.slice(0, 8)
   return (
     <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 scrollbar-none [&::-webkit-scrollbar]:hidden">
-      {items.map((cat) => (
-        <button
-          key={String(cat._id)}
-          type="button"
-          onClick={() => onQuickBook?.(cat)}
-          className="lc-home-service-card snap-start"
-        >
-          <ServiceImage src={getCategoryImageUrl(cat)} alt="" className="lc-home-service-card-img" />
-          <div className="lc-home-service-card-body">
-            <p className="line-clamp-2 text-sm font-bold text-slate-900">{cat.name}</p>
-            {cat.subtitle ? (
-              <p className="mt-0.5 line-clamp-1 text-[11px] font-medium text-slate-500">{cat.subtitle}</p>
-            ) : null}
-            <p className="mt-1.5 text-[10px] font-bold text-brand">Book now</p>
-          </div>
-        </button>
-      ))}
+      {items.map((cat) => {
+        const topOffer = (cat.services || [])
+          .map(s => getServiceOfferDetails(s))
+          .filter(o => o.hasOffer)
+          .sort((a, b) => b.discountValue - a.discountValue)[0]
+
+        return (
+          <button
+            key={String(cat._id)}
+            type="button"
+            onClick={() => onQuickBook?.(cat)}
+            className="lc-home-service-card snap-start relative group"
+          >
+            <div className="relative h-28 w-full overflow-hidden rounded-t-[1.15rem]">
+              <ServiceImage src={getCategoryImageUrl(cat)} alt="" className="lc-home-service-card-img" />
+              {topOffer && (
+                <div className="absolute top-1.5 left-1.5">
+                  <ServiceOfferBadge label={topOffer.offerBadge} variant="ribbon" className="!text-[8px]" />
+                </div>
+              )}
+            </div>
+            <div className="lc-home-service-card-body">
+              <p className="line-clamp-2 text-sm font-bold text-slate-900 group-hover:text-brand transition">{cat.name}</p>
+              {cat.subtitle ? (
+                <p className="mt-0.5 line-clamp-1 text-[11px] font-medium text-slate-500">{cat.subtitle}</p>
+              ) : null}
+              <div className="mt-1.5 flex items-center justify-between">
+                <span className="text-[10px] font-bold text-brand">Book now</span>
+                {topOffer && (
+                  <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded">
+                    Offers on
+                  </span>
+                )}
+              </div>
+            </div>
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -102,37 +125,66 @@ function ListLayout({ categories, onQuickBook }) {
   return (
     <div className="space-y-3">
       <ul className="space-y-2">
-        {items.map((svc) => (
-          <li key={String(svc._id)}>
-            <button
-              type="button"
-              onClick={() => onQuickBook?.(svc.parentCat)}
-              className="lc-home-service-list-row"
-            >
-              <div className="h-14 w-14 shrink-0 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden">
-                {svc.iconUrl ? (
-                  <img src={getCategoryImageUrl({ name: svc.name, imageUrl: svc.iconUrl })} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <ServiceImage
-                    src={getCategoryImageUrl(svc.parentCat)}
-                    alt=""
-                    className="h-14 w-14 shrink-0 rounded-xl"
-                  />
-                )}
-              </div>
-              <span className="min-w-0 flex-1 text-left ml-1">
-                <span className="block truncate text-sm font-bold text-slate-900">{svc.name}</span>
-                <span className="block truncate text-xs font-medium text-slate-500">
-                  {svc.parentCat.name}
+        {items.map((svc) => {
+          const offer = getServiceOfferDetails(svc);
+
+          return (
+            <li key={String(svc._id)}>
+              <button
+                type="button"
+                onClick={() => onQuickBook?.(svc.parentCat)}
+                className="lc-home-service-list-row group"
+              >
+                <div className="relative h-14 w-14 shrink-0 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden">
+                  {svc.iconUrl ? (
+                    <img src={getCategoryImageUrl({ name: svc.name, imageUrl: svc.iconUrl })} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <ServiceImage
+                      src={getCategoryImageUrl(svc.parentCat)}
+                      alt=""
+                      className="h-14 w-14 shrink-0 rounded-xl"
+                    />
+                  )}
+                  {offer.hasOffer && (
+                    <div className="absolute top-0.5 left-0.5">
+                      <span className="rounded bg-rose-600 px-1 py-0.2 text-[7px] font-black uppercase text-white shadow">
+                        %{offer.discountValue}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <span className="min-w-0 flex-1 text-left ml-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="block truncate text-sm font-bold text-slate-900 group-hover:text-brand transition">{svc.name}</span>
+                    {offer.hasOffer && (
+                      <ServiceOfferBadge label={offer.offerBadge} variant="compact" className="!text-[9px] !py-0" />
+                    )}
+                  </div>
+                  <span className="block truncate text-xs font-medium text-slate-500">
+                    {svc.parentCat.name}
+                  </span>
                 </span>
-              </span>
-              <span className="shrink-0 text-sm font-bold text-blue-600">
-                {svc.minHours === 0.5 ? `₹${Math.round(svc.hourlyPrice / 2)}/30min` : `₹${svc.hourlyPrice}/hr`}
-              </span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 ml-2" aria-hidden />
-            </button>
-          </li>
-        ))}
+                <span className="shrink-0 text-right pr-1">
+                  {offer.hasOffer ? (
+                    <div>
+                      <span className="block text-[10px] text-slate-400 line-through">
+                        {offer.displayOriginalPrice}
+                      </span>
+                      <span className="text-sm font-bold text-blue-600">
+                        {offer.displayPrice}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-sm font-bold text-blue-600">
+                      {offer.displayPrice}
+                    </span>
+                  )}
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-slate-300 ml-1.5" aria-hidden />
+              </button>
+            </li>
+          )
+        })}
         {items.length === 0 && (
           <li className="text-sm text-slate-500 py-4 text-center">No services available.</li>
         )}

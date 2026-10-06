@@ -278,7 +278,7 @@ export const patchSubcategory = asyncHandler(async (req, res) => {
 })
 
 export const createService = asyncHandler(async (req, res) => {
-  const { subcategoryId, name, description = '', basePrice = 0, estimatedDurationMins = 60, iconUrl, hourlyPrice = 0, minHours = 1, maxHours = 24, discountType = 'PERCENTAGE', discountValue = 0, isAllZones = true, zones = [], isActive } = req.body
+  const { subcategoryId, name, description = '', basePrice = 0, estimatedDurationMins = 60, iconUrl, hourlyPrice = 0, minHours = 1, maxHours = 24, discountType = 'PERCENTAGE', discountValue = 0, offerBadge = '', offerDescription = '', isAllZones = true, zones = [], isActive } = req.body
   const subcat = await LabourSubcategory.findById(subcategoryId)
   if (!subcat) {
     return sendError(res, { message: 'Subcategory not found', statusCode: HTTP_STATUS.NOT_FOUND, code: 'NOT_FOUND' })
@@ -311,6 +311,8 @@ export const createService = asyncHandler(async (req, res) => {
     maxHours: Number(maxHours),
     discountType,
     discountValue: Number(discountValue),
+    offerBadge: String(offerBadge || '').trim(),
+    offerDescription: String(offerDescription || '').trim(),
     isAllZones: Boolean(isAllZones),
     zones: Array.isArray(zones) ? zones : [],
     isActive: isActive !== undefined ? Boolean(isActive) : true,
@@ -339,7 +341,7 @@ export const patchService = asyncHandler(async (req, res) => {
   if (!s) {
     return sendError(res, { message: 'Service not found', statusCode: HTTP_STATUS.NOT_FOUND, code: 'NOT_FOUND' })
   }
-  const { name, description, basePrice, estimatedDurationMins, isActive, iconUrl, hourlyPrice, minHours, maxHours, discountType, discountValue, isAllZones, zones } = req.body
+  const { name, description, basePrice, estimatedDurationMins, isActive, iconUrl, hourlyPrice, minHours, maxHours, discountType, discountValue, offerBadge, offerDescription, isAllZones, zones } = req.body
   if (name != null) s.name = String(name).trim()
   if (description != null) s.description = String(description)
   if (basePrice != null) s.basePrice = Number(basePrice)
@@ -350,6 +352,8 @@ export const patchService = asyncHandler(async (req, res) => {
   if (maxHours != null) s.maxHours = Number(maxHours)
   if (discountType != null) s.discountType = discountType
   if (discountValue != null) s.discountValue = Number(discountValue)
+  if (offerBadge !== undefined) s.offerBadge = String(offerBadge || '').trim()
+  if (offerDescription !== undefined) s.offerDescription = String(offerDescription || '').trim()
   if (isAllZones != null) s.isAllZones = Boolean(isAllZones)
   if (zones != null && Array.isArray(zones)) s.zones = zones
   if (iconUrl !== undefined) {
