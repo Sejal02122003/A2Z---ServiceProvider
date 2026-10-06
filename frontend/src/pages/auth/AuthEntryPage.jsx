@@ -40,13 +40,6 @@ function isValidIndianMobile(digits) {
   return digits.length === 10 && /^[6-9]\d{9}$/.test(digits)
 }
 
-const OTP_BYPASS_HINT = import.meta.env.VITE_OTP_BYPASS_HINT === 'true'
-
-function demoOtpFromPhone(digits) {
-  if (!digits || digits.length < 6) return null
-  return digits.slice(-6)
-}
-
 function FeedbackBanner({ variant, children }) {
   if (!children) return null
   const styles =
@@ -182,9 +175,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
       setStep('otp')
       setBanner({
         variant: 'success',
-        message: OTP_BYPASS_HINT && p
-          ? `Demo OTP: enter the last 6 digits of ${p} (${demoOtpFromPhone(p)}).`
-          : 'OTP sent. Check SMS — in development it may appear in the server terminal.',
+        message: 'OTP has been sent to your mobile number.',
       })
     } catch (e) {
       if (e instanceof ApiError && (e.code === 'USER_NOT_FOUND' || e.statusCode === 404)) {
@@ -520,11 +511,6 @@ export function AuthEntryPage({ authGroup = 'users' }) {
                   Code sent to{' '}
                   <span className="font-bold tabular-nums text-slate-900">+91 {phone}</span>
                 </p>
-                {OTP_BYPASS_HINT && p ? (
-                  <p className="mt-2 rounded-xl border border-brand/20 bg-brand/5 px-3 py-2 text-xs font-semibold text-brand">
-                    Demo: OTP is the last 6 digits of your number ({demoOtpFromPhone(p)}).
-                  </p>
-                ) : null}
                 <p className="mt-4 mb-3 text-[11px] font-bold uppercase tracking-wide text-slate-500">Enter OTP</p>
                 <div className="flex gap-2" onPaste={handleOtpPaste}>
                   {otpCells.map((digit, i) => (
