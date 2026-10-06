@@ -192,6 +192,24 @@ export function AuthEntryPage({ authGroup = 'users' }) {
           variant: 'error',
           message: 'No account found for this mobile number. Please tap "Register" above to create an account.',
         })
+      } else if (e instanceof ApiError && e.code === 'WRONG_PORTAL') {
+        const targetPortal = authGroup === 'users' ? 'Labour' : 'Customer'
+        const targetPath = authGroup === 'users' ? '/labours/auth' : '/users/auth'
+        setBanner({
+          variant: 'error',
+          message: (
+            <span>
+              {e.message}{' '}
+              <button
+                type="button"
+                onClick={() => navigate(targetPath)}
+                className="font-bold underline hover:opacity-80 ml-1 text-brand"
+              >
+                Go to {targetPortal} login &rarr;
+              </button>
+            </span>
+          ),
+        })
       } else {
         setBanner({
           variant: 'error',

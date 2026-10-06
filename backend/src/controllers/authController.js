@@ -146,23 +146,9 @@ export const loginRequestOtp = asyncHandler(async (req, res) => {
     })
   }
 
-  if (authGroup === 'users' && user.role === USER_ROLES.LABOUR) {
+  if (user.isActive === false) {
     return sendError(res, {
-      message: 'Please log in using the Labour app.',
-      statusCode: HTTP_STATUS.FORBIDDEN,
-      code: 'WRONG_PORTAL',
-    })
-  }
-  if (authGroup === 'labours' && user.role !== USER_ROLES.LABOUR) {
-    return sendError(res, {
-      message: 'Please log in using the User app.',
-      statusCode: HTTP_STATUS.FORBIDDEN,
-      code: 'WRONG_PORTAL',
-    })
-  }
-  if (!user.isActive) {
-    return sendError(res, {
-      message: 'Account is disabled',
+      message: 'Account is disabled. Please contact support.',
       statusCode: HTTP_STATUS.FORBIDDEN,
       code: 'ACCOUNT_DISABLED',
     })
