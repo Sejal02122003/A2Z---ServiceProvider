@@ -9,44 +9,7 @@ import { IndividualHomeScreen } from './home/IndividualHomeScreen.jsx'
 import { LabourHomeScreen } from './home/LabourHomeScreen.jsx'
 import { userSubscriptionApi } from '../../api/userSubscriptionApi.js'
 
-/**
- * For labour users — check trial/subscription gate before rendering dashboard
- */
 function LabourGate({ user }) {
-  const navigate = useNavigate()
-  const [checking, setChecking] = useState(true)
-
-  useEffect(() => {
-    // Only gate if KYC is verified
-    if (user?.labourProfile?.kycStatus !== KYC_STATUS.VERIFIED) {
-      setChecking(false)
-      return
-    }
-
-    userSubscriptionApi.checkAccess()
-      .then((res) => {
-        const data = res?.data
-        if (!data?.hasAccess) {
-          navigate('/app/subscription', { replace: true })
-        } else {
-          setChecking(false)
-        }
-      })
-      .catch(() => {
-        // On error, allow access (fail-open)
-        setChecking(false)
-      })
-  }, [user, navigate])
-
-  if (checking) {
-    // Brief loading — prevents flash of dashboard before gate redirect
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand/20 border-t-brand" />
-      </div>
-    )
-  }
-
   return <LabourHomeScreen user={user} />
 }
 
