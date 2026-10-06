@@ -101,18 +101,29 @@ export const getEarningsSummary = asyncHandler(async (req, res) => {
   let weekPaise = 0
   let monthPaise = 0
 
-  // Track refunds separately (do NOT include in work earnings)
+  // Track refunds and penalties separately
   let refundsPaise = 0
+  let penaltiesPaise = 0
   const wallet = await Wallet.findOne({ userId })
   if (wallet) {
-    const refundTransactions = await WalletTransaction.find({
-      walletId: wallet._id,
-      type: 'CREDIT',
-      context: 'REFUND'
-    })
+    const [refundTransactions, penaltyTransactions] = await Promise.all([
+      WalletTransaction.find({
+        walletId: wallet._id,
+        type: 'CREDIT',
+        context: 'REFUND'
+      }),
+      WalletTransaction.find({
+        walletId: wallet._id,
+        type: 'DEBIT',
+        context: 'PENALTY'
+      })
+    ])
 
     refundTransactions.forEach(t => {
-      refundsPaise += t.amount * 100
+      refundsPaise += (t.amount || 0) * 100
+    })
+    penaltyTransactions.forEach(t => {
+      penaltiesPaise += (t.amount || 0) * 100
     })
   }
 
@@ -161,7 +172,7 @@ export const getEarningsSummary = asyncHandler(async (req, res) => {
   ])
   const paidInr = paidRequests.length > 0 ? paidRequests[0].total : 0
 
-  const availableInr = Math.floor(earnedPaise / 100) - paidInr - pendingInr
+  const availableInr = Math.floor(earnedPaise / 100) - paidInr - pendingInr - Math.floor(penaltiesPaise / 100)
   const availablePaise = Math.max(0, availableInr * 100)
   const pendingPaise = pendingInr * 100
 
@@ -174,7 +185,8 @@ export const getEarningsSummary = asyncHandler(async (req, res) => {
         monthPaise,
         availablePaise,
         pendingPaise,
-        refundsPaise
+        refundsPaise,
+        penaltiesPaise
       }
     }
   })
@@ -280,4 +292,16 @@ export const requestWithdrawal = asyncHandler(async (req, res) => {
 export const getMyWithdrawals = asyncHandler(async (req, res) => {
   const requests = await WithdrawalRequest.find({ labourId: req.user._id }).sort({ createdAt: -1 })
   return sendSuccess(res, { data: { requests } })
+})
+
+export const getMyTransactions = asyncHandler(async (req, res) => {
+  const wallet = await Wallet.findOne({ userId: req.user._id })
+  if (!wallet) {
+    return sendSuccess(res, { data: { transactions: [] } })
+  }
+  const transactions = await WalletTransaction.find({ walletId: wallet._id })
+    .sort({ createdAt: -1 })
+    .limit(50)
+    .lean()
+  return sendSuccess(res, { data: { transactions } })
 })

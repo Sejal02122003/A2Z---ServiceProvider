@@ -21,10 +21,12 @@ import {
   Camera,
   Loader2,
   Wallet,
+  AlertOctagon,
 } from 'lucide-react'
 import { AppBadge } from '../app-ui/data-display/AppBadge.jsx'
 import { AppSecondaryButton } from '../app/AppSecondaryButton.jsx'
 import { GlassPanel } from '../ui/GlassPanel.jsx'
+import { LabourBounceCancelModal } from './LabourBounceCancelModal.jsx'
 import { buildAssignmentDetailSnapshot } from '../../lib/labourAssignmentDetail.js'
 import { uploadMedia, assetUrlFromUpload } from '../../api/uploadApi.js'
 import { UPLOAD_FOLDERS } from '../../constants/uploadFolders.js'
@@ -132,6 +134,7 @@ export function LabourAssignmentDetailModal({ open, onClose, job, rawJob, assign
   const [uploadingImage, setUploadingImage] = useState(false)
   const [showPaymentWaiting, setShowPaymentWaiting] = useState(false)
   const [livePaymentStatus, setLivePaymentStatus] = useState(rawJob?.paymentStatus || 'PENDING')
+  const [showCancelModal, setShowCancelModal] = useState(false)
   
   const socket = useSocket()
   const user = useSelector(state => state.auth.user)
@@ -527,6 +530,20 @@ export function LabourAssignmentDetailModal({ open, onClose, job, rawJob, assign
                       </AppPrimaryButton>
                     </div>
                   )}
+
+                  {['ACCEPTED', 'EN_ROUTE'].includes(displayStatus) && (
+                    <div className="pt-2 border-t border-slate-200/60">
+                      <button
+                        type="button"
+                        onClick={() => setShowCancelModal(true)}
+                        disabled={loading}
+                        className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50/70 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors"
+                      >
+                        <AlertOctagon className="h-3.5 w-3.5" />
+                        Cancel Assignment / Bounce Job
+                      </button>
+                    </div>
+                  )}
                 </GlassPanel>
               </section>
             ) : null}
@@ -728,6 +745,17 @@ export function LabourAssignmentDetailModal({ open, onClose, job, rawJob, assign
               </motion.div>
             </div>
           )}
+
+          <LabourBounceCancelModal
+            open={showCancelModal}
+            onClose={() => setShowCancelModal(false)}
+            booking={activeRawJob}
+            onCancelled={({ penaltyDeducted, reason }) => {
+              setShowCancelModal(false)
+              if (onRefresh) onRefresh()
+              onClose()
+            }}
+          />
         </motion.div>
       ) : null}
     </AnimatePresence>

@@ -599,13 +599,81 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
     }
   }
 
+  // Phase 5: Handle Bounce Penalty if Labourer cancels an accepted/en-route booking
+  let penaltyDeducted = 0
+  if (status === 'CANCELLED') {
+    const { reason = '', waivePenalty = false } = req.body
+    booking.cancellationReason = reason || 'Cancelled'
+    booking.cancelledAt = new Date()
+
+    if (isLabourer) {
+      booking.cancelledBy = 'LABOUR'
+      if (assignment) {
+        assignment.cancellationReason = reason || 'Cancelled by worker'
+      }
+
+      // Check if reason is an exempt fake/bogus customer alert
+      const lowerReason = String(reason).toLowerCase()
+      const isExempt = Boolean(waivePenalty) || 
+                       lowerReason.includes('fake') || 
+                       lowerReason.includes('unreachable') || 
+                       lowerReason.includes('wrong address') ||
+                       lowerReason.includes('customer requested') ||
+                       lowerReason.includes('customer cancelled')
+
+      if (!isExempt) {
+        const settings = await SystemSetting.findOne({ configKey: 'master_config' })
+        const penaltyAmount = Number(settings?.cancellationPenalty ?? 50)
+        
+        if (penaltyAmount > 0) {
+          penaltyDeducted = penaltyAmount
+          let wallet = await Wallet.findOne({ userId: req.user._id })
+          if (!wallet) wallet = await Wallet.create({ userId: req.user._id })
+
+          wallet.selfBalance = (wallet.selfBalance || 0) - penaltyAmount
+          await wallet.save()
+
+          booking.penaltyDeducted = penaltyAmount
+          if (assignment) assignment.penaltyDeducted = penaltyAmount
+
+          const shortCode = String(booking._id).slice(-6).toUpperCase()
+          const { WalletTransaction } = await import('../models/WalletTransaction.js')
+          await WalletTransaction.create({
+            walletId: wallet._id,
+            amount: penaltyAmount,
+            type: 'DEBIT',
+            targetWallet: 'SELF',
+            context: 'PENALTY',
+            referenceId: booking._id,
+            description: `Bounce Penalty: Deducted for cancelling accepted job #${shortCode} (${reason || 'Worker cancellation'})`
+          })
+        }
+      }
+    } else {
+      booking.cancelledBy = 'CUSTOMER'
+    }
+    await booking.save()
+  }
+
   // Notify customer
   import('../socket.js').then(({ emitToUser }) => {
-    emitToUser(booking.userId, 'BOOKING_STATUS_UPDATE', { bookingId: booking._id, status })
+    emitToUser(booking.userId, 'BOOKING_STATUS_UPDATE', { 
+      bookingId: booking._id, 
+      status, 
+      cancelledBy: booking.cancelledBy,
+      cancellationReason: booking.cancellationReason,
+      penaltyDeducted 
+    })
     if (booking.assignments && booking.assignments.length > 0) {
       booking.assignments.forEach(a => {
         const lid = typeof a.labourId === 'object' ? a.labourId._id : a.labourId;
-        if (lid) emitToUser(lid, 'BOOKING_STATUS_UPDATE', { bookingId: booking._id, status })
+        if (lid) emitToUser(lid, 'BOOKING_STATUS_UPDATE', { 
+          bookingId: booking._id, 
+          status, 
+          cancelledBy: booking.cancelledBy,
+          cancellationReason: booking.cancellationReason,
+          penaltyDeducted 
+        })
       });
     }
   }).catch(err => console.error(err))
@@ -615,7 +683,9 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
     // To Customer
     sendNotificationToUser(booking.userId, {
       title: 'Booking Update',
-      body: `Your booking status is now ${status}`,
+      body: status === 'CANCELLED' 
+        ? `Your booking #${String(booking._id).slice(-6).toUpperCase()} was cancelled: ${booking.cancellationReason || 'Cancelled'}`
+        : `Your booking status is now ${status}`,
       data: { type: 'booking_update', bookingId: String(booking._id) }
     })
     
@@ -625,22 +695,31 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
         const lid = typeof a.labourId === 'object' ? a.labourId._id : a.labourId;
         if (lid) {
           sendNotificationToUser(lid, {
-            title: 'Job Status Update',
-            body: `The job status has been updated to ${status}`,
+            title: status === 'CANCELLED' && penaltyDeducted > 0 ? 'Bounce Penalty Applied' : 'Job Status Update',
+            body: status === 'CANCELLED' && penaltyDeducted > 0 
+              ? `Bounce penalty of ₹${penaltyDeducted} deducted for cancelling job #${String(booking._id).slice(-6).toUpperCase()}`
+              : `The job status has been updated to ${status}`,
             data: { type: 'booking_update', bookingId: String(booking._id) }
           })
         }
       });
     } else if (booking.laborId) {
       sendNotificationToUser(booking.laborId, {
-        title: 'Job Status Update',
-        body: `The job status has been updated to ${status}`,
+        title: status === 'CANCELLED' && penaltyDeducted > 0 ? 'Bounce Penalty Applied' : 'Job Status Update',
+        body: status === 'CANCELLED' && penaltyDeducted > 0 
+          ? `Bounce penalty of ₹${penaltyDeducted} deducted for cancelling job #${String(booking._id).slice(-6).toUpperCase()}`
+          : `The job status has been updated to ${status}`,
         data: { type: 'booking_update', bookingId: String(booking._id) }
       })
     }
   }).catch(err => console.error(err))
 
-  return sendSuccess(res, { message: `Booking marked as ${status}`, data: { booking } })
+  return sendSuccess(res, { 
+    message: penaltyDeducted > 0
+      ? `Booking marked as ${status}. Bounce penalty of ₹${penaltyDeducted} has been deducted.`
+      : `Booking marked as ${status}`, 
+    data: { booking, penaltyDeducted } 
+  })
 })
 
 export const confirmCashPayment = asyncHandler(async (req, res) => {

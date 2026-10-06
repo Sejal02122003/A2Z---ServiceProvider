@@ -40,4 +40,10 @@ router.get(
   wallet.getMyWithdrawals,
 )
 
+router.get(
+  '/transactions',
+  restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),
+  wallet.getMyTransactions,
+)
+
 export default router

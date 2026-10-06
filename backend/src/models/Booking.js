@@ -142,7 +142,9 @@ const bookingSchema = new mongoose.Schema(
       startedAt: Date,
       completedAt: Date,
       extraHours: { type: Number, default: 0 },
-      extraAmount: { type: Number, default: 0 }
+      extraAmount: { type: Number, default: 0 },
+      cancellationReason: String,
+      penaltyDeducted: { type: Number, default: 0 },
     }],
     
     // Contractor Specific Details
@@ -158,6 +160,15 @@ const bookingSchema = new mongoose.Schema(
       }]
     },
     
+    // Cancellation & Bounce Penalty Meta
+    cancelledBy: {
+      type: String,
+      enum: ['CUSTOMER', 'LABOUR', 'ADMIN', 'SYSTEM'],
+    },
+    cancelledAt: { type: Date },
+    cancellationReason: { type: String, trim: true },
+    penaltyDeducted: { type: Number, default: 0 },
+
     // Legacy fields (kept for backward compatibility or simple 1-to-1 bookings)
     startedAt: { type: Date },
     startOtp: { type: String },
