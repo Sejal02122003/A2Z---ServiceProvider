@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Settings, Percent, IndianRupee, Wallet, Receipt, AlertTriangle, CheckCircle2, Loader2, Clock, Image as ImageIcon, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Settings, Percent, IndianRupee, Wallet, Receipt, AlertTriangle, CheckCircle2, Loader2, Clock, Image as ImageIcon, Trash2, Radio } from 'lucide-react'
 import { adminSettingsApi } from '../../api/adminSettingsApi.js'
 import { fetchAdminLabourCategoryTree, updateAdminLabourCategoryGst } from '../../api/adminLabourCategoriesApi.js'
 import { ApiError } from '../../api/http.js'
@@ -122,6 +123,9 @@ export function AdminSettingsPage() {
   // Cancellation Penalty
   const [cancellationPenalty, setCancellationPenalty] = useState('')
 
+  // Simulated Opportunities Toggle
+  const [simulatedOpportunitiesEnabled, setSimulatedOpportunitiesEnabled] = useState(true)
+
   // Subscription Settings
   const [isUserSubscriptionEnabled, setIsUserSubscriptionEnabled] = useState(true)
   const [dailySubscriptionPrice, setDailySubscriptionPrice] = useState('')
@@ -169,6 +173,11 @@ export function AdminSettingsPage() {
         // Cancellation Penalty
         if (s.cancellationPenalty != null) {
           setCancellationPenalty(String(s.cancellationPenalty))
+        }
+
+        // Simulated Opportunities
+        if (s.simulatedOpportunitiesEnabled != null) {
+          setSimulatedOpportunitiesEnabled(Boolean(s.simulatedOpportunitiesEnabled))
         }
 
         // Subscription Settings
@@ -639,6 +648,52 @@ export function AdminSettingsPage() {
             })}
           >
             Save Penalty
+          </AppPrimaryButton>
+        </SettingsSection>
+
+        {/* Simulated Opportunity Alerts Global Toggle */}
+        <SettingsSection
+          icon={Radio}
+          title="Simulated Opportunity Alerts"
+          description="Global toggle for simulated booking alerts to engage vendors"
+          accent="amber-600"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={simulatedOpportunitiesEnabled}
+                onClick={() => setSimulatedOpportunitiesEnabled(!simulatedOpportunitiesEnabled)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 ${simulatedOpportunitiesEnabled ? 'bg-brand' : 'bg-slate-200'}`}
+              >
+                <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${simulatedOpportunitiesEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+              </button>
+              <div>
+                <label className="text-sm font-bold text-slate-800 cursor-pointer" onClick={() => setSimulatedOpportunitiesEnabled(!simulatedOpportunitiesEnabled)}>
+                  Simulated Opportunity Alerts
+                </label>
+                <p className="text-xs font-semibold text-slate-500">
+                  {simulatedOpportunitiesEnabled ? 'Status: ON 🟢 — Alerts can be sent to vendors.' : 'Status: OFF 🔴 — Alerts are currently disabled.'}
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/admin/simulated-opportunities"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-extrabold text-slate-700 shadow-xs hover:bg-slate-100 transition shrink-0"
+            >
+              <Radio className="h-3.5 w-3.5 text-amber-600" />
+              Manage & Send Alerts
+            </Link>
+          </div>
+          <AppPrimaryButton
+            type="button"
+            loading={saving === 'Simulated'}
+            onClick={() => handleSave('Simulated Opportunities', adminSettingsApi.updateSimulatedOpportunitiesToggle, {
+              simulatedOpportunitiesEnabled,
+            })}
+          >
+            Save Alert Setting
           </AppPrimaryButton>
         </SettingsSection>
 

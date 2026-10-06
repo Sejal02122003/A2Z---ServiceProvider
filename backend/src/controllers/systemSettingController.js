@@ -203,3 +203,20 @@ export const deleteBranding = asyncHandler(async (req, res) => {
 
   return sendSuccess(res, { message: `${type} deleted successfully`, data: { branding: settings.branding } })
 })
+
+export const updateSimulatedOpportunitiesToggle = asyncHandler(async (req, res) => {
+  const { simulatedOpportunitiesEnabled } = req.body
+  let settings = await SystemSetting.findOne({ configKey: 'master_config' })
+  if (!settings) {
+    settings = new SystemSetting({ configKey: 'master_config' })
+  }
+  settings.simulatedOpportunitiesEnabled = Boolean(simulatedOpportunitiesEnabled)
+  settings.updatedBy = req.user._id
+  await settings.save()
+
+  return sendSuccess(res, {
+    message: 'Simulated opportunities setting updated successfully',
+    data: { simulatedOpportunitiesEnabled: settings.simulatedOpportunitiesEnabled },
+  })
+})
+

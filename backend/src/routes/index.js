@@ -31,6 +31,7 @@ import policyRoutes from './policyRoutes.js'
 import fcmTokenRoutes from './fcmTokenRoutes.js'
 import adminProfileRoutes from './adminProfileRoutes.js'
 import notificationsRoutes from './notificationsRoutes.js'
+import simulatedOpportunityRoutes from './simulatedOpportunityRoutes.js'
 
 const router = Router()
 
@@ -52,6 +53,7 @@ router.use('/user-subscriptions', userSubscriptionRoutes)
 router.use('/policies', policyRoutes)
 router.use('/fcm-tokens', fcmTokenRoutes)
 router.use('/notifications', notificationsRoutes)
+router.use('/simulated-opportunities', simulatedOpportunityRoutes)
 
 router.use('/admin/settings', systemSettingRoutes)
 router.use('/admin/zones', adminZoneRoutes)

@@ -24,6 +24,7 @@ import {
   ClipboardCheck,
   Star,
   CalendarDays,
+  Radio,
 } from 'lucide-react'
 
 /**
@@ -78,6 +79,7 @@ export const ADMIN_NAV_SECTIONS = [
     title: 'Operations',
     items: [
       { to: '/admin/bookings', label: 'Bookings & requests', icon: ClipboardList },
+      { to: '/admin/simulated-opportunities', label: 'Simulated Alerts', icon: Radio },
       { to: '/admin/complaints', label: 'Complaints', icon: MessageSquare },
       { to: '/admin/zone-management', label: 'Zone Management', icon: Map },
       { to: '/admin/zones', label: 'Manage Radius', icon: Map },
@@ -126,6 +128,7 @@ export const ADMIN_NAV_SECTIONS = [
 ]
 
 const ROUTE_TITLES = [
+  { prefix: '/admin/simulated-opportunities', title: 'Simulated Opportunities' },
   { prefix: '/admin/profile', title: 'Profile' },
   { prefix: '/admin/complaints', title: 'Complaints' },
   { prefix: '/admin/settings', title: 'Settings' },

@@ -39,8 +39,10 @@ import { AdminTermsConditionsPage } from './pages/admin/AdminTermsConditionsPage
 import { AdminFAQsPage } from './pages/admin/AdminFAQsPage.jsx'
 import { AdminCancellationPolicyPage } from './pages/admin/AdminCancellationPolicyPage.jsx'
 import { AdminRefundPolicyPage } from './pages/admin/AdminRefundPolicyPage.jsx'
+import { AdminSimulatedOpportunitiesPage } from './pages/admin/AdminSimulatedOpportunitiesPage.jsx'
 
 import { BroadcastPopup } from './components/app/BroadcastPopup.jsx'
+import { SimulatedOpportunityPopup } from './components/app/SimulatedOpportunityPopup.jsx'
 import { ErrorBoundary } from './components/ErrorBoundary.jsx'
 import { useEffect } from 'react'
 import { APP_B2C_ROLES } from './constants/panelRoles.js'
@@ -136,11 +138,13 @@ function App() {
             <Route path="faqs" element={<AdminFAQsPage />} />
             <Route path="cancellation-policy" element={<AdminCancellationPolicyPage />} />
             <Route path="refund-policy" element={<AdminRefundPolicyPage />} />
+            <Route path="simulated-opportunities" element={<AdminSimulatedOpportunitiesPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <BroadcastPopup />
+        <SimulatedOpportunityPopup />
         </AuthProvider>
       </BrandingProvider>
     </BrowserRouter>

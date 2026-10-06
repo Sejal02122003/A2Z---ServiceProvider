@@ -80,6 +80,13 @@ export const adminSettingsApi = {
     })
   },
 
+  updateSimulatedOpportunitiesToggle: (payload) => {
+    return apiRequest('/admin/settings/simulated-opportunities-toggle', {
+      method: 'PATCH',
+      body: payload,
+    })
+  },
+
   uploadBranding: (formData) => {
     return apiRequest('/admin/settings/branding', {
       method: 'POST',

@@ -131,6 +131,15 @@ router.patch(
   settings.updatePaymentModes,
 )
 
+router.patch(
+  '/simulated-opportunities-toggle',
+  [
+    body('simulatedOpportunitiesEnabled').isBoolean().withMessage('simulatedOpportunitiesEnabled must be a boolean'),
+  ],
+  validateRequest,
+  settings.updateSimulatedOpportunitiesToggle,
+)
+
 router.post(
   '/branding',
   uploadMediaMulter,
