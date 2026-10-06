@@ -425,11 +425,12 @@ export function AdminSimulatedOpportunitiesPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto"
+              className="w-full max-w-lg rounded-[2rem] bg-white shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col overflow-hidden"
             >
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 p-6 pb-4 shrink-0 bg-white">
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand/10 text-brand">
                     <Zap className="h-5 w-5" />
                   </div>
                   <div>
@@ -450,7 +451,9 @@ export function AdminSimulatedOpportunitiesPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleCreateSubmit} className="space-y-4">
+              {/* Scrollable Form Body */}
+              <form onSubmit={handleCreateSubmit} className="flex-1 min-h-0 flex flex-col">
+                <div className="flex-1 min-h-0 overflow-y-auto p-6 pt-4 space-y-4 overscroll-contain">
                 {/* Category Selection */}
                 <div>
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1 block">
@@ -632,8 +635,10 @@ export function AdminSimulatedOpportunitiesPage() {
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+                </div>
+
+                {/* Actions Footer */}
+                <div className="p-6 pt-3 border-t border-slate-100 shrink-0 bg-white flex items-center justify-end gap-3">
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
@@ -664,9 +669,10 @@ export function AdminSimulatedOpportunitiesPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto"
+              className="w-full max-w-lg rounded-[2rem] bg-white shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col overflow-hidden"
             >
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 p-6 pb-4 shrink-0 bg-white">
                 <div>
                   <h3 className="text-base font-extrabold text-slate-900">
                     Opportunity #{String(detailItem._id).slice(-6).toUpperCase()}
@@ -684,7 +690,8 @@ export function AdminSimulatedOpportunitiesPage() {
                 </button>
               </div>
 
-              <div className="space-y-4">
+              {/* Scrollable Body */}
+              <div className="flex-1 min-h-0 overflow-y-auto p-6 pt-4 space-y-4 overscroll-contain">
                 <div className="rounded-2xl bg-slate-50 p-4 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-slate-500 font-medium">Service:</span>
@@ -752,16 +759,17 @@ export function AdminSimulatedOpportunitiesPage() {
                     </div>
                   )}
                 </div>
+              </div>
 
-                <div className="pt-3 border-t border-slate-100 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setDetailItem(null)}
-                    className="px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200"
-                  >
-                    Close
-                  </button>
-                </div>
+              {/* Footer */}
+              <div className="p-6 pt-3 border-t border-slate-100 shrink-0 bg-white flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setDetailItem(null)}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200"
+                >
+                  Close
+                </button>
               </div>
             </motion.div>
           </div>
