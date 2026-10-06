@@ -40,6 +40,7 @@ import { AdminFAQsPage } from './pages/admin/AdminFAQsPage.jsx'
 import { AdminCancellationPolicyPage } from './pages/admin/AdminCancellationPolicyPage.jsx'
 import { AdminRefundPolicyPage } from './pages/admin/AdminRefundPolicyPage.jsx'
 import { AdminSimulatedOpportunitiesPage } from './pages/admin/AdminSimulatedOpportunitiesPage.jsx'
+import AdminWalletRewardsPage from './pages/admin/AdminWalletRewardsPage.jsx'
 
 import { BroadcastPopup } from './components/app/BroadcastPopup.jsx'
 import { SimulatedOpportunityPopup } from './components/app/SimulatedOpportunityPopup.jsx'
@@ -119,6 +120,7 @@ function App() {
             <Route path="bookings" element={<AdminBookingsPage />} />
 
             <Route path="billing" element={<AdminBillingPage />} />
+            <Route path="wallet-rewards" element={<AdminWalletRewardsPage />} />
             <Route path="banners" element={<AdminBannersPage />} />
             <Route path="complaints" element={<AdminComplaintsPage />} />
             <Route path="profile" element={<AdminProfilePage />} />

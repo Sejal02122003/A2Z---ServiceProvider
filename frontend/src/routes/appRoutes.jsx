@@ -18,6 +18,8 @@ import { JobTracking } from '../pages/app/JobTracking.jsx'
 import { MyBookings } from '../pages/app/MyBookings.jsx'
 import { ActiveJob } from '../pages/app/ActiveJob.jsx'
 import { LaborWallet } from '../pages/app/LaborWallet.jsx'
+import UserWalletPage from '../pages/app/UserWalletPage.jsx'
+import { useAuth } from '../hooks/useAuth.js'
 import { AppSubCategoryServicePage } from '../pages/app/AppSubCategoryServicePage.jsx'
 import { AppSubscriptionPage } from '../pages/app/AppSubscriptionPage.jsx'
 import { AppPrivacyPolicyPage } from '../pages/app/AppPrivacyPolicyPage.jsx'
@@ -27,6 +29,14 @@ import { AppCancellationPolicyPage } from '../pages/app/AppCancellationPolicyPag
 import { AppRefundPolicyPage } from '../pages/app/AppRefundPolicyPage.jsx'
 import { AppBillingPage } from '../pages/app/AppBillingPage.jsx'
 import { USER_ROLES } from '../constants/userRoles.js'
+
+function AppRoleWalletWrapper() {
+  const { user } = useAuth()
+  if (user?.role === USER_ROLES.LABOUR) {
+    return <LaborWallet />
+  }
+  return <UserWalletPage />
+}
 
 
 
@@ -138,12 +148,12 @@ export const appShellChildRoutes = (
         </RoleRoute>
       }
     />
-    {/* New: Labor Wallet */}
+    {/* Role-aware Wallet Route */}
     <Route
       path="wallet"
       element={
-        <RoleRoute allow={[USER_ROLES.LABOUR]}>
-          <LaborWallet />
+        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR]}>
+          <AppRoleWalletWrapper />
         </RoleRoute>
       }
     />

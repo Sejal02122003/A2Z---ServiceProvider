@@ -13,6 +13,20 @@ const walletSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    balance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    currency: {
+      type: String,
+      default: 'INR',
+    },
+    welcomeBonusCredited: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     adminBalance: {
       type: Number,
       default: 0, // Amount owed to admin

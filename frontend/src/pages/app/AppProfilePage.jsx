@@ -28,6 +28,7 @@ import {
   Wrench,
   Trash2,
   AlertTriangle,
+  Wallet,
 } from 'lucide-react'
 import { KitStatusBadge } from '../../components/admin/welcomeKit/KitStatusBadge.jsx'
 import { BOOT_ROUTES } from '../../constants/bootFlow.js'
@@ -466,6 +467,7 @@ export function AppProfilePage() {
       icon: CalendarClock,
       label: user?.role === USER_ROLES.CONTRACTOR ? 'Bookings & requests' : 'Bookings',
     })
+    quickLinks.push({ to: '/app/wallet', icon: Wallet, label: 'My Wallet' })
   }
   if (user?.role === USER_ROLES.CONTRACTOR) {
     quickLinks.push({ to: '/app/billing', icon: FileText, label: 'Billing & contracts' })

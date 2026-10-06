@@ -166,6 +166,24 @@ export const calculateBill = asyncHandler(async (req, res) => {
     commissionAmount = (basePrice * settings.commission.globalPercentage) / 100
   }
 
+  // Calculate wallet discount options if user is authenticated
+  let walletInfo = {
+    enabled: false,
+    walletBalance: 0,
+    maxWalletDiscount: 0,
+    actualWalletDiscount: 0,
+    discountPercentage: 0,
+    minimumBookingAmount: 0,
+  }
+  if (req.user?._id) {
+    try {
+      const { calculateWalletDiscount } = await import('../services/userWalletService.js')
+      walletInfo = await calculateWalletDiscount(req.user._id, totalAmount)
+    } catch (err) {
+      console.error('[WALLET_ERROR] Error in calculateBill wallet calculation:', err)
+    }
+  }
+
   return sendSuccess(res, {
     data: {
       originalSubTotal,
@@ -180,7 +198,8 @@ export const calculateBill = asyncHandler(async (req, res) => {
       commissionAmount, // Internal calculation preview
       laborShare: basePrice - commissionAmount,
       paymentModes: settings.paymentModes || { cashEnabled: true, onlineEnabled: true },
-      breakdown
+      breakdown,
+      walletInfo,
     }
   })
 })
@@ -288,7 +307,31 @@ export const createBooking = asyncHandler(async (req, res) => {
   }
 
   
-  const totalAmount = baseAmount + taxes
+  const rawTotalAmount = baseAmount + taxes
+  let finalPayableAmount = rawTotalAmount
+  let walletDiscountData = { applied: false, amount: 0, walletTransactionId: null }
+
+  if (req.body.useWallet && req.user?._id) {
+    try {
+      const { deductWalletForBooking } = await import('../services/userWalletService.js')
+      const deductionRes = await deductWalletForBooking({
+        userId: req.user._id,
+        bookingId: null,
+        eligibleBillAmount: rawTotalAmount,
+        requestedUseWallet: true,
+      })
+      if (deductionRes.applied && deductionRes.amount > 0) {
+        walletDiscountData = {
+          applied: true,
+          amount: deductionRes.amount,
+          walletTransactionId: deductionRes.walletTransactionId,
+        }
+        finalPayableAmount = Math.max(0, rawTotalAmount - deductionRes.amount)
+      }
+    } catch (err) {
+      console.error('[WALLET_ERROR] Error applying wallet discount during booking creation:', err)
+    }
+  }
 
   let commissionAmount = 0
   if (settings?.commission?.isActive && settings.commission.type === 'global') {
@@ -329,7 +372,8 @@ export const createBooking = asyncHandler(async (req, res) => {
     basePrice,
     platformFee,
     taxes,
-    totalAmount,
+    walletDiscount: walletDiscountData,
+    totalAmount: finalPayableAmount,
     commissionAmount,
     laborShare,
     paymentMethod,
@@ -337,6 +381,16 @@ export const createBooking = asyncHandler(async (req, res) => {
     startOtp,
     completionOtp
   })
+
+  // Link transaction referenceId to created booking
+  if (walletDiscountData.walletTransactionId) {
+    import('../models/WalletTransaction.js').then(({ WalletTransaction }) => {
+      WalletTransaction.findByIdAndUpdate(walletDiscountData.walletTransactionId, {
+        referenceId: booking._id,
+        description: `Service discount of ₹${walletDiscountData.amount} applied on booking #${String(booking._id).slice(-6).toUpperCase()}`,
+      }).catch(err => console.error('Error linking wallet tx reference:', err))
+    })
+  }
 
 
   // Phase 3: Trigger the Broadcast Engine asynchronously
@@ -652,6 +706,19 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
     } else {
       booking.cancelledBy = 'CUSTOMER'
     }
+
+    // Refund customer wallet discount if booking cancelled
+    if (booking.walletDiscount?.applied && booking.walletDiscount?.amount > 0) {
+      import('../services/userWalletService.js').then(({ refundWalletForBooking }) => {
+        refundWalletForBooking({
+          userId: booking.userId,
+          bookingId: booking._id,
+          amount: booking.walletDiscount.amount,
+          reason: `Refund for cancelled booking #${String(booking._id).slice(-6).toUpperCase()}`,
+        }).catch(err => console.error('Error refunding customer wallet on cancellation:', err))
+      })
+    }
+
     await booking.save()
   }
 

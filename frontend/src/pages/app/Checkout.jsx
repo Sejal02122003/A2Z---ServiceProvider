@@ -67,6 +67,7 @@ export function Checkout() {
   const [scheduledTime, setScheduledTime] = useState('')
   const [saveAddress, setSaveAddress] = useState(true)
   const [paymentMethod, setPaymentMethod] = useState('CASH')
+  const [useWallet, setUseWallet] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const inputRef = useRef(null)
@@ -277,6 +278,7 @@ export function Checkout() {
         lng,
         saveAddress,
         paymentMethod,
+        useWallet: Boolean(useWallet && bill?.walletInfo?.actualWalletDiscount > 0),
       })
 
       const booking = res.data?.booking
@@ -393,13 +395,52 @@ export function Checkout() {
                 <span className="font-bold text-slate-900">{formatInr(bill.taxes)}</span>
               </div>
             )}
+
+            {/* Wallet Balance & Discount Section */}
+            {bill.walletInfo?.enabled && bill.walletInfo?.availableBalance > 0 && bill.walletInfo?.actualWalletDiscount > 0 && (
+              <div className="mt-3 p-3 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 border border-amber-200 dark:border-amber-800/40 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded-lg bg-amber-500/10 text-amber-600">
+                      <Wallet className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900 dark:text-white">Use Wallet Balance</p>
+                      <p className="text-[11px] text-slate-500">Available: {formatInr(bill.walletInfo.availableBalance)}</p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={useWallet}
+                      onChange={(e) => setUseWallet(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+                {useWallet && (
+                  <div className="flex justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400 pt-1 border-t border-amber-200/60">
+                    <span>Wallet Discount Applied ({bill.walletInfo.percentage}% max):</span>
+                    <span>-{formatInr(bill.walletInfo.actualWalletDiscount)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex justify-between border-t border-slate-200 pt-2 text-base">
-              <span className="font-extrabold text-slate-900">Total</span>
-              <span className="font-extrabold text-brand">{formatInr(bill.totalAmount)}</span>
+              <span className="font-extrabold text-slate-900">Total Payable</span>
+              <span className="font-extrabold text-brand">
+                {formatInr(
+                  useWallet && bill.walletInfo?.actualWalletDiscount > 0
+                    ? Math.max(0, bill.totalAmount - bill.walletInfo.actualWalletDiscount)
+                    : bill.totalAmount
+                )}
+              </span>
             </div>
-            {(bill.totalSavings > 0 || bill.serviceDiscount > 0) && (
+            {((bill.totalSavings > 0 || bill.serviceDiscount > 0) || (useWallet && bill.walletInfo?.actualWalletDiscount > 0)) && (
               <div className="mt-2.5 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/80 p-2 text-center text-xs font-bold text-emerald-800">
-                🎉 You saved {formatInr(bill.totalSavings || bill.serviceDiscount)} on this booking!
+                🎉 Total savings on this booking: {formatInr((bill.totalSavings || bill.serviceDiscount || 0) + (useWallet ? bill.walletInfo?.actualWalletDiscount || 0 : 0))}!
               </div>
             )}
           </div>

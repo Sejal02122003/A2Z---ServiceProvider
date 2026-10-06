@@ -221,3 +221,178 @@ export const deleteWithdrawalRequest = asyncHandler(async (req, res) => {
   }
   return sendSuccess(res, { message: 'Withdrawal request deleted successfully' })
 })
+
+/**
+ * GET /api/admin/wallets/settings
+ */
+export const getAdminWalletSettings = asyncHandler(async (req, res) => {
+  const { getWalletSettings } = await import('../services/userWalletService.js')
+  const settings = await getWalletSettings()
+  return sendSuccess(res, { data: { settings } })
+})
+
+/**
+ * PUT /api/admin/wallets/settings
+ */
+export const updateAdminWalletSettings = asyncHandler(async (req, res) => {
+  const { updateWalletSettings } = await import('../services/userWalletService.js')
+  const settings = await updateWalletSettings(req.body, req.user._id)
+  return sendSuccess(res, { message: 'Wallet settings updated successfully', data: { settings } })
+})
+
+/**
+ * GET /api/admin/wallets/users
+ * Returns list of users with wallet balances and bonus status
+ */
+export const getAdminUserWallets = asyncHandler(async (req, res) => {
+  const { User } = await import('../models/User.js')
+  const search = req.query.search?.trim() || ''
+  const role = req.query.role || 'all'
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20))
+  const skip = (page - 1) * limit
+
+  const query = {}
+  if (role !== 'all') {
+    query.role = role
+  }
+  if (search) {
+    const isPhone = /^\d+$/.test(search)
+    if (isPhone) {
+      query.phone = { $regex: search, $options: 'i' }
+    } else {
+      query.$or = [
+        { fullName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+      ]
+    }
+  }
+
+  const [users, total] = await Promise.all([
+    User.find(query)
+      .select('fullName phone email role welcomeBonusCredited createdAt')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    User.countDocuments(query),
+  ])
+
+  const userIds = users.map((u) => u._id)
+  const wallets = await Wallet.find({ userId: { $in: userIds } }).lean()
+  const walletMap = new Map(wallets.map((w) => [String(w.userId), w]))
+
+  // Aggregate total credits & debits for these users
+  const txAgg = await WalletTransaction.aggregate([
+    { $match: { userId: { $in: userIds }, status: 'COMPLETED' } },
+    {
+      $group: {
+        _id: { userId: '$userId', type: '$type' },
+        total: { $sum: '$amount' },
+      },
+    },
+  ])
+
+  const userStats = {}
+  txAgg.forEach((stat) => {
+    const uid = String(stat._id.userId)
+    if (!userStats[uid]) userStats[uid] = { credits: 0, debits: 0 }
+    if (stat._id.type === 'CREDIT') userStats[uid].credits += stat.total
+    if (stat._id.type === 'DEBIT') userStats[uid].debits += stat.total
+  })
+
+  const results = users.map((u) => {
+    const w = walletMap.get(String(u._id))
+    const s = userStats[String(u._id)] || { credits: 0, debits: 0 }
+    const currentBalance = w ? (w.balance !== undefined ? w.balance : (w.selfBalance || 0)) : 0
+    return {
+      _id: u._id,
+      fullName: u.fullName || '—',
+      phone: u.phone,
+      email: u.email || '—',
+      role: u.role,
+      welcomeBonusCredited: Boolean(u.welcomeBonusCredited || w?.welcomeBonusCredited),
+      balance: currentBalance,
+      totalCredits: s.credits,
+      totalDebits: s.debits,
+      createdAt: u.createdAt,
+    }
+  })
+
+  return sendSuccess(res, {
+    data: {
+      users: results,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+      total,
+    },
+  })
+})
+
+/**
+ * GET /api/admin/wallets/users/:userId
+ * Details and transactions for specific user
+ */
+export const getAdminUserWalletDetails = asyncHandler(async (req, res) => {
+  const { User } = await import('../models/User.js')
+  const { userId } = req.params
+
+  const user = await User.findById(userId).lean()
+  if (!user) {
+    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  const wallet = await Wallet.findOne({ userId }).lean()
+  const currentBalance = wallet ? (wallet.balance !== undefined ? wallet.balance : (wallet.selfBalance || 0)) : 0
+
+  const transactions = await WalletTransaction.find({
+    $or: [{ userId }, { walletId: wallet?._id }],
+  })
+    .sort({ createdAt: -1 })
+    .limit(100)
+    .lean()
+
+  return sendSuccess(res, {
+    data: {
+      user: {
+        _id: user._id,
+        fullName: user.fullName || '—',
+        phone: user.phone,
+        email: user.email || '—',
+        role: user.role,
+        welcomeBonusCredited: Boolean(user.welcomeBonusCredited || wallet?.welcomeBonusCredited),
+      },
+      wallet: {
+        balance: currentBalance,
+        welcomeBonusCredited: Boolean(wallet?.welcomeBonusCredited),
+      },
+      transactions,
+    },
+  })
+})
+
+/**
+ * POST /api/admin/wallets/users/:userId/adjust
+ * Manual credit/debit adjustment
+ */
+export const adjustAdminUserWallet = asyncHandler(async (req, res) => {
+  const { userId } = req.params
+  const { amount, type, reason } = req.body
+  const { adminAdjustWallet } = await import('../services/userWalletService.js')
+
+  const result = await adminAdjustWallet({
+    userId,
+    amount,
+    type,
+    reason,
+    adminUserId: req.user._id,
+  })
+
+  return sendSuccess(res, {
+    message: `Wallet ${type === 'CREDIT' ? 'credited' : 'debited'} successfully`,
+    data: result,
+  })
+})
+

@@ -78,6 +78,11 @@ const bookingSchema = new mongoose.Schema(
     basePrice: { type: Number, required: true },
     platformFee: { type: Number, required: true, default: 0 },
     taxes: { type: Number, default: 0 },
+    walletDiscount: {
+      applied: { type: Boolean, default: false },
+      amount: { type: Number, default: 0 },
+      walletTransactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'WalletTransaction' },
+    },
     totalAmount: { type: Number, required: true },
     commissionAmount: { type: Number, required: true, default: 0 },
     laborShare: { type: Number, required: true },

@@ -25,6 +25,7 @@ import {
   Star,
   CalendarDays,
   Radio,
+  Gift,
 } from 'lucide-react'
 
 /**
@@ -89,6 +90,7 @@ export const ADMIN_NAV_SECTIONS = [
     title: 'Finance',
     items: [
       { to: '/admin/billing', label: 'Payments & billing', icon: Wallet },
+      { to: '/admin/wallet-rewards', label: 'Wallet & Rewards', icon: Gift },
       { to: '/admin/platform-fee', label: 'Platform Fee', icon: HandCoins },
       { to: '/admin/commission-fee', label: 'Commission Fee', icon: HandCoins },
       { to: '/admin/labour-wallet', label: 'Labour Wallet', icon: Wallet },
@@ -128,6 +130,7 @@ export const ADMIN_NAV_SECTIONS = [
 ]
 
 const ROUTE_TITLES = [
+  { prefix: '/admin/wallet-rewards', title: 'Wallet & Rewards' },
   { prefix: '/admin/simulated-opportunities', title: 'Simulated Opportunities' },
   { prefix: '/admin/profile', title: 'Profile' },
   { prefix: '/admin/complaints', title: 'Complaints' },

@@ -107,11 +107,30 @@ export const registerVerify = asyncHandler(async (req, res) => {
     })
   }
   await deleteOtpChallengeDoc(otp.doc)
+
+  // Credit welcome bonus for newly registered users
+  let welcomeBonus = null
+  try {
+    const { ensureWelcomeBonus } = await import('../services/userWalletService.js')
+    const bonusRes = await ensureWelcomeBonus(user._id)
+    if (bonusRes && bonusRes.credited) {
+      welcomeBonus = {
+        credited: true,
+        amount: bonusRes.bonusAmount,
+      }
+    }
+  } catch (err) {
+    console.error('[AUTH_ERROR] Error in welcome bonus processing:', err)
+  }
+
   const token = signAccessToken(user)
   return sendSuccess(res, {
     message: 'Account created',
     statusCode: HTTP_STATUS.CREATED,
-    data: buildAuthPayload(user, token),
+    data: {
+      ...buildAuthPayload(user, token),
+      welcomeBonus,
+    },
   })
 })
 
