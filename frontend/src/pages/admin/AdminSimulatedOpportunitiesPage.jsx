@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { simulatedOpportunitiesApi } from '../../api/simulatedOpportunitiesApi.js'
 import { fetchAdminLabourCategoryTree } from '../../api/adminLabourCategoriesApi.js'
+import { adminZonesApi } from '../../api/adminZonesApi.js'
 import { ApiError } from '../../api/http.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
@@ -42,6 +43,18 @@ function formatDate(dateStr) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function formatZoneDisplay(z) {
+  if (!z) return ''
+  const parts = [z.city, z.state].filter(Boolean).map((s) => String(s).trim()).filter(Boolean)
+  return parts.length > 0 ? `${z.name} (${parts.join(', ')})` : z.name || 'Unnamed Zone'
+}
+
+function formatZoneLocation(z) {
+  if (!z) return ''
+  const parts = [z.name, z.city, z.state].filter(Boolean).map((s) => String(s).trim()).filter(Boolean)
+  return parts.join(', ') || z.name || ''
 }
 
 function StatusBadge({ status }) {
@@ -67,6 +80,7 @@ export function AdminSimulatedOpportunitiesPage() {
   const [opportunities, setOpportunities] = useState([])
   const [selectedStatus, setSelectedStatus] = useState('ALL')
   const [categoryTree, setCategoryTree] = useState([])
+  const [zones, setZones] = useState([])
   const [toast, setToast] = useState({ message: '', variant: 'success' })
 
   // Create Modal State
@@ -75,7 +89,8 @@ export function AdminSimulatedOpportunitiesPage() {
   const [formCategory, setFormCategory] = useState('')
   const [formCategoryId, setFormCategoryId] = useState('')
   const [formServiceType, setFormServiceType] = useState('')
-  const [formLocation, setFormLocation] = useState('Indore, MP')
+  const [selectedZoneId, setSelectedZoneId] = useState('')
+  const [formLocation, setFormLocation] = useState('')
   const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0])
   const [formTime, setFormTime] = useState('05:00 PM')
   const [formAmount, setFormAmount] = useState('799')
@@ -94,14 +109,24 @@ export function AdminSimulatedOpportunitiesPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [settingsRes, listRes, catRes] = await Promise.all([
+      const [settingsRes, listRes, catRes, zonesRes] = await Promise.all([
         simulatedOpportunitiesApi.getSettings().catch(() => ({ data: { enabled: true } })),
         simulatedOpportunitiesApi.getAdminOpportunities({ status: selectedStatus !== 'ALL' ? selectedStatus : undefined }),
         fetchAdminLabourCategoryTree().catch(() => ({ data: [] })),
+        adminZonesApi.getActiveZones().catch(() => adminZonesApi.getAllZones({ limit: 100 }).catch(() => ({ data: [] }))),
       ])
       setEnabled(settingsRes.data?.enabled ?? true)
       setOpportunities(listRes.data?.opportunities || [])
       setCategoryTree(catRes.data?.categories || catRes.data || [])
+      
+      const loadedZones = zonesRes.data?.zones || (Array.isArray(zonesRes.data) ? zonesRes.data : [])
+      setZones(loadedZones)
+
+      if (loadedZones.length > 0 && !formLocation) {
+        const defaultZone = loadedZones[0]
+        setSelectedZoneId(defaultZone._id)
+        setFormLocation(formatZoneLocation(defaultZone))
+      }
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : 'Failed to load data', 'error')
     } finally {
@@ -465,18 +490,53 @@ export function AdminSimulatedOpportunitiesPage() {
                   />
                 </div>
 
-                {/* Location */}
+                {/* Operational Zone Selection */}
                 <div>
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1 block">
-                    Location / City Area
+                    Operational Zone / City Area
+                  </label>
+                  <select
+                    value={selectedZoneId}
+                    onChange={(e) => {
+                      const zid = e.target.value
+                      setSelectedZoneId(zid)
+                      if (zid === 'custom') {
+                        setFormLocation('')
+                      } else {
+                        const found = zones.find((z) => String(z._id) === zid)
+                        if (found) {
+                          setFormLocation(formatZoneLocation(found))
+                        }
+                      }
+                    }}
+                    className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold outline-none focus:border-brand bg-white"
+                  >
+                    <option value="">-- Select Created Zone --</option>
+                    {zones.map((z) => (
+                      <option key={z._id} value={z._id}>
+                        📍 {formatZoneDisplay(z)}
+                      </option>
+                    ))}
+                    <option value="custom">✏️ Custom Location / Other City</option>
+                  </select>
+                </div>
+
+                {/* Specific Location / Address */}
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1 block">
+                    Specific Location / Address Text *
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Vijay Nagar, Indore"
+                    required
+                    placeholder="e.g. Vijay Nagar, Scheme 54, Indore"
                     value={formLocation}
                     onChange={(e) => setFormLocation(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold outline-none focus:border-brand"
                   />
+                  <p className="text-[11px] text-slate-400 mt-1 font-medium">
+                    Selecting a zone above auto-fills this field, or you can enter any custom address.
+                  </p>
                 </div>
 
                 {/* Date & Time */}
