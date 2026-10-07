@@ -47,13 +47,13 @@ if [ -d "$BACKEND_DIR" ]; then
     npm install --omit=dev --legacy-peer-deps || npm install --legacy-peer-deps
     
     # Reload only a2z-api without affecting zapoo processes
-    if pm2 list | grep -q "$PM2_APP_NAME"; then
-        pm2 reload "$PM2_APP_NAME"
-        log_success "PM2 process '$PM2_APP_NAME' reloaded without downtime."
+    if pm2 list | grep -q "a2z-api"; then
+        pm2 reload "a2z-api"
+        log_success "PM2 process 'a2z-api' reloaded without downtime."
     else
-        pm2 start src/server.js --name "$PM2_APP_NAME"
+        pm2 start src/server.js --name "a2z-api"
         pm2 save
-        log_success "PM2 process '$PM2_APP_NAME' started."
+        log_success "PM2 process 'a2z-api' started."
     fi
     
     cd "$SCRIPT_DIR"
@@ -86,5 +86,5 @@ echo ""
 echo "=============================================================================="
 log_success "✅ A2Z Deployment Completed Successfully!"
 echo "=============================================================================="
-pm2 status "$PM2_APP_NAME"
+pm2 status "a2z-api"
 echo ""
