@@ -18,6 +18,7 @@ import {
   Wallet,
   Zap,
   Trash2,
+  Sparkles,
 } from 'lucide-react'
 import { AppStackScreenHeader } from '../../../components/app/AppStackScreenHeader.jsx'
 import { AppButton } from '../../../components/app-ui/buttons/AppButton.jsx'
