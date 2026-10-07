@@ -33,6 +33,11 @@ import adminProfileRoutes from './adminProfileRoutes.js'
 import notificationsRoutes from './notificationsRoutes.js'
 import simulatedOpportunityRoutes from './simulatedOpportunityRoutes.js'
 
+import productRoutes from './productRoutes.js'
+import serviceProductRoutes from './serviceProductRoutes.js'
+import inventoryRoutes from './inventoryRoutes.js'
+import materialRequestRoutes from './materialRequestRoutes.js'
+
 const router = Router()
 
 router.use('/auth', authRoutes)
@@ -40,6 +45,11 @@ router.use('/users', userRoutes)
 router.use('/service-partners', servicePartnerRoutes)
 router.use('/uploads', uploadRoutes)
 router.use('/labour-categories', labourCategoryRoutes)
+
+router.use('/products', productRoutes)
+router.use('/', serviceProductRoutes)
+router.use('/inventory', inventoryRoutes)
+router.use('/material-requests', materialRequestRoutes)
 
 router.use('/workforce', workforceRoutes)
 router.use('/bookings', bookingRoutes)
@@ -76,3 +86,4 @@ import { USER_ROLES } from '../constants/roles.js'
 router.get('/admin/commission-fee', protect, restrictTo(USER_ROLES.ADMIN), getCollectedCommissionAmount)
 
 export default router
+

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Plus, Search, RefreshCw, Edit2, Trash2, Wrench, Eye, X, AlertTriangle } from 'lucide-react'
+import { Plus, Search, RefreshCw, Edit2, Trash2, Wrench, Eye, X, AlertTriangle, Package } from 'lucide-react'
+
 import {
   fetchAdminLabourCategoryTree,
   createAdminLabourService,
@@ -1446,6 +1448,13 @@ export function AdminServicesPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-1">
+                        <Link
+                          to={`/admin/inventory?tab=service-materials`}
+                          title="Configure Required Materials"
+                          className="rounded-lg border border-transparent p-1.5 text-slate-400 hover:border-slate-200 hover:bg-slate-50 hover:text-indigo-600 transition"
+                        >
+                          <Package className="h-4 w-4" />
+                        </Link>
                         <button
                           onClick={() => setViewService(s)}
                           title="View Details"
@@ -1468,6 +1477,7 @@ export function AdminServicesPage() {
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
+
                     </td>
                   </tr>
                 ))

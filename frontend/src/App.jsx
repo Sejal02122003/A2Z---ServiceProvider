@@ -14,7 +14,9 @@ import { AdminSubCategoriesPage } from './pages/admin/AdminSubCategoriesPage.jsx
 import { AdminServicesPage } from './pages/admin/AdminServicesPage.jsx'
 import { AdminLoginPage } from './pages/admin/AdminLoginPage.jsx'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage.jsx'
+import { AdminInventoryHubPage } from './pages/admin/AdminInventoryHubPage.jsx'
 import { AdminUsersPage } from './pages/admin/AdminUsersPage.jsx'
+
 import { AdminLabourPage } from './pages/admin/AdminLabourPage.jsx'
 
 import { AdminBookingsPage } from './pages/admin/AdminBookingsPage.jsx'
@@ -111,6 +113,14 @@ function App() {
             }
           >
             <Route index element={<AdminDashboardPage />} />
+            <Route path="inventory" element={<AdminInventoryHubPage />} />
+            <Route path="inventory/products" element={<AdminInventoryHubPage />} />
+            <Route path="inventory/service-materials" element={<AdminInventoryHubPage />} />
+            <Route path="inventory/material-requests" element={<AdminInventoryHubPage />} />
+            <Route path="inventory/stock" element={<AdminInventoryHubPage />} />
+            <Route path="inventory/vendor-inventory" element={<AdminInventoryHubPage />} />
+            <Route path="inventory/transactions" element={<AdminInventoryHubPage />} />
+            <Route path="inventory/low-stock" element={<AdminInventoryHubPage />} />
             <Route path="categories" element={<AdminCategoriesPage />} />
             <Route path="sub-categories" element={<AdminSubCategoriesPage />} />
             <Route path="services" element={<AdminServicesPage />} />
@@ -118,6 +128,7 @@ function App() {
             <Route path="labour" element={<AdminLabourPage />} />
 
             <Route path="bookings" element={<AdminBookingsPage />} />
+
 
             <Route path="billing" element={<AdminBillingPage />} />
             <Route path="wallet-rewards" element={<AdminWalletRewardsPage />} />

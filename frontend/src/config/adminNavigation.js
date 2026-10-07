@@ -24,9 +24,12 @@ import {
   ClipboardCheck,
   Star,
   CalendarDays,
+  AlertTriangle,
+  Boxes,
   Radio,
   Gift,
 } from 'lucide-react'
+
 
 /**
  * Admin Labour hub (`/admin/labour`) shows links to these routes — a curated slice of Work Scope modules
@@ -57,6 +60,19 @@ export const ADMIN_NAV_SECTIONS = [
     items: [{ to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true }],
   },
   {
+    title: 'Inventory',
+    items: [
+      { to: '/admin/inventory', label: 'Inventory Hub', icon: Package, end: true },
+      { to: '/admin/inventory/products', label: 'Products', icon: Tag },
+      { to: '/admin/inventory/service-materials', label: 'Service Materials', icon: Wrench },
+      { to: '/admin/inventory/material-requests', label: 'Material Requests', icon: ClipboardCheck },
+      { to: '/admin/inventory/stock', label: 'Stock Management', icon: Boxes },
+      { to: '/admin/inventory/vendor-inventory', label: 'Vendor Inventory', icon: Users },
+      { to: '/admin/inventory/transactions', label: 'Ledger Audit', icon: BarChart3 },
+      { to: '/admin/inventory/low-stock', label: 'Low Stock Alerts', icon: AlertTriangle },
+    ],
+  },
+  {
     title: 'Users',
     items: [
       { to: '/admin/users', label: 'Users', icon: Users },
@@ -76,6 +92,7 @@ export const ADMIN_NAV_SECTIONS = [
       { to: '/admin/services', label: 'Services', icon: Wrench },
     ],
   },
+
   {
     title: 'Operations',
     items: [
@@ -130,7 +147,16 @@ export const ADMIN_NAV_SECTIONS = [
 ]
 
 const ROUTE_TITLES = [
+  { prefix: '/admin/inventory/products', title: 'Inventory — Products' },
+  { prefix: '/admin/inventory/service-materials', title: 'Inventory — Service Materials' },
+  { prefix: '/admin/inventory/material-requests', title: 'Inventory — Material Requests' },
+  { prefix: '/admin/inventory/stock', title: 'Inventory — Stock Management' },
+  { prefix: '/admin/inventory/vendor-inventory', title: 'Inventory — Vendor Inventory' },
+  { prefix: '/admin/inventory/transactions', title: 'Inventory — Ledger Audit' },
+  { prefix: '/admin/inventory/low-stock', title: 'Inventory — Low Stock Alerts' },
+  { prefix: '/admin/inventory', title: 'Central Inventory Hub' },
   { prefix: '/admin/wallet-rewards', title: 'Wallet & Rewards' },
+
   { prefix: '/admin/simulated-opportunities', title: 'Simulated Opportunities' },
   { prefix: '/admin/profile', title: 'Profile' },
   { prefix: '/admin/complaints', title: 'Complaints' },

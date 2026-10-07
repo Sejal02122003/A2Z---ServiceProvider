@@ -14,6 +14,7 @@ import {
   UserRound,
   Wrench,
   FileText,
+  Package,
 } from 'lucide-react'
 import { USER_ROLES } from '../constants/userRoles.js'
 
@@ -46,12 +47,14 @@ const byRole = {
     bottomNav: [
       { id: 'home', to: '/app', label: 'Home', icon: Home, end: true },
       { id: 'jobs', to: '/app/jobs', label: 'Jobs', icon: HardHat },
+      { id: 'materials', to: '/app/materials', label: 'Materials', icon: Package },
       { id: 'earnings', to: '/app/earnings', label: 'Earnings', icon: IndianRupee },
       { id: 'profile', to: '/app/profile', label: 'Profile', icon: UserRound },
     ],
     drawerNav: [
       { id: 'home', to: '/app', label: 'Home', icon: Home, end: true },
       { id: 'jobs', to: '/app/jobs', label: 'Assignments', icon: HardHat },
+      { id: 'materials', to: '/app/materials', label: 'Materials & Stock', icon: Package },
       { id: 'book', to: '/app/my-bookings', label: 'My bookings', icon: CalendarClock },
       { id: 'earnings', to: '/app/earnings', label: 'Earnings & payouts', icon: IndianRupee },
       { id: 'kyc', to: '/app/kyc', label: 'Aadhaar KYC', icon: ShieldCheck },
@@ -74,8 +77,10 @@ export function getAppNavigation(role) {
 
 export function getAppShellTitle(pathname) {
   if (pathname.startsWith('/app/jobs')) return 'Jobs'
+  if (pathname.startsWith('/app/materials')) return 'Materials'
   if (pathname.startsWith('/app/earnings')) return 'Earnings'
   if (pathname.startsWith('/app/kyc')) return 'KYC verification'
+
   if (pathname.startsWith('/app/notifications')) return 'Notifications'
   if (pathname.startsWith('/app/work-categories')) return 'Work types'
   if (pathname.startsWith('/app/booking/flow')) return 'Book labour'

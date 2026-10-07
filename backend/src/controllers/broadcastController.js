@@ -223,7 +223,17 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
 
   await booking.save()
 
+  // Auto-generate material requirement if service has mapped products
+  import('../services/materialRequirementService.js')
+    .then(({ generateMaterialRequirementForBooking }) => {
+      generateMaterialRequirementForBooking(booking._id, labour._id).catch(err =>
+        console.error('[MaterialRequirement Error on Broadcast Accept]', err)
+      )
+    })
+    .catch(err => console.error('[Import Error]', err))
+
   // Increment subscription bookingsAccepted count
+
   if (accessCheck.subscription) {
     const { UserSubscription } = await import('../models/UserSubscription.js')
     await UserSubscription.findByIdAndUpdate(accessCheck.subscription._id, {

@@ -28,7 +28,9 @@ import { AppFAQsPage } from '../pages/app/AppFAQsPage.jsx'
 import { AppCancellationPolicyPage } from '../pages/app/AppCancellationPolicyPage.jsx'
 import { AppRefundPolicyPage } from '../pages/app/AppRefundPolicyPage.jsx'
 import { AppBillingPage } from '../pages/app/AppBillingPage.jsx'
+import { VendorMaterialsPage } from '../pages/app/VendorMaterialsPage.jsx'
 import { USER_ROLES } from '../constants/userRoles.js'
+
 
 function AppRoleWalletWrapper() {
   const { user } = useAuth()
@@ -166,6 +168,15 @@ export const appShellChildRoutes = (
         </RoleRoute>
       }
     />
+    <Route
+      path="materials"
+      element={
+        <RoleRoute allow={[USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR, USER_ROLES.ADMIN]}>
+          <VendorMaterialsPage />
+        </RoleRoute>
+      }
+    />
+
     <Route path="privacy-policy" element={<AppPrivacyPolicyPage />} />
     <Route path="terms-conditions" element={<AppTermsConditionsPage />} />
     <Route path="faqs" element={<AppFAQsPage />} />

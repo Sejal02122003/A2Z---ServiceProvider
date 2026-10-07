@@ -187,6 +187,15 @@ export const assignLabourerManually = asyncHandler(async (req, res) => {
   booking.status = 'ASSIGNED'
   await booking.save()
 
+  // Auto-generate material requirement if service has mapped products
+  import('../services/materialRequirementService.js')
+    .then(({ generateMaterialRequirementForBooking }) => {
+      generateMaterialRequirementForBooking(booking._id, laborId).catch(err =>
+        console.error('[MaterialRequirement Error on Manual Assign]', err)
+      )
+    })
+    .catch(err => console.error('[Import Error]', err))
+
   const updatedBooking = await Booking.findById(id)
     .populate('userId', 'fullName phone email profileImageUrl serviceIds labourProfile')
     .populate('laborId', 'fullName phone email profileImageUrl serviceIds labourProfile')
@@ -196,6 +205,7 @@ export const assignLabourerManually = asyncHandler(async (req, res) => {
 
   return sendSuccess(res, { message: 'Labourer assigned manually successfully', data: { booking: updatedBooking } })
 })
+
 
 export const createBookingAdmin = asyncHandler(async (req, res) => {
   const bookingData = req.body
