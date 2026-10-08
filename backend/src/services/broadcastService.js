@@ -58,20 +58,33 @@ export async function startBroadcastCycle(bookingId) {
 
   const query = {
     _id: { $nin: busyLabourIds },
-    role: { $in: ['labour', 'contractor'] },
+    role: { $in: ['labour', 'contractor', 'vendor'] },
     'labourProfile.availabilityStatus': 'available',
     'labourProfile.kycStatus': 'verified',
     'labourProfile.currentLatitude': { $gte: bookingLat - bufferLatDiff, $lte: bookingLat + bufferLatDiff },
     'labourProfile.currentLongitude': { $gte: bookingLng - bufferLngDiff, $lte: bookingLng + bufferLngDiff }
   }
 
+  const matchOr = []
   if (booking.contractorInfo && booking.contractorInfo.services && booking.contractorInfo.services.length > 0) {
     const requestedServiceIds = booking.contractorInfo.services.map(s => s.serviceId)
-    query['labourProfile.serviceIds'] = { $in: requestedServiceIds }
-  } else if (booking.serviceId) {
-    query['labourProfile.serviceIds'] = booking.serviceId
-  } else if (booking.subcategoryId) {
-    query['labourProfile.subcategoryIds'] = booking.subcategoryId
+    matchOr.push({ 'labourProfile.serviceIds': { $in: requestedServiceIds } })
+  } else {
+    if (booking.serviceId) {
+      matchOr.push({ 'labourProfile.serviceIds': booking.serviceId })
+    }
+    if (booking.subcategoryId) {
+      matchOr.push({ 'labourProfile.subcategoryIds': booking.subcategoryId })
+      const { LabourSubcategory } = await import('../models/LabourSubcategory.js')
+      const sub = await LabourSubcategory.findById(booking.subcategoryId).lean()
+      if (sub?.categoryId) {
+        matchOr.push({ 'labourProfile.categoryIds': sub.categoryId })
+      }
+    }
+  }
+
+  if (matchOr.length > 0) {
+    query.$or = matchOr
   }
 
   const potentialLaborersRaw = await User.find(query).lean()
@@ -118,16 +131,15 @@ export async function startBroadcastCycle(bookingId) {
     const sTime = to24Hour(dayEntry.startTime || '00:00')
     const eTime = to24Hour(dayEntry.endTime || '23:59')
     
-    if (targetStartTimeStr < sTime || targetStartTimeStr > eTime) return false
-
-    if (targetEndTimeStr) {
-      if (targetEndTimeStr > eTime) return false
-    } else {
-      let [h, m] = targetStartTimeStr.split(':')
-      h = parseInt(h, 10) + (booking.hours || 1)
-      const bufferEndTime = `${String(h).padStart(2, '0')}:${m}`
-      if (bufferEndTime <= '23:59' && bufferEndTime > eTime) return false
+    if (booking.type === 'INSTANT') {
+      // For instant jobs, worker is available if current time falls within working shift
+      if (currentIstTimeStr < sTime || currentIstTimeStr > eTime) return false
+      return true
     }
+
+    // For scheduled jobs
+    if (targetStartTimeStr < sTime || targetStartTimeStr > eTime) return false
+    if (targetEndTimeStr && targetEndTimeStr > eTime) return false
 
     return true
   })
@@ -144,30 +156,36 @@ export async function startBroadcastCycle(bookingId) {
   const subEligible = []
   const today = new Date().toISOString().split('T')[0]
   const activeSubsMap = {} // Store to increment bookingsReceived later
+  const isSubscriptionEnforced = settings?.isUserSubscriptionEnabled === true
 
-  for (const labor of walletEligible) {
-    const trialEnds = labor.labourProfile?.trialEndsAt
-    const now = new Date()
-    if (trialEnds && now <= new Date(trialEnds)) {
-      subEligible.push(labor) // Free trial
-      continue
-    }
+  if (!isSubscriptionEnforced) {
+    // When subscription is disabled in settings, all available laborers are eligible
+    subEligible.push(...walletEligible)
+  } else {
+    for (const labor of walletEligible) {
+      const trialEnds = labor.labourProfile?.trialEndsAt
+      const now = new Date()
+      if (trialEnds && now <= new Date(trialEnds)) {
+        subEligible.push(labor) // Free trial
+        continue
+      }
 
-    const activeSub = await UserSubscription.findOne({
-      labour: labor._id,
-      date: { $lte: today },
-      endDate: { $gte: today },
-      status: 'active'
-    })
-    
-    if (activeSub) {
-      subEligible.push(labor)
-      activeSubsMap[labor._id] = activeSub
+      const activeSub = await UserSubscription.findOne({
+        labour: labor._id,
+        date: { $lte: today },
+        endDate: { $gte: today },
+        status: 'active'
+      })
+      
+      if (activeSub) {
+        subEligible.push(labor)
+        activeSubsMap[labor._id] = activeSub
+      }
     }
   }
 
   if (subEligible.length === 0) {
-    await markBookingFailed(booking, 'No eligible laborers found (Subscription)')
+    await markBookingFailed(booking, 'No eligible laborers found (Subscription / Trial Expired)')
     return
   }
 
