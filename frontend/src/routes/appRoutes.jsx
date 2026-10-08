@@ -29,6 +29,7 @@ import { AppCancellationPolicyPage } from '../pages/app/AppCancellationPolicyPag
 import { AppRefundPolicyPage } from '../pages/app/AppRefundPolicyPage.jsx'
 import { AppBillingPage } from '../pages/app/AppBillingPage.jsx'
 import { VendorMaterialsPage } from '../pages/app/VendorMaterialsPage.jsx'
+import { VendorTrialStatusPage } from '../pages/app/VendorTrialStatusPage.jsx'
 import { USER_ROLES } from '../constants/userRoles.js'
 
 
@@ -128,6 +129,22 @@ export const appShellChildRoutes = (
       element={
         <RoleRoute allow={[USER_ROLES.LABOUR]}>
           <AppSubscriptionPage />
+        </RoleRoute>
+      }
+    />
+    <Route
+      path="trial"
+      element={
+        <RoleRoute allow={[USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR]}>
+          <VendorTrialStatusPage />
+        </RoleRoute>
+      }
+    />
+    <Route
+      path="trial-status"
+      element={
+        <RoleRoute allow={[USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR]}>
+          <VendorTrialStatusPage />
         </RoleRoute>
       }
     />

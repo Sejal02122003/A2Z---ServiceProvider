@@ -6,6 +6,7 @@ import { getRoadDistances } from '../utils/googleMapsDistance.js'
 import { UserSubscription } from '../models/UserSubscription.js'
 import { Review } from '../models/Review.js'
 import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
+import { USER_ROLES } from '../constants/roles.js'
 
 export const BROADCAST_TIMEOUT_MS = 300000 // 5 minutes flash broadcast timeout
 
@@ -49,18 +50,26 @@ export async function startBroadcastCycle(bookingId) {
   const bufferLatDiff = latDiff * 1.2
   const bufferLngDiff = lngDiff * 1.2
 
-  // EXCLUDE labourers who are actively executing a job on-site
+  // EXCLUDE labourers who are actively executing a job on-site AND the booking customer
   const busyBookings = await Booking.find({
     status: { $in: ['EN_ROUTE', 'STARTED'] },
     acceptedLabourId: { $exists: true, $ne: null }
   }).select('acceptedLabourId').lean()
   const busyLabourIds = busyBookings.map(b => b.acceptedLabourId)
 
+  const customerId = booking.userId?._id || booking.userId
+  const excludedUserIds = [...busyLabourIds]
+  if (customerId) {
+    excludedUserIds.push(customerId)
+  }
+
   const query = {
-    _id: { $nin: busyLabourIds },
-    role: { $in: ['labour', 'contractor', 'vendor'] },
+    _id: { $nin: excludedUserIds },
+    role: USER_ROLES.LABOUR,
     'labourProfile.availabilityStatus': 'available',
     'labourProfile.kycStatus': 'verified',
+    vendorStatus: { $nin: ['BLOCKED', 'REJECTED', 'FINAL_FAILURE', 'FINAL_CHANCE_PAYMENT_PENDING', 'TRIAL_PAUSED', 'PENDING_ADMIN_CONFIRMATION', 'ADMIN_REVIEW_REQUIRED'] },
+    isActive: true,
     'labourProfile.currentLatitude': { $gte: bookingLat - bufferLatDiff, $lte: bookingLat + bufferLatDiff },
     'labourProfile.currentLongitude': { $gte: bookingLng - bufferLngDiff, $lte: bookingLng + bufferLngDiff }
   }

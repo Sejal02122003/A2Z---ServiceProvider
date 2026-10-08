@@ -28,6 +28,9 @@ import {
   Boxes,
   Radio,
   Gift,
+  Award,
+  UserCheck,
+  Sliders,
 } from 'lucide-react'
 
 
@@ -82,6 +85,14 @@ export const ADMIN_NAV_SECTIONS = [
     title: 'Workforce',
     items: [
       { to: '/admin/labour', label: 'KYC', icon: IdCard },
+    ],
+  },
+  {
+    title: 'Vendor Management',
+    items: [
+      { to: '/admin/vendor-trials', label: 'Trial Management', icon: Award },
+      { to: '/admin/vendor-trials/pending-confirmations', label: 'Pending Confirmations', icon: UserCheck },
+      { to: '/admin/vendor-trials/settings', label: 'Trial Settings', icon: Sliders },
     ],
   },
   {
@@ -158,6 +169,9 @@ const ROUTE_TITLES = [
   { prefix: '/admin/wallet-rewards', title: 'Wallet & Rewards' },
 
   { prefix: '/admin/simulated-opportunities', title: 'Simulated Opportunities' },
+  { prefix: '/admin/vendor-trials/pending-confirmations', title: 'Vendor Management — Pending Confirmations' },
+  { prefix: '/admin/vendor-trials/settings', title: 'Vendor Management — Trial Settings' },
+  { prefix: '/admin/vendor-trials', title: 'Vendor Management — Trial Management' },
   { prefix: '/admin/profile', title: 'Profile' },
   { prefix: '/admin/complaints', title: 'Complaints' },
   { prefix: '/admin/settings', title: 'Settings' },

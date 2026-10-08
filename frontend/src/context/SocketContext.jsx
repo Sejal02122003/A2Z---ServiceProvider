@@ -47,6 +47,9 @@ export function SocketProvider({ children }) {
 
     newSocket.on('connect_error', (err) => {
       console.warn('[Socket] Connection error:', err.message)
+      if (err.message && err.message.toLowerCase().includes('authentication error')) {
+        newSocket.disconnect()
+      }
     })
 
     currentSocket = newSocket

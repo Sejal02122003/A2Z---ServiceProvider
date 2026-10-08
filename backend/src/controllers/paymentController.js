@@ -234,6 +234,15 @@ export const verifyPayment = asyncHandler(async (req, res) => {
         }
       }
     }
+  } else if (pTx.purpose === 'TRIAL_PENALTY') {
+    const { verifyAndActivateFinalChance } = await import('../services/trialEvaluationService.js')
+    await verifyAndActivateFinalChance({
+      vendorId: pTx.userId,
+      razorpayOrderId,
+      razorpayPaymentId,
+      razorpaySignature,
+      finalChanceRequestId: pTx.finalChanceRequestId,
+    })
   }
 
   return sendSuccess(res, { message: 'Payment verified successfully', data: { pTx } })

@@ -621,6 +621,24 @@ export function AppProfilePage() {
         </Link>
       ) : null}
 
+      {user?.role === USER_ROLES.LABOUR || user?.role === USER_ROLES.CONTRACTOR ? (
+        <Link
+          to="/app/trial"
+          className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200/80 bg-amber-50/70 px-4 py-3.5 shadow-sm transition active:scale-[0.99]"
+        >
+          <span className="flex items-center gap-2.5">
+            <Sparkles className="h-5 w-5 shrink-0 text-amber-600" aria-hidden />
+            <span className="text-left">
+              <span className="block text-sm font-bold text-slate-900">Vendor Trial & Status</span>
+              <span className="block text-[11px] font-medium text-slate-600">
+                View trial progress, ratings, and confirmation status
+              </span>
+            </span>
+          </span>
+          <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" aria-hidden />
+        </Link>
+      ) : null}
+
       {user?.role === USER_ROLES.LABOUR ? (
         <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">

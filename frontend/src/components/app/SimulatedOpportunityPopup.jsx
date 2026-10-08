@@ -36,15 +36,17 @@ export function SimulatedOpportunityPopup() {
   const [statusMessage, setStatusMessage] = useState('')
   const [resultState, setResultState] = useState(null) // 'WON' | 'TAKEN' | 'EXPIRED' | 'CANCELLED'
 
-  const isWorkerOrContractor =
+  const isLabour =
     user?.role === USER_ROLES.LABOUR ||
-    user?.role === 'labour' ||
-    user?.role === USER_ROLES.CONTRACTOR ||
-    user?.role === 'contractor'
+    user?.role === 'labour'
 
   // Socket listeners for Simulated Opportunities
   useEffect(() => {
-    if (!socket || !isWorkerOrContractor) return
+    if (!isLabour) {
+      setIncoming(null)
+      return
+    }
+    if (!socket) return
 
     const handleAlert = (data) => {
       console.log('--- SIMULATED_OPPORTUNITY_ALERT ---', data)
@@ -89,7 +91,7 @@ export function SimulatedOpportunityPopup() {
       socket.off('SIMULATED_OPPORTUNITY_TAKEN', handleTaken)
       socket.off('SIMULATED_OPPORTUNITY_CANCELLED', handleCancelled)
     }
-  }, [socket, isWorkerOrContractor])
+  }, [socket, isLabour])
 
   // Countdown timer
   useEffect(() => {
@@ -161,7 +163,7 @@ export function SimulatedOpportunityPopup() {
     setStatusMessage('')
   }
 
-  if (!isWorkerOrContractor) return null
+  if (!isLabour) return null
 
   return (
     <AnimatePresence>

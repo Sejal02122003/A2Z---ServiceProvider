@@ -43,6 +43,10 @@ import { AdminCancellationPolicyPage } from './pages/admin/AdminCancellationPoli
 import { AdminRefundPolicyPage } from './pages/admin/AdminRefundPolicyPage.jsx'
 import { AdminSimulatedOpportunitiesPage } from './pages/admin/AdminSimulatedOpportunitiesPage.jsx'
 import AdminWalletRewardsPage from './pages/admin/AdminWalletRewardsPage.jsx'
+import { AdminVendorTrialsPage } from './pages/admin/AdminVendorTrialsPage.jsx'
+import { AdminPendingConfirmationsPage } from './pages/admin/AdminPendingConfirmationsPage.jsx'
+import { AdminTrialSettingsPage } from './pages/admin/AdminTrialSettingsPage.jsx'
+import { AdminVendorTrialDetailPage } from './pages/admin/AdminVendorTrialDetailPage.jsx'
 
 import { BroadcastPopup } from './components/app/BroadcastPopup.jsx'
 import { SimulatedOpportunityPopup } from './components/app/SimulatedOpportunityPopup.jsx'
@@ -146,6 +150,10 @@ function App() {
             <Route path="reviews" element={<AdminReviewsRatingsPage />} />
             <Route path="labour-subscriptions" element={<AdminLabourSubscriptionsPage />} />
             <Route path="free-trials" element={<AdminFreeTrialPage />} />
+            <Route path="vendor-trials" element={<AdminVendorTrialsPage />} />
+            <Route path="vendor-trials/pending-confirmations" element={<AdminPendingConfirmationsPage />} />
+            <Route path="vendor-trials/settings" element={<AdminTrialSettingsPage />} />
+            <Route path="vendor-trials/:vendorId" element={<AdminVendorTrialDetailPage />} />
             <Route path="privacy-policy" element={<AdminPrivacyPolicyPage />} />
             <Route path="terms-conditions" element={<AdminTermsConditionsPage />} />
             <Route path="faqs" element={<AdminFAQsPage />} />

@@ -37,8 +37,11 @@ import productRoutes from './productRoutes.js'
 import serviceProductRoutes from './serviceProductRoutes.js'
 import inventoryRoutes from './inventoryRoutes.js'
 import materialRequestRoutes from './materialRequestRoutes.js'
+import trialRoutes from './trialRoutes.js'
 
 const router = Router()
+
+router.use('/', trialRoutes)
 
 router.use('/auth', authRoutes)
 router.use('/users', userRoutes)

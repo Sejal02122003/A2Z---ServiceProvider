@@ -9,6 +9,7 @@ import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { populateLabourCategories } from '../utils/populateLabourCategories.js'
 import { isValidAadhaarLength, maskAadhaarLast4, normalizeAadhaar } from '../utils/aadhaar.js'
 import { normalizeStoredMediaUrl } from '../utils/mediaUrl.js'
+import { startVendorTrial } from '../services/trialEvaluationService.js'
 
 const MAX_KYC_IMAGE_CHARS = 750_000
 
@@ -358,16 +359,15 @@ export const reviewLabourKyc = asyncHandler(async (req, res) => {
     profile.kycStatus = KYC_STATUS.VERIFIED
     profile.kycReviewNote = undefined
 
-    // Set Trial logic (only for labour for now, or both?)
-    if (user.role === USER_ROLES.LABOUR) {
-      const settings = await SystemSetting.findOne({ configKey: 'master_config' })
-      const trialDays = settings?.freeTrialDays || 3
-      const now = new Date()
-      const trialEnds = new Date(now)
-      trialEnds.setDate(now.getDate() + trialDays)
-      
-      profile.trialStartedAt = now
-      profile.trialEndsAt = trialEnds
+    // Start vendor trial lifecycle automatically upon KYC approval (Requirement 2)
+    try {
+      await startVendorTrial(user._id, {
+        performedBy: req.user?._id,
+        actorRole: 'ADMIN',
+        reason: 'Admin verified KYC, starting vendor trial period',
+      })
+    } catch (trialErr) {
+      console.error('Error auto-starting vendor trial:', trialErr)
     }
   } else {
     profile.kycStatus = KYC_STATUS.FAILED
@@ -380,7 +380,7 @@ export const reviewLabourKyc = asyncHandler(async (req, res) => {
   }
 
   return sendSuccess(res, {
-    message: decision === 'approved' ? 'KYC approved' : 'KYC marked as rejected',
+    message: decision === 'approved' ? 'KYC approved and Vendor Trial started' : 'KYC marked as rejected',
     data: { user: user.toSafeObject({ includeLabourKycImages: true }) },
   })
 })

@@ -3,6 +3,7 @@ import { Booking } from '../models/Booking.js'
 import { User } from '../models/User.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
+import { evaluateBookingRating } from '../services/trialEvaluationService.js'
 
 export const submitReview = asyncHandler(async (req, res) => {
   const { bookingId, rating, comment, revieweeId: providedRevieweeId } = req.body
@@ -17,8 +18,10 @@ export const submitReview = asyncHandler(async (req, res) => {
   }
 
   let revieweeId
+  let isCustomerReviewingWorker = false
   if (String(booking.userId) === String(req.user._id)) {
-    revieweeId = providedRevieweeId || booking.laborId // Customer reviewing Labor
+    revieweeId = providedRevieweeId || booking.laborId || booking.acceptedLabourId // Customer reviewing Labor
+    isCustomerReviewingWorker = true
   } else if (String(booking.laborId) === String(req.user._id) || (booking.assignments && booking.assignments.some(a => String(a.labourId) === String(req.user._id)))) {
     revieweeId = booking.userId // Labor reviewing Customer
   } else {
@@ -38,7 +41,26 @@ export const submitReview = asyncHandler(async (req, res) => {
     comment
   })
 
-  return sendSuccess(res, { message: 'Review submitted successfully', data: { review } })
+  // If customer reviewed a vendor/worker, trigger trial evaluation
+  let trialEvalResult = null
+  if (isCustomerReviewingWorker && revieweeId) {
+    try {
+      trialEvalResult = await evaluateBookingRating({
+        bookingId,
+        rating,
+        comment,
+        reviewerId: req.user._id,
+        vendorId: revieweeId,
+      })
+    } catch (trialErr) {
+      console.error('Error evaluating trial rating:', trialErr)
+    }
+  }
+
+  return sendSuccess(res, {
+    message: 'Review submitted successfully',
+    data: { review, trialEvaluation: trialEvalResult },
+  })
 })
 
 export const getReviews = asyncHandler(async (req, res) => {

@@ -19,8 +19,9 @@ export function AppSubCategoryServicePage() {
   const [bookingTypeOpen, setBookingTypeOpen] = useState(false)
   const [bookingService, setBookingService] = useState(null)
   
-  const [cat, setCat] = useState(() => location.state?.cat)
-  const [loading, setLoading] = useState(false)
+  const [cat, setCat] = useState(() => location.state?.cat || null)
+  const [loading, setLoading] = useState(() => !location.state?.cat)
+  const [fetchDone, setFetchDone] = useState(() => !!location.state?.cat)
 
   useEffect(() => {
     let cancelled = false
@@ -30,17 +31,30 @@ export function AppSubCategoryServicePage() {
       .then(res => {
         if (cancelled) return
         const groups = res.data?.groups || []
+        let matched = null
         for (const g of groups) {
           for (const c of (g.categories || [])) {
             if (String(c._id) === String(id) || String(c._id) === String(cat?._id)) {
-              setCat({ ...c, groupId: g._id, groupName: g.name, services: c.services || [] })
+              matched = { ...c, groupId: g._id, groupName: g.name, services: c.services || [] }
+              break
             }
           }
+          if (matched) break
+          if (String(g._id) === String(id)) {
+            matched = { ...g, groupId: g._id, groupName: g.name, services: g.services || [] }
+            break
+          }
+        }
+        if (matched) {
+          setCat(matched)
         }
       })
       .catch(console.error)
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+          setFetchDone(true)
+        }
       })
     return () => { cancelled = true }
   }, [id, cat?._id])
@@ -71,11 +85,6 @@ export function AppSubCategoryServicePage() {
     [navigate, cat, bookingService]
   )
 
-  if (!cat && !loading) {
-    // If user refreshes or visits directly, redirect back
-    return <Navigate to="/app" replace />
-  }
-
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 gap-3">
@@ -85,7 +94,29 @@ export function AppSubCategoryServicePage() {
     )
   }
 
-  const services = cat?.services || []
+  if (!cat && fetchDone) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 gap-4 p-6 text-center">
+        <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 max-w-sm w-full">
+          <Wrench className="mx-auto h-10 w-10 text-slate-300 mb-3" />
+          <h2 className="text-base font-bold text-slate-800">Category Not Found</h2>
+          <p className="text-xs text-slate-500 mt-1 mb-4">The requested service category is currently not available.</p>
+          <button
+            onClick={() => navigate('/app', { replace: true })}
+            className="w-full rounded-xl bg-brand py-2.5 text-xs font-bold text-white shadow transition hover:bg-brand/90"
+          >
+            Back to Home
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!cat) {
+    return null
+  }
+
+  const services = cat.services || []
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 -mx-4 -mt-[max(0.5rem,env(safe-area-inset-top,0px))]">
@@ -100,7 +131,7 @@ export function AppSubCategoryServicePage() {
               <ArrowLeft className="h-5 w-5" />
             </button>
             <div className="flex flex-col justify-center min-w-0">
-              <h1 className="text-[20px] font-bold tracking-tight text-slate-900 leading-none truncate">{cat.name}</h1>
+              <h1 className="text-[20px] font-bold tracking-tight text-slate-900 leading-none truncate">{cat.name || 'Services'}</h1>
             </div>
           </div>
         </div>
@@ -114,7 +145,7 @@ export function AppSubCategoryServicePage() {
               {cat.subtitle}
             </p>
           ) : (
-            <p className="text-sm text-slate-400 italic">No description available for this sub-category.</p>
+            <p className="text-sm text-slate-400 italic">No description available for this category.</p>
           )}
         </section>
 

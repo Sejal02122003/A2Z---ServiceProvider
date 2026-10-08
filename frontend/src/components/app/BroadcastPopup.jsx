@@ -21,12 +21,16 @@ export function BroadcastPopup() {
   const [error, setError] = useState('')
   const [selectedServiceId, setSelectedServiceId] = useState(null)
 
-  // Only render for labour, vendor, and contractor users
-  const isWorkerOrContractor = ['labour', 'contractor', 'vendor'].includes(user?.role) || user?.role === USER_ROLES.LABOUR
+  // Only render for labour / worker users
+  const isLabour = user?.role === USER_ROLES.LABOUR || user?.role === 'labour'
 
   // Listen for broadcast events
   useEffect(() => {
-    if (!socket || !isWorkerOrContractor) return
+    if (!isLabour) {
+      setIncoming(null)
+      return
+    }
+    if (!socket) return
 
     const handleBroadcast = (data) => {
       console.log('--- BOOKING_RECEIVED EVENT ---', data);
@@ -48,7 +52,7 @@ export function BroadcastPopup() {
       socket.off('BOOKING_RECEIVED', handleBroadcast)
       socket.off('BOOKING_EXPIRED', handleExpired)
     }
-  }, [socket, isWorkerOrContractor])
+  }, [socket, isLabour])
 
   // Countdown timer
   useEffect(() => {
@@ -109,7 +113,7 @@ export function BroadcastPopup() {
     }
   }, [incoming])
 
-  if (!isWorkerOrContractor) return null
+  if (!isLabour) return null
 
   const services = incoming?.services || []
   const requiresSelection = incoming?.requiresServiceSelection && services.length > 1

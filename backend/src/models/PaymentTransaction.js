@@ -28,6 +28,11 @@ const paymentTransactionSchema = new mongoose.Schema(
       ref: 'WorkforceRequest',
       index: true,
     },
+    finalChanceRequestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'FinalChanceRequest',
+      index: true,
+    },
     razorpayOrderId: {
       type: String,
       required: true,
@@ -54,7 +59,7 @@ const paymentTransactionSchema = new mongoose.Schema(
     },
     purpose: {
       type: String,
-      enum: ['BOOKING', 'WALLET_CLEARANCE', 'INVOICE', 'SUBSCRIPTION', 'WORKFORCE_REQUEST'],
+      enum: ['BOOKING', 'WALLET_CLEARANCE', 'INVOICE', 'SUBSCRIPTION', 'WORKFORCE_REQUEST', 'TRIAL_PENALTY'],
       required: true,
     },
   },
