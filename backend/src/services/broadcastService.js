@@ -49,9 +49,9 @@ export async function startBroadcastCycle(bookingId) {
   const bufferLatDiff = latDiff * 1.2
   const bufferLngDiff = lngDiff * 1.2
 
-  // EXCLUDE labourers who are already busy with an active job
+  // EXCLUDE labourers who are actively executing a job on-site
   const busyBookings = await Booking.find({
-    status: { $in: ['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED'] },
+    status: { $in: ['EN_ROUTE', 'STARTED'] },
     acceptedLabourId: { $exists: true, $ne: null }
   }).select('acceptedLabourId').lean()
   const busyLabourIds = busyBookings.map(b => b.acceptedLabourId)

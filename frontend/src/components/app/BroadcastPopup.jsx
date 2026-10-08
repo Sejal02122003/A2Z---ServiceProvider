@@ -21,8 +21,8 @@ export function BroadcastPopup() {
   const [error, setError] = useState('')
   const [selectedServiceId, setSelectedServiceId] = useState(null)
 
-  // Only render for labour and contractor users
-  const isWorkerOrContractor = user?.role === USER_ROLES.LABOUR || user?.role === 'labour' || user?.role === USER_ROLES.CONTRACTOR || user?.role === 'contractor'
+  // Only render for labour, vendor, and contractor users
+  const isWorkerOrContractor = ['labour', 'contractor', 'vendor'].includes(user?.role) || user?.role === USER_ROLES.LABOUR
 
   // Listen for broadcast events
   useEffect(() => {

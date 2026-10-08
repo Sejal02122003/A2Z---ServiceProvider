@@ -9,6 +9,7 @@ import {
   generateMaterialRequirementForBooking,
   createInventoryLog,
 } from '../services/materialRequirementService.js'
+import { emitToUser } from '../socket.js'
 
 // ==========================================
 // VENDOR CONTROLLERS
@@ -30,8 +31,12 @@ export const getVendorMaterialRequests = asyncHandler(async (req, res) => {
     }
   }
 
-  const { status, page = 1, limit = 20 } = req.query
+  const { status, bookingId, page = 1, limit = 20 } = req.query
   const query = { vendorId }
+
+  if (bookingId) {
+    query.bookingId = bookingId
+  }
 
   if (status && status !== 'ALL') {
     if (status === 'PENDING') {
@@ -183,6 +188,14 @@ export const createVendorMaterialRequest = asyncHandler(async (req, res) => {
     .populate('serviceId', 'name')
     .populate('bookingId')
     .lean()
+
+  emitToUser(vendorId, 'MATERIAL_REQUEST_UPDATED', {
+    requestId: materialRequest._id,
+    bookingId: materialRequest.bookingId,
+    status: materialRequest.status,
+    request: populated,
+    message: 'Material request submitted to Admin for inventory check',
+  })
 
   return sendSuccess(res, {
     message: 'Material request submitted successfully',
@@ -534,6 +547,22 @@ export const approveMaterialRequest = asyncHandler(async (req, res) => {
 
   await materialRequest.save()
 
+  const populated = await MaterialRequest.findById(materialRequest._id)
+    .populate('items.productId')
+    .populate('serviceId', 'name')
+    .populate('bookingId')
+    .lean()
+
+  emitToUser(materialRequest.vendorId, 'MATERIAL_REQUEST_UPDATED', {
+    requestId: materialRequest._id,
+    bookingId: materialRequest.bookingId,
+    status: materialRequest.status,
+    request: populated,
+    message: allAvailable
+      ? 'Materials approved and confirmed in stock by Admin'
+      : 'Materials approved, waiting for stock arrival',
+  })
+
   return sendSuccess(res, {
     message: allAvailable
       ? 'Material request approved successfully'
@@ -565,6 +594,21 @@ export const rejectMaterialRequest = asyncHandler(async (req, res) => {
   })
 
   await materialRequest.save()
+
+  const populated = await MaterialRequest.findById(materialRequest._id)
+    .populate('items.productId')
+    .populate('serviceId', 'name')
+    .populate('bookingId')
+    .lean()
+
+  emitToUser(materialRequest.vendorId, 'MATERIAL_REQUEST_UPDATED', {
+    requestId: materialRequest._id,
+    bookingId: materialRequest.bookingId,
+    status: 'REJECTED',
+    adminRemarks: materialRequest.adminRemarks,
+    request: populated,
+    message: `Material request rejected: ${materialRequest.adminRemarks}`,
+  })
 
   return sendSuccess(res, {
     message: 'Material request rejected',
@@ -690,6 +734,14 @@ export const issueMaterials = asyncHandler(async (req, res) => {
     .populate('bookingId')
     .lean()
 
+  emitToUser(materialRequest.vendorId, 'MATERIAL_REQUEST_UPDATED', {
+    requestId: materialRequest._id,
+    bookingId: materialRequest.bookingId,
+    status: materialRequest.status,
+    request: populated,
+    message: 'Materials issued and confirmed in stock! You can now start your journey.',
+  })
+
   return sendSuccess(res, {
     message: `Materials issued successfully. Status: ${materialRequest.status}`,
     data: { request: populated },
@@ -714,6 +766,21 @@ export const markWaitingForStock = asyncHandler(async (req, res) => {
   })
 
   await materialRequest.save()
+
+  const populated = await MaterialRequest.findById(materialRequest._id)
+    .populate('items.productId')
+    .populate('serviceId', 'name')
+    .populate('bookingId')
+    .lean()
+
+  emitToUser(materialRequest.vendorId, 'MATERIAL_REQUEST_UPDATED', {
+    requestId: materialRequest._id,
+    bookingId: materialRequest.bookingId,
+    status: 'WAITING_FOR_STOCK',
+    adminRemarks: materialRequest.adminRemarks,
+    request: populated,
+    message: `Material request marked waiting for stock: ${materialRequest.adminRemarks}`,
+  })
 
   return sendSuccess(res, {
     message: 'Material request marked as WAITING_FOR_STOCK',

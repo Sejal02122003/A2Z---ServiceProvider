@@ -16,6 +16,15 @@ import {
   Upload,
   Wallet,
   User,
+  Package,
+  Boxes,
+  Lock,
+  Send,
+  Sparkles,
+  Info,
+  ShieldCheck,
+  ShieldAlert,
+  AlertTriangle,
 } from 'lucide-react'
 import { bookingsApi } from '../../api/bookingsApi.js'
 import { ApiError } from '../../api/http.js'
@@ -25,6 +34,11 @@ import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { uploadMedia, assetUrlFromUpload } from '../../api/uploadApi.js'
 import { UPLOAD_FOLDERS } from '../../constants/uploadFolders.js'
+import {
+  fetchVendorMaterialRequests,
+  createVendorMaterialRequest,
+  fetchServiceProductMappings,
+} from '../../api/inventoryApi.js'
 
 function formatCountdown(ms) {
   if (ms <= 0) return '00:00:00'
@@ -83,11 +97,44 @@ export function ActiveJob() {
   const [showCashConfirm, setShowCashConfirm] = useState(false)
   const [pendingCashSubmit, setPendingCashSubmit] = useState(null)
 
+  // Material Management State
+  const [materialRequest, setMaterialRequest] = useState(null)
+  const [serviceProducts, setServiceProducts] = useState([])
+  const [loadingMaterials, setLoadingMaterials] = useState(true)
+  const [requestingMaterials, setRequestingMaterials] = useState(false)
+  const [materialActionMsg, setMaterialActionMsg] = useState('')
+
   const [now, setNow] = useState(Date.now())
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(interval)
   }, [])
+
+  // Fetch Material Requirements & Request
+  const loadMaterialsData = useCallback(async (currentBooking) => {
+    if (!bookingId) return
+    try {
+      setLoadingMaterials(true)
+      const res = await fetchVendorMaterialRequests({ bookingId })
+      const requests = res?.requests || res?.data?.requests || []
+      const existingReq = requests.find(r => String(r.bookingId?._id || r.bookingId) === String(bookingId))
+      if (existingReq) {
+        setMaterialRequest(existingReq)
+      } else if (requests.length > 0) {
+        setMaterialRequest(requests[0])
+      }
+
+      const sId = currentBooking?.serviceId?._id || currentBooking?.serviceId
+      if (sId) {
+        const mappings = await fetchServiceProductMappings(sId)
+        setServiceProducts(mappings || [])
+      }
+    } catch (err) {
+      console.warn('Could not load material requirements:', err)
+    } finally {
+      setLoadingMaterials(false)
+    }
+  }, [bookingId])
 
   // Fetch booking
   useEffect(() => {
@@ -98,6 +145,9 @@ export function ActiveJob() {
         if (cancelled) return
         const b = res.data?.booking
         setBooking(b)
+        if (b) {
+          loadMaterialsData(b)
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof ApiError ? err.message : 'Failed to load job')
@@ -106,7 +156,7 @@ export function ActiveJob() {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [bookingId])
+  }, [bookingId, loadMaterialsData])
 
   // Socket updates
   useEffect(() => {
@@ -140,9 +190,46 @@ export function ActiveJob() {
       }
     }
 
+    const handleMaterialUpdate = (data) => {
+      if (String(data.bookingId) === String(bookingId) || String(data.requestId) === String(materialRequest?._id)) {
+        if (data.request) {
+          setMaterialRequest(data.request)
+        } else {
+          loadMaterialsData(booking)
+        }
+        if (data.message) {
+          setMaterialActionMsg(data.message)
+          setTimeout(() => setMaterialActionMsg(''), 7000)
+        }
+      }
+    }
+
     socket.on('BOOKING_STATUS_UPDATE', handleStatusUpdate)
-    return () => { socket.off('BOOKING_STATUS_UPDATE', handleStatusUpdate) }
-  }, [socket, bookingId])
+    socket.on('MATERIAL_REQUEST_UPDATED', handleMaterialUpdate)
+    return () => {
+      socket.off('BOOKING_STATUS_UPDATE', handleStatusUpdate)
+      socket.off('MATERIAL_REQUEST_UPDATED', handleMaterialUpdate)
+    }
+  }, [socket, bookingId, materialRequest?._id, booking, loadMaterialsData, user])
+
+  const handleRequestMaterials = async () => {
+    setRequestingMaterials(true)
+    setUpdateError('')
+    try {
+      const res = await createVendorMaterialRequest({ bookingId })
+      if (res?.request) {
+        setMaterialRequest(res.request)
+      } else {
+        await loadMaterialsData(booking)
+      }
+      setMaterialActionMsg('Material request submitted to Admin for inventory verification!')
+      setTimeout(() => setMaterialActionMsg(''), 6000)
+    } catch (err) {
+      setUpdateError(err instanceof ApiError ? err.message : 'Failed to request materials')
+    } finally {
+      setRequestingMaterials(false)
+    }
+  }
 
   const handleStatusUpdate = useCallback(async (nextStatus, requireOtp = false, bypassCashCheck = false) => {
     if (requireOtp && !otp) {
@@ -238,16 +325,21 @@ export function ActiveJob() {
     }
   }, [socket, booking])
 
-  const handleCancel = useCallback(async () => {
-    const confirmed = window.confirm(
-      'Are you sure? A ₹50 penalty will be applied to your wallet.'
-    )
+  const handleCancel = useCallback(async (isMaterialOutStock = false) => {
+    const confirmMsg = isMaterialOutStock
+      ? 'Cancel this booking because required materials are out of stock in warehouse?'
+      : 'Are you sure? A ₹50 penalty will be applied to your wallet.'
+
+    const confirmed = window.confirm(confirmMsg)
     if (!confirmed) return
 
     setUpdating(true)
     setUpdateError('')
     try {
-      await bookingsApi.updateBookingStatus(bookingId, 'CANCELLED')
+      await bookingsApi.updateBookingStatus(bookingId, {
+        status: 'CANCELLED',
+        reason: isMaterialOutStock ? 'Required materials out of stock' : 'Cancelled by service provider',
+      })
       navigate('/app/my-bookings', { replace: true })
     } catch (err) {
       setUpdateError(err instanceof ApiError ? err.message : 'Failed to cancel')
@@ -325,6 +417,22 @@ export function ActiveJob() {
   // Check if it's too early to start a scheduled job (more than 30 mins away)
   const isTooEarly = booking.type === 'SCHEDULED' && status === 'ACCEPTED' &&
     (new Date(booking.scheduledAt).getTime() - Date.now() > 30 * 60 * 1000)
+
+  const materialItems = (materialRequest?.items && materialRequest.items.length > 0)
+    ? materialRequest.items
+    : serviceProducts.map(sp => ({
+        productId: sp.productId,
+        quantityRequired: sp.quantityRequired || 1,
+        unit: sp.unit || sp.productId?.unit || 'Piece',
+        itemType: sp.itemType || 'CONSUMABLE',
+        itemStatus: 'PENDING_CHECK',
+      }))
+
+  const hasRequiredMaterials = materialItems.length > 0
+  const materialStatus = materialRequest?.status || (hasRequiredMaterials ? 'UNREQUESTED' : 'NONE')
+  const isMaterialApproved = !hasRequiredMaterials || ['APPROVED', 'ISSUED', 'READY_FOR_ISSUE'].includes(materialStatus)
+  const isMaterialRejected = materialStatus === 'REJECTED'
+  const isMaterialWaiting = ['REQUESTED', 'PENDING_APPROVAL', 'WAITING_FOR_STOCK', 'UNREQUESTED'].includes(materialStatus)
 
   return (
     <div className="space-y-4 pb-8">
@@ -492,6 +600,191 @@ export function ActiveJob() {
           <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
           {updateError}
         </motion.p>
+      )}
+
+      {/* Material Requirements & Stock Verification Section for ACCEPTED Jobs */}
+      {status === 'ACCEPTED' && !isCompleted && !isCancelled && (
+        <div className="space-y-3">
+          {/* Real-time Flash Notification if Admin took action */}
+          {materialActionMsg && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-2 rounded-2xl bg-brand/10 border border-brand/30 p-3.5 text-xs font-bold text-brand shadow-xs"
+            >
+              <Sparkles className="h-4 w-4 shrink-0 text-brand animate-pulse" />
+              <span>{materialActionMsg}</span>
+            </motion.div>
+          )}
+
+          {/* Required Materials Card */}
+          <GlassPanel className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                  <Boxes className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">Required Job Materials</h3>
+                  <p className="text-sm font-bold text-slate-900">Inventory Verification</p>
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              {(() => {
+                const badgeConfig = {
+                  ISSUED: { bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'In Stock & Issued', icon: ShieldCheck },
+                  APPROVED: { bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Approved In Stock', icon: CheckCircle2 },
+                  READY_FOR_ISSUE: { bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Ready for Issue', icon: CheckCircle2 },
+                  WAITING_FOR_STOCK: { bg: 'bg-amber-50 text-amber-700 border-amber-200', label: 'Waiting for Stock', icon: Clock },
+                  REQUESTED: { bg: 'bg-amber-50 text-amber-700 border-amber-200', label: 'Pending Admin Check', icon: Clock },
+                  PENDING_APPROVAL: { bg: 'bg-amber-50 text-amber-700 border-amber-200', label: 'Pending Admin Check', icon: Clock },
+                  REJECTED: { bg: 'bg-rose-50 text-rose-700 border-rose-200', label: 'Out of Stock (Rejected)', icon: ShieldAlert },
+                  UNREQUESTED: { bg: 'bg-sky-50 text-sky-700 border-sky-200', label: 'Check Required', icon: Info },
+                  NONE: { bg: 'bg-slate-50 text-slate-500 border-slate-200', label: 'No Materials Required', icon: Check },
+                }[materialStatus] || { bg: 'bg-slate-50 text-slate-700 border-slate-200', label: materialStatus, icon: Package }
+
+                const IconComponent = badgeConfig.icon
+
+                return (
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${badgeConfig.bg}`}>
+                    <IconComponent className="h-3 w-3" />
+                    {badgeConfig.label}
+                  </span>
+                )
+              })()}
+            </div>
+
+            {/* List of items */}
+            {loadingMaterials ? (
+              <div className="flex items-center justify-center py-4 text-xs font-semibold text-slate-400">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Checking required materials...
+              </div>
+            ) : materialItems.length > 0 ? (
+              <div className="space-y-2 border-t border-slate-100 pt-3">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  Products required for this service ({materialItems.length}):
+                </p>
+                <div className="space-y-1.5">
+                  {materialItems.map((item, idx) => {
+                    const prodName = item.productId?.name || item.name || 'Service Product'
+                    const qty = item.quantityRequired || item.quantityRequested || 1
+                    const unit = item.unit || item.productId?.unit || 'Unit'
+                    const isConsumable = item.itemType === 'CONSUMABLE' || item.productId?.itemType === 'CONSUMABLE'
+
+                    const itemStat = item.itemStatus || 'PENDING'
+                    const isItemOk = ['ISSUED', 'ALTERNATIVE_ISSUED', 'READY_FOR_ISSUE'].includes(itemStat) || ['APPROVED', 'ISSUED'].includes(materialStatus)
+                    const isItemBad = itemStat === 'OUT_OF_STOCK' || materialStatus === 'REJECTED'
+
+                    return (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/80 border border-slate-100 text-xs"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className={`h-6 w-6 rounded-lg flex items-center justify-center shrink-0 ${
+                            isItemOk ? 'bg-emerald-100 text-emerald-700' : isItemBad ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-600'
+                          }`}>
+                            {isItemOk ? <Check className="h-3.5 w-3.5" /> : isItemBad ? <X className="h-3.5 w-3.5" /> : <Package className="h-3.5 w-3.5" />}
+                          </div>
+                          <div>
+                            <span className="font-bold text-slate-900 leading-tight block">{prodName}</span>
+                            <span className="text-[10px] text-slate-500">
+                              {qty} {unit} • <span className={isConsumable ? 'text-amber-600' : 'text-blue-600'}>{isConsumable ? 'Consumable' : 'Equipment'}</span>
+                            </span>
+                          </div>
+                        </div>
+
+                        {item.alternativeIssuedProductId && (
+                          <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                            Substituted
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl bg-slate-50 p-3 text-center text-xs text-slate-500">
+                No physical inventory products required for this booking. You can start directly.
+              </div>
+            )}
+
+            {/* Status Information Box */}
+            {hasRequiredMaterials && (
+              <div className="pt-1">
+                {isMaterialRejected ? (
+                  <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-800 space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <ShieldAlert className="h-4 w-4 text-rose-600" />
+                      <span>Admin Status: Materials Out of Stock</span>
+                    </div>
+                    <p className="text-[11px] text-rose-700">
+                      Admin verified inventory and confirmed required materials are unavailable. Please cancel this booking below.
+                    </p>
+                    {materialRequest?.adminRemarks && (
+                      <p className="text-[11px] font-semibold text-rose-900 bg-white/70 p-1.5 rounded-lg border border-rose-200">
+                        Admin Note: &quot;{materialRequest.adminRemarks}&quot;
+                      </p>
+                    )}
+                  </div>
+                ) : materialStatus === 'UNREQUESTED' ? (
+                  <div className="rounded-xl bg-sky-50 border border-sky-200 p-3 text-xs text-sky-900 space-y-2">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <Info className="h-4 w-4 text-sky-700" />
+                      <span>Action Required: Request Materials from Admin</span>
+                    </div>
+                    <p className="text-[11px] text-sky-700">
+                      Send a stock verification request to Admin. Once Admin approves that products are in stock, you can start your journey.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={requestingMaterials}
+                      onClick={handleRequestMaterials}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-sky-600 py-2.5 px-4 text-xs font-extrabold text-white shadow-sm hover:bg-sky-700 active:scale-95 transition"
+                    >
+                      {requestingMaterials ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Send className="h-3.5 w-3.5" />
+                          Check Stock & Send Request to Admin
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : isMaterialWaiting ? (
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900 space-y-1.5">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <Clock className="h-4 w-4 text-amber-600 animate-pulse" />
+                      <span>Waiting for Admin Stock Approval</span>
+                    </div>
+                    <p className="text-[11px] text-amber-800">
+                      Your material request is being reviewed by the Admin. You will receive an instant notification here once confirmed.
+                    </p>
+                    {materialRequest?.adminRemarks && (
+                      <p className="text-[11px] font-semibold text-amber-950 bg-white/70 p-1.5 rounded-lg border border-amber-200">
+                        Admin Note: &quot;{materialRequest.adminRemarks}&quot;
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-900 space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                      <span>Materials Approved & Confirmed in Stock</span>
+                    </div>
+                    <p className="text-[11px] text-emerald-700">
+                      Admin has verified warehouse inventory. All materials are ready. You are clear to start your journey!
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </GlassPanel>
+        </div>
       )}
 
       {/* Global Countdown for Scheduled Jobs */}
@@ -662,6 +955,61 @@ export function ActiveJob() {
                     {updating ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Complete Job'}
                   </button>
                 </GlassPanel>
+              ) : status === 'ACCEPTED' ? (
+                <>
+                  {isMaterialRejected ? (
+                    <button
+                      type="button"
+                      disabled={updating}
+                      onClick={() => handleCancel(true)}
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 px-6 py-4 text-base font-extrabold text-white shadow-lg shadow-rose-600/25 transition hover:bg-rose-700 active:scale-[0.98] disabled:opacity-50"
+                    >
+                      <AlertTriangle className="h-5 w-5" />
+                      Cancel Booking (Materials Out of Stock)
+                    </button>
+                  ) : !isMaterialApproved ? (
+                    <div className="space-y-1.5">
+                      <button
+                        type="button"
+                        disabled
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-200 px-6 py-4 text-base font-extrabold text-slate-400 cursor-not-allowed border border-slate-300 shadow-none"
+                      >
+                        <Lock className="h-5 w-5 text-slate-400" />
+                        Start Journey (Locked)
+                      </button>
+                      <p className="text-center text-[11px] font-semibold text-amber-700">
+                        🔒 Locked: Waiting for Admin to confirm & approve materials in stock
+                      </p>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={updating}
+                      onClick={() => handleStatusUpdate(config.next, false)}
+                      className={`flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-extrabold text-white shadow-lg transition hover:opacity-90 active:scale-[0.98] disabled:opacity-50 ${config.color}`}
+                    >
+                      {updating ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <>
+                          <config.icon className="h-5 w-5" />
+                          {config.label}
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {!isMaterialRejected && (
+                    <button
+                      type="button"
+                      disabled={updating}
+                      onClick={() => handleCancel(false)}
+                      className="w-full rounded-2xl border-2 border-slate-200 bg-white px-6 py-3 text-sm font-extrabold text-slate-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 active:scale-[0.98] disabled:opacity-50"
+                    >
+                      Cancel Booking
+                    </button>
+                  )}
+                </>
               ) : (
                 <button
                   type="button"
@@ -677,17 +1025,6 @@ export function ActiveJob() {
                       {config.label}
                     </>
                   )}
-                </button>
-              )}
-
-              {status === 'ACCEPTED' && (
-                <button
-                  type="button"
-                  disabled={updating}
-                  onClick={handleCancel}
-                  className="w-full rounded-2xl border-2 border-slate-200 bg-white px-6 py-3 text-sm font-extrabold text-slate-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 active:scale-[0.98] disabled:opacity-50"
-                >
-                  Cancel Booking
                 </button>
               )}
             </>
