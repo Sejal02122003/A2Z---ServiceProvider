@@ -64,6 +64,42 @@ export async function updateTrialConfig(updates, adminUser) {
     { new: true, upsert: true, runValidators: true }
   )
 
+  // Sync active and uncompleted vendor trials to reflect the new configuration
+  const activeStatuses = [
+    VENDOR_TRIAL_STATUS.NOT_STARTED,
+    VENDOR_TRIAL_STATUS.TRIAL_ACTIVE,
+    VENDOR_TRIAL_STATUS.TRIAL_PAUSED,
+    VENDOR_TRIAL_STATUS.WARNING,
+    VENDOR_TRIAL_STATUS.ADMIN_REVIEW_REQUIRED,
+  ]
+
+  const trialUpdates = {}
+  if (cleanUpdates.freeTrialCount !== undefined) {
+    trialUpdates.configuredTrialCount = cleanUpdates.freeTrialCount
+  }
+  if (cleanUpdates.passingRatingThreshold !== undefined) {
+    trialUpdates.passingRatingThreshold = cleanUpdates.passingRatingThreshold
+  }
+  if (cleanUpdates.warningRatingThreshold !== undefined) {
+    trialUpdates.warningRatingThreshold = cleanUpdates.warningRatingThreshold
+  }
+  if (cleanUpdates.finalChancePenaltyAmount !== undefined) {
+    trialUpdates.finalChancePenaltyAmount = cleanUpdates.finalChancePenaltyAmount
+  }
+  if (cleanUpdates.finalChanceEnabled !== undefined) {
+    trialUpdates.finalChanceEnabled = cleanUpdates.finalChanceEnabled
+  }
+  if (cleanUpdates.ratingWindowHours !== undefined) {
+    trialUpdates.ratingWindowHours = cleanUpdates.ratingWindowHours
+  }
+
+  if (Object.keys(trialUpdates).length > 0) {
+    await VendorTrial.updateMany(
+      { status: { $in: activeStatuses } },
+      { $set: trialUpdates }
+    )
+  }
+
   return config
 }
 
