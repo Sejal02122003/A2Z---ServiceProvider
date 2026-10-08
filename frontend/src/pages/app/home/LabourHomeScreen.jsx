@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   AlertCircle,
   AlertTriangle,
+  Award,
   Bell,
   Building2,
   CalendarClock,
@@ -26,6 +27,7 @@ import {
   Menu,
   MessageCircle,
   Navigation,
+  Package,
   Phone,
   Shield,
   ShieldCheck,
@@ -48,6 +50,7 @@ import {
 } from '../../../lib/appUserLocationStorage.js'
 import { AppUserLocationModal } from '../../../components/app/AppUserLocationModal.jsx'
 import { LabourAssignmentDetailModal } from '../../../components/labour/LabourAssignmentDetailModal.jsx'
+import { VendorJoiningConfirmedModal } from '../../../components/labour/VendorJoiningConfirmedModal.jsx'
 import { useLabourPresence } from '../../../hooks/useLabourPresence.js'
 
 import { useLabourSocket } from '../../../hooks/useLabourSocket.js'
@@ -56,6 +59,7 @@ import { broadcastsApi } from '../../../api/broadcastsApi.js'
 import { withdrawalsApi } from '../../../api/withdrawalsApi.js'
 import { getPublicSettings } from '../../../api/adminSettingsApi.js'
 import { updateLabourSchedule } from '../../../api/userLabourApi.js'
+import { vendorTrialApi } from '../../../api/vendorTrialApi.js'
 import { readWalletState, subscribeWallet } from '../../../lib/labourWalletStorage.js'
 import {
   buildEarningsGlance,
@@ -171,6 +175,34 @@ export function LabourHomeScreen({ user }) {
     }).catch(console.error)
     return () => { cancelled = true }
   }, [])
+
+  const [trialData, setTrialData] = useState(null)
+  const [showConfirmedModal, setShowConfirmedModal] = useState(false)
+
+  useEffect(() => {
+    if (!user || user.id === 'guest' || user._id === 'guest') return
+    let cancelled = false
+    vendorTrialApi.getMyTrial().then((res) => {
+      if (cancelled) return
+      if (res?.data) {
+        setTrialData(res.data)
+        const t = res.data.trial
+        const vendorId = user?._id || user?.id || t?.vendorId
+        if ((t?.status === 'CONFIRMED' || user?.vendorStatus === 'CONFIRMED') && vendorId) {
+          const key = `a2z_vendor_confirmed_seen_${vendorId}`
+          if (!localStorage.getItem(key)) {
+            setShowConfirmedModal(true)
+          }
+        }
+      }
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [user])
+
+  const isConfirmedPartner = useMemo(() => {
+    return user?.vendorStatus === 'CONFIRMED' || trialData?.trial?.status === 'CONFIRMED'
+  }, [user, trialData])
+
   const [toast, setToast] = useState('')
   const [safetyIdx, setSafetyIdx] = useState(0)
   const [appLocation, setAppLocation] = useState(() => readAppUserLocation())
@@ -511,7 +543,44 @@ export function LabourHomeScreen({ user }) {
       </section>
 
       <div className="space-y-5 px-4">
-        {kycOk && isOnFreeTrial && freeTrialMessage && (
+        {/* State: CONFIRMED Joining & Kit Collection Banner */}
+        {isConfirmedPartner && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-700 to-slate-900 p-4 text-white shadow-xl shadow-emerald-950/20"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md">
+                  <Award className="h-6 w-6 text-yellow-300" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-emerald-100 backdrop-blur-md">
+                      Verified Partner
+                    </span>
+                    <span className="text-[10px] text-emerald-200">Trial Completed</span>
+                  </div>
+                  <p className="mt-0.5 text-sm font-extrabold text-white truncate">Joining Confirmed — Collect Your Kit</p>
+                  <p className="text-[11px] text-emerald-100/90 truncate">
+                    Your trial is cleared! Collect your uniform, ID card & bag from A2Z Hub.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowConfirmedModal(true)}
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-white px-3.5 py-2 text-xs font-bold text-emerald-950 shadow-md transition hover:bg-emerald-50 active:scale-95"
+              >
+                <Package className="h-3.5 w-3.5 text-emerald-700" />
+                <span>Kit Details</span>
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {kycOk && isOnFreeTrial && !isConfirmedPartner && freeTrialMessage && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1090,6 +1159,20 @@ export function LabourHomeScreen({ user }) {
         rawJob={todayAssignment.raw}
         assignmentKind={todayAssignment.kind}
         onRefresh={loadBookings}
+      />
+
+      <VendorJoiningConfirmedModal
+        isOpen={showConfirmedModal}
+        onClose={() => {
+          const vendorId = user?._id || user?.id || trialData?.trial?.vendorId
+          if (vendorId) {
+            localStorage.setItem(`a2z_vendor_confirmed_seen_${vendorId}`, 'true')
+          }
+          setShowConfirmedModal(false)
+        }}
+        user={user}
+        trialData={trialData}
+        onViewTrialDetails={() => navigate('/app/trial-status')}
       />
     </motion.div>
   )

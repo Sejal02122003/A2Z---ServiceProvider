@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { vendorTrialApi } from '../../api/vendorTrialApi.js'
+import { VendorJoiningConfirmedModal } from '../../components/labour/VendorJoiningConfirmedModal.jsx'
 import {
   Award,
   Star,
@@ -16,6 +17,7 @@ import {
   Sparkles,
   HelpCircle,
   TrendingUp,
+  Package,
 } from 'lucide-react'
 
 export function VendorTrialStatusPage() {
@@ -24,6 +26,7 @@ export function VendorTrialStatusPage() {
   const [history, setHistory] = useState({ evaluations: [], warnings: [] })
   const [requesting, setRequesting] = useState(false)
   const [toast, setToast] = useState({ type: '', message: '' })
+  const [showConfirmedModal, setShowConfirmedModal] = useState(false)
 
   useEffect(() => {
     loadTrial()
@@ -38,6 +41,15 @@ export function VendorTrialStatusPage() {
       ])
       if (resTrial?.data) {
         setTrialData(resTrial.data)
+        const t = resTrial.data.trial
+        const v = resTrial.data.vendor
+        const vendorId = v?._id || t?.vendorId
+        if (t?.status === 'CONFIRMED' && vendorId) {
+          const key = `a2z_vendor_confirmed_seen_${vendorId}`
+          if (!localStorage.getItem(key)) {
+            setShowConfirmedModal(true)
+          }
+        }
       }
       if (resHistory?.data) {
         setHistory(resHistory.data)
@@ -194,6 +206,15 @@ export function VendorTrialStatusPage() {
           <p className="mt-3 text-xs text-emerald-100 leading-relaxed">
             Congratulations! You have successfully completed your trial period and have been confirmed as an official A2Z Service Provider.
           </p>
+
+          <button
+            type="button"
+            onClick={() => setShowConfirmedModal(true)}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-xs font-bold text-emerald-900 shadow-md transition hover:bg-emerald-50 active:scale-[0.99]"
+          >
+            <Package className="h-4 w-4 text-emerald-600" />
+            <span>View Welcome Kit & Joining Confirmation</span>
+          </button>
         </motion.div>
       )}
 
@@ -467,6 +488,22 @@ export function VendorTrialStatusPage() {
           ))}
         </div>
       )}
+
+      {/* Joining Confirmation & Welcome Kit Modal */}
+      <VendorJoiningConfirmedModal
+        isOpen={showConfirmedModal}
+        onClose={() => {
+          const v = trialData?.vendor
+          const t = trialData?.trial
+          const vendorId = v?._id || t?.vendorId
+          if (vendorId) {
+            localStorage.setItem(`a2z_vendor_confirmed_seen_${vendorId}`, 'true')
+          }
+          setShowConfirmedModal(false)
+        }}
+        user={trialData?.vendor}
+        trialData={trialData}
+      />
     </div>
   )
 }
