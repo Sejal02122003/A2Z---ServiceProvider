@@ -49,6 +49,7 @@ import { AdminTrialSettingsPage } from './pages/admin/AdminTrialSettingsPage.jsx
 import { AdminVendorTrialDetailPage } from './pages/admin/AdminVendorTrialDetailPage.jsx'
 import AdminRewardsHubPage from './pages/admin/AdminRewardsHubPage.jsx'
 import AdminBookingRemindersPage from './pages/admin/AdminBookingRemindersPage.jsx'
+import AdminPenaltyManagementPage from './pages/admin/AdminPenaltyManagementPage.jsx'
 
 import { BroadcastPopup } from './components/app/BroadcastPopup.jsx'
 import { SimulatedOpportunityPopup } from './components/app/SimulatedOpportunityPopup.jsx'
@@ -165,6 +166,8 @@ function App() {
             <Route path="cancellation-policy" element={<AdminCancellationPolicyPage />} />
             <Route path="refund-policy" element={<AdminRefundPolicyPage />} />
             <Route path="simulated-opportunities" element={<AdminSimulatedOpportunitiesPage />} />
+            <Route path="penalty-management" element={<AdminPenaltyManagementPage />} />
+            <Route path="penalty-management/:tab" element={<AdminPenaltyManagementPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

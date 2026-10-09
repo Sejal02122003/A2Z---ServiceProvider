@@ -31,6 +31,7 @@ import { AppBillingPage } from '../pages/app/AppBillingPage.jsx'
 import { VendorMaterialsPage } from '../pages/app/VendorMaterialsPage.jsx'
 import { VendorTrialStatusPage } from '../pages/app/VendorTrialStatusPage.jsx'
 import VendorRewardsPage from '../pages/app/VendorRewardsPage.jsx'
+import LabourPenaltiesPage from '../pages/app/labour/LabourPenaltiesPage.jsx'
 import { USER_ROLES } from '../constants/userRoles.js'
 
 
@@ -215,6 +216,22 @@ export const appShellChildRoutes = (
       element={
         <RoleRoute allow={[USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR]}>
           <VendorRewardsPage />
+        </RoleRoute>
+      }
+    />
+    <Route
+      path="penalties"
+      element={
+        <RoleRoute allow={[USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR]}>
+          <LabourPenaltiesPage />
+        </RoleRoute>
+      }
+    />
+    <Route
+      path="labour/penalties"
+      element={
+        <RoleRoute allow={[USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR]}>
+          <LabourPenaltiesPage />
         </RoleRoute>
       }
     />

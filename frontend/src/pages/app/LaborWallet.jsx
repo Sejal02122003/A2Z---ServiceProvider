@@ -16,6 +16,7 @@ import {
   ArrowUpRight,
   Gift,
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { walletsApi } from '../../api/walletsApi.js'
 import { adminSettingsApi } from '../../api/adminSettingsApi.js'
 import { paymentsApi } from '../../api/paymentsApi.js'
@@ -214,6 +215,23 @@ export function LaborWallet() {
           </GlassPanel>
         </motion.div>
       </div>
+
+      {/* Penalties & Disputes Shortcut */}
+      <Link
+        to="/app/labour/penalties"
+        className="flex items-center justify-between rounded-2xl border border-rose-200/70 bg-gradient-to-r from-rose-50/60 to-amber-50/50 p-4 transition-all hover:border-rose-300 hover:shadow-sm"
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-100 text-rose-700">
+            <ShieldAlert className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-900">Late Fees & Penalty History</p>
+            <p className="text-[11px] font-medium text-slate-500">Review deductions, check status, or submit a dispute</p>
+          </div>
+        </div>
+        <span className="text-xs font-bold text-rose-600">View &rarr;</span>
+      </Link>
 
       {/* Wallet Info */}
       <GlassPanel className="p-4">

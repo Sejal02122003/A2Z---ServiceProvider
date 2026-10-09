@@ -10,6 +10,7 @@ import { INVOICE_STATUS } from '../constants/workforceConstants.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { parseISTDateTime } from '../utils/dateHelper.js'
+import { recordLateFeeIncident, recordBounceIncident } from '../services/penaltyService.js'
 
 export const calculateBill = asyncHandler(async (req, res) => {
   const { serviceId, hours: rawHours = 1, quantity = 1, address, contractorServices } = req.body
@@ -575,6 +576,13 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
       if (finalStartImg) booking.startWorkImage = finalStartImg;
       booking.startedAt = new Date();
     }
+
+    // Verify and record Late Fee Incident if partner arrived past grace period
+    recordLateFeeIncident({
+      booking,
+      vendorId: req.user._id,
+      arrivalTime: new Date(),
+    }).catch((err) => console.warn('[Late Fee Hook Warning]', err?.message))
   }
 
   if (status === 'COMPLETED') {
@@ -702,32 +710,19 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
                        lowerReason.includes('customer cancelled')
 
       if (!isExempt) {
-        const settings = await SystemSetting.findOne({ configKey: 'master_config' })
-        const penaltyAmount = Number(settings?.cancellationPenalty ?? 50)
-        
-        if (penaltyAmount > 0) {
-          penaltyDeducted = penaltyAmount
-          let wallet = await Wallet.findOne({ userId: req.user._id })
-          if (!wallet) wallet = await Wallet.create({ userId: req.user._id })
-
-          wallet.selfBalance = (wallet.selfBalance || 0) - penaltyAmount
-          await wallet.save()
-
-          booking.penaltyDeducted = penaltyAmount
-          if (assignment) assignment.penaltyDeducted = penaltyAmount
-
-          const shortCode = String(booking._id).slice(-6).toUpperCase()
-          const { WalletTransaction } = await import('../models/WalletTransaction.js')
-          await WalletTransaction.create({
-            walletId: wallet._id,
-            amount: penaltyAmount,
-            type: 'DEBIT',
-            targetWallet: 'SELF',
-            context: 'PENALTY',
-            referenceId: booking._id,
-            description: `Bounce Penalty: Deducted for cancelling accepted job #${shortCode} (${reason || 'Worker cancellation'})`
-          })
-        }
+        // Record Bounce Penalty through central engine (supports review vs auto-deduct, audit, precedence)
+        recordBounceIncident({
+          booking,
+          vendorId: req.user._id,
+          reason: reason || 'Worker cancellation',
+          cancelledBy: 'LABOUR',
+          isExempt,
+        }).then((res) => {
+          if (res?.created && res.penalty?.deductedAmount) {
+            booking.penaltyDeducted = res.penalty.deductedAmount
+            if (assignment) assignment.penaltyDeducted = res.penalty.deductedAmount
+          }
+        }).catch((err) => console.warn('[Bounce Penalty Hook Warning]', err?.message))
       }
     } else {
       booking.cancelledBy = 'CUSTOMER'
