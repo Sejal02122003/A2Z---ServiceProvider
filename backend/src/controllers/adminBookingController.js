@@ -155,7 +155,16 @@ export const updateBookingStatusAdmin = asyncHandler(async (req, res) => {
     return sendError(res, { message: 'Booking not found', statusCode: HTTP_STATUS.NOT_FOUND })
   }
   
-  // Optionally notify user here if socket is imported
+  // Lifecycle reminder handling on admin status change
+  if (['CANCELLED', 'REFUNDED', 'COMPLETED'].includes(status)) {
+    import('../services/bookingReminderService.js').then(({ cancelRemindersForBooking }) => {
+      cancelRemindersForBooking(booking._id, `Admin updated status to ${status}`).catch(console.error)
+    }).catch(() => {})
+  } else if (['ACCEPTED', 'ASSIGNED'].includes(status)) {
+    import('../services/bookingReminderService.js').then(({ scheduleRemindersForBooking }) => {
+      scheduleRemindersForBooking(booking._id).catch(console.error)
+    }).catch(() => {})
+  }
 
   return sendSuccess(res, { message: 'Booking status updated successfully', data: { booking } })
 })
@@ -196,6 +205,15 @@ export const assignLabourerManually = asyncHandler(async (req, res) => {
     })
     .catch(err => console.error('[Import Error]', err))
 
+  // Schedule automated reminder alerts for newly assigned vendor & customer
+  import('../services/bookingReminderService.js')
+    .then(({ scheduleRemindersForBooking }) => {
+      scheduleRemindersForBooking(booking._id).catch(err =>
+        console.error('[Reminder Scheduling Error on Manual Assign]', err)
+      )
+    })
+    .catch(err => console.error('[Import Error]', err))
+
   const updatedBooking = await Booking.findById(id)
     .populate('userId', 'fullName phone email profileImageUrl serviceIds labourProfile')
     .populate('laborId', 'fullName phone email profileImageUrl serviceIds labourProfile')
@@ -224,6 +242,15 @@ export const createBookingAdmin = asyncHandler(async (req, res) => {
     completionOtp
   })
   
+  // Schedule reminders for newly created admin booking
+  import('../services/bookingReminderService.js')
+    .then(({ scheduleRemindersForBooking }) => {
+      scheduleRemindersForBooking(booking._id).catch(err =>
+        console.error('[Reminder Scheduling Error on Admin Create]', err)
+      )
+    })
+    .catch(err => console.error('[Import Error]', err))
+
   return sendSuccess(res, { message: 'Booking created successfully', statusCode: HTTP_STATUS.CREATED, data: { booking } })
 })
 
@@ -239,6 +266,17 @@ export const updateBookingAdmin = asyncHandler(async (req, res) => {
 
   if (!booking) {
     return sendError(res, { message: 'Booking not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  // Reschedule reminders if date/time or vendor changed
+  if (updates.scheduledAt || updates.timeSlot || updates.laborId) {
+    import('../services/bookingReminderService.js')
+      .then(({ rescheduleRemindersForBooking }) => {
+        rescheduleRemindersForBooking(booking._id).catch(err =>
+          console.error('[Reminder Reschedule Error on Admin Update]', err)
+        )
+      })
+      .catch(err => console.error('[Import Error]', err))
   }
 
   return sendSuccess(res, { message: 'Booking updated successfully', data: { booking } })

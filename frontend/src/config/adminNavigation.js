@@ -31,6 +31,7 @@ import {
   Award,
   UserCheck,
   Sliders,
+  BellRing,
 } from 'lucide-react'
 
 
@@ -108,6 +109,7 @@ export const ADMIN_NAV_SECTIONS = [
     title: 'Operations',
     items: [
       { to: '/admin/bookings', label: 'Bookings & requests', icon: ClipboardList },
+      { to: '/admin/booking-reminders', label: 'Booking Reminders', icon: BellRing },
       { to: '/admin/simulated-opportunities', label: 'Simulated Alerts', icon: Radio },
       { to: '/admin/complaints', label: 'Complaints', icon: MessageSquare },
       { to: '/admin/zone-management', label: 'Zone Management', icon: Map },
@@ -168,6 +170,7 @@ const ROUTE_TITLES = [
   { prefix: '/admin/inventory/low-stock', title: 'Inventory — Low Stock Alerts' },
   { prefix: '/admin/inventory', title: 'Central Inventory Hub' },
   { prefix: '/admin/rewards', title: 'Rewards & Incentives Management' },
+  { prefix: '/admin/booking-reminders', title: 'Booking Date & Time Reminders' },
   { prefix: '/admin/wallet-rewards', title: 'Wallet & Rewards' },
 
   { prefix: '/admin/simulated-opportunities', title: 'Simulated Opportunities' },

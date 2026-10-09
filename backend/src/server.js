@@ -6,6 +6,7 @@ import { initSocket } from './socket.js'
 import { initBroadcastCron } from './cron/broadcastCron.js'
 import { initSubscriptionRefundCron } from './cron/subscriptionRefund.js'
 import { initRewardReconciliationCron } from './cron/rewardReconciliationCron.js'
+import { initBookingReminderCron } from './cron/bookingReminderCron.js'
 
 const port = Number(process.env.PORT) || 5005
 
@@ -18,6 +19,7 @@ async function main() {
   initBroadcastCron()
   initSubscriptionRefundCron()
   initRewardReconciliationCron()
+  initBookingReminderCron()
 
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {

@@ -48,6 +48,7 @@ import { AdminPendingConfirmationsPage } from './pages/admin/AdminPendingConfirm
 import { AdminTrialSettingsPage } from './pages/admin/AdminTrialSettingsPage.jsx'
 import { AdminVendorTrialDetailPage } from './pages/admin/AdminVendorTrialDetailPage.jsx'
 import AdminRewardsHubPage from './pages/admin/AdminRewardsHubPage.jsx'
+import AdminBookingRemindersPage from './pages/admin/AdminBookingRemindersPage.jsx'
 
 import { BroadcastPopup } from './components/app/BroadcastPopup.jsx'
 import { SimulatedOpportunityPopup } from './components/app/SimulatedOpportunityPopup.jsx'
@@ -133,6 +134,7 @@ function App() {
             <Route path="labour" element={<AdminLabourPage />} />
 
             <Route path="bookings" element={<AdminBookingsPage />} />
+            <Route path="booking-reminders" element={<AdminBookingRemindersPage />} />
 
 
             <Route path="billing" element={<AdminBillingPage />} />

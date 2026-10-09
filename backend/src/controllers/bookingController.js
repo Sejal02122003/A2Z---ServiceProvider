@@ -405,6 +405,11 @@ export const createBooking = asyncHandler(async (req, res) => {
     import('../socket.js').then(({ emitToUser }) => {
       emitToUser(booking.userId, 'BOOKING_SCHEDULED_QUEUED', { bookingId: booking._id, scheduledAt: booking.scheduledAt })
     }).catch(err => console.error(err))
+
+    // Schedule automated Date & Time reminder notifications
+    import('../services/bookingReminderService.js').then(({ scheduleRemindersForBooking }) => {
+      scheduleRemindersForBooking(booking._id).catch(err => console.error('[Reminder Scheduling Error on Create]', err))
+    }).catch(err => console.error('[Import Error]', err))
   }
 
   // Save the address for future use if requested
@@ -666,6 +671,11 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
           evaluateVendorRewardsOnEvent({ vendorId: vId, bookingId: booking._id })
         })
       }).catch(err => console.error('Reward evaluation on booking completion error:', err))
+
+      // Cancel any pending reminders for completed booking
+      import('../services/bookingReminderService.js').then(({ cancelRemindersForBooking }) => {
+        cancelRemindersForBooking(booking._id, 'Booking completed').catch(console.error)
+      }).catch(() => {})
     }
   }
 
@@ -734,6 +744,11 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
         }).catch(err => console.error('Error refunding customer wallet on cancellation:', err))
       })
     }
+
+    // Cancel any scheduled reminders for this cancelled booking
+    import('../services/bookingReminderService.js').then(({ cancelRemindersForBooking }) => {
+      cancelRemindersForBooking(booking._id, `Booking cancelled by ${booking.cancelledBy || 'User'}: ${booking.cancellationReason || 'Cancelled'}`).catch(console.error)
+    }).catch(err => console.error('[Import Error]', err))
 
     await booking.save()
   }

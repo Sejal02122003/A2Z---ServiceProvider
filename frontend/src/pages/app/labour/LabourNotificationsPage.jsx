@@ -42,6 +42,7 @@ import {
 
 import { readWalletState, subscribeWallet } from '../../../lib/labourWalletStorage.js'
 import { buildEarningsGlance } from '../../../lib/labourHomeHelpers.js'
+import { bookingReminderApi } from '../../../api/bookingReminderApi.js'
 
 const TABS = [
   { id: 'all', label: 'All' },
@@ -84,6 +85,17 @@ export function LabourNotificationsPage() {
   useEffect(() => subscribeWallet(setWallet), [])
   useEffect(() => subscribeLabourNotifications(() => setTick((t) => t + 1)), [])
 
+  const [serverNotifications, setServerNotifications] = useState([])
+
+  useEffect(() => {
+    if (!user || user.id === 'guest' || user._id === 'guest') return
+    bookingReminderApi.getMyNotifications().then((res) => {
+      if (res?.data?.notifications) {
+        setServerNotifications(res.data.notifications)
+      }
+    }).catch(() => {})
+  }, [user, tick])
+
   const earnings = useMemo(() => {
     const withdrawn = wallet.withdrawals.reduce((a, w) => a + w.amountPaise, 0)
     return buildEarningsGlance([], wallet.ratePaisePerMin, withdrawn)
@@ -94,11 +106,26 @@ export function LabourNotificationsPage() {
     [user, jobs, earnings, tick],
   )
 
+  const mergedItems = useMemo(() => {
+    const serverItems = serverNotifications.map((sn) => ({
+      id: sn._id,
+      title: sn.title,
+      body: sn.body,
+      kind: 'system',
+      read: sn.read,
+      category: 'updates',
+      time: sn.createdAt ? new Date(sn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+      href: sn.bookingId?._id || sn.bookingId ? `/app/active-job/${sn.bookingId?._id || sn.bookingId}` : undefined,
+      isServer: true,
+    }))
+    return [...serverItems, ...feed.items]
+  }, [serverNotifications, feed.items])
+
   const filtered = useMemo(() => {
-    if (tab === 'jobs') return feed.items.filter((n) => n.category === 'jobs')
-    if (tab === 'updates') return feed.items.filter((n) => n.category === 'updates')
-    return feed.items
-  }, [feed.items, tab])
+    if (tab === 'jobs') return mergedItems.filter((n) => n.category === 'jobs')
+    if (tab === 'updates') return mergedItems.filter((n) => n.category === 'updates')
+    return mergedItems
+  }, [mergedItems, tab])
 
   const showToast = useCallback((msg) => {
     setToast(msg)
@@ -106,13 +133,18 @@ export function LabourNotificationsPage() {
   }, [])
 
   const handleMarkAllRead = () => {
+    bookingReminderApi.markAllNotificationsRead().catch(() => {})
     markNotificationsRead(feed.items.map((n) => n.id))
     setTick((t) => t + 1)
     showToast('All caught up — notifications marked read.')
   }
 
   const handleOpen = (n) => {
-    markNotificationRead(n.id)
+    if (n.isServer) {
+      bookingReminderApi.markNotificationRead(n.id).catch(() => {})
+    } else {
+      markNotificationRead(n.id)
+    }
     setTick((t) => t + 1)
     if (n.href && n.kind !== 'job_request') {
       navigate(n.href)

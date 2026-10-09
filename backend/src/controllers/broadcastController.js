@@ -261,6 +261,15 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     })
     .catch((err) => console.error('Failed to notify sockets:', err))
 
+  // Schedule automated reminders for assigned vendor & customer
+  import('../services/bookingReminderService.js')
+    .then(({ scheduleRemindersForBooking }) => {
+      scheduleRemindersForBooking(booking._id).catch(err =>
+        console.error('[Reminder Scheduling Error on Broadcast Accept]', err)
+      )
+    })
+    .catch(err => console.error('[Import Error]', err))
+
   return sendSuccess(res, { message: 'Booking accepted successfully', data: { booking } })
 })
 

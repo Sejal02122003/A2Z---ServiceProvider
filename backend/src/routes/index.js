@@ -39,11 +39,13 @@ import inventoryRoutes from './inventoryRoutes.js'
 import materialRequestRoutes from './materialRequestRoutes.js'
 import trialRoutes from './trialRoutes.js'
 import rewardRoutes from './rewardRoutes.js'
+import bookingReminderRoutes from './bookingReminderRoutes.js'
 
 const router = Router()
 
 router.use('/', trialRoutes)
 router.use('/', rewardRoutes)
+router.use('/reminders', bookingReminderRoutes)
 
 router.use('/auth', authRoutes)
 router.use('/users', userRoutes)
