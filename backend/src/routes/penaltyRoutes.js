@@ -14,24 +14,25 @@ import {
   getVendorPenaltyById,
   submitVendorDispute,
 } from '../controllers/penaltyController.js'
-import { authenticateToken, requireAdmin } from '../middleware/auth.js'
+import { protect, restrictTo } from '../middleware/auth.js'
+import { USER_ROLES } from '../constants/roles.js'
 
 const router = express.Router()
 
 // All routes require authentication
-router.use(authenticateToken)
+router.use(protect)
 
 // -------------------------------------------------------------
 // VENDOR / PARTNER ROUTES
 // -------------------------------------------------------------
-router.get('/vendor/my-penalties', getVendorPenalties)
-router.get('/vendor/my-penalties/:id', getVendorPenaltyById)
-router.post('/vendor/my-penalties/:id/dispute', submitVendorDispute)
+router.get('/vendor/my-penalties', restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR), getVendorPenalties)
+router.get('/vendor/my-penalties/:id', restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR), getVendorPenaltyById)
+router.post('/vendor/my-penalties/:id/dispute', restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR), submitVendorDispute)
 
 // -------------------------------------------------------------
-// ADMIN ROUTES (Protected by requireAdmin)
+// ADMIN ROUTES (Protected by restrictTo ADMIN)
 // -------------------------------------------------------------
-router.use('/admin', requireAdmin)
+router.use('/admin', restrictTo(USER_ROLES.ADMIN))
 
 router.get('/admin/overview', getAdminOverview)
 router.get('/admin/settings', getAdminSettings)
