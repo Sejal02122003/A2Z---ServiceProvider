@@ -59,6 +59,17 @@ const simulatedOpportunitySchema = new mongoose.Schema(
       latitude: { type: Number },
       longitude: { type: Number },
     },
+    isAllZones: {
+      type: Boolean,
+      default: false,
+    },
+    zoneIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Zone',
+      },
+    ],
+    zoneNames: [{ type: String, trim: true }],
     serviceDate: {
       type: Date,
     },

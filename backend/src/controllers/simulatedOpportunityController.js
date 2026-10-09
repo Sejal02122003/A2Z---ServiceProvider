@@ -1,6 +1,7 @@
 import { SimulatedOpportunity } from '../models/SimulatedOpportunity.js'
 import { SystemSetting } from '../models/SystemSetting.js'
 import { User } from '../models/User.js'
+import { Zone } from '../models/Zone.js'
 import { InAppNotification } from '../models/InAppNotification.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
@@ -64,6 +65,9 @@ export const createSimulatedOpportunity = asyncHandler(async (req, res) => {
     serviceType,
     categoryId,
     subcategoryId,
+    zoneIds = [],
+    isAllZones = false,
+    zoneId,
     location,
     serviceDate,
     serviceTime,
@@ -88,8 +92,36 @@ export const createSimulatedOpportunity = asyncHandler(async (req, res) => {
     })
   }
 
-  const numVendorCount = Math.max(1, Math.min(100, Number(notifyVendorCount) || 10))
+  const numVendorCount = Math.max(1, Math.min(200, Number(notifyVendorCount) || 10))
   const numExpiryMinutes = Math.max(1, Math.min(1440, Number(expiryMinutes) || 10))
+
+  // Zone resolution: All Zones vs Multiple Specific Zones
+  let resolvedIsAllZones = Boolean(isAllZones)
+  let resolvedZoneIds = []
+  let resolvedZoneNames = []
+
+  // Check if zoneIds or zoneId passed 'all'
+  if (
+    resolvedIsAllZones ||
+    zoneId === 'all' ||
+    (Array.isArray(zoneIds) && zoneIds.includes('all'))
+  ) {
+    resolvedIsAllZones = true
+    resolvedZoneNames = ['All Zones (Broadcast Everywhere)']
+  } else {
+    // Normalise incoming zone IDs
+    const rawZoneList = Array.isArray(zoneIds)
+      ? zoneIds
+      : zoneId && zoneId !== 'custom'
+      ? [zoneId]
+      : []
+
+    if (rawZoneList.length > 0) {
+      const dbZones = await Zone.find({ _id: { $in: rawZoneList } }).lean()
+      resolvedZoneIds = dbZones.map((z) => z._id)
+      resolvedZoneNames = dbZones.map((z) => (z.city ? `${z.name} (${z.city})` : z.name))
+    }
+  }
 
   // Find eligible vendors/labourers
   const vendorQuery = {
@@ -131,9 +163,12 @@ export const createSimulatedOpportunity = asyncHandler(async (req, res) => {
     serviceType,
     categoryId: categoryId || null,
     subcategoryId: subcategoryId || null,
+    isAllZones: resolvedIsAllZones,
+    zoneIds: resolvedZoneIds,
+    zoneNames: resolvedZoneNames,
     location: {
-      address: location?.address || 'City Area',
-      city: location?.city || '',
+      address: location?.address || (resolvedIsAllZones ? 'All Operational Zones' : resolvedZoneNames.join(', ') || 'City Area'),
+      city: location?.city || (resolvedZoneNames.length === 1 ? resolvedZoneNames[0] : ''),
       latitude: location?.latitude || null,
       longitude: location?.longitude || null,
     },
@@ -148,7 +183,7 @@ export const createSimulatedOpportunity = asyncHandler(async (req, res) => {
     status: 'OPEN',
   })
 
-  console.log(`[SIMULATED_OPPORTUNITY_CREATED] ID: ${opportunity._id} | Service: ${serviceCategory} - ${serviceType} | Amount: ₹${numAmount} | Vendors: ${targetVendorIds.length}`)
+  console.log(`[SIMULATED_OPPORTUNITY_CREATED] ID: ${opportunity._id} | Service: ${serviceCategory} - ${serviceType} | Zones: ${resolvedIsAllZones ? 'ALL' : resolvedZoneNames.join(', ')} | Amount: ₹${numAmount} | Vendors: ${targetVendorIds.length}`)
 
   // Dispatch real-time Socket and Push Notifications to all notified vendors
   const alertPayload = {

@@ -89,8 +89,9 @@ export function AdminSimulatedOpportunitiesPage() {
   const [formCategory, setFormCategory] = useState('')
   const [formCategoryId, setFormCategoryId] = useState('')
   const [formServiceType, setFormServiceType] = useState('')
-  const [selectedZoneId, setSelectedZoneId] = useState('')
-  const [formLocation, setFormLocation] = useState('')
+  const [selectedZoneIds, setSelectedZoneIds] = useState([])
+  const [isAllZones, setIsAllZones] = useState(true)
+  const [formLocation, setFormLocation] = useState('All Operational Zones')
   const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0])
   const [formTime, setFormTime] = useState('05:00 PM')
   const [formAmount, setFormAmount] = useState('799')
@@ -122,10 +123,8 @@ export function AdminSimulatedOpportunitiesPage() {
       const loadedZones = zonesRes.data?.zones || (Array.isArray(zonesRes.data) ? zonesRes.data : [])
       setZones(loadedZones)
 
-      if (loadedZones.length > 0 && !formLocation) {
-        const defaultZone = loadedZones[0]
-        setSelectedZoneId(defaultZone._id)
-        setFormLocation(formatZoneLocation(defaultZone))
+      if (loadedZones.length > 0 && selectedZoneIds.length === 0) {
+        setSelectedZoneIds(loadedZones.map((z) => z._id))
       }
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : 'Failed to load data', 'error')
@@ -165,6 +164,8 @@ export function AdminSimulatedOpportunitiesPage() {
         serviceCategory: formCategory || 'General Service',
         categoryId: formCategoryId || undefined,
         serviceType: formServiceType,
+        isAllZones,
+        zoneIds: isAllZones ? [] : selectedZoneIds,
         location: { address: formLocation },
         serviceDate: formDate,
         serviceTime: formTime,
@@ -493,35 +494,120 @@ export function AdminSimulatedOpportunitiesPage() {
                   />
                 </div>
 
-                {/* Operational Zone Selection */}
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1 block">
-                    Operational Zone / City Area
-                  </label>
-                  <select
-                    value={selectedZoneId}
-                    onChange={(e) => {
-                      const zid = e.target.value
-                      setSelectedZoneId(zid)
-                      if (zid === 'custom') {
-                        setFormLocation('')
-                      } else {
-                        const found = zones.find((z) => String(z._id) === zid)
-                        if (found) {
-                          setFormLocation(formatZoneLocation(found))
+                {/* Operational Zone Selection (All Zones & Multi-Zone Support) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                      Operational Zone / City Target
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAllZones(true)
+                          setSelectedZoneIds(zones.map((z) => z._id))
+                          setFormLocation('All Operational Zones')
+                        }}
+                        className={`text-[11px] font-extrabold px-2.5 py-1 rounded-lg transition ${
+                          isAllZones
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        🌐 Select All Zones
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAllZones(false)
+                          setSelectedZoneIds([])
+                          setFormLocation('')
+                        }}
+                        className="text-[11px] font-bold text-slate-500 hover:text-slate-800 underline"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Multi-Zone Selection Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2.5 rounded-2xl bg-slate-50 border border-slate-200/80">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextAll = !isAllZones
+                        setIsAllZones(nextAll)
+                        if (nextAll) {
+                          setSelectedZoneIds(zones.map((z) => z._id))
+                          setFormLocation('All Operational Zones')
+                        } else {
+                          setSelectedZoneIds([])
+                          setFormLocation('')
                         }
-                      }
-                    }}
-                    className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold outline-none focus:border-brand bg-white"
-                  >
-                    <option value="">-- Select Created Zone --</option>
-                    {zones.map((z) => (
-                      <option key={z._id} value={z._id}>
-                        📍 {formatZoneDisplay(z)}
-                      </option>
-                    ))}
-                    <option value="custom">✏️ Custom Location / Other City</option>
-                  </select>
+                      }}
+                      className={`flex items-center justify-between p-2.5 rounded-xl text-xs font-bold text-left transition border ${
+                        isAllZones
+                          ? 'bg-blue-50 border-blue-400 text-blue-900 shadow-xs'
+                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5 truncate">
+                        <span>🌐</span>
+                        <span>All Zones (Everywhere)</span>
+                      </span>
+                      {isAllZones && <Check className="h-4 w-4 text-blue-600 shrink-0" />}
+                    </button>
+
+                    {zones.map((z) => {
+                      const isSelected = isAllZones || selectedZoneIds.includes(z._id)
+                      return (
+                        <button
+                          key={z._id}
+                          type="button"
+                          onClick={() => {
+                            let nextSelected = []
+                            if (isAllZones) {
+                              setIsAllZones(false)
+                              nextSelected = zones.map((zone) => zone._id).filter((id) => id !== z._id)
+                            } else if (selectedZoneIds.includes(z._id)) {
+                              nextSelected = selectedZoneIds.filter((id) => id !== z._id)
+                            } else {
+                              nextSelected = [...selectedZoneIds, z._id]
+                            }
+
+                            setSelectedZoneIds(nextSelected)
+                            if (nextSelected.length === zones.length && zones.length > 0) {
+                              setIsAllZones(true)
+                              setFormLocation('All Operational Zones')
+                            } else {
+                              setIsAllZones(false)
+                              const selectedObj = zones.filter((zone) => nextSelected.includes(zone._id))
+                              setFormLocation(selectedObj.map((zone) => formatZoneLocation(zone)).join(', '))
+                            }
+                          }}
+                          className={`flex items-center justify-between p-2.5 rounded-xl text-xs font-bold text-left transition border ${
+                            isSelected
+                              ? 'bg-amber-50 border-amber-400 text-amber-900 shadow-xs'
+                              : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          <span className="truncate pr-1">📍 {formatZoneDisplay(z)}</span>
+                          {isSelected && <Check className="h-4 w-4 text-amber-600 shrink-0" />}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium px-1">
+                    <span>
+                      {isAllZones
+                        ? '🟢 Alert will broadcast across ALL operational zones'
+                        : `${selectedZoneIds.length} zone(s) selected for broadcast`}
+                    </span>
+                    {selectedZoneIds.length > 0 && !isAllZones && (
+                      <span className="text-amber-700 font-bold">Multi-Zone Filter Active</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Specific Location / Address */}
@@ -538,7 +624,7 @@ export function AdminSimulatedOpportunitiesPage() {
                     className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold outline-none focus:border-brand"
                   />
                   <p className="text-[11px] text-slate-400 mt-1 font-medium">
-                    Selecting a zone above auto-fills this field, or you can enter any custom address.
+                    Auto-populated based on selected zone(s), or enter a custom address note.
                   </p>
                 </div>
 
