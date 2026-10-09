@@ -38,10 +38,12 @@ import serviceProductRoutes from './serviceProductRoutes.js'
 import inventoryRoutes from './inventoryRoutes.js'
 import materialRequestRoutes from './materialRequestRoutes.js'
 import trialRoutes from './trialRoutes.js'
+import rewardRoutes from './rewardRoutes.js'
 
 const router = Router()
 
 router.use('/', trialRoutes)
+router.use('/', rewardRoutes)
 
 router.use('/auth', authRoutes)
 router.use('/users', userRoutes)

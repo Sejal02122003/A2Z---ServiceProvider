@@ -101,6 +101,7 @@ function formatPunchTime(iso) {
 }
 
 const QUICK_ACTIONS = [
+  { to: '/app/rewards', label: 'Rewards', icon: Award, bg: 'from-amber-500/15 to-amber-50', iconTone: 'text-amber-700' },
   { to: '/app/subscription', label: 'Subscription', icon: Crown, bg: 'from-amber-500/15 to-amber-50', iconTone: 'text-amber-700' },
   { to: '/app/earnings', label: 'Earnings', icon: IndianRupee, bg: 'from-blue-600/15 to-blue-50', iconTone: 'text-blue-700' },
   { to: '/app/jobs', label: 'My jobs', icon: HardHat, bg: 'from-emerald-500/15 to-emerald-50', iconTone: 'text-emerald-800' },

@@ -30,6 +30,7 @@ import { AppRefundPolicyPage } from '../pages/app/AppRefundPolicyPage.jsx'
 import { AppBillingPage } from '../pages/app/AppBillingPage.jsx'
 import { VendorMaterialsPage } from '../pages/app/VendorMaterialsPage.jsx'
 import { VendorTrialStatusPage } from '../pages/app/VendorTrialStatusPage.jsx'
+import VendorRewardsPage from '../pages/app/VendorRewardsPage.jsx'
 import { USER_ROLES } from '../constants/userRoles.js'
 
 
@@ -206,6 +207,14 @@ export const appShellChildRoutes = (
       element={
         <RoleRoute allow={[USER_ROLES.LABOUR]}>
           <AppEarningsPage />
+        </RoleRoute>
+      }
+    />
+    <Route
+      path="rewards"
+      element={
+        <RoleRoute allow={[USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR]}>
+          <VendorRewardsPage />
         </RoleRoute>
       }
     />

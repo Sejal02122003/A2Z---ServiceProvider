@@ -47,6 +47,7 @@ import { AdminVendorTrialsPage } from './pages/admin/AdminVendorTrialsPage.jsx'
 import { AdminPendingConfirmationsPage } from './pages/admin/AdminPendingConfirmationsPage.jsx'
 import { AdminTrialSettingsPage } from './pages/admin/AdminTrialSettingsPage.jsx'
 import { AdminVendorTrialDetailPage } from './pages/admin/AdminVendorTrialDetailPage.jsx'
+import AdminRewardsHubPage from './pages/admin/AdminRewardsHubPage.jsx'
 
 import { BroadcastPopup } from './components/app/BroadcastPopup.jsx'
 import { SimulatedOpportunityPopup } from './components/app/SimulatedOpportunityPopup.jsx'
@@ -135,6 +136,8 @@ function App() {
 
 
             <Route path="billing" element={<AdminBillingPage />} />
+            <Route path="rewards" element={<AdminRewardsHubPage />} />
+            <Route path="rewards/:tab" element={<AdminRewardsHubPage />} />
             <Route path="wallet-rewards" element={<AdminWalletRewardsPage />} />
             <Route path="banners" element={<AdminBannersPage />} />
             <Route path="complaints" element={<AdminComplaintsPage />} />

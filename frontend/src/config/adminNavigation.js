@@ -115,8 +115,9 @@ export const ADMIN_NAV_SECTIONS = [
     ],
   },
   {
-    title: 'Finance',
+    title: 'Finance & Incentives',
     items: [
+      { to: '/admin/rewards', label: 'Rewards & Incentives', icon: Award },
       { to: '/admin/billing', label: 'Payments & billing', icon: Wallet },
       { to: '/admin/wallet-rewards', label: 'Wallet & Rewards', icon: Gift },
       { to: '/admin/platform-fee', label: 'Platform Fee', icon: HandCoins },
@@ -166,6 +167,7 @@ const ROUTE_TITLES = [
   { prefix: '/admin/inventory/transactions', title: 'Inventory — Ledger Audit' },
   { prefix: '/admin/inventory/low-stock', title: 'Inventory — Low Stock Alerts' },
   { prefix: '/admin/inventory', title: 'Central Inventory Hub' },
+  { prefix: '/admin/rewards', title: 'Rewards & Incentives Management' },
   { prefix: '/admin/wallet-rewards', title: 'Wallet & Rewards' },
 
   { prefix: '/admin/simulated-opportunities', title: 'Simulated Opportunities' },

@@ -650,6 +650,22 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
           await adminWallet.save()
         }
       }
+
+      // Trigger Rewards & Incentives evaluation for participating vendors
+      import('../services/rewardEvaluationService.js').then(({ evaluateVendorRewardsOnEvent }) => {
+        const targetVendors = []
+        if (booking.laborId) targetVendors.push(booking.laborId)
+        if (booking.acceptedLabourId) targetVendors.push(booking.acceptedLabourId)
+        if (booking.assignments && booking.assignments.length > 0) {
+          booking.assignments.forEach(a => {
+            if (a.labourId) targetVendors.push(typeof a.labourId === 'object' ? a.labourId._id : a.labourId)
+          })
+        }
+        const uniqueVendors = [...new Set(targetVendors.map(String))]
+        uniqueVendors.forEach(vId => {
+          evaluateVendorRewardsOnEvent({ vendorId: vId, bookingId: booking._id })
+        })
+      }).catch(err => console.error('Reward evaluation on booking completion error:', err))
     }
   }
 

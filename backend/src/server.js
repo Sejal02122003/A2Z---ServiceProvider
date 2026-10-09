@@ -5,6 +5,7 @@ import { connectDb } from './config/db.js'
 import { initSocket } from './socket.js'
 import { initBroadcastCron } from './cron/broadcastCron.js'
 import { initSubscriptionRefundCron } from './cron/subscriptionRefund.js'
+import { initRewardReconciliationCron } from './cron/rewardReconciliationCron.js'
 
 const port = Number(process.env.PORT) || 5005
 
@@ -16,6 +17,7 @@ async function main() {
   console.log('Cron jobs initialized')
   initBroadcastCron()
   initSubscriptionRefundCron()
+  initRewardReconciliationCron()
 
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {

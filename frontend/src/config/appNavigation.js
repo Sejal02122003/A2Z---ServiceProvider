@@ -15,6 +15,7 @@ import {
   Wrench,
   FileText,
   Package,
+  Award,
 } from 'lucide-react'
 import { USER_ROLES } from '../constants/userRoles.js'
 
@@ -54,6 +55,7 @@ const byRole = {
     drawerNav: [
       { id: 'home', to: '/app', label: 'Home', icon: Home, end: true },
       { id: 'jobs', to: '/app/jobs', label: 'Assignments', icon: HardHat },
+      { id: 'rewards', to: '/app/rewards', label: 'Rewards & Incentives', icon: Award },
       { id: 'materials', to: '/app/materials', label: 'Materials & Stock', icon: Package },
       { id: 'book', to: '/app/my-bookings', label: 'My bookings', icon: CalendarClock },
       { id: 'earnings', to: '/app/earnings', label: 'Earnings & payouts', icon: IndianRupee },
@@ -77,6 +79,7 @@ export function getAppNavigation(role) {
 
 export function getAppShellTitle(pathname) {
   if (pathname.startsWith('/app/jobs')) return 'Jobs'
+  if (pathname.startsWith('/app/rewards')) return 'Rewards & Incentives'
   if (pathname.startsWith('/app/materials')) return 'Materials'
   if (pathname.startsWith('/app/earnings')) return 'Earnings'
   if (pathname.startsWith('/app/kyc')) return 'KYC verification'

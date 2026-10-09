@@ -41,7 +41,7 @@ export const submitReview = asyncHandler(async (req, res) => {
     comment
   })
 
-  // If customer reviewed a vendor/worker, trigger trial evaluation
+  // If customer reviewed a vendor/worker, trigger trial evaluation & rewards evaluation
   let trialEvalResult = null
   if (isCustomerReviewingWorker && revieweeId) {
     try {
@@ -55,6 +55,10 @@ export const submitReview = asyncHandler(async (req, res) => {
     } catch (trialErr) {
       console.error('Error evaluating trial rating:', trialErr)
     }
+
+    import('../services/rewardEvaluationService.js').then(({ evaluateVendorRewardsOnEvent }) => {
+      evaluateVendorRewardsOnEvent({ vendorId: revieweeId, bookingId })
+    }).catch(err => console.error('Error evaluating rewards on review:', err))
   }
 
   return sendSuccess(res, {
