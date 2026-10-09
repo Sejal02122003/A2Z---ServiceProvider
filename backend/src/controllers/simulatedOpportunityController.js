@@ -1,6 +1,7 @@
 import { SimulatedOpportunity } from '../models/SimulatedOpportunity.js'
 import { SystemSetting } from '../models/SystemSetting.js'
 import { User } from '../models/User.js'
+import { InAppNotification } from '../models/InAppNotification.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { emitToUser } from '../socket.js'
@@ -162,22 +163,42 @@ export const createSimulatedOpportunity = asyncHandler(async (req, res) => {
     serviceTime: opportunity.serviceTime,
     estimatedAmount: opportunity.estimatedAmount,
     expiresAt: opportunity.expiresAt,
-    timeoutMs: numExpiryMinutes * 60 * 1000,
+    timeoutMs: 15000, // 15-second countdown alert
     priority: opportunity.priority,
   }
 
-  targetVendorIds.forEach((vendorId) => {
+  targetVendorIds.forEach(async (vendorId) => {
     try {
       emitToUser(vendorId, 'SIMULATED_OPPORTUNITY_ALERT', alertPayload)
 
+      // Persistent In-App Notification
+      try {
+        await InAppNotification.create({
+          recipientId: vendorId,
+          recipientRole: 'VENDOR',
+          title: `⚡ Urgent Lead: ${serviceType} (₹${numAmount})`,
+          body: `New incoming booking available near you. Estimated earning: ₹${numAmount}. Respond quickly!`,
+          type: 'SIMULATED_OPPORTUNITY',
+          metadata: {
+            opportunityId: String(opportunity._id),
+            serviceType,
+            estimatedAmount: numAmount,
+          },
+        })
+      } catch (inAppErr) {
+        console.warn(`[InAppNotification Error for ${vendorId}]`, inAppErr?.message)
+      }
+
+      // Firebase Push Notification
       sendNotificationToUser(vendorId, {
-        title: '⚡ New Service Opportunity!',
-        body: `${serviceType} required near you. Estimated earning: ₹${numAmount}`,
+        title: `⚡ New Booking Alert! (₹${numAmount})`,
+        body: `${serviceType} lead nearby. Open app now to claim before other partners!`,
         data: {
           type: 'SIMULATED_OPPORTUNITY',
           opportunityId: String(opportunity._id),
-          serviceType,
+          serviceType: String(serviceType),
           estimatedAmount: String(numAmount),
+          click_action: '/app/labour',
         },
       }).catch((err) => console.error(`[Push Notification Error for ${vendorId}]`, err?.message))
     } catch (err) {

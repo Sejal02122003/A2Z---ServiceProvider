@@ -29,9 +29,11 @@ export function SimulatedOpportunityPopup() {
   const reduce = useReducedMotion()
   const user = useSelector((s) => s.auth.user)
   const timerRef = useRef(null)
+  const soundIntervalRef = useRef(null)
+  const audioCtxRef = useRef(null)
 
   const [incoming, setIncoming] = useState(null)
-  const [timeLeft, setTimeLeft] = useState(60)
+  const [timeLeft, setTimeLeft] = useState(15)
   const [responding, setResponding] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [resultState, setResultState] = useState(null) // 'WON' | 'TAKEN' | 'EXPIRED' | 'CANCELLED'
@@ -40,32 +42,99 @@ export function SimulatedOpportunityPopup() {
     user?.role === USER_ROLES.LABOUR ||
     user?.role === 'labour'
 
+  // Audio Chime Generator using Web Audio API
+  const playAlertChime = useCallback(() => {
+    try {
+      const AudioCtxClass = window.AudioContext || window.webkitAudioContext
+      if (!AudioCtxClass) return
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new AudioCtxClass()
+      }
+      const ctx = audioCtxRef.current
+      if (ctx.state === 'suspended') {
+        ctx.resume()
+      }
+
+      const now = ctx.currentTime
+
+      // First beep tone
+      const osc1 = ctx.createOscillator()
+      const gain1 = ctx.createGain()
+      osc1.type = 'triangle'
+      osc1.frequency.setValueAtTime(880, now) // A5
+      gain1.gain.setValueAtTime(0.35, now)
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.22)
+      osc1.connect(gain1)
+      gain1.connect(ctx.destination)
+      osc1.start(now)
+      osc1.stop(now + 0.22)
+
+      // Second beep tone (higher harmonic)
+      const osc2 = ctx.createOscillator()
+      const gain2 = ctx.createGain()
+      osc2.type = 'triangle'
+      osc2.frequency.setValueAtTime(1174.66, now + 0.18) // D6
+      gain2.gain.setValueAtTime(0.4, now + 0.18)
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45)
+      osc2.connect(gain2)
+      gain2.connect(ctx.destination)
+      osc2.start(now + 0.18)
+      osc2.stop(now + 0.45)
+    } catch (e) {
+      console.warn('[Opportunity Chime Error]', e)
+    }
+  }, [])
+
+  const stopAlertSound = useCallback(() => {
+    if (soundIntervalRef.current) {
+      clearInterval(soundIntervalRef.current)
+      soundIntervalRef.current = null
+    }
+    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+      try {
+        audioCtxRef.current.close()
+      } catch {
+        /* ignore */
+      }
+      audioCtxRef.current = null
+    }
+  }, [])
+
   // Socket listeners for Simulated Opportunities
   useEffect(() => {
     if (!isLabour) {
       setIncoming(null)
+      stopAlertSound()
       return
     }
     if (!socket) return
 
     const handleAlert = (data) => {
       console.log('--- SIMULATED_OPPORTUNITY_ALERT ---', data)
-      const expiryMs = data.expiresAt ? new Date(data.expiresAt).getTime() - Date.now() : (data.timeoutMs || 60000)
-      const seconds = Math.max(5, Math.floor(expiryMs / 1000))
+      // 15 seconds alert countdown
+      const seconds = 15
 
       setIncoming(data)
       setTimeLeft(seconds)
       setStatusMessage('')
       setResultState(null)
       setResponding(false)
+
+      // Start ringing sound immediately and repeat every 1.1s
+      stopAlertSound()
+      playAlertChime()
+      soundIntervalRef.current = setInterval(() => {
+        playAlertChime()
+      }, 1100)
     }
 
     const handleTaken = (data) => {
       console.log('--- SIMULATED_OPPORTUNITY_TAKEN ---', data)
+      stopAlertSound()
       setIncoming((prev) => {
         if (prev && String(prev.opportunityId || prev.alertId) === String(data.opportunityId)) {
           setResultState('TAKEN')
-          setStatusMessage(data.message || 'This opportunity has already been taken by another vendor.')
+          setStatusMessage(data.message || 'This booking has just been accepted by another partner.')
         }
         return prev
       })
@@ -73,6 +142,7 @@ export function SimulatedOpportunityPopup() {
 
     const handleCancelled = (data) => {
       console.log('--- SIMULATED_OPPORTUNITY_CANCELLED ---', data)
+      stopAlertSound()
       setIncoming((prev) => {
         if (prev && String(prev.opportunityId || prev.alertId) === String(data.opportunityId)) {
           setResultState('CANCELLED')
@@ -87,13 +157,14 @@ export function SimulatedOpportunityPopup() {
     socket.on('SIMULATED_OPPORTUNITY_CANCELLED', handleCancelled)
 
     return () => {
+      stopAlertSound()
       socket.off('SIMULATED_OPPORTUNITY_ALERT', handleAlert)
       socket.off('SIMULATED_OPPORTUNITY_TAKEN', handleTaken)
       socket.off('SIMULATED_OPPORTUNITY_CANCELLED', handleCancelled)
     }
-  }, [socket, isLabour])
+  }, [socket, isLabour, playAlertChime, stopAlertSound])
 
-  // Countdown timer
+  // 15s Countdown timer -> Automatically transitions to TAKEN (accepted by other partner)
   useEffect(() => {
     if (!incoming || resultState) return
 
@@ -101,8 +172,9 @@ export function SimulatedOpportunityPopup() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timerRef.current)
-          setResultState('EXPIRED')
-          setStatusMessage('This opportunity has expired.')
+          stopAlertSound()
+          setResultState('TAKEN')
+          setStatusMessage('⚡ Opportunity Missed: This booking was just accepted by another nearby partner. Stay online for the next request!')
           return 0
         }
         return prev - 1
@@ -112,12 +184,13 @@ export function SimulatedOpportunityPopup() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
-  }, [incoming, resultState])
+  }, [incoming, resultState, stopAlertSound])
 
   const handleAccept = useCallback(async () => {
     if (!incoming || responding) return
     const oppId = incoming.opportunityId || incoming.alertId
 
+    stopAlertSound()
     setResponding(true)
     setStatusMessage('')
     try {
@@ -130,7 +203,7 @@ export function SimulatedOpportunityPopup() {
       if (err?.statusCode === 409 || msg.toLowerCase().includes('already taken')) {
         setResultState('TAKEN')
       } else if (msg.toLowerCase().includes('expired')) {
-        setResultState('EXPIRED')
+        setResultState('TAKEN')
       } else if (msg.toLowerCase().includes('cancelled')) {
         setResultState('CANCELLED')
       }
@@ -138,10 +211,11 @@ export function SimulatedOpportunityPopup() {
     } finally {
       setResponding(false)
     }
-  }, [incoming, responding])
+  }, [incoming, responding, stopAlertSound])
 
   const handleReject = useCallback(async () => {
     if (!incoming) return
+    stopAlertSound()
     const oppId = incoming.opportunityId || incoming.alertId
     setResponding(true)
     try {
@@ -154,9 +228,10 @@ export function SimulatedOpportunityPopup() {
       setResultState(null)
       setResponding(false)
     }
-  }, [incoming])
+  }, [incoming, stopAlertSound])
 
   const handleDismiss = () => {
+    stopAlertSound()
     if (timerRef.current) clearInterval(timerRef.current)
     setIncoming(null)
     setResultState(null)
