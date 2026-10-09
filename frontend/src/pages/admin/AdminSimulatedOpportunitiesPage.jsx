@@ -14,6 +14,10 @@ import {
   Calendar,
   IndianRupee,
   ShieldAlert,
+  ShieldCheck,
+  Flame,
+  ChevronDown,
+  Sparkles,
   Eye,
   Ban,
   RefreshCw,
@@ -118,7 +122,12 @@ export function AdminSimulatedOpportunitiesPage() {
       ])
       setEnabled(settingsRes.data?.enabled ?? true)
       setOpportunities(listRes.data?.opportunities || [])
-      setCategoryTree(catRes.data?.categories || catRes.data || [])
+      const loadedCats = catRes.data?.categories || catRes.data || []
+      setCategoryTree(loadedCats)
+      if (loadedCats.length > 0 && !formCategoryId) {
+        setFormCategoryId(String(loadedCats[0]._id))
+        setFormCategory(loadedCats[0].name)
+      }
       
       const loadedZones = zonesRes.data?.zones || (Array.isArray(zonesRes.data) ? zonesRes.data : [])
       setZones(loadedZones)
@@ -455,33 +464,82 @@ export function AdminSimulatedOpportunitiesPage() {
               {/* Scrollable Form Body */}
               <form onSubmit={handleCreateSubmit} className="flex-1 min-h-0 flex flex-col">
                 <div className="flex-1 min-h-0 overflow-y-auto p-6 pt-4 space-y-4 overscroll-contain">
-                {/* Category Selection */}
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1 block">
-                    Service Category
-                  </label>
-                  <select
-                    value={formCategoryId}
-                    onChange={(e) => {
-                      const cid = e.target.value
-                      setFormCategoryId(cid)
-                      const found = categoryTree.find((c) => String(c._id) === cid)
-                      if (found) setFormCategory(found.name)
-                    }}
-                    className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold outline-none focus:border-brand"
-                  >
-                    <option value="">-- Choose Category or Enter Custom --</option>
-                    {categoryTree.map((c) => (
-                      <option key={c._id} value={c._id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                {/* Category Selection (Interactive Chips Only) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-brand" />
+                      Service Category
+                    </label>
+                    <span className="text-[11px] font-extrabold text-brand bg-brand/10 px-2.5 py-0.5 rounded-full">
+                      {formCategory || 'Selected Category'}
+                    </span>
+                  </div>
+
+                  {/* Category Cards Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {categoryTree.map((c) => {
+                      const isSelected = formCategoryId === String(c._id)
+                      return (
+                        <button
+                          key={c._id}
+                          type="button"
+                          onClick={() => {
+                            setFormCategoryId(String(c._id))
+                            setFormCategory(c.name)
+                          }}
+                          className={`p-2.5 rounded-xl text-xs font-bold text-left transition flex items-center justify-between border ${
+                            isSelected
+                              ? 'bg-brand text-white border-brand shadow-sm shadow-brand/25 scale-[1.01]'
+                              : 'bg-slate-50 text-slate-700 border-slate-200/80 hover:bg-slate-100 hover:border-slate-300'
+                          }`}
+                        >
+                          <span className="truncate pr-1">{c.name}</span>
+                          {isSelected ? (
+                            <Check className="h-3.5 w-3.5 shrink-0 text-white" />
+                          ) : (
+                            <span className="h-1.5 w-1.5 rounded-full bg-slate-300 shrink-0" />
+                          )}
+                        </button>
+                      )
+                    })}
+
+                    {/* Custom / Other Category Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormCategoryId('custom')
+                        setFormCategory('')
+                      }}
+                      className={`p-2.5 rounded-xl text-xs font-bold text-left transition flex items-center justify-between border ${
+                        formCategoryId === 'custom'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-slate-50 text-slate-700 border-slate-200/80 hover:bg-slate-100 hover:border-slate-300'
+                      }`}
+                    >
+                      <span className="truncate pr-1">✏️ Other Category</span>
+                      {formCategoryId === 'custom' && <Check className="h-3.5 w-3.5 shrink-0 text-white" />}
+                    </button>
+                  </div>
+
+                  {/* Input if custom category is chosen */}
+                  {formCategoryId === 'custom' && (
+                    <div className="pt-1">
+                      <input
+                        type="text"
+                        required
+                        placeholder="Enter custom category name (e.g. Electrician, Plumbing)"
+                        value={formCategory}
+                        onChange={(e) => setFormCategory(e.target.value)}
+                        className="w-full rounded-xl border border-blue-400 bg-white p-3 text-sm font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-400/20"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Service Type / Title */}
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1 block">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-1 block">
                     Service Name / Type *
                   </label>
                   <input
@@ -490,15 +548,16 @@ export function AdminSimulatedOpportunitiesPage() {
                     placeholder="e.g. AC Repair & Service, Deep Cleaning"
                     value={formServiceType}
                     onChange={(e) => setFormServiceType(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold outline-none focus:border-brand"
+                    className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
                   />
                 </div>
 
                 {/* Operational Zone Selection (All Zones & Multi-Zone Support) */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                      Operational Zone / City Target
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5 text-brand" />
+                      Operational Zone Target
                     </label>
                     <div className="flex items-center gap-2">
                       <button
@@ -612,7 +671,7 @@ export function AdminSimulatedOpportunitiesPage() {
 
                 {/* Specific Location / Address */}
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1 block">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-1 block">
                     Specific Location / Address Text *
                   </label>
                   <input
@@ -621,7 +680,7 @@ export function AdminSimulatedOpportunitiesPage() {
                     placeholder="e.g. Vijay Nagar, Scheme 54, Indore"
                     value={formLocation}
                     onChange={(e) => setFormLocation(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold outline-none focus:border-brand"
+                    className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
                   />
                   <p className="text-[11px] text-slate-400 mt-1 font-medium">
                     Auto-populated based on selected zone(s), or enter a custom address note.
@@ -631,18 +690,20 @@ export function AdminSimulatedOpportunitiesPage() {
                 {/* Date & Time */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1 block">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-1 block flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5 text-slate-500" />
                       Preferred Date
                     </label>
                     <input
                       type="date"
                       value={formDate}
                       onChange={(e) => setFormDate(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold outline-none focus:border-brand"
+                      className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1 block">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-1 block flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-slate-500" />
                       Preferred Time
                     </label>
                     <input
@@ -650,7 +711,7 @@ export function AdminSimulatedOpportunitiesPage() {
                       placeholder="e.g. 5:00 PM"
                       value={formTime}
                       onChange={(e) => setFormTime(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold outline-none focus:border-brand"
+                      className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
                     />
                   </div>
                 </div>
@@ -658,66 +719,140 @@ export function AdminSimulatedOpportunitiesPage() {
                 {/* Amount & Vendor Count */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1 block">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-1 block flex items-center gap-1.5">
+                      <IndianRupee className="h-3.5 w-3.5 text-emerald-600" />
                       Estimated Earning (₹) *
                     </label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      placeholder="e.g. 799"
-                      value={formAmount}
-                      onChange={(e) => setFormAmount(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold outline-none focus:border-brand"
-                    />
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                        ₹
+                      </span>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        placeholder="799"
+                        value={formAmount}
+                        onChange={(e) => setFormAmount(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 p-3 pl-8 text-sm font-bold text-slate-900 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1 block">
-                      Notify Vendors Count
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-1 block flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5 text-blue-600" />
+                      Target Partners Count
                     </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={formVendorCount}
-                      onChange={(e) => setFormVendorCount(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold outline-none focus:border-brand"
-                    />
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="1"
+                        max="200"
+                        value={formVendorCount}
+                        onChange={(e) => setFormVendorCount(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 p-3 pr-10 text-sm font-bold text-slate-900 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
+                        Vendors
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Expiry Minutes & Priority */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1 block">
-                      Expires After (Minutes)
+                {/* Expiry Duration Chips */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-amber-600" />
+                      Expires After (Duration)
                     </label>
-                    <select
-                      value={formExpiryMinutes}
-                      onChange={(e) => setFormExpiryMinutes(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold outline-none focus:border-brand"
-                    >
-                      <option value="5">5 Minutes</option>
-                      <option value="10">10 Minutes</option>
-                      <option value="15">15 Minutes</option>
-                      <option value="30">30 Minutes</option>
-                      <option value="60">1 Hour</option>
-                      <option value="120">2 Hours</option>
-                    </select>
+                    <span className="text-[11px] font-bold text-amber-700">
+                      {formExpiryMinutes >= 60
+                        ? `${formExpiryMinutes / 60} Hour${formExpiryMinutes > 60 ? 's' : ''}`
+                        : `${formExpiryMinutes} Minutes`}
+                    </span>
                   </div>
-                  <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1 block">
-                      Priority
-                    </label>
-                    <select
-                      value={formPriority}
-                      onChange={(e) => setFormPriority(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold outline-none focus:border-brand"
-                    >
-                      <option value="NORMAL">Normal</option>
-                      <option value="HIGH">High</option>
-                      <option value="URGENT">Urgent ⚡</option>
-                    </select>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    {[
+                      { val: '5', label: '5 Min' },
+                      { val: '10', label: '10 Min' },
+                      { val: '15', label: '15 Min' },
+                      { val: '30', label: '30 Min' },
+                      { val: '60', label: '1 Hour' },
+                      { val: '120', label: '2 Hours' },
+                    ].map((opt) => {
+                      const isActive = String(formExpiryMinutes) === opt.val
+                      return (
+                        <button
+                          key={opt.val}
+                          type="button"
+                          onClick={() => setFormExpiryMinutes(opt.val)}
+                          className={`py-2 px-2 rounded-xl text-xs font-bold text-center transition border ${
+                            isActive
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20 scale-[1.02]'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Priority Selection (Segmented Cards) */}
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 block">
+                    Alert Urgency & Priority Level
+                  </label>
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {[
+                      {
+                        id: 'NORMAL',
+                        label: 'Normal',
+                        icon: ShieldCheck,
+                        desc: 'Standard broadcast',
+                        activeClass: 'border-slate-400 bg-slate-100 text-slate-900 ring-2 ring-slate-400/30',
+                        iconClass: 'text-slate-600',
+                      },
+                      {
+                        id: 'HIGH',
+                        label: 'High',
+                        icon: Flame,
+                        desc: 'High demand alert',
+                        activeClass: 'border-amber-500 bg-amber-50 text-amber-950 ring-2 ring-amber-500/30',
+                        iconClass: 'text-amber-600',
+                      },
+                      {
+                        id: 'URGENT',
+                        label: 'Urgent ⚡',
+                        icon: Zap,
+                        desc: 'Top priority ping',
+                        activeClass: 'border-rose-500 bg-rose-50 text-rose-950 ring-2 ring-rose-500/30',
+                        iconClass: 'text-rose-600 animate-pulse',
+                      },
+                    ].map((p) => {
+                      const isSelected = formPriority === p.id
+                      const IconComponent = p.icon
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setFormPriority(p.id)}
+                          className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-center transition ${
+                            isSelected
+                              ? p.activeClass
+                              : 'border-slate-200/80 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className={`p-1.5 rounded-xl mb-1 ${isSelected ? 'bg-white shadow-xs' : 'bg-slate-100'}`}>
+                            <IconComponent className={`h-4 w-4 ${p.iconClass}`} />
+                          </div>
+                          <span className="text-xs font-black">{p.label}</span>
+                          <span className="text-[10px] font-medium text-slate-400 mt-0.5">{p.desc}</span>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
 
