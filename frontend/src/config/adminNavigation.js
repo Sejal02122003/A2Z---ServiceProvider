@@ -33,6 +33,7 @@ import {
   Sliders,
   BellRing,
   ShieldAlert,
+  Ban,
 } from 'lucide-react'
 
 
@@ -110,6 +111,7 @@ export const ADMIN_NAV_SECTIONS = [
     title: 'Operations',
     items: [
       { to: '/admin/bookings', label: 'Bookings & requests', icon: ClipboardList },
+      { to: '/admin/booking-cancellation', label: 'Cancellation & Late Fee Policy', icon: Ban },
       { to: '/admin/penalty-management', label: 'Penalty & Bounce Policy', icon: ShieldAlert },
       { to: '/admin/booking-reminders', label: 'Booking Reminders', icon: BellRing },
       { to: '/admin/simulated-opportunities', label: 'Simulated Alerts', icon: Radio },
@@ -173,6 +175,7 @@ const ROUTE_TITLES = [
   { prefix: '/admin/inventory', title: 'Central Inventory Hub' },
   { prefix: '/admin/rewards', title: 'Rewards & Incentives Management' },
   { prefix: '/admin/penalty-management', title: 'Penalty & Bounce Management' },
+  { prefix: '/admin/booking-cancellation', title: 'Booking Cancellation & Late Fee Policy' },
   { prefix: '/admin/booking-reminders', title: 'Booking Date & Time Reminders' },
   { prefix: '/admin/wallet-rewards', title: 'Wallet & Rewards' },
 

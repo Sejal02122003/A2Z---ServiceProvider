@@ -41,6 +41,7 @@ import trialRoutes from './trialRoutes.js'
 import rewardRoutes from './rewardRoutes.js'
 import bookingReminderRoutes from './bookingReminderRoutes.js'
 import penaltyRoutes from './penaltyRoutes.js'
+import bookingCancellationRoutes from './bookingCancellationRoutes.js'
 
 const router = Router()
 
@@ -48,6 +49,7 @@ router.use('/', trialRoutes)
 router.use('/', rewardRoutes)
 router.use('/reminders', bookingReminderRoutes)
 router.use('/penalties', penaltyRoutes)
+router.use('/booking-cancellations', bookingCancellationRoutes)
 
 router.use('/auth', authRoutes)
 router.use('/users', userRoutes)

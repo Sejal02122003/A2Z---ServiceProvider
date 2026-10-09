@@ -28,6 +28,9 @@ const bookingSchema = new mongoose.Schema(
       enum: ['INSTANT', 'SCHEDULED'],
       required: true,
     },
+    date: {
+      type: String,
+    },
     scheduledAt: {
       type: Date,
     },
@@ -113,11 +116,16 @@ const bookingSchema = new mongoose.Schema(
         'STARTED',
         'COMPLETED',
         'CANCELLED',
+        'CANCELLATION_REQUESTED',
         'REFUNDED',
         'FAILED',
       ],
       default: 'CREATED',
       index: true,
+    },
+    cancellationRecordId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'BookingCancellationRecord',
     },
     broadcastRadius: { type: Number },
     eligibleLabourCount: { type: Number, default: 0 },
