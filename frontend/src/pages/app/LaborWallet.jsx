@@ -571,60 +571,77 @@ export function LaborWallet() {
       {/* Top-up Modal */}
       <AnimatePresence>
         {showTopUpModal && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-sm">
+          <div 
+            onClick={() => setShowTopUpModal(false)}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md overflow-y-auto"
+          >
             <motion.div
-              initial={{ opacity: 0, y: 100 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 100 }}
-              className="w-full max-w-md rounded-t-3xl sm:rounded-3xl bg-white p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.92, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 15 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="w-full max-w-md rounded-3xl bg-white p-5 sm:p-6 shadow-2xl my-auto border border-slate-100 max-h-[90vh] flex flex-col overflow-y-auto"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <PlusCircle className="h-5 w-5 text-cyan-600" />
-                  <h3 className="font-extrabold text-slate-900">Recharge Wallet</h3>
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-50 text-cyan-700">
+                    <PlusCircle className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 text-base">Recharge Wallet</h3>
+                    <p className="text-[11px] font-medium text-slate-500">Instant UPI & Online Payment</p>
+                  </div>
                 </div>
                 <button
                   onClick={() => setShowTopUpModal(false)}
-                  className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition active:scale-95"
+                  aria-label="Close"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
-              <div className="py-4 space-y-4">
+              <div className="py-4 space-y-4.5">
                 <div>
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
                     Select or Enter Amount (₹)
                   </label>
                   <div className="relative mt-2">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-lg font-bold text-slate-400">₹</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-slate-400">₹</span>
                     <input
                       type="number"
                       min="1"
                       value={topUpAmount}
                       onChange={(e) => setTopUpAmount(e.target.value)}
                       placeholder="500"
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-8 pr-4 text-xl font-black text-slate-900 outline-none focus:border-cyan-500 focus:bg-white"
+                      className="w-full rounded-2xl border-2 border-slate-200 bg-slate-50 py-3.5 pl-10 pr-4 text-2xl font-black text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
                     />
                   </div>
                 </div>
 
                 {/* Quick select buttons */}
-                <div className="grid grid-cols-4 gap-2">
-                  {QUICK_AMOUNTS.map((amt) => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() => setTopUpAmount(String(amt))}
-                      className={`rounded-xl border py-2 text-xs font-bold transition ${
-                        topUpAmount === String(amt)
-                          ? 'border-cyan-500 bg-cyan-50 text-cyan-800'
-                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      ₹{amt}
-                    </button>
-                  ))}
+                <div>
+                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">Quick amounts</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {QUICK_AMOUNTS.map((amt) => {
+                      const isSelected = topUpAmount === String(amt)
+                      return (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setTopUpAmount(String(amt))}
+                          className={`rounded-xl border py-2.5 text-xs font-black transition active:scale-95 ${
+                            isSelected
+                              ? 'border-cyan-500 bg-cyan-50 text-cyan-800 ring-2 ring-cyan-500/20 shadow-sm'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          ₹{amt}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
 
                 {topUpError && (
@@ -633,20 +650,22 @@ export function LaborWallet() {
                   </p>
                 )}
 
-                <button
-                  disabled={recharging || !topUpAmount || Number(topUpAmount) <= 0}
-                  onClick={handleTopUp}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-500 py-3.5 text-base font-extrabold text-slate-950 shadow-lg shadow-cyan-500/25 transition hover:bg-cyan-400 active:scale-[0.98] disabled:opacity-50"
-                >
-                  {recharging ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <>
-                      <CreditCard className="h-5 w-5" />
-                      Add ₹{topUpAmount || 0} to Wallet
-                    </>
-                  )}
-                </button>
+                <div className="pt-2">
+                  <button
+                    disabled={recharging || !topUpAmount || Number(topUpAmount) <= 0}
+                    onClick={handleTopUp}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-500 py-4 text-base font-black text-slate-950 shadow-lg shadow-cyan-500/25 transition hover:bg-cyan-400 active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {recharging ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <>
+                        <CreditCard className="h-5 w-5" />
+                        Add ₹{topUpAmount || 0} to Wallet
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
