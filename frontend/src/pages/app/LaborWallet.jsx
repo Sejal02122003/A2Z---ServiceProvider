@@ -22,6 +22,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../../hooks/useAuth.js'
 import { walletsApi } from '../../api/walletsApi.js'
 import { paymentsApi } from '../../api/paymentsApi.js'
 import { ApiError } from '../../api/http.js'
@@ -58,6 +59,7 @@ function loadRazorpay() {
 const QUICK_AMOUNTS = [200, 500, 1000, 2000]
 
 export function LaborWallet() {
+  const { user } = useAuth()
   const reduce = useReducedMotion()
   const [wallet, setWallet] = useState(null)
   const [transactions, setTransactions] = useState([])
@@ -116,67 +118,66 @@ export function LaborWallet() {
 
     try {
       const razorpayLoaded = await loadRazorpay()
-      if (razorpayLoaded) {
-        try {
-          const payRes = await paymentsApi.initPayment({
-            amount: num,
-            purpose: 'WALLET_TOPUP',
-          })
-
-          const order = payRes.data?.order
-          if (order) {
-            const options = {
-              key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_8sYbzHWidwe5Zw',
-              amount: order.amount,
-              currency: order.currency || 'INR',
-              order_id: order.id,
-              name: 'A2Z Service Provider',
-              description: `Wallet Top-up ₹${num}`,
-              handler: async function (response) {
-                try {
-                  await paymentsApi.verifyPayment({
-                    razorpayOrderId: response.razorpay_order_id,
-                    razorpayPaymentId: response.razorpay_payment_id,
-                    razorpaySignature: response.razorpay_signature,
-                  })
-                  setTopUpSuccess(`₹${num} added to your wallet!`)
-                  setShowTopUpModal(false)
-                  fetchWalletData()
-                } catch {
-                  setTopUpError('Payment verification failed. Please contact support.')
-                } finally {
-                  setRecharging(false)
-                }
-              },
-              modal: {
-                ondismiss: () => {
-                  setRecharging(false)
-                },
-              },
-              theme: { color: '#009eb3' },
-            }
-            const rzp = new window.Razorpay(options)
-            rzp.open()
-            return
-          }
-        } catch (gatewayErr) {
-          console.warn('[Razorpay Init Fallback to direct recharge]', gatewayErr)
-        }
+      if (!razorpayLoaded) {
+        setTopUpError('Payment gateway SDK failed to load. Please check your internet connection.')
+        setRecharging(false)
+        return
       }
 
-      // Direct recharge API fallback
-      const rechargeRes = await walletsApi.rechargeMyWallet({
+      const payRes = await paymentsApi.initPayment({
         amount: num,
-        paymentMethod: 'UPI_DIRECT',
-        description: 'Wallet top-up',
+        purpose: 'WALLET_TOPUP',
       })
 
-      setTopUpSuccess(rechargeRes?.message || `₹${num} added to your wallet!`)
-      setShowTopUpModal(false)
-      fetchWalletData()
+      const order = payRes.data?.order
+      if (!order) {
+        throw new Error('Could not create payment order')
+      }
+
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_8sYbzHWidwe5Zw',
+        amount: order.amount,
+        currency: order.currency || 'INR',
+        order_id: order.id,
+        name: 'A2Z Service Provider',
+        description: `Wallet Top-up ₹${num}`,
+        prefill: {
+          name: user?.fullName || '',
+          email: user?.email || '',
+          contact: user?.phone ? String(user.phone).replace(/\D/g, '').slice(-10) : '',
+        },
+        handler: async function (response) {
+          try {
+            await paymentsApi.verifyPayment({
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            })
+            setTopUpSuccess(`₹${num} added to your wallet!`)
+            setShowTopUpModal(false)
+            fetchWalletData()
+          } catch (err) {
+            setTopUpError(err?.message || 'Payment verification failed. Please contact support.')
+          } finally {
+            setRecharging(false)
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setRecharging(false)
+          },
+        },
+        theme: { color: '#009eb3' },
+      }
+
+      const rzp = new window.Razorpay(options)
+      rzp.on('payment.failed', function (resp) {
+        setTopUpError(resp.error?.description || 'Payment failed. Please try again.')
+        setRecharging(false)
+      })
+      rzp.open()
     } catch (err) {
-      setTopUpError(err instanceof ApiError ? err.message : err.message || 'Failed to recharge wallet')
-    } finally {
+      setTopUpError(err instanceof ApiError ? err.message : err.message || 'Failed to initialize recharge')
       setRecharging(false)
     }
   }
@@ -189,7 +190,7 @@ export function LaborWallet() {
     try {
       const razorpayLoaded = await loadRazorpay()
       if (!razorpayLoaded) {
-        setClearError('Payment gateway failed to load')
+        setClearError('Payment gateway failed to load. Please check your connection.')
         setClearing(false)
         return
       }
@@ -209,6 +210,11 @@ export function LaborWallet() {
         order_id: order.id,
         name: 'A2Z Service Provider',
         description: 'Clear wallet dues',
+        prefill: {
+          name: user?.fullName || '',
+          email: user?.email || '',
+          contact: user?.phone ? String(user.phone).replace(/\D/g, '').slice(-10) : '',
+        },
         handler: async function (response) {
           try {
             await paymentsApi.verifyPayment({
@@ -234,12 +240,16 @@ export function LaborWallet() {
       }
 
       const rzp = new window.Razorpay(options)
+      rzp.on('payment.failed', function (resp) {
+        setClearError(resp.error?.description || 'Payment failed.')
+        setClearing(false)
+      })
       rzp.open()
     } catch (err) {
       setClearError(err instanceof ApiError ? err.message : err.message || 'Payment failed')
       setClearing(false)
     }
-  }, [wallet, fetchWalletData])
+  }, [wallet, user, fetchWalletData])
 
   if (loading) {
     return (
