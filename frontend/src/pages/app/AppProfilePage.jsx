@@ -457,6 +457,7 @@ export function AppProfilePage() {
   const quickLinks = []
   quickLinks.push({ to: '/app', icon: Home, label: 'Home' })
   if (user?.role === USER_ROLES.LABOUR) {
+    quickLinks.push({ to: '/app/wallet', icon: Wallet, label: 'My Wallet & Recharge' })
     quickLinks.push({ to: '/app/jobs', icon: HardHat, label: 'Jobs & assignments' })
     quickLinks.push({ to: '/app/my-bookings', icon: CalendarClock, label: 'My Bookings (Direct)' })
     quickLinks.push({ to: '/app/kyc', icon: Fingerprint, label: 'Aadhaar KYC' })

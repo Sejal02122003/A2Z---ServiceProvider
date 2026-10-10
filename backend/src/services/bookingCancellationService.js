@@ -443,6 +443,19 @@ export async function processVendorCancellation({
       .catch((err) => console.error(err))
   }
 
+  // Release cash booking charges reservation if cash booking
+  if (booking.paymentMethod === 'CASH') {
+    const expectedCharges = (booking.platformFee || 0) + (booking.taxes || 0) + (booking.commissionAmount || 0)
+    if (vendorId && expectedCharges > 0) {
+      import('./labourWalletService.js')
+        .then(({ releaseCashBookingCharges }) => {
+          releaseCashBookingCharges({ labourId: vendorId, bookingId: booking._id, amount: expectedCharges })
+            .catch((err) => console.error('Error releasing reservation on cancellation:', err))
+        })
+        .catch(() => {})
+    }
+  }
+
   // Cancel scheduled reminders for booking
   import('./bookingReminderService.js')
     .then(({ cancelRemindersForBooking }) => {

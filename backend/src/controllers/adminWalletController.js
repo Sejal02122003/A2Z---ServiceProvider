@@ -396,3 +396,194 @@ export const adjustAdminUserWallet = asyncHandler(async (req, res) => {
   })
 })
 
+/**
+ * GET /api/admin/wallets/labour-stats
+ * Comprehensive reporting on Labour Wallets, Recovery, and Settlements
+ */
+export const getLabourWalletStats = asyncHandler(async (req, res) => {
+  const { AdminWallet } = await import('../models/AdminWallet.js')
+  const { Booking } = await import('../models/Booking.js')
+  const { User } = await import('../models/User.js')
+  const { getWalletSettings } = await import('../services/userWalletService.js')
+
+  const [adminWallet, settings, labourUsers] = await Promise.all([
+    AdminWallet.findOne().lean(),
+    getWalletSettings(),
+    User.find({ role: { $in: ['labour', 'contractor'] } }).select('_id').lean(),
+  ])
+
+  const labourIds = labourUsers.map(u => u._id)
+
+  const [walletAgg, txSettlementAgg, pendingSettlementsCount, insufficientCasesCount] = await Promise.all([
+    // Aggregate labour wallet balances
+    Wallet.aggregate([
+      { $match: { userId: { $in: labourIds } } },
+      {
+        $group: {
+          _id: null,
+          totalCurrentBalance: { $sum: { $ifNull: ['$selfBalance', '$balance'] } },
+          totalReservedBalance: { $sum: { $ifNull: ['$reservedBalance', 0] } },
+          totalOutstandingDues: { $sum: { $ifNull: ['$adminBalance', 0] } },
+          totalWallets: { $sum: 1 },
+        },
+      },
+    ]),
+
+    // Aggregate recovered charges from CASH_BOOKING_SETTLEMENT transactions
+    WalletTransaction.aggregate([
+      { $match: { context: 'CASH_BOOKING_SETTLEMENT', status: { $in: ['COMPLETED', 'PARTIAL'] } } },
+      {
+        $group: {
+          _id: null,
+          totalCommissionRecovered: { $sum: '$chargesBreakdown.commission' },
+          totalPlatformFeesRecovered: { $sum: '$chargesBreakdown.platformFee' },
+          totalGstRecovered: { $sum: '$chargesBreakdown.gst' },
+          totalWalletDebits: { $sum: '$chargesBreakdown.totalDeducted' },
+          totalTransactions: { $sum: 1 },
+        },
+      },
+    ]),
+
+    // Pending cash booking settlements
+    Booking.countDocuments({
+      paymentMethod: 'CASH',
+      status: 'COMPLETED',
+      adminSettlementStatus: { $ne: 'SETTLED' },
+    }),
+
+    // Insufficient balance cases (wallets with adminBalance > 0)
+    Wallet.countDocuments({
+      userId: { $in: labourIds },
+      adminBalance: { $gt: 0 },
+    }),
+  ])
+
+  const walletTotals = walletAgg[0] || {
+    totalCurrentBalance: 0,
+    totalReservedBalance: 0,
+    totalOutstandingDues: 0,
+    totalWallets: 0,
+  }
+
+  const txTotals = txSettlementAgg[0] || {
+    totalCommissionRecovered: adminWallet?.totalCommissionsCollected || 0,
+    totalPlatformFeesRecovered: adminWallet?.totalPlatformFeesCollected || 0,
+    totalGstRecovered: adminWallet?.totalTaxesCollected || 0,
+    totalWalletDebits: 0,
+    totalTransactions: 0,
+  }
+
+  return sendSuccess(res, {
+    data: {
+      stats: {
+        totalLabourBalance: walletTotals.totalCurrentBalance,
+        totalReservedBalance: walletTotals.totalReservedBalance,
+        totalAvailableBalance: Math.max(0, walletTotals.totalCurrentBalance - walletTotals.totalReservedBalance),
+        totalOutstandingDues: walletTotals.totalOutstandingDues,
+        totalLabourAccounts: walletTotals.totalWallets,
+        minimumRequiredBalance: settings.minimumLabourWalletBalance || 0,
+        isWalletEnabled: Boolean(settings.enabled ?? true),
+        totalCommissionRecovered: txTotals.totalCommissionRecovered || (adminWallet?.totalCommissionsCollected || 0),
+        totalPlatformFeesRecovered: txTotals.totalPlatformFeesRecovered || (adminWallet?.totalPlatformFeesCollected || 0),
+        totalGstRecovered: txTotals.totalGstRecovered || (adminWallet?.totalTaxesCollected || 0),
+        totalChargesRecovered: (txTotals.totalCommissionRecovered || 0) + (txTotals.totalPlatformFeesRecovered || 0) + (txTotals.totalGstRecovered || 0),
+        pendingSettlementsCount,
+        insufficientCasesCount,
+      },
+    },
+  })
+})
+
+/**
+ * GET /api/admin/wallets/transactions
+ * Searchable, filterable ledger of all wallet transactions
+ */
+export const getAllWalletTransactions = asyncHandler(async (req, res) => {
+  const {
+    search = '',
+    type,
+    context,
+    status,
+    userId,
+    bookingId,
+    startDate,
+    endDate,
+    page = 1,
+    limit = 20,
+  } = req.query
+
+  const pageNum = Math.max(1, parseInt(page, 10) || 1)
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20))
+  const skip = (pageNum - 1) * limitNum
+
+  const query = {}
+
+  if (type) query.type = type
+  if (context) query.context = context
+  if (status) query.status = status
+  if (userId) query.userId = userId
+  if (bookingId) query.bookingId = bookingId
+
+  if (startDate || endDate) {
+    query.createdAt = {}
+    if (startDate) query.createdAt.$gte = new Date(startDate)
+    if (endDate) query.createdAt.$lte = new Date(endDate)
+  }
+
+  if (search && search.trim()) {
+    const s = search.trim()
+    const isObjectId = mongoose.Types.ObjectId.isValid(s)
+    
+    if (isObjectId) {
+      query.$or = [{ _id: s }, { userId: s }, { bookingId: s }, { referenceId: s }]
+    } else {
+      query.$or = [
+        { transactionId: { $regex: s, $options: 'i' } },
+        { idempotencyKey: { $regex: s, $options: 'i' } },
+        { description: { $regex: s, $options: 'i' } },
+      ]
+    }
+  }
+
+  const [transactions, total] = await Promise.all([
+    WalletTransaction.find(query)
+      .populate('userId', 'fullName phone email role')
+      .populate('labourId', 'fullName phone email role')
+      .populate('bookingId', 'totalAmount paymentMethod status createdAt address')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .lean(),
+    WalletTransaction.countDocuments(query),
+  ])
+
+  return sendSuccess(res, {
+    data: {
+      transactions,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        pages: Math.ceil(total / limitNum) || 1,
+      },
+    },
+  })
+})
+
+/**
+ * POST /api/admin/wallets/reconcile-settlement/:bookingId
+ * Manually trigger or retry settlement for a completed cash booking
+ */
+export const reconcileBookingSettlement = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params
+  const { settleCashBookingPayment } = await import('../services/labourWalletService.js')
+
+  const result = await settleCashBookingPayment({ bookingId })
+
+  return sendSuccess(res, {
+    message: result.alreadySettled ? 'Booking was already settled' : 'Booking settlement processed successfully',
+    data: result,
+  })
+})
+
+

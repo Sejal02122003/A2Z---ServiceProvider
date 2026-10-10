@@ -178,6 +178,22 @@ export const appShellChildRoutes = (
         </RoleRoute>
       }
     />
+    <Route
+      path="labor-wallet"
+      element={
+        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR]}>
+          <AppRoleWalletWrapper />
+        </RoleRoute>
+      }
+    />
+    <Route
+      path="labour-wallet"
+      element={
+        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR]}>
+          <AppRoleWalletWrapper />
+        </RoleRoute>
+      }
+    />
 
     <Route
       path="jobs"

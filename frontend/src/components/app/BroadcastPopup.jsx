@@ -277,9 +277,23 @@ export function BroadcastPopup() {
               </div>
 
               {error && (
-                <p className="mt-2 flex items-center gap-1 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {error}
-                </p>
+                <div className="mt-2 rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700 border border-rose-200 space-y-1">
+                  <p className="flex items-center gap-1">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {error}
+                  </p>
+                  {(error.toLowerCase().includes('wallet') || error.toLowerCase().includes('recharge') || error.toLowerCase().includes('balance')) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIncoming(null)
+                        navigate('/app/labor-wallet')
+                      }}
+                      className="mt-1 block text-xs font-extrabold text-brand underline"
+                    >
+                      Go to My Wallet to Recharge &rarr;
+                    </button>
+                  )}
+                </div>
               )}
 
               {/* Actions */}

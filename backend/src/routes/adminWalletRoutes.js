@@ -12,6 +12,15 @@ router.use(protect, restrictTo(USER_ROLES.ADMIN))
 router.get('/settings', adminWallet.getAdminWalletSettings)
 router.put('/settings', adminWallet.updateAdminWalletSettings)
 
+router.get('/labour-stats', adminWallet.getLabourWalletStats)
+router.get('/transactions', adminWallet.getAllWalletTransactions)
+router.post(
+  '/reconcile-settlement/:bookingId',
+  [param('bookingId').isMongoId().withMessage('Invalid bookingId')],
+  validateRequest,
+  adminWallet.reconcileBookingSettlement,
+)
+
 router.get('/users', adminWallet.getAdminUserWallets)
 router.get('/users/:userId', adminWallet.getAdminUserWalletDetails)
 router.post(

@@ -740,6 +740,18 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
       })
     }
 
+    // Release held cash charges reservation for labourer if cash booking
+    if (booking.paymentMethod === 'CASH') {
+      const labourIdToRelease = booking.laborId || booking.acceptedLabourId || (assignment ? assignment.labourId : null)
+      const expectedCharges = (booking.platformFee || 0) + (booking.taxes || 0) + (booking.commissionAmount || 0)
+      if (labourIdToRelease && expectedCharges > 0) {
+        import('../services/labourWalletService.js').then(({ releaseCashBookingCharges }) => {
+          releaseCashBookingCharges({ labourId: labourIdToRelease, bookingId: booking._id, amount: expectedCharges })
+            .catch(err => console.error('Error releasing reservation on cancellation:', err))
+        }).catch(() => {})
+      }
+    }
+
     // Cancel any scheduled reminders for this cancelled booking
     import('../services/bookingReminderService.js').then(({ cancelRemindersForBooking }) => {
       cancelRemindersForBooking(booking._id, `Booking cancelled by ${booking.cancelledBy || 'User'}: ${booking.cancellationReason || 'Cancelled'}`).catch(console.error)
@@ -842,41 +854,13 @@ export const confirmCashPayment = asyncHandler(async (req, res) => {
   booking.paymentStatus = 'PAID'
   await booking.save()
 
-  // Charge Admin Dues to the Labourer's Wallet NOW that the cash has been collected!
-  import('../models/Wallet.js').then(async ({ Wallet }) => {
-    let wallet = await Wallet.findOne({ userId: booking.laborId })
-    if (!wallet) wallet = new Wallet({ userId: booking.laborId })
-    
-    const adminDues = (booking.platformFee || 0) + (booking.taxes || 0) + (booking.commissionAmount || 0)
-    wallet.adminBalance += adminDues
-    await wallet.save()
-
-    import('../models/WalletTransaction.js').then(({ WalletTransaction }) => {
-      WalletTransaction.create({
-        walletId: wallet._id,
-        amount: adminDues,
-        type: 'CREDIT',
-        targetWallet: 'ADMIN',
-        context: 'BOOKING',
-        referenceId: booking._id,
-        description: 'Platform fees, taxes & commission for Cash Booking'
-      }).catch(err => console.error('WalletTx error:', err))
-    })
-
-    // Log splits to AdminWallet for Platform Fee and Commission
-    if (booking.platformFee > 0 || booking.commissionAmount > 0 || booking.basePrice > 0 || booking.taxes > 0) {
-      import('../models/AdminWallet.js').then(async ({ AdminWallet }) => {
-        let adminWallet = await AdminWallet.findOne()
-        if (!adminWallet) adminWallet = new AdminWallet()
-        
-        adminWallet.totalPlatformFeesCollected += (booking.platformFee || 0)
-        adminWallet.totalCommissionsCollected += (booking.commissionAmount || 0)
-        adminWallet.totalTaxesCollected += (booking.taxes || 0)
-        adminWallet.totalServiceAmountCollected += (booking.basePrice || 0)
-        await adminWallet.save()
-      }).catch(err => console.error('AdminWallet error:', err))
-    }
-  }).catch(err => console.error(err))
+  // Perform atomic cash booking settlement (recovering exact commission + platform fee + taxes)
+  try {
+    const { settleCashBookingPayment } = await import('../services/labourWalletService.js')
+    await settleCashBookingPayment({ bookingId: booking._id, labourId: booking.laborId || booking.acceptedLabourId })
+  } catch (err) {
+    console.error('[Cash Settlement Error in confirmCashPayment]:', err)
+  }
 
   // Notify both
   import('../socket.js').then(({ emitToUser }) => {

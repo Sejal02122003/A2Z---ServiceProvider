@@ -49,6 +49,22 @@ router.get(
 )
 
 router.get(
+  '/eligibility/:bookingId',
+  restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),
+  wallet.checkBookingEligibility,
+)
+
+router.post(
+  '/recharge',
+  restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),
+  [
+    body('amount').isFloat({ min: 1 }).withMessage('Recharge amount must be at least ₹1'),
+  ],
+  validateRequest,
+  wallet.rechargeMyWallet,
+)
+
+router.get(
   '/transactions',
   restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),
   wallet.getMyTransactions,

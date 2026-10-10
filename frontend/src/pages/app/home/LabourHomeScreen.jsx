@@ -101,11 +101,12 @@ function formatPunchTime(iso) {
 }
 
 const QUICK_ACTIONS = [
+  { to: '/app/wallet', label: 'My Wallet', icon: Wallet, bg: 'from-emerald-500/15 to-emerald-50', iconTone: 'text-emerald-800' },
   { to: '/app/rewards', label: 'Rewards', icon: Award, bg: 'from-amber-500/15 to-amber-50', iconTone: 'text-amber-700' },
   { to: '/app/subscription', label: 'Subscription', icon: Crown, bg: 'from-amber-500/15 to-amber-50', iconTone: 'text-amber-700' },
   { to: '/app/earnings', label: 'Earnings', icon: IndianRupee, bg: 'from-blue-600/15 to-blue-50', iconTone: 'text-blue-700' },
   { to: '/app/jobs', label: 'My jobs', icon: HardHat, bg: 'from-emerald-500/15 to-emerald-50', iconTone: 'text-emerald-800' },
-  { to: '/app/jobs', label: 'Site details', icon: MapPin, bg: 'from-violet-500/15 to-violet-50', iconTone: 'text-violet-700' },
+  { to: '/app/materials', label: 'Materials', icon: Package, bg: 'from-teal-500/15 to-teal-50', iconTone: 'text-teal-700' },
   { to: '/app/work-categories', label: 'Skills', icon: Wrench, bg: 'from-orange-500/15 to-orange-50', iconTone: 'text-orange-800' },
   { to: '/app/support', label: 'Support', icon: LifeBuoy, bg: 'from-rose-500/15 to-rose-50', iconTone: 'text-rose-700' },
 ]
@@ -426,6 +427,15 @@ export function LabourHomeScreen({ user }) {
               </button>
 
               <div className="flex items-center gap-2 sm:gap-3">
+                <Link
+                  to="/app/wallet"
+                  className="relative flex h-11 items-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/20 px-3 text-white backdrop-blur-sm transition hover:bg-emerald-500/30 active:scale-95"
+                  aria-label="Open Wallet"
+                >
+                  <Wallet className="h-4 w-4 text-emerald-300" />
+                  <span className="text-xs font-black tracking-tight text-white">Wallet</span>
+                </Link>
+
                 <button
                   type="button"
                   onClick={() => navigate('/app/notifications')}

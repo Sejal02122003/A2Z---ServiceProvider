@@ -21,6 +21,17 @@ export const walletsApi = {
     return apiRequest('/wallets/transactions', { method: 'GET' })
   },
 
+  checkBookingEligibility: (bookingId) => {
+    return apiRequest(`/wallets/eligibility/${bookingId}`, { method: 'GET' })
+  },
+
+  rechargeMyWallet: (payload) => {
+    return apiRequest('/wallets/recharge', {
+      method: 'POST',
+      body: payload,
+    })
+  },
+
   // Customer / User wallet APIs
   getMyUserWallet: () => {
     return apiRequest('/wallets/user/me', { method: 'GET' })

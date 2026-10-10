@@ -133,6 +133,15 @@ export const verifyPayment = asyncHandler(async (req, res) => {
          }).catch(err => console.error('Failed to emit payment status socket', err))
       }
     }
+  } else if (pTx.purpose === 'WALLET_TOPUP') {
+    const { rechargeLabourWallet } = await import('../services/labourWalletService.js')
+    await rechargeLabourWallet({
+      labourId: req.user._id,
+      amount: pTx.amount,
+      transactionId: pTx.razorpayPaymentId || `PAY_${pTx._id}`,
+      paymentMethod: 'ONLINE_GATEWAY',
+      description: 'Wallet top-up via Razorpay',
+    })
   } else if (pTx.purpose === 'WALLET_CLEARANCE') {
     let wallet = await Wallet.findOne({ userId: req.user._id })
     if (wallet) {

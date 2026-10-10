@@ -16,6 +16,7 @@ import {
   FileText,
   Package,
   Award,
+  Wallet,
 } from 'lucide-react'
 import { USER_ROLES } from '../constants/userRoles.js'
 
@@ -31,6 +32,7 @@ const byRole = {
     ],
     drawerNav: [
       { id: 'home', to: '/app', label: 'Home', icon: Home, end: true },
+      { id: 'wallet', to: '/app/wallet', label: 'My Wallet', icon: Wallet },
       { id: 'search', to: '/app/search', label: 'Search services', icon: Search },
       { id: 'billing', to: '/app/billing', label: 'Invoice & Billing', icon: FileText },
       { id: 'book', to: '/app/my-bookings', label: 'My bookings', icon: ClipboardList },
@@ -48,12 +50,13 @@ const byRole = {
     bottomNav: [
       { id: 'home', to: '/app', label: 'Home', icon: Home, end: true },
       { id: 'jobs', to: '/app/jobs', label: 'Jobs', icon: HardHat },
-      { id: 'materials', to: '/app/materials', label: 'Materials', icon: Package },
+      { id: 'wallet', to: '/app/wallet', label: 'Wallet', icon: Wallet },
       { id: 'earnings', to: '/app/earnings', label: 'Earnings', icon: IndianRupee },
       { id: 'profile', to: '/app/profile', label: 'Profile', icon: UserRound },
     ],
     drawerNav: [
       { id: 'home', to: '/app', label: 'Home', icon: Home, end: true },
+      { id: 'wallet', to: '/app/wallet', label: 'My Wallet & Recharge', icon: Wallet },
       { id: 'jobs', to: '/app/jobs', label: 'Assignments', icon: HardHat },
       { id: 'rewards', to: '/app/rewards', label: 'Rewards & Incentives', icon: Award },
       { id: 'materials', to: '/app/materials', label: 'Materials & Stock', icon: Package },
@@ -78,6 +81,7 @@ export function getAppNavigation(role) {
 }
 
 export function getAppShellTitle(pathname) {
+  if (pathname.startsWith('/app/wallet') || pathname.startsWith('/app/labor-wallet')) return 'My Wallet'
   if (pathname.startsWith('/app/jobs')) return 'Jobs'
   if (pathname.startsWith('/app/rewards')) return 'Rewards & Incentives'
   if (pathname.startsWith('/app/materials')) return 'Materials'

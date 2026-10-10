@@ -27,7 +27,7 @@ export async function getWalletSettings() {
  * Update wallet settings with validation
  */
 export async function updateWalletSettings(data, adminUserId) {
-  const { enabled, welcomeBonusAmount, walletDiscountPercentage, minimumBookingAmount } = data
+  const { enabled, welcomeBonusAmount, walletDiscountPercentage, minimumBookingAmount, minimumLabourWalletBalance } = data
 
   const update = {}
   if (enabled !== undefined) update.enabled = Boolean(enabled)
@@ -45,6 +45,11 @@ export async function updateWalletSettings(data, adminUserId) {
     const num = Number(minimumBookingAmount)
     if (isNaN(num) || num < 0) throw new Error('Minimum booking amount must be >= 0')
     update.minimumBookingAmount = num
+  }
+  if (minimumLabourWalletBalance !== undefined) {
+    const num = Number(minimumLabourWalletBalance)
+    if (isNaN(num) || num < 0) throw new Error('Minimum labour wallet balance must be >= 0')
+    update.minimumLabourWalletBalance = num
   }
   if (adminUserId) update.updatedBy = adminUserId
 

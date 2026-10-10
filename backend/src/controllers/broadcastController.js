@@ -77,22 +77,7 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     })
   }
 
-  // Cash Limit check
-  const { Wallet } = await import('../models/Wallet.js')
-  const { SystemSetting } = await import('../models/SystemSetting.js')
-
-  const wallet = await Wallet.findOne({ userId: labour._id })
-  if (wallet && wallet.adminBalance > 0) {
-    const settings = await SystemSetting.findOne({ configKey: 'master_config' })
-    if (settings && wallet.adminBalance >= (settings.labourCashLimit ?? 500)) {
-      return sendError(res, {
-        message: `Cannot accept new bookings. You owe the admin ₹${wallet.adminBalance}. Please clear your dues first.`,
-        statusCode: HTTP_STATUS.FORBIDDEN,
-      })
-    }
-  }
-
-  // Fetch booking first to check quantity logic
+  // Fetch booking first
   let booking = await Booking.findOne({ _id: bookingId, status: 'BROADCASTING' })
   
   if (!booking) {
@@ -110,6 +95,35 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
       message: `Cannot accept booking. Current status is ${currentBooking.status}`,
       statusCode: HTTP_STATUS.BAD_REQUEST,
     })
+  }
+
+  // Wallet Eligibility Check (Rules: availableWalletBalance >= bookingAmount & >= minRequired)
+  const { checkLabourBookingEligibility, reserveCashBookingCharges } = await import('../services/labourWalletService.js')
+  const walletCheck = await checkLabourBookingEligibility({ labourId: labour._id, booking })
+  if (!walletCheck.eligible) {
+    return sendError(res, {
+      message: walletCheck.reason,
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: walletCheck.code,
+      data: {
+        bookingAmount: walletCheck.bookingAmount,
+        availableWalletBalance: walletCheck.availableWalletBalance,
+        requiredTopUp: walletCheck.requiredTopUp,
+        minimumWalletBalance: walletCheck.minimumWalletBalance,
+      },
+    })
+  }
+
+  // Concurrency-safe reservation for cash bookings
+  if (booking.paymentMethod === 'CASH') {
+    const reserveResult = await reserveCashBookingCharges({ labourId: labour._id, booking })
+    if (!reserveResult.reserved) {
+      return sendError(res, {
+        message: reserveResult.message || 'Insufficient available wallet balance to accept this booking.',
+        statusCode: HTTP_STATUS.CONFLICT,
+        code: 'CONCURRENT_WALLET_HOLD_FAILED',
+      })
+    }
   }
 
   // Check if labourer already accepted

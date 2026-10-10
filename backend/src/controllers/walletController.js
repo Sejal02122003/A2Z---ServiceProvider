@@ -6,14 +6,42 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import mongoose from 'mongoose'
 
+import { getLabourWalletDetails, checkLabourBookingEligibility, rechargeLabourWallet } from '../services/labourWalletService.js'
+
 export const getMyWallet = asyncHandler(async (req, res) => {
-  let wallet = await Wallet.findOne({ userId: req.user._id })
-  
-  if (!wallet) {
-    wallet = await Wallet.create({ userId: req.user._id })
+  const walletDetails = await getLabourWalletDetails(req.user._id)
+  return sendSuccess(res, { data: { wallet: walletDetails } })
+})
+
+export const checkBookingEligibility = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params
+  const result = await checkLabourBookingEligibility({
+    labourId: req.user._id,
+    bookingId,
+  })
+  return sendSuccess(res, { data: result })
+})
+
+export const rechargeMyWallet = asyncHandler(async (req, res) => {
+  const { amount, paymentMethod = 'ONLINE', description = 'Wallet recharge' } = req.body
+  const numAmount = Number(amount)
+
+  if (isNaN(numAmount) || numAmount <= 0) {
+    return sendError(res, { message: 'Valid positive recharge amount is required', statusCode: HTTP_STATUS.BAD_REQUEST })
   }
 
-  return sendSuccess(res, { data: { wallet } })
+  const result = await rechargeLabourWallet({
+    labourId: req.user._id,
+    amount: numAmount,
+    paymentMethod,
+    description,
+  })
+
+  const updatedWallet = await getLabourWalletDetails(req.user._id)
+  return sendSuccess(res, {
+    message: `₹${numAmount} credited to your wallet successfully`,
+    data: { wallet: updatedWallet, transaction: result.transaction },
+  })
 })
 
 function calculateLabourBookingShare(b, userId) {
