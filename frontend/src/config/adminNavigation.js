@@ -34,6 +34,7 @@ import {
   BellRing,
   ShieldAlert,
   Ban,
+  ShieldCheck,
 } from 'lucide-react'
 
 
