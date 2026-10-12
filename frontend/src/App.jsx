@@ -16,7 +16,7 @@ import { AdminLoginPage } from './pages/admin/AdminLoginPage.jsx'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage.jsx'
 import { AdminInventoryHubPage } from './pages/admin/AdminInventoryHubPage.jsx'
 import { AdminUsersPage } from './pages/admin/AdminUsersPage.jsx'
-
+import { AdminIdentityVerificationsPage } from './pages/admin/AdminIdentityVerificationsPage.jsx'
 import { AdminLabourPage } from './pages/admin/AdminLabourPage.jsx'
 
 import { AdminBookingsPage } from './pages/admin/AdminBookingsPage.jsx'
@@ -133,6 +133,7 @@ function App() {
             <Route path="sub-categories" element={<AdminSubCategoriesPage />} />
             <Route path="services" element={<AdminServicesPage />} />
             <Route path="users" element={<AdminUsersPage />} />
+            <Route path="identity-verifications" element={<AdminIdentityVerificationsPage />} />
             <Route path="labour" element={<AdminLabourPage />} />
 
             <Route path="bookings" element={<AdminBookingsPage />} />

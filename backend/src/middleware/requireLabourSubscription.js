@@ -2,23 +2,32 @@ import { SystemSetting } from '../models/SystemSetting.js'
 import { UserSubscription } from '../models/UserSubscription.js'
 import { HTTP_STATUS, sendError } from '../utils/apiResponse.js'
 import { USER_ROLES, KYC_STATUS } from '../constants/roles.js'
+import { IDENTITY_STATUS } from '../constants/identityConstants.js'
 
 export const requireLabourSubscription = async (req, res, next) => {
   if (req.user.role !== USER_ROLES.LABOUR) {
     return next() // Only applies to labours
   }
 
-  // 1. Must be verified & active
-  if (req.user.labourProfile?.kycStatus !== KYC_STATUS.VERIFIED) {
+  // 1. Must have verified KYC & Identity (and not suspended/rejected)
+  const isKycVerified = req.user.labourProfile?.kycStatus === KYC_STATUS.VERIFIED
+  const isIdentityVerified =
+    req.user.identityStatus === IDENTITY_STATUS.VERIFIED ||
+    (!req.user.identityStatus && isKycVerified)
+  const isDisallowedIdentity =
+    req.user.identityStatus === IDENTITY_STATUS.REJECTED ||
+    req.user.identityStatus === IDENTITY_STATUS.SUSPENDED
+
+  if (!isKycVerified || !isIdentityVerified || isDisallowedIdentity) {
     return sendError(res, {
-      message: 'Your account must be verified by admin first',
+      message: 'Your account and identity verification must be approved by admin before accepting bookings.',
       statusCode: HTTP_STATUS.FORBIDDEN,
       code: 'UNVERIFIED',
     })
   }
 
   // Check Vendor Trial / Blocked / Inactive Status
-  if (req.user.isActive === false || req.user.vendorStatus === 'BLOCKED') {
+  if (req.user.isActive === false || req.user.vendorStatus === 'BLOCKED' || req.user.identityStatus === IDENTITY_STATUS.SUSPENDED) {
     return sendError(res, {
       message: 'Your service provider account is currently blocked.',
       statusCode: HTTP_STATUS.FORBIDDEN,

@@ -10,6 +10,11 @@ import { populateLabourCategories } from '../utils/populateLabourCategories.js'
 import { isValidAadhaarLength, maskAadhaarLast4, normalizeAadhaar } from '../utils/aadhaar.js'
 import { normalizeStoredMediaUrl } from '../utils/mediaUrl.js'
 import { startVendorTrial } from '../services/trialEvaluationService.js'
+import { IDENTITY_STATUS } from '../constants/identityConstants.js'
+import { validateName } from '../utils/nameNormalization.js'
+import { IdentityVerification } from '../models/IdentityVerification.js'
+import { logIdentityAudit } from '../services/identityVerificationService.js'
+import { IDENTITY_AUDIT_ACTIONS } from '../models/IdentityAuditLog.js'
 
 const MAX_KYC_IMAGE_CHARS = 750_000
 
@@ -68,7 +73,17 @@ export const updateMe = asyncHandler(async (req, res) => {
     }
   }
 
-  if (fullName != null) user.fullName = String(fullName).trim()
+  if (fullName != null) {
+    const nameCheck = validateName(fullName)
+    if (!nameCheck.isValid) {
+      return sendError(res, {
+        message: nameCheck.reason,
+        statusCode: HTTP_STATUS.BAD_REQUEST,
+        code: 'INVALID_NAME',
+      })
+    }
+    user.fullName = nameCheck.cleanName
+  }
   if (phone != null) user.phone = String(phone).trim()
   if (email != null) user.email = String(email).trim().toLowerCase() || undefined
   
@@ -310,15 +325,50 @@ export const submitLabourKycDocuments = asyncHandler(async (req, res) => {
     [`${profileKey}.kycVideoUrl`]: videoUrl,
     [`${profileKey}.kycVideoMeta`]: sanitizeKycVideoMeta(req.body.videoMeta),
     [`${profileKey}.kycSubmittedAt`]: new Date(),
+    identityStatus: IDENTITY_STATUS.PENDING_IDENTITY_VERIFICATION,
   }
   if (hasAadhaarInput) updateData[`${profileKey}.aadhaarMasked`] = maskAadhaarLast4(normalizedAadhaar)
   if (hasPanInput) updateData[`${profileKey}.panMasked`] = maskPan(normalizedPan)
+
+  // Create or update IdentityVerification record
+  let identityDoc = await IdentityVerification.findOne({ userId: req.user._id })
+  if (!identityDoc) {
+    identityDoc = await IdentityVerification.create({
+      userId: req.user._id,
+      role: req.user.role,
+      submittedName: req.user.fullName || 'Service Partner',
+      status: IDENTITY_STATUS.PENDING_IDENTITY_VERIFICATION,
+      documentType: 'aadhaar',
+      documentNumberMasked: updateData[`${profileKey}.aadhaarMasked`] || updateData[`${profileKey}.panMasked`],
+      documentUrls: [videoUrl],
+      submittedAt: new Date(),
+    })
+  } else {
+    identityDoc.status = IDENTITY_STATUS.PENDING_IDENTITY_VERIFICATION
+    identityDoc.documentNumberMasked = updateData[`${profileKey}.aadhaarMasked`] || updateData[`${profileKey}.panMasked`]
+    identityDoc.documentUrls = [videoUrl]
+    identityDoc.submittedAt = new Date()
+    await identityDoc.save()
+  }
+  updateData.identityVerificationRef = identityDoc._id
 
   req.user = await User.findByIdAndUpdate(
     req.user._id,
     { $set: updateData, $unset: { [`${profileKey}.kycReviewNote`]: 1 } },
     { new: true, runValidators: false }
   )
+
+  await logIdentityAudit({
+    userId: req.user._id,
+    verificationId: identityDoc._id,
+    action: IDENTITY_AUDIT_ACTIONS.IDENTITY_SUBMITTED,
+    previousStatus: IDENTITY_STATUS.CONTACT_VERIFIED,
+    newStatus: IDENTITY_STATUS.PENDING_IDENTITY_VERIFICATION,
+    performedBy: req.user._id,
+    actorRole: 'USER',
+    reason: 'Vendor submitted video KYC and masked government ID details for identity verification',
+  })
+
   if (req.user.role === USER_ROLES.LABOUR) {
     await populateLabourCategories(req.user)
   }
@@ -359,6 +409,30 @@ export const reviewLabourKyc = asyncHandler(async (req, res) => {
     profile.kycStatus = KYC_STATUS.VERIFIED
     profile.kycReviewNote = undefined
 
+    user.identityStatus = IDENTITY_STATUS.VERIFIED
+    user.verifiedLegalName = user.fullName
+
+    if (user.identityVerificationRef) {
+      await IdentityVerification.findByIdAndUpdate(user.identityVerificationRef, {
+        status: IDENTITY_STATUS.VERIFIED,
+        verifiedAt: new Date(),
+        reviewedBy: req.user?._id,
+        reviewedAt: new Date(),
+        verifiedLegalName: user.fullName,
+      })
+    }
+
+    await logIdentityAudit({
+      userId: user._id,
+      verificationId: user.identityVerificationRef,
+      action: IDENTITY_AUDIT_ACTIONS.ADMIN_APPROVED,
+      previousStatus: IDENTITY_STATUS.PENDING_IDENTITY_VERIFICATION,
+      newStatus: IDENTITY_STATUS.VERIFIED,
+      performedBy: req.user?._id,
+      actorRole: 'ADMIN',
+      reason: 'Admin reviewed and approved vendor video KYC and identity evidence',
+    })
+
     // Start vendor trial lifecycle automatically upon KYC approval (Requirement 2)
     try {
       await startVendorTrial(user._id, {
@@ -372,6 +446,28 @@ export const reviewLabourKyc = asyncHandler(async (req, res) => {
   } else {
     profile.kycStatus = KYC_STATUS.FAILED
     profile.kycReviewNote = typeof note === 'string' ? note.trim().slice(0, 500) : ''
+
+    user.identityStatus = IDENTITY_STATUS.REJECTED
+
+    if (user.identityVerificationRef) {
+      await IdentityVerification.findByIdAndUpdate(user.identityVerificationRef, {
+        status: IDENTITY_STATUS.REJECTED,
+        rejectionReason: note || 'KYC verification rejected by admin',
+        reviewedBy: req.user?._id,
+        reviewedAt: new Date(),
+      })
+    }
+
+    await logIdentityAudit({
+      userId: user._id,
+      verificationId: user.identityVerificationRef,
+      action: IDENTITY_AUDIT_ACTIONS.ADMIN_REJECTED,
+      previousStatus: IDENTITY_STATUS.PENDING_IDENTITY_VERIFICATION,
+      newStatus: IDENTITY_STATUS.REJECTED,
+      performedBy: req.user?._id,
+      actorRole: 'ADMIN',
+      reason: note || 'KYC verification rejected by admin',
+    })
   }
 
   await user.save()

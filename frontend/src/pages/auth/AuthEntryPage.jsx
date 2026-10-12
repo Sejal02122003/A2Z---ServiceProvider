@@ -40,6 +40,15 @@ function isValidIndianMobile(digits) {
   return digits.length === 10 && /^[6-9]\d{9}$/.test(digits)
 }
 
+function validateClientName(name) {
+  if (!name || typeof name !== 'string') return 'Please enter a valid name.'
+  const t = name.trim()
+  if (t.length < 2) return 'Please enter a valid name (at least 2 letters).'
+  if (t.length > 100) return 'Name cannot exceed 100 characters.'
+  if (!/\p{L}/u.test(t)) return 'Please enter a valid name containing letters.'
+  return null
+}
+
 function FeedbackBanner({ variant, children }) {
   if (!children) return null
   const styles =
@@ -153,9 +162,16 @@ export function AuthEntryPage({ authGroup = 'users' }) {
       return
     }
     
-    if (mode === 'register' && !termsAccepted) {
-      setBanner({ variant: 'error', message: 'You must agree to the Terms of Service to register.' })
-      return
+    if (mode === 'register') {
+      const nameErr = validateClientName(fullName)
+      if (nameErr) {
+        setBanner({ variant: 'error', message: nameErr })
+        return
+      }
+      if (!termsAccepted) {
+        setBanner({ variant: 'error', message: 'You must agree to the Terms of Service to register.' })
+        return
+      }
     }
 
     setBusy(true)
@@ -235,8 +251,9 @@ export function AuthEntryPage({ authGroup = 'users' }) {
         applySession(token, user)
         signedInUser = user
       } else {
-        if (!fullName.trim()) {
-          setBanner({ variant: 'error', message: 'Full name is required to complete registration.' })
+        const nameErr = validateClientName(fullName)
+        if (nameErr) {
+          setBanner({ variant: 'error', message: nameErr })
           setBusy(false)
           return
         }

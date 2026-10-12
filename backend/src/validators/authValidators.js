@@ -45,9 +45,26 @@ export const validateOtpChallengeId = body('challengeId')
   .isMongoId()
   .withMessage('Invalid OTP session')
 
-export const validateFullNameOptional = body('fullName').optional().trim().isLength({ min: 2, max: 120 }).withMessage('Name length 2–120')
+import { validateName } from '../utils/nameNormalization.js'
 
-export const validateFullNameRequired = body('fullName').trim().notEmpty().withMessage('Full name is required').isLength({ min: 2, max: 120 })
+export const validateFullNameOptional = body('fullName')
+  .optional({ checkFalsy: true })
+  .trim()
+  .custom((value) => {
+    const res = validateName(value)
+    if (!res.isValid) throw new Error(res.reason)
+    return true
+  })
+
+export const validateFullNameRequired = body('fullName')
+  .trim()
+  .notEmpty()
+  .withMessage('Full name is required')
+  .custom((value) => {
+    const res = validateName(value)
+    if (!res.isValid) throw new Error(res.reason)
+    return true
+  })
 
 export const validateContractorFields = [
   body('companyName')

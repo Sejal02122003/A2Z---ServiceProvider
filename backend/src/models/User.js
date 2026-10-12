@@ -1,6 +1,7 @@
 import mongoose from 'mongoose'
 import bcrypt from 'bcryptjs'
 import { USER_ROLES, KYC_STATUS } from '../constants/roles.js'
+import { IDENTITY_STATUS } from '../constants/identityConstants.js'
 import { BILLING_MODE } from '../constants/workforceConstants.js'
 const documentSchema = new mongoose.Schema(
   {
@@ -214,6 +215,28 @@ const userSchema = new mongoose.Schema(
       default: 'NOT_STARTED',
       index: true,
     },
+    identityStatus: {
+      type: String,
+      enum: Object.values(IDENTITY_STATUS),
+      default: IDENTITY_STATUS.UNVERIFIED,
+      index: true,
+    },
+    verifiedLegalName: {
+      type: String,
+      trim: true,
+    },
+    identityVerificationRef: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'IdentityVerification',
+    },
+    identityRiskScore: {
+      type: Number,
+      default: 0,
+    },
+    identityRiskFlags: {
+      type: [String],
+      default: [],
+    },
     labourProfile: labourProfileSchema,
     contractorProfile: contractorProfileSchema,
   },
@@ -228,6 +251,18 @@ userSchema.methods.comparePassword = async function comparePassword(plain) {
 userSchema.methods.toSafeObject = function toSafeObject(options = {}) {
   const o = this.toObject({ virtuals: true })
   delete o.passwordHash
+
+  // Safe backward compatibility for older accounts without identityStatus
+  if (!o.identityStatus || o.identityStatus === IDENTITY_STATUS.UNVERIFIED) {
+    if (o.labourProfile?.kycStatus === KYC_STATUS.VERIFIED || o.contractorProfile?.kycStatus === KYC_STATUS.VERIFIED) {
+      o.identityStatus = IDENTITY_STATUS.VERIFIED
+    } else if (o.isPhoneVerified) {
+      o.identityStatus = IDENTITY_STATUS.CONTACT_VERIFIED
+    } else {
+      o.identityStatus = IDENTITY_STATUS.UNVERIFIED
+    }
+  }
+
   if (!options.includeLabourKycImages && o.labourProfile) {
     const lp = { ...o.labourProfile }
     delete lp.kycFrontImageDataUrl

@@ -82,6 +82,7 @@ export const ADMIN_NAV_SECTIONS = [
     title: 'Users',
     items: [
       { to: '/admin/users', label: 'Users', icon: Users },
+      { to: '/admin/identity-verifications', label: 'Identity Verification', icon: ShieldCheck },
     ],
   },
   {
@@ -206,6 +207,7 @@ const ROUTE_TITLES = [
   { prefix: '/admin/sub-categories', title: 'Sub-Categories' },
   { prefix: '/admin/categories', title: 'Categories' },
   { prefix: '/admin/labour', title: 'KYC' },
+  { prefix: '/admin/identity-verifications', title: 'Identity Verification & Anti-Impersonation' },
   { prefix: '/admin/users', title: 'Users' },
   { prefix: '/admin/zone-management', title: 'Zone Management' },
   { prefix: '/admin/zones', title: 'Manage Radius' },

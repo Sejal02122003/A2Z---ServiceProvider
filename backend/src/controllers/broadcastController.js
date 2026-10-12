@@ -11,9 +11,19 @@ async function validateLabourBookingAccess(labour) {
   const { SystemSetting } = await import('../models/SystemSetting.js')
   const { UserSubscription } = await import('../models/UserSubscription.js')
 
-  // 1. KYC check
-  if (labour.labourProfile?.kycStatus !== KYC_STATUS.VERIFIED) {
-    return { allowed: false, code: 'KYC_NOT_APPROVED', message: 'KYC not approved. Cannot receive bookings.' }
+  // 1. KYC and Identity check
+  const isKycVerified = labour.labourProfile?.kycStatus === KYC_STATUS.VERIFIED
+  const isIdentityVerified =
+    labour.identityStatus === 'VERIFIED' || (!labour.identityStatus && isKycVerified)
+  const isSuspendedOrRejected =
+    labour.identityStatus === 'SUSPENDED' || labour.identityStatus === 'REJECTED'
+
+  if (!isKycVerified || !isIdentityVerified || isSuspendedOrRejected) {
+    return {
+      allowed: false,
+      code: 'KYC_NOT_APPROVED',
+      message: 'Identity verification or KYC not approved. Cannot receive bookings.',
+    }
   }
 
   const settings = await SystemSetting.findOne({ configKey: 'master_config' })

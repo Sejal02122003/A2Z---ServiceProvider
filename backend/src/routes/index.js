@@ -42,6 +42,7 @@ import rewardRoutes from './rewardRoutes.js'
 import bookingReminderRoutes from './bookingReminderRoutes.js'
 import penaltyRoutes from './penaltyRoutes.js'
 import bookingCancellationRoutes from './bookingCancellationRoutes.js'
+import { identityUserRouter, identityAdminRouter } from './identityVerificationRoutes.js'
 
 const router = Router()
 
@@ -53,6 +54,7 @@ router.use('/booking-cancellations', bookingCancellationRoutes)
 
 router.use('/auth', authRoutes)
 router.use('/users', userRoutes)
+router.use('/identity-verification', identityUserRouter)
 router.use('/service-partners', servicePartnerRoutes)
 router.use('/uploads', uploadRoutes)
 router.use('/labour-categories', labourCategoryRoutes)
@@ -79,6 +81,7 @@ router.use('/simulated-opportunities', simulatedOpportunityRoutes)
 router.use('/admin/settings', systemSettingRoutes)
 router.use('/admin/zones', adminZoneRoutes)
 router.use('/admin/workforce', adminWorkforceRoutes)
+router.use('/admin/identity-verifications', identityAdminRouter)
 router.use('/admin/wallets', adminWalletRoutes)
 router.use('/admin/complaints', adminComplaintRoutes)
 router.use('/admin/dashboard', adminDashboardRoutes)

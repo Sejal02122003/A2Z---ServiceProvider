@@ -556,6 +556,23 @@ export function AppProfilePage() {
                   Phone not verified
                 </AppBadge>
               )}
+              {user?.identityStatus === 'VERIFIED' ? (
+                <AppBadge variant="emerald" uppercase={false}>
+                  Identity verified
+                </AppBadge>
+              ) : user?.identityStatus === 'MANUAL_REVIEW' ? (
+                <AppBadge variant="amber" uppercase={false}>
+                  Identity in review
+                </AppBadge>
+              ) : user?.identityStatus === 'REJECTED' ? (
+                <AppBadge variant="rose" uppercase={false}>
+                  Identity review needed
+                </AppBadge>
+              ) : user?.identityStatus === 'PENDING_IDENTITY_VERIFICATION' ? (
+                <AppBadge variant="sky" uppercase={false}>
+                  Identity pending
+                </AppBadge>
+              ) : null}
               {statusPill ? (
                 <AppBadge variant={statusPill.variant} uppercase={false}>
                   {statusPill.label}
@@ -856,6 +873,26 @@ export function AppProfilePage() {
               icon={Sparkles} 
               label="Full name" 
               value={<span className="truncate">{user?.fullName || '—'}</span>} 
+            />
+            <DetailRow
+              icon={ShieldCheck}
+              label="Identity Status"
+              value={
+                <span className="font-bold text-xs">
+                  {user?.identityStatus === 'VERIFIED' ? (
+                    <span className="text-emerald-700">Verified</span>
+                  ) : user?.identityStatus === 'MANUAL_REVIEW' ? (
+                    <span className="text-amber-700">In Review</span>
+                  ) : user?.identityStatus === 'REJECTED' ? (
+                    <span className="text-rose-700">Action Required</span>
+                  ) : user?.identityStatus === 'PENDING_IDENTITY_VERIFICATION' ? (
+                    <span className="text-sky-700">Pending Review</span>
+                  ) : (
+                    <span className="text-slate-500">Phone Verified</span>
+                  )}
+                </span>
+              }
+              sub={user?.verifiedLegalName ? `Verified legal name: ${user.verifiedLegalName}` : 'Protected against impersonation'}
             />
             <DetailRow
               icon={Phone}

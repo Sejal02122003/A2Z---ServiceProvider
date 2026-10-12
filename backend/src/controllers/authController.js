@@ -1,11 +1,15 @@
 import bcrypt from 'bcryptjs'
 import { User } from '../models/User.js'
 import { USER_ROLES } from '../constants/roles.js'
+import { IDENTITY_STATUS } from '../constants/identityConstants.js'
 import { createOtpChallenge, validateOtpChallenge, deleteOtpChallengeDoc } from '../services/otpService.js'
 import { signAccessToken } from '../services/tokenService.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { populateLabourCategories } from '../utils/populateLabourCategories.js'
+import { otpRequestLimiter } from '../utils/rateLimiter.js'
+import { evaluateIdentityRiskSignals, logIdentityAudit } from '../services/identityVerificationService.js'
+import { IDENTITY_AUDIT_ACTIONS } from '../models/IdentityAuditLog.js'
 
 function buildAuthPayload(user, token) {
   const safe = user.toSafeObject()
@@ -18,6 +22,16 @@ function buildAuthPayload(user, token) {
 /** POST /auth/register/request-otp */
 export const registerRequestOtp = asyncHandler(async (req, res) => {
   const { phone, role, authGroup } = req.body
+
+  const limitCheck = otpRequestLimiter.isAllowed(phone)
+  if (!limitCheck.allowed) {
+    return sendError(res, {
+      message: `Too many OTP requests. Please wait ${limitCheck.retryAfterSeconds} seconds before trying again.`,
+      statusCode: 429,
+      code: 'RATE_LIMITED',
+    })
+  }
+
   const existing = await User.findOne({ phone })
   if (existing) {
     return sendError(res, {
@@ -77,11 +91,16 @@ export const registerVerify = asyncHandler(async (req, res) => {
     })
   }
 
+  const risk = await evaluateIdentityRiskSignals({ submittedName: fullName, phone })
+
   const doc = {
     phone,
     role,
     fullName,
     isPhoneVerified: true,
+    identityStatus: IDENTITY_STATUS.CONTACT_VERIFIED,
+    identityRiskScore: risk.riskScore,
+    identityRiskFlags: risk.riskFlags,
     lastLoginAt: new Date(),
   }
 
@@ -107,6 +126,20 @@ export const registerVerify = asyncHandler(async (req, res) => {
     })
   }
   await deleteOtpChallengeDoc(otp.doc)
+
+  await logIdentityAudit({
+    userId: user._id,
+    action: IDENTITY_AUDIT_ACTIONS.CONTACT_VERIFIED,
+    previousStatus: IDENTITY_STATUS.UNVERIFIED,
+    newStatus: IDENTITY_STATUS.CONTACT_VERIFIED,
+    performedBy: user._id,
+    actorRole: 'USER',
+    reason: 'Account registered and phone number verified via OTP',
+    metadata: {
+      riskScore: risk.riskScore,
+      riskFlags: risk.riskFlags,
+    },
+  })
 
   // Credit welcome bonus for newly registered users
   let welcomeBonus = null
@@ -146,9 +179,9 @@ export const loginRequestOtp = asyncHandler(async (req, res) => {
     })
   }
 
-  if (user.isActive === false) {
+  if (user.isActive === false || user.identityStatus === IDENTITY_STATUS.SUSPENDED) {
     return sendError(res, {
-      message: 'Account is disabled. Please contact support.',
+      message: 'Account is suspended or disabled. Please contact support.',
       statusCode: HTTP_STATUS.FORBIDDEN,
       code: 'ACCOUNT_DISABLED',
     })
@@ -179,6 +212,14 @@ export const loginVerify = asyncHandler(async (req, res) => {
     })
   }
 
+  if (user.isActive === false || user.identityStatus === IDENTITY_STATUS.SUSPENDED) {
+    return sendError(res, {
+      message: 'Account is suspended or disabled. Please contact support.',
+      statusCode: HTTP_STATUS.FORBIDDEN,
+      code: 'ACCOUNT_DISABLED',
+    })
+  }
+
   const otp = await validateOtpChallenge({ phone, purpose: 'login', code, challengeId })
   if (!otp.ok) {
     const map = {
@@ -197,6 +238,9 @@ export const loginVerify = asyncHandler(async (req, res) => {
 
   user.isPhoneVerified = true
   user.lastLoginAt = new Date()
+  if (!user.identityStatus || user.identityStatus === IDENTITY_STATUS.UNVERIFIED) {
+    user.identityStatus = IDENTITY_STATUS.CONTACT_VERIFIED
+  }
   await user.save()
   await deleteOtpChallengeDoc(otp.doc)
 
