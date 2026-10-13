@@ -61,6 +61,8 @@ export function MyBookings() {
     return { activeBookings: active, pastBookings: past }
   }, [bookings])
 
+  const displayed = tab === 'active' ? activeBookings : pastBookings
+
   const handleBookingUpdated = (updatedBooking) => {
     setBookings((prev) =>
       prev.map((b) => (b._id === updatedBooking._id ? { ...b, ...updatedBooking } : b))
