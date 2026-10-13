@@ -61,6 +61,7 @@ const walletTransactionSchema = new mongoose.Schema(
         'GST_DEDUCTION',
         'WALLET_RECHARGE',
         'REVERSAL',
+        'SERVICE_CREDIT',
       ],
       required: true,
     },
@@ -80,7 +81,7 @@ const walletTransactionSchema = new mongoose.Schema(
     },
     referenceType: {
       type: String,
-      enum: ['BOOKING', 'WELCOME_BONUS', 'ADMIN', 'MANUAL', 'WITHDRAWAL', 'REFUND', 'REVERSAL', 'PAYMENT', 'OTHER'],
+      enum: ['BOOKING', 'WELCOME_BONUS', 'ADMIN', 'MANUAL', 'WITHDRAWAL', 'REFUND', 'REVERSAL', 'PAYMENT', 'SERVICE_CREDIT', 'OTHER'],
       default: 'OTHER',
     },
     referenceId: {
@@ -101,6 +102,10 @@ const walletTransactionSchema = new mongoose.Schema(
     description: {
       type: String,
       trim: true,
+    },
+    metadata: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
     },
     status: {
       type: String,

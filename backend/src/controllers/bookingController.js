@@ -708,6 +708,17 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
         cancelRemindersForBooking(booking._id, 'Booking completed').catch(console.error)
       }).catch(() => {})
     }
+
+    // Award automatic 15% (or configured %) service completion credit to customer wallet
+    if (booking.paymentStatus === 'PAID') {
+      import('../services/userWalletService.js')
+        .then(({ awardServiceCompletionWalletCredit }) => {
+          awardServiceCompletionWalletCredit(booking._id).catch((creditErr) =>
+            console.error('[Service Completion Wallet Credit Error in updateBookingStatus]:', creditErr)
+          )
+        })
+        .catch((err) => console.error(err))
+    }
   }
 
   // Phase 5: Handle Bounce Penalty if Labourer cancels an accepted/en-route booking
@@ -883,6 +894,14 @@ export const confirmCashPayment = asyncHandler(async (req, res) => {
     await settleCashBookingPayment({ bookingId: booking._id, labourId: booking.laborId || booking.acceptedLabourId })
   } catch (err) {
     console.error('[Cash Settlement Error in confirmCashPayment]:', err)
+  }
+
+  // Award automatic 15% (or configured %) service completion credit to customer wallet
+  try {
+    const { awardServiceCompletionWalletCredit } = await import('../services/userWalletService.js')
+    await awardServiceCompletionWalletCredit(booking._id)
+  } catch (creditErr) {
+    console.error('[Service Completion Wallet Credit Error in confirmCashPayment]:', creditErr)
   }
 
   // Notify both

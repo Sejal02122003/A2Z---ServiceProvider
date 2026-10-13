@@ -131,6 +131,15 @@ export const verifyPayment = asyncHandler(async (req, res) => {
              });
            }
          }).catch(err => console.error('Failed to emit payment status socket', err))
+
+         // Award automatic 15% (or configured %) service completion credit to customer wallet
+         import('../services/userWalletService.js')
+           .then(({ awardServiceCompletionWalletCredit }) => {
+             awardServiceCompletionWalletCredit(booking._id).catch((creditErr) =>
+               console.error('[Service Completion Wallet Credit Error in verifyPayment]:', creditErr)
+             )
+           })
+           .catch((err) => console.error(err))
       }
     }
   } else if (pTx.purpose === 'WALLET_TOPUP') {

@@ -586,4 +586,42 @@ export const reconcileBookingSettlement = asyncHandler(async (req, res) => {
   })
 })
 
+/**
+ * POST /api/admin/wallets/service-credit/retry/:bookingId
+ * Admin manual retry/award of service credit for an eligible booking
+ */
+export const retryBookingServiceCredit = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params
+  const { awardServiceCompletionWalletCredit } = await import('../services/userWalletService.js')
+
+  const result = await awardServiceCompletionWalletCredit(bookingId)
+
+  return sendSuccess(res, {
+    message: result.awarded ? 'Service credit awarded successfully' : (result.reason || 'Service credit processed'),
+    data: result,
+  })
+})
+
+/**
+ * POST /api/admin/wallets/service-credit/reverse/:bookingId
+ * Admin manual reversal of service credit for a booking
+ */
+export const reverseBookingServiceCredit = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params
+  const { reason = 'Admin manual reversal' } = req.body
+  const { reverseServiceCompletionWalletCredit } = await import('../services/userWalletService.js')
+
+  const result = await reverseServiceCompletionWalletCredit({
+    bookingId,
+    reason,
+    adminUserId: req.user._id,
+  })
+
+  return sendSuccess(res, {
+    message: result.reversed ? 'Service credit reversed successfully' : (result.reason || 'Service credit reversal processed'),
+    data: result,
+  })
+})
+
+
 

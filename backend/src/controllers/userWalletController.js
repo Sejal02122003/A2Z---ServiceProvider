@@ -56,6 +56,10 @@ export const getMyUserWallet = asyncHandler(async (req, res) => {
         welcomeBonusAmount: settings.welcomeBonusAmount,
         walletDiscountPercentage: settings.walletDiscountPercentage,
         minimumBookingAmount: settings.minimumBookingAmount,
+        serviceCreditEnabled: settings.serviceCreditEnabled !== false,
+        serviceCreditPercentage: settings.serviceCreditPercentage ?? 15,
+        serviceCreditMaxAmount: settings.serviceCreditMaxAmount ?? 0,
+        serviceCreditMinBookingAmount: settings.serviceCreditMinBookingAmount ?? 0,
       },
     },
   })
@@ -79,7 +83,12 @@ export const getMyUserTransactions = asyncHandler(async (req, res) => {
   }
 
   const [transactions, total] = await Promise.all([
-    WalletTransaction.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    WalletTransaction.find(query)
+      .populate('bookingId', 'basePrice totalAmount status paymentMethod paymentStatus')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
     WalletTransaction.countDocuments(query),
   ])
 
@@ -96,7 +105,7 @@ export const getMyUserTransactions = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/wallets/public-settings
- * Returns public-facing wallet discount rules
+ * Returns public-facing wallet discount & cashback rules
  */
 export const getPublicWalletSettings = asyncHandler(async (req, res) => {
   const settings = await getWalletSettings()
@@ -106,6 +115,10 @@ export const getPublicWalletSettings = asyncHandler(async (req, res) => {
       welcomeBonusAmount: settings.welcomeBonusAmount,
       walletDiscountPercentage: settings.walletDiscountPercentage,
       minimumBookingAmount: settings.minimumBookingAmount,
+      serviceCreditEnabled: settings.serviceCreditEnabled !== false,
+      serviceCreditPercentage: settings.serviceCreditPercentage ?? 15,
+      serviceCreditMaxAmount: settings.serviceCreditMaxAmount ?? 0,
+      serviceCreditMinBookingAmount: settings.serviceCreditMinBookingAmount ?? 0,
     },
   })
 })

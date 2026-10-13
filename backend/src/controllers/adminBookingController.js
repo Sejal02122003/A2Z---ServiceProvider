@@ -160,6 +160,22 @@ export const updateBookingStatusAdmin = asyncHandler(async (req, res) => {
     import('../services/bookingReminderService.js').then(({ cancelRemindersForBooking }) => {
       cancelRemindersForBooking(booking._id, `Admin updated status to ${status}`).catch(console.error)
     }).catch(() => {})
+
+    if (status === 'COMPLETED' && booking.paymentStatus === 'PAID') {
+      import('../services/userWalletService.js').then(({ awardServiceCompletionWalletCredit }) => {
+        awardServiceCompletionWalletCredit(booking._id).catch((creditErr) =>
+          console.error('[Service Completion Credit Error in Admin Update]:', creditErr)
+        )
+      }).catch(() => {})
+    } else if (['CANCELLED', 'REFUNDED'].includes(status) && booking.serviceCredit?.credited && !booking.serviceCredit?.reversed) {
+      import('../services/userWalletService.js').then(({ reverseServiceCompletionWalletCredit }) => {
+        reverseServiceCompletionWalletCredit({
+          bookingId: booking._id,
+          reason: `Admin changed status to ${status}`,
+          adminUserId: req.user?._id,
+        }).catch((revErr) => console.error('[Service Credit Reversal Error in Admin Update]:', revErr))
+      }).catch(() => {})
+    }
   } else if (['ACCEPTED', 'ASSIGNED'].includes(status)) {
     import('../services/bookingReminderService.js').then(({ scheduleRemindersForBooking }) => {
       scheduleRemindersForBooking(booking._id).catch(console.error)

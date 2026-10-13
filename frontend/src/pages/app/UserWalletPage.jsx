@@ -63,12 +63,16 @@ export default function UserWalletPage() {
 
   const getContextLabel = (tx) => {
     switch (tx.context) {
+      case 'SERVICE_CREDIT':
+        return { label: `🎁 ${tx.metadata?.percentage || settings.serviceCreditPercentage || 15}% Service Reward`, color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300' };
       case 'WELCOME_BONUS':
         return { label: '🎉 Welcome Bonus', color: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300' };
       case 'SERVICE_DISCOUNT':
         return { label: '🏷️ Booking Discount', color: 'bg-primary-100 text-primary-800 dark:bg-primary-950/60 dark:text-primary-300' };
       case 'REFUND':
         return { label: '↩️ Booking Refund', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' };
+      case 'REVERSAL':
+        return { label: '↩️ Credit Reversal', color: 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300' };
       case 'ADMIN_ADJUSTMENT':
         return { label: '⚖️ Manual Adjustment', color: 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300' };
       default:
@@ -179,14 +183,17 @@ export default function UserWalletPage() {
       </div>
 
       {/* How it works info box */}
-      <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/40 rounded-2xl p-4 flex gap-3 items-start">
+      <div className="bg-gradient-to-r from-amber-50 to-indigo-50 dark:from-amber-950/20 dark:to-indigo-950/20 border border-amber-200/80 dark:border-amber-800/40 rounded-2xl p-4 flex gap-3 items-start">
         <Sparkles className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-        <div className="space-y-1 text-xs text-amber-900 dark:text-amber-200">
-          <p className="font-bold">How to use your wallet discount:</p>
-          <ul className="list-disc pl-4 space-y-0.5 text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
-            <li>Select any eligible service and proceed to checkout.</li>
-            <li>Toggle <strong>"Use Wallet Balance"</strong> on the booking summary.</li>
-            <li>Get up to <strong>{settings.walletDiscountPercentage}%</strong> deducted directly from your final bill!</li>
+        <div className="space-y-1.5 text-xs text-slate-800 dark:text-slate-200">
+          <p className="font-bold text-amber-900 dark:text-amber-200">Wallet Rewards & Benefits</p>
+          <ul className="list-disc pl-4 space-y-1 text-slate-700 dark:text-slate-300 leading-relaxed">
+            <li>
+              <strong>15% Automatic Service Credit:</strong> Receive 15% of the eligible service charge credited directly to your wallet every time a booking is completed.
+            </li>
+            <li>
+              <strong>Instant Checkout Discount:</strong> Toggle <strong>"Use Wallet Balance"</strong> during checkout to save up to <strong>{settings.walletDiscountPercentage || 20}%</strong> on your bill.
+            </li>
           </ul>
         </div>
       </div>
@@ -216,6 +223,8 @@ export default function UserWalletPage() {
             {transactions.map((tx) => {
               const badge = getContextLabel(tx);
               const isCredit = tx.type === 'CREDIT';
+              const bookingRef = tx.bookingId?._id || tx.metadata?.bookingId || (tx.referenceType === 'BOOKING' ? tx.referenceId : null);
+              const eligibleAmt = tx.metadata?.eligibleAmount || tx.bookingId?.basePrice;
 
               return (
                 <div key={tx._id} className="p-4 flex items-center justify-between hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
@@ -237,7 +246,7 @@ export default function UserWalletPage() {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
                         <span>
                           {new Date(tx.createdAt).toLocaleDateString('en-IN', {
                             day: '2-digit',
@@ -249,6 +258,22 @@ export default function UserWalletPage() {
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${badge.color}`}>
                           {badge.label}
                         </span>
+                        {bookingRef && (
+                          <>
+                            <span>•</span>
+                            <span className="text-[11px] text-slate-500 font-medium">
+                              Ref: #{String(bookingRef).slice(-6).toUpperCase()}
+                            </span>
+                          </>
+                        )}
+                        {eligibleAmt !== undefined && (
+                          <>
+                            <span>•</span>
+                            <span className="text-[11px] text-slate-500">
+                              Service: ₹{eligibleAmt}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>

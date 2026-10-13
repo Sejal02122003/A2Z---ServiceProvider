@@ -35,6 +35,12 @@ export default function AdminWalletRewardsPage() {
     welcomeBonusAmount: 1000,
     walletDiscountPercentage: 20,
     minimumBookingAmount: 0,
+    serviceCreditEnabled: true,
+    serviceCreditPercentage: 15,
+    serviceCreditMaxAmount: 0,
+    serviceCreditMinBookingAmount: 0,
+    serviceCreditApplicablePaymentMethods: ['ONLINE', 'CASH'],
+    serviceCreditVersion: 1,
     updatedAt: null,
     updatedBy: null,
   });
@@ -42,6 +48,7 @@ export default function AdminWalletRewardsPage() {
   // Simulator State
   const [testBill, setTestBill] = useState(1000);
   const [testBalance, setTestBalance] = useState(300);
+  const [testServiceAmount, setTestServiceAmount] = useState(1000);
 
   // Users State
   const [users, setUsers] = useState([]);
@@ -75,6 +82,12 @@ export default function AdminWalletRewardsPage() {
           welcomeBonusAmount: s.welcomeBonusAmount ?? 1000,
           walletDiscountPercentage: s.walletDiscountPercentage ?? 20,
           minimumBookingAmount: s.minimumBookingAmount ?? 0,
+          serviceCreditEnabled: s.serviceCreditEnabled !== undefined ? s.serviceCreditEnabled : true,
+          serviceCreditPercentage: s.serviceCreditPercentage ?? 15,
+          serviceCreditMaxAmount: s.serviceCreditMaxAmount ?? 0,
+          serviceCreditMinBookingAmount: s.serviceCreditMinBookingAmount ?? 0,
+          serviceCreditApplicablePaymentMethods: s.serviceCreditApplicablePaymentMethods || ['ONLINE', 'CASH'],
+          serviceCreditVersion: s.serviceCreditVersion ?? 1,
           updatedAt: s.updatedAt,
           updatedBy: s.updatedBy,
         });
@@ -133,6 +146,13 @@ export default function AdminWalletRewardsPage() {
       return;
     }
 
+    const creditPct = Number(settings.serviceCreditPercentage);
+    if (isNaN(creditPct) || creditPct < 0 || creditPct > 100) {
+      setErrorMsg('Service credit percentage must be between 0% and 100%');
+      setSaving(false);
+      return;
+    }
+
     try {
       const res = await walletsApi.updateAdminWalletSettings({
         enabled: settings.enabled,
@@ -140,17 +160,28 @@ export default function AdminWalletRewardsPage() {
         welcomeBonusAmount: bonusVal,
         walletDiscountPercentage: Number(settings.walletDiscountPercentage),
         minimumBookingAmount: Number(settings.minimumBookingAmount),
+        serviceCreditEnabled: Boolean(settings.serviceCreditEnabled),
+        serviceCreditPercentage: creditPct,
+        serviceCreditMaxAmount: Number(settings.serviceCreditMaxAmount) || 0,
+        serviceCreditMinBookingAmount: Number(settings.serviceCreditMinBookingAmount) || 0,
+        serviceCreditApplicablePaymentMethods: settings.serviceCreditApplicablePaymentMethods,
       });
 
       if (res.success) {
         const updated = res.data?.settings || res.data;
-        setSuccessMsg('Wallet & Welcome Bonus settings updated successfully!');
+        setSuccessMsg('Wallet & Service Credit settings updated successfully!');
         setSettings({
           enabled: updated.enabled !== undefined ? updated.enabled : settings.enabled,
           welcomeBonusEnabled: updated.welcomeBonusEnabled !== undefined ? updated.welcomeBonusEnabled : settings.welcomeBonusEnabled,
           welcomeBonusAmount: updated.welcomeBonusAmount ?? bonusVal,
           walletDiscountPercentage: updated.walletDiscountPercentage ?? settings.walletDiscountPercentage,
           minimumBookingAmount: updated.minimumBookingAmount ?? settings.minimumBookingAmount,
+          serviceCreditEnabled: updated.serviceCreditEnabled !== undefined ? updated.serviceCreditEnabled : settings.serviceCreditEnabled,
+          serviceCreditPercentage: updated.serviceCreditPercentage ?? creditPct,
+          serviceCreditMaxAmount: updated.serviceCreditMaxAmount ?? settings.serviceCreditMaxAmount,
+          serviceCreditMinBookingAmount: updated.serviceCreditMinBookingAmount ?? settings.serviceCreditMinBookingAmount,
+          serviceCreditApplicablePaymentMethods: updated.serviceCreditApplicablePaymentMethods || settings.serviceCreditApplicablePaymentMethods,
+          serviceCreditVersion: updated.serviceCreditVersion ?? settings.serviceCreditVersion,
           updatedAt: updated.updatedAt,
           updatedBy: updated.updatedBy,
         });
@@ -424,11 +455,164 @@ export default function AdminWalletRewardsPage() {
                 )}
               </div>
 
-              {/* Setting B: Max Wallet Discount Percentage */}
+              {/* Setting B: Automatic Service Completion Credit */}
+              <div className="p-4 rounded-xl border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/40 dark:bg-indigo-950/20 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-indigo-200/60 dark:border-indigo-900/40">
+                  <div className="flex items-center gap-2">
+                    <Percent className="w-5 h-5 text-indigo-500" />
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">Service Completion Wallet Credit</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Automatically credits customer wallet upon successful booking completion & payment verification.
+                      </p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.serviceCreditEnabled}
+                      onChange={(e) => setSettings({ ...settings, serviceCreditEnabled: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    <span className="ml-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {settings.serviceCreditEnabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </label>
+                </div>
+
+                {/* Currently Active Banner */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-900/80 border border-indigo-200/80 dark:border-indigo-800/40 text-xs shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full ${settings.enabled && settings.serviceCreditEnabled ? 'bg-indigo-500 animate-pulse' : 'bg-slate-400'}`}></span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">
+                      Active Reward Rate:
+                    </span>
+                  </div>
+                  <div className="text-sm font-black text-indigo-600 dark:text-indigo-400">
+                    {settings.enabled && settings.serviceCreditEnabled ? `${settings.serviceCreditPercentage}% (₹150 on ₹1,000)` : 'Inactive (Disabled)'}
+                  </div>
+                </div>
+
+                {/* Percentage input & presets */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                      Credit Percentage (0% - 100%)
+                    </label>
+                    <span className="text-[11px] font-semibold text-slate-400">
+                      Default: 15%
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      value={settings.serviceCreditPercentage}
+                      onChange={(e) => setSettings({ ...settings, serviceCreditPercentage: e.target.value === '' ? '' : Number(e.target.value) })}
+                      className="w-full pr-8 pl-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="15"
+                      required
+                    />
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400 font-bold">
+                      %
+                    </div>
+                  </div>
+
+                  {/* Preset Quick Buttons */}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {[5, 10, 15, 20, 25].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setSettings({ ...settings, serviceCreditPercentage: preset })}
+                        className={`px-3 py-1 text-xs font-bold rounded-lg border transition-all ${
+                          Number(settings.serviceCreditPercentage) === preset
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+                        }`}
+                      >
+                        {preset}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Additional Settings: Max Amount & Min Booking Amount */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                      Max Credit Cap (₹, 0 = No Cap)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={settings.serviceCreditMaxAmount}
+                      onChange={(e) => setSettings({ ...settings, serviceCreditMaxAmount: Number(e.target.value) })}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-900 dark:text-white"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                      Min Booking Amount (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={settings.serviceCreditMinBookingAmount}
+                      onChange={(e) => setSettings({ ...settings, serviceCreditMinBookingAmount: Number(e.target.value) })}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-900 dark:text-white"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+
+                {/* Applicable Payment Methods */}
+                <div className="pt-2">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
+                    Eligible Payment Methods
+                  </label>
+                  <div className="flex gap-4">
+                    {['ONLINE', 'CASH'].map((method) => {
+                      const isChecked = settings.serviceCreditApplicablePaymentMethods?.includes(method);
+                      return (
+                        <label key={method} className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const curr = [...(settings.serviceCreditApplicablePaymentMethods || [])];
+                              if (e.target.checked) {
+                                if (!curr.includes(method)) curr.push(method);
+                              } else {
+                                const idx = curr.indexOf(method);
+                                if (idx > -1) curr.splice(idx, 1);
+                              }
+                              setSettings({ ...settings, serviceCreditApplicablePaymentMethods: curr });
+                            }}
+                            className="rounded text-indigo-600 focus:ring-indigo-500"
+                          />
+                          {method === 'ONLINE' ? '💳 Online Payments' : '💵 Cash on Completion'}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 pt-2 border-t border-indigo-200/50 dark:border-indigo-900/30 flex items-center justify-between">
+                  <span>Configuration Version: v{settings.serviceCreditVersion || 1}</span>
+                  <span className="text-indigo-600 dark:text-indigo-400 font-semibold">Idempotent • Safe Rollback</span>
+                </div>
+              </div>
+
+              {/* Setting C: Max Wallet Discount Percentage */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
                   <Percent className="w-4 h-4 text-primary-500" />
-                  Maximum Wallet Discount (%)
+                  Maximum Wallet Discount at Checkout (%)
                 </label>
                 <div className="relative">
                   <input
@@ -451,7 +635,7 @@ export default function AdminWalletRewardsPage() {
                 </p>
               </div>
 
-              {/* Setting C: Minimum Booking Amount */}
+              {/* Setting D: Minimum Booking Amount */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
                   <IndianRupee className="w-4 h-4 text-emerald-500" />
@@ -493,12 +677,78 @@ export default function AdminWalletRewardsPage() {
 
           {/* Live Simulator Preview */}
           <div className="lg:col-span-5 space-y-6">
+            {/* Simulator 1: Service Completion Credit */}
+            <div className="bg-gradient-to-br from-indigo-950 to-slate-900 text-white rounded-2xl p-6 shadow-xl border border-indigo-900/50 relative overflow-hidden">
+              <div className="flex items-center gap-2 mb-2">
+                <Gift className="w-5 h-5 text-indigo-400" />
+                <h3 className="font-bold text-base">Service Completion Credit Simulator</h3>
+              </div>
+              <p className="text-xs text-indigo-200/80 mb-4">
+                Calculate automatic cashback reward credited to customer on job completion.
+              </p>
+
+              <div className="space-y-3 mb-4">
+                <div>
+                  <label className="text-xs text-indigo-300 font-medium block mb-1">Eligible Service Base Price (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={testServiceAmount}
+                    onChange={(e) => setTestServiceAmount(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-slate-800/90 border border-indigo-700/50 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-indigo-400 font-semibold"
+                  />
+                </div>
+              </div>
+
+              {(() => {
+                const calcCredit = Math.round((testServiceAmount * (Number(settings.serviceCreditPercentage) || 0)) / 100);
+                const cappedCredit = (Number(settings.serviceCreditMaxAmount) > 0)
+                  ? Math.min(calcCredit, Number(settings.serviceCreditMaxAmount))
+                  : calcCredit;
+                const finalCredit = (testServiceAmount >= (Number(settings.serviceCreditMinBookingAmount) || 0) && settings.enabled && settings.serviceCreditEnabled)
+                  ? cappedCredit
+                  : 0;
+
+                return (
+                  <div className="bg-slate-900/80 rounded-xl p-4 space-y-2 text-xs border border-indigo-800/50 font-mono">
+                    <div className="flex justify-between text-slate-300">
+                      <span>Service Base Amount:</span>
+                      <span className="font-semibold text-white">₹{testServiceAmount}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-300">
+                      <span>Configured Percentage:</span>
+                      <span className="font-semibold text-indigo-300">{settings.serviceCreditPercentage}%</span>
+                    </div>
+                    <div className="h-px bg-slate-800 my-1" />
+                    <div className="flex justify-between text-emerald-400 font-bold text-sm">
+                      <span>Customer Wallet Credit:</span>
+                      <span>+ ₹{finalCredit}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="mt-3 flex gap-2">
+                {[500, 1000, 2000].map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setTestServiceAmount(amt)}
+                    className="px-2.5 py-1 text-[11px] rounded bg-indigo-900/60 hover:bg-indigo-800/80 text-indigo-200 border border-indigo-700/50 font-medium"
+                  >
+                    Test ₹{amt} → ₹{Math.round((amt * (Number(settings.serviceCreditPercentage) || 15)) / 100)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Simulator 2: Checkout Discount Simulator */}
             <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-xl border border-slate-800 relative overflow-hidden">
               <div className="absolute top-0 right-0 -mt-8 -mr-8 w-40 h-40 bg-primary-500/10 rounded-full blur-2xl pointer-events-none" />
 
               <div className="flex items-center gap-2 mb-4">
                 <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                <h3 className="font-bold text-base">Live Discount Calculation Simulator</h3>
+                <h3 className="font-bold text-base">Checkout Discount Simulator</h3>
               </div>
               <p className="text-xs text-slate-400 mb-5">
                 Preview how the current settings calculate checkout wallet deductions in real time.

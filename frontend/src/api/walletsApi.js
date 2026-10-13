@@ -81,4 +81,17 @@ export const walletsApi = {
       body: payload,
     })
   },
+
+  retryBookingServiceCredit: (bookingId) => {
+    return apiRequest(`/admin/wallets/service-credit/retry/${bookingId}`, {
+      method: 'POST',
+    })
+  },
+
+  reverseBookingServiceCredit: (bookingId, payload = {}) => {
+    return apiRequest(`/admin/wallets/service-credit/reverse/${bookingId}`, {
+      method: 'POST',
+      body: payload,
+    })
+  },
 }

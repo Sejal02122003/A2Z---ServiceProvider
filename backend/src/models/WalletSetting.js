@@ -38,6 +38,45 @@ const walletSettingSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    // Automatic Service-Based Wallet Credit Settings (15% default)
+    serviceCreditEnabled: {
+      type: Boolean,
+      default: true,
+    },
+    serviceCreditPercentage: {
+      type: Number,
+      default: 15,
+      min: 0,
+      max: 100,
+    },
+    serviceCreditMaxAmount: {
+      type: Number,
+      default: 0, // 0 = unlimited
+      min: 0,
+    },
+    serviceCreditMinBookingAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    serviceCreditApplicablePaymentMethods: {
+      type: [String],
+      default: ['ONLINE', 'CASH'],
+    },
+    serviceCreditVersion: {
+      type: Number,
+      default: 1,
+    },
+    auditLog: [
+      {
+        action: { type: String, default: 'CONFIG_UPDATED' },
+        performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        timestamp: { type: Date, default: Date.now },
+        oldValues: { type: mongoose.Schema.Types.Mixed },
+        newValues: { type: mongoose.Schema.Types.Mixed },
+        reason: { type: String },
+      },
+    ],
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

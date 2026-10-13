@@ -30,9 +30,50 @@ router.put(
       .optional()
       .isBoolean()
       .withMessage('enabled must be a boolean'),
+    body('serviceCreditEnabled')
+      .optional()
+      .isBoolean()
+      .withMessage('serviceCreditEnabled must be a boolean'),
+    body('serviceCreditPercentage')
+      .optional()
+      .isFloat({ min: 0, max: 100 })
+      .withMessage('serviceCreditPercentage must be a number between 0 and 100'),
+    body('serviceCreditMaxAmount')
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage('serviceCreditMaxAmount must be a non-negative number'),
+    body('serviceCreditMinBookingAmount')
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage('serviceCreditMinBookingAmount must be a non-negative number'),
+    body('serviceCreditApplicablePaymentMethods')
+      .optional()
+      .isArray()
+      .withMessage('serviceCreditApplicablePaymentMethods must be an array of payment methods'),
+    body('reason')
+      .optional()
+      .isString()
+      .trim(),
   ],
   validateRequest,
   adminWallet.updateAdminWalletSettings
+)
+
+router.post(
+  '/service-credit/retry/:bookingId',
+  [param('bookingId').isMongoId().withMessage('Invalid bookingId')],
+  validateRequest,
+  adminWallet.retryBookingServiceCredit
+)
+
+router.post(
+  '/service-credit/reverse/:bookingId',
+  [
+    param('bookingId').isMongoId().withMessage('Invalid bookingId'),
+    body('reason').optional().isString().trim(),
+  ],
+  validateRequest,
+  adminWallet.reverseBookingServiceCredit
 )
 
 router.get('/labour-stats', adminWallet.getLabourWalletStats)

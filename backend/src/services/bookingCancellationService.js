@@ -1263,6 +1263,18 @@ export async function processCustomerCancellation({
       .catch((err) => console.error(err))
   }
 
+  // B. Reverse service completion wallet credit if it was credited
+  if (booking.serviceCredit?.credited && !booking.serviceCredit?.reversed) {
+    import('./userWalletService.js')
+      .then(({ reverseServiceCompletionWalletCredit }) => {
+        reverseServiceCompletionWalletCredit({
+          bookingId: booking._id,
+          reason: `Customer cancelled booking #${shortCode}`,
+        }).catch((err) => console.warn('[Service Credit Reversal Warning]', err?.message))
+      })
+      .catch((err) => console.error(err))
+  }
+
   // B. Release held cash booking charges on assigned labourer
   if (booking.paymentMethod === 'CASH') {
     const expectedCharges =
