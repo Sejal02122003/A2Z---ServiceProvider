@@ -425,9 +425,9 @@ export function JobTracking() {
         open={showCancelModal}
         booking={booking}
         onClose={() => setShowCancelModal(false)}
-        onSuccess={(updatedBooking) => {
-          setBooking(updatedBooking)
+        onSuccess={() => {
           setShowCancelModal(false)
+          navigate('/app', { replace: true })
         }}
       />
 

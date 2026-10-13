@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AlertCircle, CheckCircle2, ChevronRight, HelpCircle, Loader2, ShieldAlert, X } from 'lucide-react'
 import { bookingsApi } from '../../../api/bookingsApi.js'
@@ -23,6 +24,7 @@ const STANDARD_REASONS = [
  *   onSuccess   - fn(updatedBooking, cancellationData), called when cancellation succeeds
  */
 export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
+  const navigate = useNavigate()
   const [loadingEligibility, setLoadingEligibility] = useState(true)
   const [eligibility, setEligibility] = useState(null)
   const [selectedReason, setSelectedReason] = useState('')
@@ -194,10 +196,13 @@ export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
                 <div className="w-full pt-4">
                   <button
                     type="button"
-                    onClick={onClose}
+                    onClick={() => {
+                      if (onClose) onClose()
+                      navigate('/app', { replace: true })
+                    }}
                     className="w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition"
                   >
-                    Done
+                    Return to Home
                   </button>
                 </div>
               </motion.div>

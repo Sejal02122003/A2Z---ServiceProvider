@@ -328,8 +328,17 @@ export function IndividualBookingFlowPage() {
       }
     } else if (bookingEvent.type === 'BOOKING_CANCELLED') {
       setActiveBooking(prev => prev ? { ...prev, status: 'CANCELLED', ...bookingEvent.data } : null)
+      clearBookingDraft()
+      navigate('/app', { replace: true })
     }
-  }, [bookingEvent, activeBookingId, goStep, realUser])
+  }, [bookingEvent, activeBookingId, goStep, realUser, navigate])
+
+  useEffect(() => {
+    if (activeBooking?.status === 'CANCELLED' && step === 'active') {
+      clearBookingDraft()
+      navigate('/app', { replace: true })
+    }
+  }, [activeBooking?.status, step, navigate])
 
   useEffect(() => {
     const cid = categoryIdParam
@@ -889,11 +898,10 @@ export function IndividualBookingFlowPage() {
           open={cancelModalOpen}
           booking={activeBooking}
           onClose={() => setCancelModalOpen(false)}
-          onSuccess={(updatedBooking) => {
-            setActiveBooking(updatedBooking)
-            setCancelModalOpen(false)
+          onSuccess={() => {
             clearBookingDraft()
-            navigate('/app/my-bookings', { replace: true })
+            setCancelModalOpen(false)
+            navigate('/app', { replace: true })
           }}
         />
       </div>
@@ -1500,10 +1508,10 @@ export function IndividualBookingFlowPage() {
           open={cancelModalOpen}
           booking={activeBooking}
           onClose={() => setCancelModalOpen(false)}
-          onSuccess={(updatedBooking) => {
-            setActiveBooking(updatedBooking)
-            setCancelModalOpen(false)
+          onSuccess={() => {
             clearBookingDraft()
+            setCancelModalOpen(false)
+            navigate('/app', { replace: true })
           }}
         />
 
