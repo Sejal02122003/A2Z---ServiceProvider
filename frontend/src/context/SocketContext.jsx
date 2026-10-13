@@ -4,7 +4,9 @@ import { io } from 'socket.io-client'
 
 const SocketContext = createContext(null)
 
-const SOCKET_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5005/api/v1').replace('/api/v1', '')
+const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL ||
+  (import.meta.env.DEV ? '/' : (import.meta.env.VITE_API_URL || 'http://localhost:5005/api/v1').replace('/api/v1', ''))
 
 let currentSocket = null
 let currentToken = null
@@ -36,8 +38,8 @@ export function SocketProvider({ children }) {
 
     const newSocket = io(SOCKET_URL, {
       auth: { token },
-      transports: ['websocket', 'polling'],
-      reconnectionAttempts: 5,
+      transports: ['polling', 'websocket'],
+      reconnectionAttempts: 10,
       reconnectionDelay: 2000,
     })
 

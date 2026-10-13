@@ -7,10 +7,25 @@ let io
 export const initSocket = (httpServer) => {
   io = new Server(httpServer, {
     cors: {
-      origin: process.env.CORS_ORIGIN?.split(',') || '*',
+      origin: (origin, callback) => {
+        if (!origin || process.env.NODE_ENV !== 'production') {
+          return callback(null, true)
+        }
+        const allowed = (process.env.CORS_ORIGIN || '*')
+          .split(',')
+          .map((o) => o.trim())
+        if (allowed.includes('*') || allowed.includes(origin)) {
+          return callback(null, true)
+        }
+        return callback(new Error('CORS origin denied'), false)
+      },
       methods: ['GET', 'POST'],
       credentials: true,
     },
+    transports: ['polling', 'websocket'],
+    allowUpgrades: true,
+    pingTimeout: 30000,
+    pingInterval: 25000,
   })
 
   // Middleware to authenticate socket connections
