@@ -106,6 +106,7 @@ export const ADMIN_NAV_SECTIONS = [
       { to: '/admin/categories', label: 'Categories', icon: Layers },
       { to: '/admin/sub-categories', label: 'Sub-Categories', icon: Tag },
       { to: '/admin/services', label: 'Services', icon: Wrench },
+      { to: '/admin/packages', label: 'Service Packages', icon: Package },
     ],
   },
 

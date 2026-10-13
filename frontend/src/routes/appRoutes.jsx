@@ -33,6 +33,8 @@ import { VendorTrialStatusPage } from '../pages/app/VendorTrialStatusPage.jsx'
 import VendorRewardsPage from '../pages/app/VendorRewardsPage.jsx'
 import LabourPenaltiesPage from '../pages/app/labour/LabourPenaltiesPage.jsx'
 import { CustomerNotificationsPage } from '../pages/app/CustomerNotificationsPage.jsx'
+import { ServicePackagesPage } from '../pages/app/ServicePackagesPage.jsx'
+import { PackageDetailsPage } from '../pages/app/PackageDetailsPage.jsx'
 import { USER_ROLES } from '../constants/userRoles.js'
 
 
@@ -89,6 +91,23 @@ export const appShellChildRoutes = (
       element={
         <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR]} allowGuest>
           <ServiceCatalog />
+        </RoleRoute>
+      }
+    />
+    {/* Service Packages */}
+    <Route
+      path="packages"
+      element={
+        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR]} allowGuest>
+          <ServicePackagesPage />
+        </RoleRoute>
+      }
+    />
+    <Route
+      path="packages/:idOrSlug"
+      element={
+        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR]} allowGuest>
+          <PackageDetailsPage />
         </RoleRoute>
       }
     />

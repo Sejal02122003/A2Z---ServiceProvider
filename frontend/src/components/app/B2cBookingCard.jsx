@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
-import { Calendar, CreditCard, MapPin, User, Loader2, Plus, Minus, Clock, CheckCircle } from 'lucide-react'
+import { Calendar, CreditCard, MapPin, User, Loader2, Plus, Minus, Clock, CheckCircle, Package } from 'lucide-react'
 import { GlassPanel } from '../ui/GlassPanel.jsx'
 import { bookingsApi } from '../../api/bookingsApi.js'
 import { getLabourBookingShare } from '../../lib/bookingLabourShare.js'
@@ -95,6 +95,11 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
               <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-sm ${STATUS_STYLES[displayStatus] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
                 {displayStatus.replace('_', ' ')}
               </span>
+              {booking.packageBooking?.isPackage && (
+                <span className="rounded-full bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[9px] font-bold text-indigo-700 uppercase">
+                  📦 {booking.packageBooking.snapshot?.badge || 'Package'}
+                </span>
+              )}
               {booking.type && !isPaid && (
                 <>
                   <span className="text-[10px] font-bold text-slate-400">•</span>
@@ -103,11 +108,17 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
               )}
             </div>
             <p className="truncate text-base font-extrabold text-slate-900 leading-tight">
-              {booking.contractorInfo?.services?.length > 0
+              {booking.packageBooking?.isPackage
+                ? booking.packageBooking.packageName
+                : booking.contractorInfo?.services?.length > 0
                 ? booking.contractorInfo.services.map(s => s.serviceId?.name || s.name || 'Service').join(', ')
                 : (booking.serviceId?.name || subcategory?.name || 'Service Booking')}
             </p>
-            {(!booking.contractorInfo?.services || booking.contractorInfo.services.length === 0) && subcategory?.name && (
+            {booking.packageBooking?.isPackage && booking.packageBooking.inclusions?.length > 0 ? (
+              <p className="truncate text-xs text-indigo-700 font-medium mt-1">
+                Includes: {booking.packageBooking.inclusions.map(i => `${i.name}${i.quantity > 1 ? ` (x${i.quantity})` : ''}`).join(', ')}
+              </p>
+            ) : (!booking.contractorInfo?.services || booking.contractorInfo.services.length === 0) && subcategory?.name && (
                 <p className="truncate text-xs text-slate-500 font-medium mt-1">
                   {subcategory.name}
                 </p>

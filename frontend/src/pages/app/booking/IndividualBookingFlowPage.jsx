@@ -20,6 +20,7 @@ import {
   Trash2,
   Sparkles,
   Loader2,
+  Package,
 } from 'lucide-react'
 import { AppStackScreenHeader } from '../../../components/app/AppStackScreenHeader.jsx'
 import { AppButton } from '../../../components/app-ui/buttons/AppButton.jsx'
@@ -103,6 +104,7 @@ export function IndividualBookingFlowPage() {
 
   const categoryIdParam = searchParams.get('categoryId')?.trim() || ''
   const groupIdParam = searchParams.get('groupId')?.trim() || ''
+  const packageIdParam = searchParams.get('packageId')?.trim() || ''
   const bookingIdParam = searchParams.get('bookingId')?.trim() || ''
 
   const [draft, setDraft] = useState(() => readBookingDraft() || {})
@@ -193,8 +195,9 @@ export function IndividualBookingFlowPage() {
     () => ({
       categoryId: draft.categoryId || categoryIdParam,
       groupId: draft.groupId || groupIdParam,
+      packageId: draft.packageId || packageIdParam,
     }),
-    [categoryIdParam, draft.categoryId, draft.groupId, groupIdParam],
+    [categoryIdParam, draft.categoryId, draft.groupId, draft.packageId, groupIdParam, packageIdParam],
   )
 
   const goStep = useCallback(
@@ -237,12 +240,13 @@ export function IndividualBookingFlowPage() {
   }, [draft.address])
 
   useEffect(() => {
-    if (!categoryIdParam && !groupIdParam) return
+    if (!categoryIdParam && !groupIdParam && !packageIdParam) return
     const patch = {}
     if (categoryIdParam) patch.categoryId = categoryIdParam
     if (groupIdParam) patch.groupId = groupIdParam
+    if (packageIdParam) patch.packageId = packageIdParam
     syncDraft(patch)
-  }, [categoryIdParam, groupIdParam, syncDraft])
+  }, [categoryIdParam, groupIdParam, packageIdParam, syncDraft])
 
   useEffect(() => {
     if (!realUser) return
@@ -520,6 +524,7 @@ export function IndividualBookingFlowPage() {
       const hours = draft.bookingType === 'instant' ? (draft.hours || draft.minHours || 1) : (days > 0 ? days * 8 : (kind === 'few_hours' ? (draft.hours || draft.minHours || 1) : (kind === 'half_day' ? 4 : 8)))
       bookingsApi.calculateBill({
         serviceId: draft.serviceId || draft.categoryId,
+        packageId: draft.packageId || packageIdParam || undefined,
         hours,
         quantity: draft.quantity || 1,
         address: draft.address,
@@ -718,6 +723,7 @@ export function IndividualBookingFlowPage() {
       const hours = draft.bookingType === 'instant' ? (draft.hours || draft.minHours || 1) : (days > 0 ? days * 8 : (kind === 'few_hours' ? (draft.hours || draft.minHours || 1) : (kind === 'half_day' ? 4 : 8)))
       const res = await bookingsApi.calculateBill({
         serviceId: draft.serviceId || draft.categoryId, // Fallback
+        packageId: draft.packageId || packageIdParam || undefined,
         hours,
         quantity: draft.quantity || 1,
         address: draft.address,
@@ -772,6 +778,7 @@ export function IndividualBookingFlowPage() {
       const hours = draft.bookingType === 'instant' ? (draft.hours || draft.minHours || 1) : (days > 0 ? days * 8 : (kind === 'few_hours' ? (draft.hours || draft.minHours || 1) : (kind === 'half_day' ? 4 : 8)))
       const payload = {
         serviceId: draft.serviceId || draft.categoryId,
+        packageId: draft.packageId || packageIdParam || undefined,
         type: draft.bookingType === 'scheduled' ? 'SCHEDULED' : 'INSTANT',
         locationText: draft.address.trim(),
         lat: draft.lat || 28.6139,
@@ -1999,7 +2006,44 @@ export function IndividualBookingFlowPage() {
                   </div>
                 ) : null}
                 <div className="border-t border-slate-200 pt-3 mt-2">
-                  {realUser?.role === 'contractor' && calculatedBill.breakdown && calculatedBill.breakdown.length > 0 ? (
+                  {calculatedBill.isPackage && calculatedBill.package && (
+                    <div className="rounded-xl bg-indigo-50 border border-indigo-200 p-3 mb-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-indigo-900">
+                          <Package className="h-4 w-4 text-brand" />
+                          {calculatedBill.package.name}
+                        </span>
+                        {calculatedBill.package.badge && (
+                          <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-black text-slate-900 shadow-2xs">
+                            {calculatedBill.package.badge}
+                          </span>
+                        )}
+                      </div>
+                      {calculatedBill.package.inclusions && calculatedBill.package.inclusions.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-bold text-slate-600">Includes:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {calculatedBill.package.inclusions.map((inc, i) => (
+                              <span key={i} className="rounded-md bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700 border border-slate-200 shadow-2xs">
+                                ✓ {inc.name} {inc.quantity > 1 ? `(x${inc.quantity})` : ''}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {calculatedBill.isPackage ? (
+                    <div className="flex justify-between font-semibold text-black">
+                      <span className="flex flex-col">
+                        <span>Package Base Fee</span>
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          Predefined fixed bundle rate
+                        </span>
+                      </span>
+                      <span>{formatInr(calculatedBill.subTotal || calculatedBill.basePrice)}</span>
+                    </div>
+                  ) : realUser?.role === 'contractor' && calculatedBill.breakdown && calculatedBill.breakdown.length > 0 ? (
                     calculatedBill.breakdown.map((item, idx) => (
                       <div key={idx} className="flex justify-between font-semibold text-black mb-2">
                         <span className="flex flex-col">

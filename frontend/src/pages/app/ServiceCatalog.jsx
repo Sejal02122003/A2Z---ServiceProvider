@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { ChevronRight, Loader2, Search, Sparkles, Tag } from 'lucide-react'
+import { ChevronRight, Loader2, Search, Sparkles, Tag, Package } from 'lucide-react'
 import { fetchLabourCategoriesGrouped } from '../../api/labourCategoriesApi.js'
 import { readAppUserLocation } from '../../lib/appUserLocationStorage.js'
 import { ApiError } from '../../api/http.js'
@@ -77,6 +77,32 @@ export function ServiceCatalog() {
   return (
     <div className="space-y-4 pb-8">
       <AppStackScreenHeader title="Book a Service" backTo="/app" />
+
+      {/* Service Packages Banner */}
+      <div
+        onClick={() => navigate('/app/packages')}
+        className="group relative cursor-pointer overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 p-4 text-white shadow-md hover:shadow-lg transition-all"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-amber-300 backdrop-blur-md">
+              <Package className="h-6 w-6" />
+            </span>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-slate-900">
+                  Bundles
+                </span>
+                <span className="text-xs font-bold text-indigo-200">Save up to 40%</span>
+              </div>
+              <h3 className="text-sm font-extrabold text-white mt-0.5">
+                Explore Service Packages
+              </h3>
+            </div>
+          </div>
+          <ChevronRight className="h-5 w-5 text-indigo-300 group-hover:translate-x-1 transition-transform" />
+        </div>
+      </div>
 
       <GlassPanel className="flex items-center gap-3 border-slate-200/80 px-4 py-3">
         <Search className="h-4 w-4 text-slate-400" aria-hidden />

@@ -342,6 +342,35 @@ export function JobTracking() {
         </GlassPanel>
       )}
 
+      {/* Package Info if booked as Package */}
+      {booking.packageBooking?.isPackage && (
+        <GlassPanel className="p-4 text-sm border-indigo-200/80 bg-indigo-50/40">
+          <div className="flex items-center justify-between pb-2 border-b border-indigo-100">
+            <span className="font-extrabold text-indigo-950 flex items-center gap-1.5">
+              <span>📦</span> {booking.packageBooking.packageName}
+            </span>
+            {booking.packageBooking.snapshot?.badge && (
+              <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-black text-slate-900 shadow-2xs">
+                {booking.packageBooking.snapshot.badge}
+              </span>
+            )}
+          </div>
+          {booking.packageBooking.inclusions && booking.packageBooking.inclusions.length > 0 && (
+            <div className="mt-2.5 space-y-1.5">
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Included Services</p>
+              <div className="grid grid-cols-1 gap-1.5">
+                {booking.packageBooking.inclusions.map((inc, i) => (
+                  <div key={i} className="flex items-center justify-between bg-white px-2.5 py-1.5 rounded-lg border border-indigo-100 text-xs">
+                    <span className="font-semibold text-slate-800">✓ {inc.name}</span>
+                    <span className="font-bold text-slate-500">Qty: {inc.quantity || 1}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </GlassPanel>
+      )}
+
       {/* Booking Info */}
       <GlassPanel className="p-4 text-sm">
         <div className="flex justify-between">

@@ -13,7 +13,14 @@ router.use(protect)
 router.post(
   '/calculate',
   [
-    body('serviceId').isMongoId().withMessage('Valid service ID required'),
+    body('serviceId').optional().isMongoId().withMessage('Valid service ID required'),
+    body('packageId').optional().isMongoId().withMessage('Valid package ID required'),
+    body().custom((val) => {
+      if (!val.serviceId && !val.packageId) {
+        throw new Error('Either serviceId or packageId must be provided')
+      }
+      return true
+    }),
   ],
   validateRequest,
   booking.calculateBill,
@@ -22,7 +29,14 @@ router.post(
 router.post(
   '/',
   [
-    body('serviceId').isMongoId().withMessage('Valid service ID required'),
+    body('serviceId').optional().isMongoId().withMessage('Valid service ID required'),
+    body('packageId').optional().isMongoId().withMessage('Valid package ID required'),
+    body().custom((val) => {
+      if (!val.serviceId && !val.packageId) {
+        throw new Error('Either serviceId or packageId must be provided')
+      }
+      return true
+    }),
     body('type').isIn(['INSTANT', 'SCHEDULED']).withMessage('Invalid booking type'),
     body('locationText').trim().notEmpty().withMessage('Location is required'),
     body('paymentMethod').isIn(['ONLINE', 'CASH']).withMessage('Invalid payment method'),

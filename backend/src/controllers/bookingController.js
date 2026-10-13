@@ -1,6 +1,7 @@
 import { Booking } from '../models/Booking.js'
 import { LabourSubcategory } from '../models/LabourSubcategory.js'
 import { LabourService } from '../models/LabourService.js'
+import { ServicePackage } from '../models/ServicePackage.js'
 import { SystemSetting } from '../models/SystemSetting.js'
 import { Zone } from '../models/Zone.js'
 import { Wallet } from '../models/Wallet.js'
@@ -18,7 +19,7 @@ import {
 } from '../services/bookingCancellationService.js'
 
 export const calculateBill = asyncHandler(async (req, res) => {
-  const { serviceId, hours: rawHours = 1, quantity = 1, address, contractorServices } = req.body
+  const { serviceId, packageId, hours: rawHours = 1, quantity = 1, address, contractorServices } = req.body
   const hours = parseFloat(rawHours) || 1 // supports 0.5 = 30 min
 
   let matchedZone = null
@@ -27,6 +28,154 @@ export const calculateBill = asyncHandler(async (req, res) => {
     matchedZone = activeZones.find(z => address.toLowerCase().includes(z.city.toLowerCase()))
   }
 
+  let settings = await SystemSetting.findOne({ configKey: 'master_config' })
+  if (!settings) {
+    settings = await SystemSetting.create({ configKey: 'master_config' })
+  }
+
+  // ----------------------------------------------------
+  // CASE 1: Predefined Service Package Pricing
+  // ----------------------------------------------------
+  if (packageId) {
+    const pkg = await ServicePackage.findById(packageId).lean()
+    if (!pkg) {
+      return sendError(res, { message: 'Service package not found', statusCode: HTTP_STATUS.NOT_FOUND })
+    }
+    if (pkg.status !== 'ACTIVE') {
+      return sendError(res, { message: 'Selected package is not active or available', statusCode: HTTP_STATUS.BAD_REQUEST })
+    }
+    const now = new Date()
+    if (pkg.validFrom && new Date(pkg.validFrom) > now) {
+      return sendError(res, { message: 'This package offer has not started yet', statusCode: HTTP_STATUS.BAD_REQUEST })
+    }
+    if (pkg.validUntil && new Date(pkg.validUntil) < now) {
+      return sendError(res, { message: 'This package offer has expired', statusCode: HTTP_STATUS.BAD_REQUEST })
+    }
+
+    // Zone validation if address is supplied
+    if (matchedZone && !pkg.isAllZones && pkg.zones && pkg.zones.length > 0) {
+      const zoneMatch = pkg.zones.some(z => String(z) === String(matchedZone._id))
+      if (!zoneMatch) {
+        return sendError(res, { message: 'This package is not available in your selected location', statusCode: HTTP_STATUS.BAD_REQUEST })
+      }
+    }
+
+    // Verify all inclusion services are currently active
+    for (const inc of (pkg.inclusions || [])) {
+      if (inc.serviceId) {
+        const srv = await LabourService.findById(inc.serviceId).lean()
+        if (!srv || !srv.isActive) {
+          return sendError(res, {
+            message: `Package inclusion "${inc.name || 'Service'}" is currently unavailable`,
+            statusCode: HTTP_STATUS.BAD_REQUEST
+          })
+        }
+      }
+    }
+
+    const packagePrice = Number(pkg.price) || 0
+    const originalPrice = Number(pkg.originalPrice) || packagePrice
+    const serviceDiscount = Math.max(0, originalPrice - packagePrice)
+    const subTotal = packagePrice
+    const originalSubTotal = originalPrice
+    const basePrice = subTotal
+    const maxHourDiscount = 0
+
+    let platformFee = 0
+    if (settings.platformFee.isActive) {
+      if (settings.platformFee.type === 'fixed') {
+        platformFee = settings.platformFee.value
+      } else if (settings.platformFee.type === 'percentage') {
+        platformFee = (basePrice * settings.platformFee.value) / 100
+      }
+    }
+
+    let gstPercentage = 0
+    if (pkg.categoryId) {
+      const { LabourCategory } = await import('../models/LabourCategory.js')
+      const category = await LabourCategory.findById(pkg.categoryId)
+      if (category && category.isGstActive) {
+        gstPercentage = category.gstPercentage || 0
+      }
+    } else if (settings.gstPercentage > 0) {
+      gstPercentage = settings.gstPercentage
+    }
+
+    const taxes = gstPercentage > 0 ? (basePrice * gstPercentage) / 100 : 0
+    const baseAmount = basePrice + platformFee
+    const totalAmount = baseAmount + taxes
+
+    let commissionAmount = 0
+    if (settings.commission.isActive && settings.commission.type === 'global') {
+      commissionAmount = (basePrice * settings.commission.globalPercentage) / 100
+    }
+
+    let walletInfo = {
+      enabled: false,
+      walletBalance: 0,
+      maxWalletDiscount: 0,
+      actualWalletDiscount: 0,
+      discountPercentage: 0,
+      minimumBookingAmount: 0,
+    }
+    if (req.user?._id) {
+      try {
+        const { calculateWalletDiscount } = await import('../services/userWalletService.js')
+        walletInfo = await calculateWalletDiscount(req.user._id, totalAmount)
+      } catch (err) {
+        console.error('[WALLET_ERROR] Error in calculateBill wallet calculation:', err)
+      }
+    }
+
+    const breakdown = (pkg.inclusions || []).map(inc => ({
+      serviceId: inc.serviceId,
+      name: inc.name,
+      quantity: inc.quantity || 1,
+      description: inc.description || '',
+      hourlyRate: 0,
+      subTotal: 0,
+      savings: 0,
+    }))
+
+    return sendSuccess(res, {
+      data: {
+        isPackage: true,
+        package: {
+          _id: pkg._id,
+          name: pkg.name,
+          slug: pkg.slug,
+          price: pkg.price,
+          originalPrice: pkg.originalPrice,
+          savings: serviceDiscount,
+          inclusions: pkg.inclusions,
+          exclusions: pkg.exclusions,
+          termsAndConditions: pkg.termsAndConditions,
+          badge: pkg.badge,
+          imageUrl: pkg.imageUrl,
+          estimatedDurationMins: pkg.estimatedDurationMins,
+        },
+        originalSubTotal,
+        serviceDiscount,
+        subTotal,
+        maxHourDiscount: 0,
+        totalSavings: serviceDiscount,
+        basePrice,
+        platformFee,
+        taxes,
+        totalAmount,
+        commissionAmount,
+        laborShare: basePrice - commissionAmount,
+        paymentModes: settings.paymentModes || { cashEnabled: true, onlineEnabled: true },
+        breakdown,
+        walletInfo,
+        restriction: await checkCustomerBookingRestriction(req.user?._id),
+      }
+    })
+  }
+
+  // ----------------------------------------------------
+  // CASE 2: Individual / Contractor Standard Services
+  // ----------------------------------------------------
   const resolveHourlyRate = async (sId) => {
     const service = await LabourService.findById(sId)
     let hourlyRate = 0
@@ -120,11 +269,6 @@ export const calculateBill = asyncHandler(async (req, res) => {
       subTotal: itemTotal,
       savings: itemDiscount,
     })
-  }
-
-  let settings = await SystemSetting.findOne({ configKey: 'master_config' })
-  if (!settings) {
-    settings = await SystemSetting.create({ configKey: 'master_config' })
   }
 
   // Calculate Subtotal (Hourly Rate * Hours * Quantity)
@@ -229,10 +373,26 @@ export const createBooking = asyncHandler(async (req, res) => {
     })
   }
 
-  const { serviceId, type, scheduledAt, timeSlot, endTime, locationText, lat, lng, paymentMethod, notes, hours: rawHours = 1, quantity = 1, imageNames = [], contractorInfo } = req.body
+  const {
+    serviceId,
+    packageId,
+    type,
+    scheduledAt,
+    timeSlot,
+    endTime,
+    locationText,
+    lat,
+    lng,
+    paymentMethod,
+    notes,
+    hours: rawHours = 1,
+    quantity = 1,
+    imageNames = [],
+    contractorInfo
+  } = req.body
   const hours = parseFloat(rawHours) || 1 // supports 0.5 = 30 min
 
-  if (!serviceId || !type || !locationText || !paymentMethod) {
+  if ((!serviceId && !packageId) || !type || !locationText || !paymentMethod) {
     return sendError(res, { message: 'Missing required fields', statusCode: HTTP_STATUS.BAD_REQUEST })
   }
 
@@ -244,13 +404,6 @@ export const createBooking = asyncHandler(async (req, res) => {
     return sendError(res, { message: 'scheduledAt date and timeSlot (startTime) are required for SCHEDULED bookings', statusCode: HTTP_STATUS.BAD_REQUEST })
   }
 
-  const service = await LabourService.findById(serviceId)
-  if (!service || !service.isActive) {
-    return sendError(res, { message: 'Valid and active Service required', statusCode: HTTP_STATUS.BAD_REQUEST })
-  }
-
-  let settings = await SystemSetting.findOne({ configKey: 'master_config' })
-  
   const parsedLng = parseFloat(lng)
   const parsedLat = parseFloat(lat)
 
@@ -262,47 +415,158 @@ export const createBooking = asyncHandler(async (req, res) => {
   if (!matchingZone) {
     return sendError(res, { message: 'We currently do not provide service in this area (Zone not found).', statusCode: HTTP_STATUS.BAD_REQUEST })
   }
-  
-  const resolveHourlyRate = async (sId) => {
-    let hrRate = 0
-    const srv = await LabourService.findById(sId)
-    if (srv) {
-      let baseRate = srv.hourlyPrice || srv.basePrice || 0
-      if (matchingZone && srv.zones && srv.zones.length > 0) {
-        const zonePricing = srv.zones.find(z => String(z.zone) === String(matchingZone._id))
-        if (zonePricing && typeof zonePricing.price === 'number') {
-          baseRate = zonePricing.price
-        }
-      }
-      if (srv.discountValue > 0) {
-        if (srv.discountType === 'PERCENTAGE') {
-          hrRate = Math.max(0, Math.round(baseRate * (1 - srv.discountValue / 100)))
-        } else {
-          hrRate = Math.max(0, baseRate - srv.discountValue)
-        }
-      } else {
-        hrRate = baseRate
+
+  let settings = await SystemSetting.findOne({ configKey: 'master_config' })
+
+  let bookingSubcategoryId = null
+  let bookingServiceId = null
+  let subTotal = 0
+  let maxHourDiscount = 0
+  let packageBookingData = null
+  let totalQuantity = quantity
+  let bookingHours = hours
+
+  // ----------------------------------------------------
+  // CASE 1: Predefined Service Package Booking
+  // ----------------------------------------------------
+  if (packageId) {
+    const pkg = await ServicePackage.findById(packageId)
+    if (!pkg || pkg.status !== 'ACTIVE') {
+      return sendError(res, { message: 'Selected package is invalid or no longer active', statusCode: HTTP_STATUS.BAD_REQUEST })
+    }
+    const now = new Date()
+    if (pkg.validFrom && new Date(pkg.validFrom) > now) {
+      return sendError(res, { message: 'This package offer has not started yet', statusCode: HTTP_STATUS.BAD_REQUEST })
+    }
+    if (pkg.validUntil && new Date(pkg.validUntil) < now) {
+      return sendError(res, { message: 'This package offer has expired', statusCode: HTTP_STATUS.BAD_REQUEST })
+    }
+    if (!pkg.isAllZones && pkg.zones && pkg.zones.length > 0) {
+      const zoneMatch = pkg.zones.some(z => String(z) === String(matchingZone._id))
+      if (!zoneMatch) {
+        return sendError(res, { message: 'This package is not available in your service area', statusCode: HTTP_STATUS.BAD_REQUEST })
       }
     }
-    return hrRate
-  }
 
-  let subTotal = 0
-  if (contractorInfo && contractorInfo.services && contractorInfo.services.length > 0) {
-    for (const item of contractorInfo.services) {
-      const hrRate = await resolveHourlyRate(item.serviceId)
-      item.price = hrRate // Store the unit hourly rate
-      subTotal += hrRate * hours * (item.quantity || 1)
+    // Validate each inclusion service is available
+    for (const inc of (pkg.inclusions || [])) {
+      if (inc.serviceId) {
+        const srv = await LabourService.findById(inc.serviceId).lean()
+        if (!srv || !srv.isActive) {
+          return sendError(res, {
+            message: `Package inclusion "${inc.name || 'Service'}" is currently unavailable or disabled`,
+            statusCode: HTTP_STATUS.BAD_REQUEST
+          })
+        }
+      }
+    }
+
+    // Determine primary service and subcategory for labour partner assignment
+    bookingServiceId = (pkg.inclusions && pkg.inclusions[0]?.serviceId) || serviceId
+    if (bookingServiceId) {
+      const primarySrv = await LabourService.findById(bookingServiceId)
+      if (primarySrv) {
+        bookingSubcategoryId = pkg.subcategoryId || primarySrv.subcategoryId
+      }
+    }
+    if (!bookingSubcategoryId) {
+      bookingSubcategoryId = pkg.subcategoryId
+    }
+
+    subTotal = Number(pkg.price) || 0
+    maxHourDiscount = 0
+    totalQuantity = 1
+    if (pkg.estimatedDurationMins) {
+      bookingHours = parseFloat((pkg.estimatedDurationMins / 60).toFixed(1)) || 1
+    }
+
+    const packageOriginalPrice = Number(pkg.originalPrice) || subTotal
+    const packageSavings = Math.max(0, packageOriginalPrice - subTotal)
+
+    packageBookingData = {
+      isPackage: true,
+      packageId: pkg._id,
+      packageName: pkg.name,
+      packageSlug: pkg.slug,
+      packagePrice: pkg.price,
+      originalPrice: packageOriginalPrice,
+      savings: packageSavings,
+      inclusions: (pkg.inclusions || []).map(inc => ({
+        serviceId: inc.serviceId,
+        name: inc.name,
+        quantity: inc.quantity || 1,
+        description: inc.description || ''
+      })),
+      snapshot: {
+        name: pkg.name,
+        slug: pkg.slug,
+        description: pkg.description,
+        shortDescription: pkg.shortDescription,
+        images: pkg.images || [],
+        imageUrl: pkg.imageUrl,
+        badge: pkg.badge,
+        termsAndConditions: pkg.termsAndConditions,
+        exclusions: pkg.exclusions,
+        estimatedDurationMins: pkg.estimatedDurationMins,
+        price: pkg.price,
+        originalPrice: packageOriginalPrice,
+        bookedAtPrice: pkg.price,
+        bookedAtDate: new Date(),
+      }
     }
   } else {
-    const hrRate = await resolveHourlyRate(serviceId)
-    subTotal = hrRate * hours * quantity
+    // ----------------------------------------------------
+    // CASE 2: Standard Single / Contractor Service Booking
+    // ----------------------------------------------------
+    const service = await LabourService.findById(serviceId)
+    if (!service || !service.isActive) {
+      return sendError(res, { message: 'Valid and active Service required', statusCode: HTTP_STATUS.BAD_REQUEST })
+    }
+    bookingSubcategoryId = service.subcategoryId
+    bookingServiceId = service._id
+
+    const resolveHourlyRate = async (sId) => {
+      let hrRate = 0
+      const srv = await LabourService.findById(sId)
+      if (srv) {
+        let baseRate = srv.hourlyPrice || srv.basePrice || 0
+        if (matchingZone && srv.zones && srv.zones.length > 0) {
+          const zonePricing = srv.zones.find(z => String(z.zone) === String(matchingZone._id))
+          if (zonePricing && typeof zonePricing.price === 'number') {
+            baseRate = zonePricing.price
+          }
+        }
+        if (srv.discountValue > 0) {
+          if (srv.discountType === 'PERCENTAGE') {
+            hrRate = Math.max(0, Math.round(baseRate * (1 - srv.discountValue / 100)))
+          } else {
+            hrRate = Math.max(0, baseRate - srv.discountValue)
+          }
+        } else {
+          hrRate = baseRate
+        }
+      }
+      return hrRate
+    }
+
+    if (contractorInfo && contractorInfo.services && contractorInfo.services.length > 0) {
+      for (const item of contractorInfo.services) {
+        const hrRate = await resolveHourlyRate(item.serviceId)
+        item.price = hrRate // Store the unit hourly rate
+        subTotal += hrRate * hours * (item.quantity || 1)
+      }
+      totalQuantity = contractorInfo.services.reduce((acc, curr) => acc + (curr.quantity || 1), 0)
+    } else {
+      const hrRate = await resolveHourlyRate(serviceId)
+      subTotal = hrRate * hours * quantity
+      totalQuantity = quantity
+    }
+
+    if (hours >= 8 && settings?.maxHourDiscountPercentage > 0) {
+      maxHourDiscount = (subTotal * settings.maxHourDiscountPercentage) / 100
+    }
   }
-  let maxHourDiscount = 0
-  if (hours >= 8 && settings?.maxHourDiscountPercentage > 0) {
-    maxHourDiscount = (subTotal * settings.maxHourDiscountPercentage) / 100
-  }
-  
+
   const basePrice = subTotal - maxHourDiscount
   let platformFee = 0
   if (settings?.platformFee?.isActive) {
@@ -310,19 +574,22 @@ export const createBooking = asyncHandler(async (req, res) => {
       ? settings.platformFee.value 
       : (basePrice * settings.platformFee.value) / 100
   }
-  
+
   const baseAmount = basePrice + platformFee
   let taxes = 0
-  
+
   let gstPercentage = 0
-  const subcategory = await LabourSubcategory.findById(service.subcategoryId)
-  if (subcategory) {
-    const { LabourCategory } = await import('../models/LabourCategory.js')
-    const category = await LabourCategory.findById(subcategory.categoryId)
-    if (category && category.isGstActive) {
-      gstPercentage = category.gstPercentage || 0
+  if (bookingSubcategoryId) {
+    const subcategory = await LabourSubcategory.findById(bookingSubcategoryId)
+    if (subcategory) {
+      const { LabourCategory } = await import('../models/LabourCategory.js')
+      const category = await LabourCategory.findById(subcategory.categoryId)
+      if (category && category.isGstActive) {
+        gstPercentage = category.gstPercentage || 0
+      }
     }
-  } else if (settings?.gstPercentage > 0) {
+  }
+  if (!gstPercentage && settings?.gstPercentage > 0) {
     gstPercentage = settings.gstPercentage
   }
 
@@ -330,7 +597,6 @@ export const createBooking = asyncHandler(async (req, res) => {
     taxes = (basePrice * gstPercentage) / 100
   }
 
-  
   const rawTotalAmount = baseAmount + taxes
   let finalPayableAmount = rawTotalAmount
   let walletDiscountData = { applied: false, amount: 0, walletTransactionId: null }
@@ -367,25 +633,21 @@ export const createBooking = asyncHandler(async (req, res) => {
   const startOtp = Math.floor(1000 + Math.random() * 9000).toString()
   const completionOtp = Math.floor(1000 + Math.random() * 9000).toString()
 
-  let totalQuantity = quantity
-  if (contractorInfo && contractorInfo.services) {
-    totalQuantity = contractorInfo.services.reduce((acc, curr) => acc + (curr.quantity || 1), 0)
-  }
-
   const booking = await Booking.create({
     userId: req.user._id,
-    subcategoryId: service.subcategoryId,
-    serviceId: service._id,
+    subcategoryId: bookingSubcategoryId,
+    serviceId: bookingServiceId,
     type,
     scheduledAt: type === 'SCHEDULED' ? parseISTDateTime(scheduledAt, timeSlot) : undefined,
     timeSlot: type === 'SCHEDULED' ? timeSlot : (type === 'INSTANT' ? timeSlot : undefined),
     endTime: type === 'SCHEDULED' ? endTime : undefined,
     images: Array.isArray(imageNames) ? imageNames : [],
     notes,
-    hours,
+    hours: bookingHours,
     quantity: totalQuantity,
     contractorInfo,
     maxHourDiscount,
+    packageBooking: packageBookingData,
     address: { 
       locationText,
       coordinates: {
@@ -405,6 +667,13 @@ export const createBooking = asyncHandler(async (req, res) => {
     startOtp,
     completionOtp
   })
+
+  // Increment booking count on the package if applicable
+  if (packageId) {
+    ServicePackage.findByIdAndUpdate(packageId, { $inc: { bookingCount: 1 } }).catch(err => {
+      console.error('[PACKAGE_COUNT_ERROR] Failed to increment booking count on package:', err)
+    })
+  }
 
   // Link transaction referenceId to created booking
   if (walletDiscountData.walletTransactionId) {
@@ -454,6 +723,8 @@ export const getBookingStatus = asyncHandler(async (req, res) => {
   const booking = await Booking.findById(req.params.id)
     .populate('subcategoryId')
     .populate('serviceId').populate('contractorInfo.services.serviceId')
+    .populate('packageBooking.packageId')
+    .populate('packageBooking.inclusions.serviceId')
     .populate('laborId', 'fullName phone profileImageUrl')
     .populate('userId', 'fullName phone')
     .populate('assignments.labourId', 'fullName phone profileImageUrl serviceIds labourProfile')
@@ -506,6 +777,8 @@ export const getMyBookings = asyncHandler(async (req, res) => {
   const bookings = await Booking.find(query)
     .populate('subcategoryId')
     .populate('serviceId').populate('contractorInfo.services.serviceId')
+    .populate('packageBooking.packageId')
+    .populate('packageBooking.inclusions.serviceId')
     .populate('userId', 'fullName phone')
     .populate('laborId', 'fullName phone profileImageUrl')
     .populate('assignments.labourId', 'fullName phone profileImageUrl serviceIds labourProfile')

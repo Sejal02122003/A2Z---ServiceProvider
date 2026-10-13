@@ -54,6 +54,7 @@ export function Checkout() {
   const reduce = useReducedMotion()
   const [searchParams] = useSearchParams()
   const subcategoryId = searchParams.get('subcategoryId') || ''
+  const packageId = searchParams.get('packageId') || ''
   const subcategoryName = searchParams.get('name') || 'Service'
   const type = searchParams.get('type') || 'INSTANT'
 
@@ -231,13 +232,16 @@ export function Checkout() {
 
   // Calculate bill on mount
   useEffect(() => {
-    if (!subcategoryId) {
-      setBillError('No service selected')
+    if (!subcategoryId && !packageId) {
+      setBillError('No service or package selected')
       setBillLoading(false)
       return
     }
     let cancelled = false
-    bookingsApi.calculateBill({ serviceId: subcategoryId })
+    bookingsApi.calculateBill({
+      serviceId: subcategoryId || undefined,
+      packageId: packageId || undefined,
+    })
       .then((res) => {
         if (cancelled) return
         setBill(res.data || {})
@@ -249,7 +253,7 @@ export function Checkout() {
         if (!cancelled) setBillLoading(false)
       })
     return () => { cancelled = true }
-  }, [subcategoryId])
+  }, [subcategoryId, packageId])
 
   const handleSubmit = useCallback(async () => {
     if (isGuest) {
@@ -269,7 +273,8 @@ export function Checkout() {
 
     try {
       const res = await bookingsApi.createBooking({
-        serviceId: subcategoryId,
+        serviceId: subcategoryId || undefined,
+        packageId: packageId || undefined,
         type,
         scheduledAt: type === 'SCHEDULED' ? scheduledTime : undefined,
         timeSlot: type === 'SCHEDULED' ? 'MORNING' : undefined, // Provide a default timeslot or parse it from time

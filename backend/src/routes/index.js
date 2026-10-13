@@ -37,6 +37,8 @@ import productRoutes from './productRoutes.js'
 import serviceProductRoutes from './serviceProductRoutes.js'
 import inventoryRoutes from './inventoryRoutes.js'
 import materialRequestRoutes from './materialRequestRoutes.js'
+import packageRoutes from './packageRoutes.js'
+import adminPackageRoutes from './adminPackageRoutes.js'
 import trialRoutes from './trialRoutes.js'
 import rewardRoutes from './rewardRoutes.js'
 import bookingReminderRoutes from './bookingReminderRoutes.js'
@@ -51,6 +53,7 @@ router.use('/', rewardRoutes)
 router.use('/reminders', bookingReminderRoutes)
 router.use('/penalties', penaltyRoutes)
 router.use('/booking-cancellations', bookingCancellationRoutes)
+router.use('/packages', packageRoutes)
 
 router.use('/auth', authRoutes)
 router.use('/users', userRoutes)
@@ -79,6 +82,7 @@ router.use('/notifications', notificationsRoutes)
 router.use('/simulated-opportunities', simulatedOpportunityRoutes)
 
 router.use('/admin/settings', systemSettingRoutes)
+router.use('/admin/packages', adminPackageRoutes)
 router.use('/admin/zones', adminZoneRoutes)
 router.use('/admin/workforce', adminWorkforceRoutes)
 router.use('/admin/identity-verifications', identityAdminRouter)

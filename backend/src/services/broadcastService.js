@@ -79,6 +79,14 @@ export async function startBroadcastCycle(bookingId) {
     const requestedServiceIds = booking.contractorInfo.services.map(s => s.serviceId)
     matchOr.push({ 'labourProfile.serviceIds': { $in: requestedServiceIds } })
   } else {
+    if (booking.packageBooking?.isPackage && Array.isArray(booking.packageBooking.inclusions) && booking.packageBooking.inclusions.length > 0) {
+      const pkgServiceIds = booking.packageBooking.inclusions
+        .map(inc => inc.serviceId)
+        .filter(Boolean)
+      if (pkgServiceIds.length > 0) {
+        matchOr.push({ 'labourProfile.serviceIds': { $in: pkgServiceIds } })
+      }
+    }
     if (booking.serviceId) {
       matchOr.push({ 'labourProfile.serviceIds': booking.serviceId })
     }
