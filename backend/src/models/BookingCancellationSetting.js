@@ -49,7 +49,7 @@ const bookingCancellationSettingSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    // Configured standard reasons list
+    // Configured standard reasons list (Vendor)
     allowedReasons: {
       type: [String],
       default: [
@@ -60,6 +60,37 @@ const bookingCancellationSettingSchema = new mongoose.Schema(
         'Unable to reach service location',
         'Customer Unreachable / Fake Address (Report Bogus)',
         'Customer Requested Cancellation',
+        'Other',
+      ],
+    },
+    // ==========================================
+    // CUSTOMER CANCELLATION POLICY
+    // ==========================================
+    customerCancellationEnabled: {
+      type: Boolean,
+      default: true,
+    },
+    // Cutoff in minutes before scheduled service start time
+    customerCutoffMinutes: {
+      type: Number,
+      default: 60,
+      min: 0,
+    },
+    // Customer cancellation fee (Safe default 0 - no fee unless configured)
+    customerCancellationFee: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    // Standard customer reasons list
+    customerAllowedReasons: {
+      type: [String],
+      default: [
+        'Booked by mistake',
+        'Wrong date or time',
+        'Service no longer required',
+        'Vendor response delay',
+        'Found another service provider',
         'Other',
       ],
     },

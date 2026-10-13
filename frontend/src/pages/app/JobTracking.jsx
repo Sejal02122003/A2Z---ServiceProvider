@@ -18,6 +18,7 @@ import { setActiveBooking, updateBookingStatus as updateBookingStatusAction, cle
 import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { BookingReviewModal } from '../../components/app/booking/BookingReviewModal.jsx'
+import { CancelBookingModal } from '../../components/app/booking/CancelBookingModal.jsx'
 
 const BOOKING_STEPS = [
   { id: 'CREATED', label: 'Booking Created' },
@@ -39,6 +40,7 @@ export function JobTracking() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showReview, setShowReview] = useState(false)
+  const [showCancelModal, setShowCancelModal] = useState(false)
   const [labourLocation, setLabourLocation] = useState(null)
 
   // Fetch booking on mount
@@ -143,19 +145,70 @@ export function JobTracking() {
   }
 
   if (booking.status === 'FAILED' || booking.status === 'CANCELLED') {
+    const isCancelled = booking.status === 'CANCELLED'
+    const shortCode = String(booking._id).slice(-6).toUpperCase()
+
     return (
-      <div className="space-y-4">
-        <AppStackScreenHeader title="Tracking" backTo="/app" />
-        <GlassPanel className="p-6 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 mb-4">
-            <span className="text-2xl font-black text-rose-600">!</span>
+      <div className="space-y-4 font-sans pb-12">
+        <AppStackScreenHeader title="Job Status" backTo="/app/my-bookings" />
+        <GlassPanel className="p-6 text-center space-y-4">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 shadow-sm border border-rose-200">
+            <span className="text-2xl font-black text-rose-600">✕</span>
           </div>
-          <h3 className="text-lg font-bold text-slate-900 mb-2">Booking {booking.status === 'FAILED' ? 'Failed' : 'Cancelled'}</h3>
-          <p className="text-sm text-slate-500">
-            {booking.status === 'FAILED' 
-              ? 'No labourers were available to accept this booking. Please try booking again at a different time.' 
-              : 'This booking has been cancelled.'}
-          </p>
+          <div>
+            <h3 className="text-xl font-black text-slate-900">
+              Booking {isCancelled ? 'Cancelled' : 'Failed'}
+            </h3>
+            <p className="text-xs font-semibold text-slate-500 mt-1">
+              Booking #{shortCode}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-rose-50/70 border border-rose-100 p-4 text-left space-y-2">
+            {booking.cancellationReason && (
+              <div className="text-xs">
+                <span className="font-bold text-rose-900">Reason: </span>
+                <span className="font-semibold text-rose-700">{booking.cancellationReason}</span>
+              </div>
+            )}
+            {booking.cancelledBy && (
+              <div className="text-xs">
+                <span className="font-bold text-rose-900">Cancelled By: </span>
+                <span className="font-semibold text-rose-700">
+                  {booking.cancelledBy === 'CUSTOMER' ? 'Customer' : booking.cancelledBy}
+                </span>
+              </div>
+            )}
+            {booking.cancelledAt && (
+              <div className="text-xs text-rose-600 font-medium">
+                Cancelled on {new Date(booking.cancelledAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+              </div>
+            )}
+            {!booking.cancellationReason && (
+              <p className="text-xs text-rose-700 font-medium">
+                {isCancelled
+                  ? 'This booking has been cancelled and is no longer active.'
+                  : 'No service partners were available for this request. Please try again.'}
+              </p>
+            )}
+          </div>
+
+          <div className="pt-2 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/app/my-bookings')}
+              className="w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition"
+            >
+              View My Bookings
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/app')}
+              className="w-full rounded-xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition"
+            >
+              Book Another Service
+            </button>
+          </div>
         </GlassPanel>
       </div>
     )
@@ -353,6 +406,30 @@ export function JobTracking() {
           </GlassPanel>
         )
       ) : null}
+
+      {/* Customer Cancellation Option */}
+      {['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED'].includes(booking.status) && (
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={() => setShowCancelModal(true)}
+            className="w-full rounded-2xl border border-rose-200 bg-rose-50/70 py-3 px-4 text-sm font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-300 transition shadow-sm flex items-center justify-center gap-2"
+          >
+            <span>Cancel This Booking</span>
+          </button>
+        </div>
+      )}
+
+      {/* Cancel Booking Modal */}
+      <CancelBookingModal
+        open={showCancelModal}
+        booking={booking}
+        onClose={() => setShowCancelModal(false)}
+        onSuccess={(updatedBooking) => {
+          setBooking(updatedBooking)
+          setShowCancelModal(false)
+        }}
+      />
 
       {/* Review Modal */}
       <BookingReviewModal

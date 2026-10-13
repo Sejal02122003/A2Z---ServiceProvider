@@ -11,6 +11,10 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { parseISTDateTime } from '../utils/dateHelper.js'
 import { recordLateFeeIncident, recordBounceIncident } from '../services/penaltyService.js'
+import {
+  getCustomerCancellationEligibility,
+  processCustomerCancellation,
+} from '../services/bookingCancellationService.js'
 
 export const calculateBill = asyncHandler(async (req, res) => {
   const { serviceId, hours: rawHours = 1, quantity = 1, address, contractorServices } = req.body
@@ -1122,3 +1126,34 @@ export const generateMyInvoice = asyncHandler(async (req, res) => {
 
   return sendSuccess(res, { data: { invoice, booking }, statusCode: HTTP_STATUS.CREATED })
 })
+
+export const getCustomerCancellationEligibilityController = asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const eligibility = await getCustomerCancellationEligibility(id, req.user._id)
+  return sendSuccess(res, { data: eligibility })
+})
+
+export const cancelCustomerBooking = asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { reason, reasonNote } = req.body
+
+  if (!reason || !String(reason).trim()) {
+    return sendError(res, {
+      message: 'Cancellation reason is required',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+    })
+  }
+
+  const result = await processCustomerCancellation({
+    bookingId: id,
+    customerId: req.user._id,
+    reason: String(reason).trim(),
+    reasonNote: reasonNote ? String(reasonNote).trim() : '',
+  })
+
+  return sendSuccess(res, {
+    message: result.message || 'Booking cancelled successfully',
+    data: result,
+  })
+})
+

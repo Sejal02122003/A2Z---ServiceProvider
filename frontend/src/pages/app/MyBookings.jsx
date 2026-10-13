@@ -61,7 +61,11 @@ export function MyBookings() {
     return { activeBookings: active, pastBookings: past }
   }, [bookings])
 
-  const displayed = tab === 'active' ? activeBookings : pastBookings
+  const handleBookingUpdated = (updatedBooking) => {
+    setBookings((prev) =>
+      prev.map((b) => (b._id === updatedBooking._id ? { ...b, ...updatedBooking } : b))
+    )
+  }
 
   return (
     <div className="space-y-4 pb-8">
@@ -133,7 +137,11 @@ export function MyBookings() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
               >
-                <B2cBookingCard booking={booking} isLabour={isLabour} />
+                <B2cBookingCard
+                  booking={booking}
+                  isLabour={isLabour}
+                  onBookingUpdated={handleBookingUpdated}
+                />
               </motion.div>
             )
           })}

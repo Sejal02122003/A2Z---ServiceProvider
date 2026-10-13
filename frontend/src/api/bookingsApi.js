@@ -51,4 +51,17 @@ export const bookingsApi = {
       body: payload,
     })
   },
+
+  cancelBooking: (id, payload) => {
+    return apiRequest(`/bookings/${id}/cancel`, {
+      method: 'POST',
+      body: payload,
+    })
+  },
+
+  getCancellationEligibility: (id) => {
+    return apiRequest(`/bookings/${id}/cancel-eligibility`, {
+      method: 'GET',
+    })
+  },
 }

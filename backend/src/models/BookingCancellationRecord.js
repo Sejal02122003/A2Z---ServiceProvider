@@ -38,13 +38,39 @@ const bookingCancellationRecordSchema = new mongoose.Schema(
     vendorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: false,
       index: true,
     },
     customerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       index: true,
+    },
+    cancelledByRole: {
+      type: String,
+      enum: ['CUSTOMER', 'VENDOR', 'ADMIN'],
+      default: 'VENDOR',
+      index: true,
+    },
+    customerFeeSnapshot: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    refundStatus: {
+      type: String,
+      enum: ['NOT_APPLICABLE', 'PENDING_REVIEW', 'INITIATED', 'COMPLETED', 'FAILED'],
+      default: 'NOT_APPLICABLE',
+      index: true,
+    },
+    refundAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    refundReference: {
+      type: String,
+      trim: true,
     },
     previousBookingStatus: {
       type: String,

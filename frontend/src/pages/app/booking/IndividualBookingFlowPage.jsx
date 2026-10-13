@@ -19,6 +19,7 @@ import {
   Zap,
   Trash2,
   Sparkles,
+  Loader2,
 } from 'lucide-react'
 import { AppStackScreenHeader } from '../../../components/app/AppStackScreenHeader.jsx'
 import { AppButton } from '../../../components/app-ui/buttons/AppButton.jsx'
@@ -47,6 +48,7 @@ import { BookingTypeSheet } from '../../../components/app/booking/BookingTypeShe
 import { BookingStepProgress } from '../../../components/app/booking/BookingStepProgress.jsx'
 import { BookingServiceHighlight } from '../../../components/app/booking/BookingServiceHighlight.jsx'
 import { BookingReviewModal } from '../../../components/app/booking/BookingReviewModal.jsx'
+import { CancelBookingModal } from '../../../components/app/booking/CancelBookingModal.jsx'
 import { useBookingSocket } from '../../../hooks/useBookingSocket.js'
 import { useAuth } from '../../../hooks/useAuth.js'
 import {
@@ -108,6 +110,8 @@ export function IndividualBookingFlowPage() {
   const [typeSheetOpen, setTypeSheetOpen] = useState(false)
   const [activeBookingId, setActiveBookingId] = useState(() => bookingIdParam || readBookingDraft()?.lastRef || null)
   const [activeBooking, setActiveBooking] = useState(null)
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [bookingLoading, setBookingLoading] = useState(false)
   
   useEffect(() => {
     if (bookingIdParam && bookingIdParam !== activeBookingId) {
@@ -240,13 +244,57 @@ export function IndividualBookingFlowPage() {
   }, [categoryIdParam, groupIdParam, syncDraft])
 
   useEffect(() => {
-    if (activeBookingId && !activeBooking && realUser) {
-      bookingsApi.getBookingStatus(activeBookingId).then(res => {
-        if (res.data?.booking) setActiveBooking(res.data.booking)
-      }).catch(err => console.error(err))
-    }
-  }, [activeBookingId, activeBooking, realUser])
+    if (!realUser) return
 
+    if (step === 'active' || step === 'billing' || step === 'payment') {
+      if (!activeBookingId) {
+        const draftLastRef = readBookingDraft()?.lastRef
+        if (draftLastRef) {
+          setActiveBookingId(draftLastRef)
+          return
+        }
+
+        setBookingLoading(true)
+        bookingsApi
+          .getMyBookings()
+          .then((res) => {
+            const list = res.data?.bookings || []
+            const active =
+              list.find((b) => {
+                const s = (b.status || '').toUpperCase()
+                const matchesCat = !categoryIdParam || String(b.category?._id || b.category) === categoryIdParam
+                return matchesCat && ['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED'].includes(s)
+              }) ||
+              list.find((b) => ['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED'].includes((b.status || '').toUpperCase())) ||
+              list.find((b) => !categoryIdParam || String(b.category?._id || b.category) === categoryIdParam) ||
+              list[0]
+
+            if (active) {
+              setActiveBookingId(active._id)
+              setActiveBooking(active)
+            }
+          })
+          .catch((err) => console.error('Failed to load user bookings:', err))
+          .finally(() => setBookingLoading(false))
+      } else if (!activeBooking) {
+        setBookingLoading(true)
+        bookingsApi
+          .getBookingStatus(activeBookingId)
+          .then((res) => {
+            if (res.data?.booking) setActiveBooking(res.data.booking)
+          })
+          .catch((err) => console.error(err))
+          .finally(() => setBookingLoading(false))
+      }
+    } else if (activeBookingId && !activeBooking) {
+      bookingsApi
+        .getBookingStatus(activeBookingId)
+        .then((res) => {
+          if (res.data?.booking) setActiveBooking(res.data.booking)
+        })
+        .catch((err) => console.error(err))
+    }
+  }, [step, activeBookingId, activeBooking, realUser, categoryIdParam])
 
   useEffect(() => {
     if (!bookingEvent) return
@@ -278,6 +326,8 @@ export function IndividualBookingFlowPage() {
           }).catch(() => { })
         }
       }
+    } else if (bookingEvent.type === 'BOOKING_CANCELLED') {
+      setActiveBooking(prev => prev ? { ...prev, status: 'CANCELLED', ...bookingEvent.data } : null)
     }
   }, [bookingEvent, activeBookingId, goStep, realUser])
 
@@ -740,6 +790,7 @@ export function IndividualBookingFlowPage() {
       const res = await bookingsApi.createBooking(payload)
       const createdBooking = res.data.booking
       setActiveBookingId(createdBooking._id)
+      setActiveBooking(createdBooking)
       patchBookingDraft({ lastRef: createdBooking._id })
       setNoMatch(false)
       goStep(draft.bookingType === 'scheduled' ? 'scheduled_success' : 'searching')
@@ -821,6 +872,30 @@ export function IndividualBookingFlowPage() {
           onComplete={() => { }}
           onNoMatch={() => { }}
         />
+
+        {activeBooking && ['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED'].includes(activeBooking.status) && (
+          <div className="px-4 mt-2">
+            <button
+              type="button"
+              onClick={() => setCancelModalOpen(true)}
+              className="w-full rounded-2xl border border-rose-200 bg-rose-50/80 py-3.5 px-4 text-sm font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-300 transition shadow-sm flex items-center justify-center gap-2"
+            >
+              <span>Cancel Search</span>
+            </button>
+          </div>
+        )}
+
+        <CancelBookingModal
+          open={cancelModalOpen}
+          booking={activeBooking}
+          onClose={() => setCancelModalOpen(false)}
+          onSuccess={(updatedBooking) => {
+            setActiveBooking(updatedBooking)
+            setCancelModalOpen(false)
+            clearBookingDraft()
+            navigate('/app/my-bookings', { replace: true })
+          }}
+        />
       </div>
     )
   }
@@ -855,12 +930,126 @@ export function IndividualBookingFlowPage() {
     return (
       <div className="space-y-4 pb-8">
         <AppStackScreenHeader
-          title={step === 'payment' ? 'Payment' : (step === 'billing' || booking?.status === 'COMPLETED') ? 'Billing' : 'Worker on the way'}
+          title={
+            step === 'payment'
+              ? 'Payment'
+              : (step === 'billing' || booking?.status === 'COMPLETED')
+              ? 'Billing'
+              : booking?.status === 'CANCELLED'
+              ? 'Booking Cancelled'
+              : 'Worker on the way'
+          }
           onBack={() => (step === 'payment' ? goStep(booking?.status === 'COMPLETED' ? 'billing' : 'active') : navigate('/app/my-bookings', { replace: true }))}
         />
-        <BookingServiceHighlight categoryName={draft.categoryName} serviceName={realUser?.role === 'contractor' && contractorServiceNames ? contractorServiceNames : draft.serviceName} />
+        <BookingServiceHighlight
+          categoryName={draft.categoryName || booking?.category?.name || 'Service'}
+          serviceName={realUser?.role === 'contractor' && contractorServiceNames ? contractorServiceNames : (draft.serviceName || booking?.service?.name)}
+        />
 
-        {step !== 'billing' && booking && booking.quantity > 1 ? (
+        {bookingLoading && !booking && (
+          <GlassPanel className="p-8 text-center">
+            <Loader2 className="mx-auto h-8 w-8 animate-spin text-brand" />
+            <p className="mt-3 text-sm font-semibold text-slate-600">Loading booking status...</p>
+          </GlassPanel>
+        )}
+
+        {!bookingLoading && !booking && (
+          <GlassPanel className="p-6 text-center space-y-3">
+            <p className="text-sm font-bold text-slate-800">No active booking details found</p>
+            <p className="text-xs text-slate-500">We could not find an ongoing booking for this session.</p>
+            <div className="pt-2 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => navigate('/app/my-bookings')}
+                className="w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition"
+              >
+                View My Bookings
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/app')}
+                className="w-full rounded-xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition"
+              >
+                Book a Service
+              </button>
+            </div>
+          </GlassPanel>
+        )}
+
+        {booking?.status === 'CANCELLED' && (
+          <GlassPanel className="p-6 text-center space-y-4">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+              <AlertCircle className="h-8 w-8" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Booking Cancelled</h3>
+              <p className="text-xs font-semibold text-slate-500 mt-1">
+                Booking #{booking._id?.slice(-8).toUpperCase()}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-rose-50/70 border border-rose-100 p-4 text-left space-y-2">
+              {booking.cancellationReason && (
+                <div className="text-xs">
+                  <span className="font-bold text-rose-900">Reason: </span>
+                  <span className="font-semibold text-rose-700">{booking.cancellationReason}</span>
+                </div>
+              )}
+              {booking.cancelledBy && (
+                <div className="text-xs">
+                  <span className="font-bold text-rose-900">Cancelled By: </span>
+                  <span className="font-semibold text-rose-700">
+                    {booking.cancelledBy === 'CUSTOMER' ? 'Customer' : booking.cancelledBy}
+                  </span>
+                </div>
+              )}
+              {booking.cancelledAt && (
+                <div className="text-xs text-rose-600 font-medium">
+                  Cancelled on {new Date(booking.cancelledAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                </div>
+              )}
+              {!booking.cancellationReason && (
+                <p className="text-xs text-rose-700 font-medium">
+                  This booking has been cancelled and is no longer active.
+                </p>
+              )}
+            </div>
+            <div className="pt-2 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => navigate('/app/my-bookings')}
+                className="w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition"
+              >
+                View My Bookings
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  clearBookingDraft()
+                  navigate('/app')
+                }}
+                className="w-full rounded-xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition"
+              >
+                Book Another Service
+              </button>
+            </div>
+          </GlassPanel>
+        )}
+
+        {booking && booking.status !== 'CANCELLED' && !worker && step !== 'billing' && ['CREATED', 'BROADCASTING'].includes(booking.status) && (
+          <GlassPanel className="p-5 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-brand/10 text-brand mb-3">
+              <Sparkles className="h-6 w-6 animate-pulse" />
+            </div>
+            <p className="text-base font-extrabold text-slate-900">Searching for Available Workers</p>
+            <p className="mt-1 text-xs text-slate-500">
+              {booking.type === 'SCHEDULED' 
+                ? 'Your scheduled booking is confirmed. A worker will be assigned before your service slot.' 
+                : 'Broadcasting your request to qualified nearby service providers...'}
+            </p>
+          </GlassPanel>
+        )}
+
+        {step !== 'billing' && booking && booking.status !== 'CANCELLED' && booking.quantity > 1 ? (
           <div className="space-y-4">
             <div className="lc-booking-flow-card">
               <p className="lc-booking-flow-label font-bold">Assigned Labourers ({booking.assignments?.length || 0} / {booking.quantity})</p>
@@ -1032,6 +1221,21 @@ export function IndividualBookingFlowPage() {
                 </div>
               </div>
             </div>
+
+            {booking && booking.status !== 'CANCELLED' && ['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED'].includes(booking.status) && (
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setCancelModalOpen(true)}
+                  className="w-full rounded-2xl border border-rose-200 bg-rose-50/80 py-3.5 px-4 text-sm font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-300 transition shadow-sm flex items-center justify-center gap-2"
+                >
+                  <span>Cancel Booking</span>
+                </button>
+                <p className="text-center text-[11px] text-slate-400">
+                  Free cancellation available before worker is on the way
+                </p>
+              </div>
+            )}
           </div>
         )}
             
@@ -1271,7 +1475,7 @@ export function IndividualBookingFlowPage() {
                 Rate your experience
               </BookingPrimaryButton>
             ) : null}
-            {activeBooking?.status !== 'COMPLETED' && step !== 'billing' ? (
+            {activeBooking?.status !== 'COMPLETED' && activeBooking?.status !== 'CANCELLED' && step !== 'billing' ? (
               <BookingPrimaryButton type="button" onClick={() => goStep('payment')}>
                 <Wallet className="h-4 w-4" aria-hidden />
                 Change payment method
@@ -1290,6 +1494,17 @@ export function IndividualBookingFlowPage() {
           revieweeId={reviewQueue[currentReviewIndex]?._id || reviewQueue[currentReviewIndex]}
           onClose={() => setReviewOpen(false)}
           onSubmitted={handleReviewSubmitted}
+        />
+
+        <CancelBookingModal
+          open={cancelModalOpen}
+          booking={activeBooking}
+          onClose={() => setCancelModalOpen(false)}
+          onSuccess={(updatedBooking) => {
+            setActiveBooking(updatedBooking)
+            setCancelModalOpen(false)
+            clearBookingDraft()
+          }}
         />
 
         {paymentSuccess && (

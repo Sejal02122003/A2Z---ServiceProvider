@@ -39,6 +39,23 @@ router.post(
   restrictTo(USER_ROLES.CUSTOMER),
   booking.confirmCashPayment
 )
+
+router.get(
+  '/:id/cancel-eligibility',
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  booking.getCustomerCancellationEligibilityController
+)
+
+router.post(
+  '/:id/cancel',
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  [
+    body('reason').trim().notEmpty().withMessage('Cancellation reason is required'),
+    body('reasonNote').optional().trim(),
+  ],
+  validateRequest,
+  booking.cancelCustomerBooking
+)
 router.patch(
   '/:id/status',
   [

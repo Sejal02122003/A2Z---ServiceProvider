@@ -50,6 +50,10 @@ export async function updateBookingCancellationSettings(data, adminUser) {
     'lateCancellationAction',
     'requireReason',
     'allowedReasons',
+    'customerCancellationEnabled',
+    'customerCutoffMinutes',
+    'customerCancellationFee',
+    'customerAllowedReasons',
   ]
 
   allowedFields.forEach((field) => {
@@ -857,3 +861,451 @@ export async function getAdminCancellationRecords({
     },
   }
 }
+
+/**
+ * 10. Check Customer Cancellation Eligibility & Retrieve Policy Rules
+ */
+export async function getCustomerCancellationEligibility(bookingId, customerId, overrideTime = null) {
+  const settings = await getBookingCancellationSettings()
+  const booking = await Booking.findById(bookingId)
+  if (!booking) {
+    return {
+      isEligible: false,
+      code: 'BOOKING_NOT_FOUND',
+      reason: 'Booking not found',
+    }
+  }
+
+  // 1. Ownership validation
+  if (customerId && String(booking.userId?._id || booking.userId) !== String(customerId)) {
+    return {
+      isEligible: false,
+      code: 'UNAUTHORIZED',
+      reason: 'You are not authorized to cancel this booking',
+    }
+  }
+
+  // 2. Lifecycle status check
+  const nonCancellableStatuses = ['EN_ROUTE', 'STARTED', 'COMPLETED', 'CANCELLED', 'REFUNDED', 'FAILED']
+  if (nonCancellableStatuses.includes(booking.status)) {
+    let reasonText = `Booking is already ${booking.status.toLowerCase()}.`
+    let code = 'STATUS_INELIGIBLE'
+    if (booking.status === 'EN_ROUTE') {
+      reasonText = 'Service partner is already on the way. Ordinary cancellation is not permitted. Please contact support.'
+      code = 'EN_ROUTE_BLOCKED'
+    } else if (booking.status === 'STARTED') {
+      reasonText = 'Service has already started and is in progress. Ordinary cancellation is not permitted.'
+      code = 'STARTED_BLOCKED'
+    } else if (booking.status === 'COMPLETED') {
+      reasonText = 'Completed bookings cannot be cancelled.'
+      code = 'ALREADY_COMPLETED'
+    } else if (booking.status === 'CANCELLED') {
+      reasonText = 'This booking has already been cancelled.'
+      code = 'ALREADY_CANCELLED'
+    }
+
+    return {
+      isEligible: false,
+      code,
+      currentStatus: booking.status,
+      reason: reasonText,
+    }
+  }
+
+  // 3. Admin policy master switch check
+  if (settings.customerCancellationEnabled === false) {
+    return {
+      isEligible: false,
+      code: 'POLICY_DISABLED',
+      reason: 'Customer cancellation is currently disabled by platform policy.',
+    }
+  }
+
+  // 4. Calculate Service Start DateTime
+  let serviceStartDateTime = null
+  if (booking.scheduledAt && !isNaN(new Date(booking.scheduledAt).getTime())) {
+    serviceStartDateTime = new Date(booking.scheduledAt)
+  } else if (booking.date) {
+    serviceStartDateTime = parseISTDateTime(booking.date, booking.timeSlot)
+  } else {
+    serviceStartDateTime = new Date(booking.createdAt || Date.now())
+  }
+
+  const now = overrideTime ? new Date(overrideTime) : new Date()
+  const timeRemainingMs = serviceStartDateTime.getTime() - now.getTime()
+  const timeRemainingMinutes = Math.floor(timeRemainingMs / (60 * 1000))
+  const cutoffMinutes = Number(settings.customerCutoffMinutes !== undefined ? settings.customerCutoffMinutes : 60)
+
+  // 5. Cutoff boundary check for SCHEDULED bookings
+  if (booking.type === 'SCHEDULED') {
+    if (timeRemainingMs <= 0) {
+      return {
+        isEligible: false,
+        code: 'SERVICE_TIME_PASSED',
+        isExpired: true,
+        serviceStartDateTime,
+        timeRemainingMinutes,
+        reason: 'Scheduled service start time has already passed. Cancellation is no longer available.',
+      }
+    }
+
+    if (cutoffMinutes > 0 && timeRemainingMinutes < cutoffMinutes) {
+      return {
+        isEligible: false,
+        code: 'CUTOFF_EXCEEDED',
+        isCutoffExceeded: true,
+        cutoffMinutes,
+        timeRemainingMinutes,
+        serviceStartDateTime,
+        reason: `Cancellations must be made at least ${cutoffMinutes} minutes before the scheduled start time (${timeRemainingMinutes}m remaining). Please contact support.`,
+      }
+    }
+  }
+
+  // 6. Compute Fee & Disclosures (Default fee is ₹0 - never charge customer vendor penalties)
+  const cancellationFee = Math.max(0, Number(settings.customerCancellationFee || 0))
+  const allowedReasons = settings.customerAllowedReasons && settings.customerAllowedReasons.length > 0
+    ? settings.customerAllowedReasons
+    : [
+        'Booked by mistake',
+        'Wrong date or time',
+        'Service no longer required',
+        'Vendor response delay',
+        'Found another service provider',
+        'Other',
+      ]
+
+  const isPaid = (booking.paymentStatus || '').toUpperCase() === 'PAID'
+  let refundNote = 'No payment was collected for this booking.'
+  if (booking.paymentMethod === 'ONLINE') {
+    if (isPaid) {
+      const estimatedRefund = Math.max(0, (booking.totalAmount || 0) - cancellationFee)
+      refundNote = `Estimated refund of ₹${estimatedRefund} will be initiated to your source payment method under platform refund policy.`
+    } else {
+      refundNote = 'Online payment was not completed yet. No amount will be charged.'
+    }
+  }
+
+  return {
+    isEligible: true,
+    code: 'ELIGIBLE',
+    bookingId: booking._id,
+    currentStatus: booking.status,
+    bookingType: booking.type,
+    serviceStartDateTime,
+    timeRemainingMinutes,
+    cutoffMinutes,
+    cancellationFee,
+    allowedReasons,
+    paymentMethod: booking.paymentMethod,
+    paymentStatus: booking.paymentStatus,
+    totalAmount: booking.totalAmount || 0,
+    refundNote,
+  }
+}
+
+/**
+ * 11. Process Customer Booking Cancellation
+ */
+export async function processCustomerCancellation({
+  bookingId,
+  customerId,
+  reason,
+  reasonNote = '',
+  overrideTime = null,
+}) {
+  if (!bookingId) {
+    throw new Error('Booking ID is required')
+  }
+  if (!customerId) {
+    throw new Error('Customer ID is required')
+  }
+
+  // 1. Validate reason
+  const trimmedReason = (reason || '').trim()
+  const trimmedNote = (reasonNote || '').trim()
+
+  const validStandardReasons = [
+    'Booked by mistake',
+    'Wrong date or time',
+    'Service no longer required',
+    'Vendor response delay',
+    'Found another service provider',
+    'Other',
+  ]
+
+  const matchedReason = validStandardReasons.find(
+    (r) => r.toLowerCase() === trimmedReason.toLowerCase()
+  )
+
+  if (!matchedReason) {
+    throw new Error(
+      `Invalid cancellation reason. Allowed reasons: ${validStandardReasons.join(', ')}`
+    )
+  }
+
+  if (matchedReason === 'Other' && !trimmedNote) {
+    throw new Error('Please provide an additional description when selecting "Other" as cancellation reason.')
+  }
+
+  const finalReasonText = matchedReason === 'Other' ? `Other: ${trimmedNote}` : matchedReason
+
+  // 2. Authoritative eligibility check
+  const eligibility = await getCustomerCancellationEligibility(bookingId, customerId, overrideTime)
+  if (!eligibility.isEligible) {
+    if (eligibility.code === 'ALREADY_CANCELLED') {
+      const existing = await Booking.findById(bookingId)
+      const existingRecord = await BookingCancellationRecord.findOne({
+        bookingId: existing?._id || bookingId,
+        cancelledByRole: 'CUSTOMER',
+      })
+      return {
+        success: true,
+        status: 'CANCELLED',
+        alreadyCancelled: true,
+        message: 'This booking has already been cancelled',
+        booking: existing,
+        record: existingRecord,
+      }
+    }
+    throw new Error(eligibility.reason || 'Booking is not eligible for cancellation')
+  }
+
+  const now = overrideTime ? new Date(overrideTime) : new Date()
+
+  // 3. Atomic conditional update to prevent race conditions
+  const allowedStatuses = ['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED']
+  const booking = await Booking.findOneAndUpdate(
+    {
+      _id: bookingId,
+      userId: customerId,
+      status: { $in: allowedStatuses },
+    },
+    {
+      $set: {
+        status: 'CANCELLED',
+        cancelledBy: 'CUSTOMER',
+        cancelledAt: now,
+        cancellationReason: finalReasonText,
+      },
+    },
+    { new: true }
+  )
+
+  if (!booking) {
+    // Check if it was already cancelled (idempotent duplicate request handling)
+    const currentBooking = await Booking.findById(bookingId)
+    if (!currentBooking) {
+      throw new Error('Booking not found')
+    }
+    if (String(currentBooking.userId) !== String(customerId)) {
+      throw new Error('You are not authorized to cancel this booking')
+    }
+    if (currentBooking.status === 'CANCELLED') {
+      const existingRecord = await BookingCancellationRecord.findOne({
+        bookingId: currentBooking._id,
+        dedupeKey: `customer_cancellation_${currentBooking._id}`,
+      })
+      return {
+        success: true,
+        status: 'CANCELLED',
+        alreadyCancelled: true,
+        message: 'Booking has already been cancelled',
+        booking: currentBooking,
+        record: existingRecord,
+      }
+    }
+
+    throw new Error(
+      `Cannot cancel booking because its status was concurrently updated to ${currentBooking.status}`
+    )
+  }
+
+  const shortCode = String(booking._id).slice(-6).toUpperCase()
+  const previousStatus = eligibility.currentStatus || 'ACCEPTED'
+  const dedupeKey = `customer_cancellation_${booking._id}`
+
+  // 4. Update assignments if multi-worker booking
+  if (booking.assignments && booking.assignments.length > 0) {
+    booking.assignments.forEach((a) => {
+      a.status = 'CANCELLED'
+      a.cancellationReason = finalReasonText
+    })
+    await booking.save()
+  }
+
+  // 5. Determine refund details safely
+  const isPaid = (booking.paymentStatus || '').toUpperCase() === 'PAID'
+  let refundStatus = 'NOT_APPLICABLE'
+  let refundAmount = 0
+  let refundReference = undefined
+
+  if (booking.paymentMethod === 'ONLINE' && isPaid) {
+    refundStatus = 'PENDING_REVIEW'
+    refundAmount = Math.max(0, (booking.totalAmount || 0) - (eligibility.cancellationFee || 0))
+    refundReference = `REFUND_PENDING_${shortCode}`
+  }
+
+  // 6. Create or update Cancellation Record for audit
+  const assignedVendorId =
+    booking.laborId ||
+    booking.acceptedLabourId ||
+    (booking.assignments?.[0]?.labourId) ||
+    undefined
+
+  const record = await BookingCancellationRecord.findOneAndUpdate(
+    { dedupeKey },
+    {
+      bookingId: booking._id,
+      customerId,
+      vendorId: assignedVendorId,
+      cancelledByRole: 'CUSTOMER',
+      previousBookingStatus: previousStatus,
+      cancellationStatus: CANCELLATION_STATUS.CANCELLED,
+      timingClassification: TIMING_CLASSIFICATION.STANDARD,
+      serviceStartDateTime: eligibility.serviceStartDateTime,
+      requestedAt: now,
+      completedAt: now,
+      timeRemainingMinutes: eligibility.timeRemainingMinutes,
+      cutoffHoursSnapshot: Number((eligibility.cutoffMinutes / 60).toFixed(2)),
+      reason: matchedReason,
+      reasonCategory: matchedReason,
+      adminNotes: trimmedNote || '',
+      customerFeeSnapshot: eligibility.cancellationFee,
+      penaltyType: 'NONE',
+      penaltyRateOrAmount: 0,
+      assessedPenaltyAmount: 0,
+      penaltyStatus: CANCELLATION_PENALTY_STATUS.NOT_APPLICABLE,
+      deductedAmount: 0,
+      approvalStatus: APPROVAL_STATUS.NOT_REQUIRED,
+      refundStatus,
+      refundAmount,
+      refundReference,
+      dedupeKey,
+    },
+    { upsert: true, new: true }
+  )
+
+  booking.cancellationRecordId = record._id
+  await booking.save()
+
+  // 7. Wallet & financial safety
+  // A. Customer wallet discount refund if applied
+  if (booking.walletDiscount?.applied && booking.walletDiscount?.amount > 0) {
+    import('./userWalletService.js')
+      .then(({ refundWalletForBooking }) => {
+        refundWalletForBooking({
+          userId: customerId,
+          bookingId: booking._id,
+          amount: booking.walletDiscount.amount,
+          reason: `Refund for customer cancelled booking #${shortCode}`,
+        }).catch((err) => console.error('[Customer Wallet Refund Error]', err?.message))
+      })
+      .catch((err) => console.error(err))
+  }
+
+  // B. Release held cash booking charges on assigned labourer
+  if (booking.paymentMethod === 'CASH') {
+    const expectedCharges =
+      (booking.platformFee || 0) + (booking.taxes || 0) + (booking.commissionAmount || 0)
+    if (assignedVendorId && expectedCharges > 0) {
+      import('./labourWalletService.js')
+        .then(({ releaseCashBookingCharges }) => {
+          const vid = typeof assignedVendorId === 'object' ? assignedVendorId._id : assignedVendorId
+          releaseCashBookingCharges({
+            labourId: vid,
+            bookingId: booking._id,
+            amount: expectedCharges,
+          }).catch((err) => console.error('[Cash Hold Release Warning]', err?.message))
+        })
+        .catch(() => {})
+    }
+  }
+
+  // C. Cancel scheduled reminders
+  import('./bookingReminderService.js')
+    .then(({ cancelRemindersForBooking }) => {
+      cancelRemindersForBooking(
+        booking._id,
+        `Booking cancelled by customer: ${finalReasonText}`
+      ).catch(console.error)
+    })
+    .catch((err) => console.error(err))
+
+  // 8. In-App Notification for customer
+  try {
+    await InAppNotification.create({
+      userId: customerId,
+      title: 'Booking Cancelled',
+      body: `Your booking #${shortCode} has been cancelled successfully.`,
+      type: 'BOOKING_CANCELLED',
+      bookingId: booking._id,
+    })
+  } catch (err) {
+    console.warn('[InAppNotification Warning]', err?.message)
+  }
+
+  // 9. Real-time Socket & Push Notifications
+  import('../socket.js')
+    .then(({ emitToUser, getIO }) => {
+      emitToUser(customerId, 'BOOKING_STATUS_UPDATE', {
+        bookingId: booking._id,
+        status: 'CANCELLED',
+        cancelledBy: 'CUSTOMER',
+        cancellationReason: finalReasonText,
+      })
+
+      if (assignedVendorId) {
+        const vid = typeof assignedVendorId === 'object' ? assignedVendorId._id : assignedVendorId
+        emitToUser(vid, 'BOOKING_STATUS_UPDATE', {
+          bookingId: booking._id,
+          status: 'CANCELLED',
+          cancelledBy: 'CUSTOMER',
+          cancellationReason: finalReasonText,
+        })
+      }
+
+      if (previousStatus === 'BROADCASTING') {
+        const io = getIO()
+        if (io) {
+          io.emit('BOOKING_EXPIRED', { bookingId: String(booking._id) })
+          io.emit('BOOKING_CANCELLED', { bookingId: String(booking._id) })
+        }
+      }
+    })
+    .catch((err) => console.error('[Socket Warning]', err))
+
+  try {
+    sendNotificationToUser(customerId, {
+      title: 'Booking Cancelled',
+      body: `Your booking #${shortCode} was cancelled successfully.`,
+      data: { type: 'booking_cancelled', bookingId: String(booking._id) },
+    })
+
+    if (assignedVendorId) {
+      const vid = typeof assignedVendorId === 'object' ? assignedVendorId._id : assignedVendorId
+      sendNotificationToUser(vid, {
+        title: 'Booking Cancelled by Customer',
+        body: `Customer has cancelled booking #${shortCode}: ${matchedReason}`,
+        data: { type: 'booking_cancelled', bookingId: String(booking._id) },
+      })
+    }
+  } catch (err) {
+    console.warn('[Push Notification Warning]', err?.message)
+  }
+
+  return {
+    success: true,
+    status: 'CANCELLED',
+    message: 'Booking cancelled successfully',
+    booking,
+    record,
+    refund: {
+      status: refundStatus,
+      amount: refundAmount,
+      reference: refundReference,
+      note: eligibility.refundNote,
+    },
+  }
+}
+

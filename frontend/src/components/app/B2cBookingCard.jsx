@@ -5,6 +5,7 @@ import { Calendar, CreditCard, MapPin, User, Loader2, Plus, Minus, Clock, CheckC
 import { GlassPanel } from '../ui/GlassPanel.jsx'
 import { bookingsApi } from '../../api/bookingsApi.js'
 import { getLabourBookingShare } from '../../lib/bookingLabourShare.js'
+import { CancelBookingModal } from './booking/CancelBookingModal.jsx'
 
 const STATUS_STYLES = {
   CREATED: 'bg-amber-100 text-amber-800 border-amber-200',
@@ -16,7 +17,7 @@ const STATUS_STYLES = {
   CANCELLED: 'bg-rose-100 text-rose-800 border-rose-200',
 }
 
-export function B2cBookingCard({ booking, isLabour }) {
+export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
   const navigate = useNavigate()
   const authUser = useSelector((state) => state.auth.user)
   const status = (booking.status || 'CREATED').toUpperCase()
@@ -37,6 +38,7 @@ export function B2cBookingCard({ booking, isLabour }) {
   const [loadingTime, setLoadingTime] = useState(null)
   const [confirmModalData, setConfirmModalData] = useState(null)
   const [successModalOpen, setSuccessModalOpen] = useState(false)
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
 
   const handleAddExtraTimeClick = (e, targetLabourId) => {
     e.stopPropagation()
@@ -322,8 +324,44 @@ export function B2cBookingCard({ booking, isLabour }) {
             </div>
           )}
         </div>
+
+        {/* Cancellation Reason note if already cancelled */}
+        {status === 'CANCELLED' && booking.cancellationReason && (
+          <div className="px-4 pb-3 bg-white text-xs font-medium text-rose-600 flex items-center gap-1.5 border-t border-rose-100/60 pt-2">
+            <span className="font-bold">Cancellation Reason:</span>
+            <span className="truncate">{booking.cancellationReason}</span>
+          </div>
+        )}
+
+        {/* Action Row for Customer Cancel */}
+        {!isLabour && ['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED'].includes(status) && (
+          <div className="flex items-center justify-end px-4 pb-3 pt-1 bg-white border-t border-slate-100/60">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setCancelModalOpen(true)
+              }}
+              className="rounded-xl border border-rose-200 bg-rose-50/60 px-3.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-300 transition shadow-sm"
+            >
+              Cancel Booking
+            </button>
+          </div>
+        )}
       </div>
     </GlassPanel>
+
+    {/* Cancel Booking Modal */}
+    <CancelBookingModal
+      open={cancelModalOpen}
+      booking={booking}
+      onClose={() => setCancelModalOpen(false)}
+      onSuccess={(updatedBooking, cancellationData) => {
+        if (onBookingUpdated) {
+          onBookingUpdated(updatedBooking, cancellationData)
+        }
+      }}
+    />
 
     {/* Confirmation Modal */}
     {confirmModalData && (

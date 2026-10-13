@@ -33,6 +33,28 @@ router.post(
 )
 
 // -------------------------------------------------------------
+// CUSTOMER CANCELLATION ENDPOINTS
+// -------------------------------------------------------------
+router.get(
+  '/customer/bookings/:bookingId/eligibility',
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  async (req, res, next) => {
+    const { getCustomerCancellationEligibilityController } = await import('../controllers/bookingController.js')
+    req.params.id = req.params.bookingId
+    return getCustomerCancellationEligibilityController(req, res, next)
+  }
+)
+router.post(
+  '/customer/bookings/:bookingId/cancel',
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  async (req, res, next) => {
+    const { cancelCustomerBooking } = await import('../controllers/bookingController.js')
+    req.params.id = req.params.bookingId
+    return cancelCustomerBooking(req, res, next)
+  }
+)
+
+// -------------------------------------------------------------
 // ADMIN MANAGEMENT ENDPOINTS
 // -------------------------------------------------------------
 router.use('/admin', restrictTo(USER_ROLES.ADMIN))
