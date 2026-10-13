@@ -37,6 +37,27 @@ export const notificationApi = {
     }),
 
   /**
+   * Delete a single notification
+   * @param {string} id
+   */
+  deleteNotification: (id) =>
+    apiRequest(`/notifications/${id}`, {
+      method: 'DELETE',
+    }),
+
+  /**
+   * Clear notifications (all or read-only)
+   * @param {{ readOnly?: boolean }} params
+   */
+  clearNotifications: (params = {}) => {
+    const query = new URLSearchParams()
+    if (params.readOnly !== undefined) query.append('readOnly', String(params.readOnly))
+    return apiRequest(`/notifications?${query.toString()}`, {
+      method: 'DELETE',
+    })
+  },
+
+  /**
    * Register FCM Token with backend
    */
   saveToken: (token, platform = 'web') =>

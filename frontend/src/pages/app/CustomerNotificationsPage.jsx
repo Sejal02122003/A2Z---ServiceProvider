@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   Bell,
   CheckCircle2,
@@ -16,6 +16,8 @@ import {
   Phone,
   KeyRound,
   User,
+  X,
+  Trash2,
 } from 'lucide-react'
 import { notificationApi } from '../../api/notificationApi.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
@@ -114,6 +116,35 @@ export function CustomerNotificationsPage() {
     }
   }
 
+  const handleRemoveNotification = async (notifId, e) => {
+    e?.stopPropagation()
+    const target = notifications.find((n) => n._id === notifId)
+    // Optimistically remove from state
+    setNotifications((prev) => prev.filter((n) => n._id !== notifId))
+    if (target && !target.read) {
+      setUnreadCount((c) => Math.max(0, c - 1))
+    }
+    try {
+      await notificationApi.deleteNotification(notifId)
+    } catch (err) {
+      console.warn('Failed to delete notification:', err)
+    }
+  }
+
+  const handleClearRead = async () => {
+    const hasRead = notifications.some((n) => n.read)
+    if (!hasRead || actionLoading) return
+    setActionLoading(true)
+    setNotifications((prev) => prev.filter((n) => !n.read))
+    try {
+      await notificationApi.clearNotifications({ readOnly: true })
+    } catch (err) {
+      console.warn('Failed to clear read notifications:', err)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const handleNotificationClick = async (notif) => {
     // Mark as read in background if unread
     if (!notif.read) {
@@ -159,17 +190,31 @@ export function CustomerNotificationsPage() {
           </div>
         </div>
 
-        {unreadCount > 0 && (
-          <button
-            type="button"
-            disabled={actionLoading}
-            onClick={handleMarkAllRead}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-brand hover:bg-brand/5 active:scale-95 transition disabled:opacity-50"
-          >
-            <Check className="h-3.5 w-3.5" />
-            Mark all read
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              disabled={actionLoading}
+              onClick={handleMarkAllRead}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-brand hover:bg-brand/5 active:scale-95 transition disabled:opacity-50"
+            >
+              <Check className="h-3.5 w-3.5" />
+              Mark all read
+            </button>
+          )}
+          {notifications.some((n) => n.read) && (
+            <button
+              type="button"
+              disabled={actionLoading}
+              onClick={handleClearRead}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 active:scale-95 transition disabled:opacity-50"
+              title="Clear all read notifications"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Clear read
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -238,138 +283,152 @@ export function CustomerNotificationsPage() {
         </GlassPanel>
       ) : (
         <div className="space-y-2.5">
-          {displayedNotifications.map((notif, index) => {
-            const isBookingAccepted = notif.type === 'BOOKING_ACCEPTED'
-            const isBookingCancelled = notif.type === 'BOOKING_CANCELLED'
-            const hasBooking = Boolean(notif.bookingId)
+          <AnimatePresence initial={false}>
+            {displayedNotifications.map((notif, index) => {
+              const isBookingAccepted = notif.type === 'BOOKING_ACCEPTED'
+              const isBookingCancelled = notif.type === 'BOOKING_CANCELLED'
+              const hasBooking = Boolean(notif.bookingId)
 
-            let icon = <Bell className="h-5 w-5 text-brand" />
-            let badgeBg = 'bg-brand/10 text-brand ring-brand/20'
+              let icon = <Bell className="h-5 w-5 text-brand" />
+              let badgeBg = 'bg-brand/10 text-brand ring-brand/20'
 
-            if (isBookingAccepted) {
-              icon = <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-              badgeBg = 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-            } else if (isBookingCancelled) {
-              icon = <XCircle className="h-5 w-5 text-rose-600" />
-              badgeBg = 'bg-rose-50 text-rose-700 ring-rose-200'
-            } else if (notif.type === 'BOOKING_REMINDER') {
-              icon = <Clock className="h-5 w-5 text-blue-600" />
-              badgeBg = 'bg-blue-50 text-blue-700 ring-blue-200'
-            }
+              if (isBookingAccepted) {
+                icon = <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                badgeBg = 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+              } else if (isBookingCancelled) {
+                icon = <XCircle className="h-5 w-5 text-rose-600" />
+                badgeBg = 'bg-rose-50 text-rose-700 ring-rose-200'
+              } else if (notif.type === 'BOOKING_REMINDER') {
+                icon = <Clock className="h-5 w-5 text-blue-600" />
+                badgeBg = 'bg-blue-50 text-blue-700 ring-blue-200'
+              }
 
-            return (
-              <motion.div
-                key={notif._id}
-                initial={reduce ? false : { opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.03 }}
-              >
-                <div
-                  onClick={() => handleNotificationClick(notif)}
-                  className={`group relative flex items-start gap-3.5 rounded-2xl border p-4 transition cursor-pointer select-none ${
-                    notif.read
-                      ? 'border-slate-200/80 bg-white/70 hover:bg-white hover:border-slate-300'
-                      : 'border-brand/30 bg-white shadow-sm ring-1 ring-brand/10 hover:border-brand/50'
-                  }`}
+              return (
+                <motion.div
+                  key={notif._id}
+                  initial={reduce ? false : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, height: 0, marginBottom: 0, overflow: 'hidden' }}
+                  transition={{ duration: 0.2 }}
                 >
-                  {/* Unread Indicator Bar */}
-                  {!notif.read && (
-                    <span
-                      className="absolute left-0 top-3 bottom-3 w-1 rounded-r-full bg-brand"
-                      aria-hidden
-                    />
-                  )}
-
-                  {/* Icon */}
                   <div
-                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ring-1 ${badgeBg}`}
+                    onClick={() => handleNotificationClick(notif)}
+                    className={`group relative flex items-start gap-3.5 rounded-2xl border p-4 transition cursor-pointer select-none ${
+                      notif.read
+                        ? 'border-slate-200/80 bg-white/70 hover:bg-white hover:border-slate-300'
+                        : 'border-brand/30 bg-white shadow-sm ring-1 ring-brand/10 hover:border-brand/50'
+                    }`}
                   >
-                    {icon}
-                  </div>
+                    {/* Unread Indicator Bar */}
+                    {!notif.read && (
+                      <span
+                        className="absolute left-0 top-3 bottom-3 w-1 rounded-r-full bg-brand"
+                        aria-hidden
+                      />
+                    )}
 
-                  {/* Content */}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <h4 className="text-sm font-extrabold text-slate-900 group-hover:text-brand transition leading-snug">
-                        {notif.title}
-                      </h4>
-                      <span className="shrink-0 text-[11px] font-bold text-slate-400">
-                        {formatNotificationTime(notif.createdAt)}
-                      </span>
+                    {/* Icon */}
+                    <div
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ring-1 ${badgeBg}`}
+                    >
+                      {icon}
                     </div>
 
-                    <p className="mt-1 text-xs font-medium text-slate-600 leading-relaxed">
-                      {notif.body}
-                    </p>
+                    {/* Content */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="text-sm font-extrabold text-slate-900 group-hover:text-brand transition leading-snug">
+                          {notif.title}
+                        </h4>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-[11px] font-bold text-slate-400">
+                            {formatNotificationTime(notif.createdAt)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => handleRemoveNotification(notif._id, e)}
+                            className="flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:bg-rose-100 transition active:scale-90"
+                            title="Remove notification"
+                            aria-label="Remove notification"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
 
-                    {/* Rich Partner Details Card for Accepted Bookings */}
-                    {isBookingAccepted && notif.metadata?.partnerName && (
-                      <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 space-y-2.5">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            {notif.metadata.partnerAvatar ? (
-                              <img
-                                src={notif.metadata.partnerAvatar}
-                                alt={notif.metadata.partnerName}
-                                className="h-9 w-9 shrink-0 rounded-xl object-cover ring-1 ring-emerald-200"
-                              />
-                            ) : (
-                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-200/80 text-emerald-800 font-bold text-xs">
-                                {notif.metadata.partnerName.charAt(0).toUpperCase()}
-                              </div>
-                            )}
-                            <div className="min-w-0">
-                              <p className="text-xs font-black text-slate-900 truncate">
-                                {notif.metadata.partnerName}
-                              </p>
-                              {notif.metadata.partnerPhone && (
-                                <p className="text-[11px] font-bold text-emerald-700">
-                                  {notif.metadata.partnerPhone}
-                                </p>
+                      <p className="mt-1 text-xs font-medium text-slate-600 leading-relaxed">
+                        {notif.body}
+                      </p>
+
+                      {/* Rich Partner Details Card for Accepted Bookings */}
+                      {isBookingAccepted && notif.metadata?.partnerName && (
+                        <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 space-y-2.5">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              {notif.metadata.partnerAvatar ? (
+                                <img
+                                  src={notif.metadata.partnerAvatar}
+                                  alt={notif.metadata.partnerName}
+                                  className="h-9 w-9 shrink-0 rounded-xl object-cover ring-1 ring-emerald-200"
+                                />
+                              ) : (
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-200/80 text-emerald-800 font-bold text-xs">
+                                  {notif.metadata.partnerName.charAt(0).toUpperCase()}
+                                </div>
                               )}
+                              <div className="min-w-0">
+                                <p className="text-xs font-black text-slate-900 truncate">
+                                  {notif.metadata.partnerName}
+                                </p>
+                                {notif.metadata.partnerPhone && (
+                                  <p className="text-[11px] font-bold text-emerald-700">
+                                    {notif.metadata.partnerPhone}
+                                  </p>
+                                )}
+                              </div>
                             </div>
+
+                            {notif.metadata.partnerPhone && (
+                              <a
+                                href={`tel:${notif.metadata.partnerPhone}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex items-center gap-1 shrink-0 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-95 transition"
+                              >
+                                <Phone className="h-3 w-3" />
+                                Call
+                              </a>
+                            )}
                           </div>
 
-                          {notif.metadata.partnerPhone && (
-                            <a
-                              href={`tel:${notif.metadata.partnerPhone}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="flex items-center gap-1 shrink-0 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-95 transition"
-                            >
-                              <Phone className="h-3 w-3" />
-                              Call
-                            </a>
+                          {notif.metadata.startOtp && (
+                            <div className="flex items-center justify-between rounded-lg bg-white/90 border border-emerald-200/70 px-2.5 py-1.5">
+                              <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                                <KeyRound className="h-3 w-3 text-emerald-600" /> Start Job OTP
+                              </span>
+                              <span className="font-mono text-xs font-black tracking-widest text-emerald-800">
+                                {notif.metadata.startOtp}
+                              </span>
+                            </div>
                           )}
                         </div>
+                      )}
 
-                        {notif.metadata.startOtp && (
-                          <div className="flex items-center justify-between rounded-lg bg-white/90 border border-emerald-200/70 px-2.5 py-1.5">
-                            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                              <KeyRound className="h-3 w-3 text-emerald-600" /> Start Job OTP
-                            </span>
-                            <span className="font-mono text-xs font-black tracking-widest text-emerald-800">
-                              {notif.metadata.startOtp}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Metadata Pill / Booking Action */}
-                    {hasBooking && (
-                      <div className="mt-2.5 flex items-center justify-between text-[11px] font-bold text-brand">
-                        <span className="inline-flex items-center gap-1">
-                          <Sparkles className="h-3 w-3" />
-                          Track Booking Live
-                        </span>
-                        <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5 text-slate-400 group-hover:text-brand" />
-                      </div>
-                    )}
+                      {/* Metadata Pill / Booking Action */}
+                      {hasBooking && (
+                        <div className="mt-2.5 flex items-center justify-between text-[11px] font-bold text-brand">
+                          <span className="inline-flex items-center gap-1">
+                            <Sparkles className="h-3 w-3" />
+                            Track Booking Live
+                          </span>
+                          <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5 text-slate-400 group-hover:text-brand" />
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            )
-          })}
+                </motion.div>
+              )
+            })}
+          </AnimatePresence>
         </div>
       )}
     </div>

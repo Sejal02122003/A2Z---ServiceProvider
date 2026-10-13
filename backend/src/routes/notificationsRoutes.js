@@ -12,6 +12,8 @@ router.get('/', notificationController.getMyNotifications)
 router.get('/unread-count', notificationController.getUnreadNotificationCount)
 router.patch('/:id/read', notificationController.markNotificationRead)
 router.post('/read-all', notificationController.markAllNotificationsRead)
+router.delete('/:id', notificationController.deleteNotification)
+router.delete('/', notificationController.clearAllNotifications)
 
 // FCM Device Token management
 router.post('/token', notificationController.saveFcmToken)

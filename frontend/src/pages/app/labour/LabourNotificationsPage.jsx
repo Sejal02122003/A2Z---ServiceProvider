@@ -153,6 +153,11 @@ export function LabourNotificationsPage() {
 
   const handleDismiss = (id, e) => {
     e?.stopPropagation()
+    const target = mergedItems.find((n) => n.id === id)
+    if (target?.isServer) {
+      bookingReminderApi.deleteNotification(id).catch(() => {})
+      setServerNotifications((prev) => prev.filter((sn) => sn._id !== id))
+    }
     dismissNotification(id)
     setTick((t) => t + 1)
   }

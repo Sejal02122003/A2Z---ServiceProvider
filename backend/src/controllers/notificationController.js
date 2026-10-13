@@ -163,3 +163,45 @@ export const removeFcmToken = asyncHandler(async (req, res) => {
   await user.save()
   return sendSuccess(res, { message: 'FCM token removed successfully' })
 })
+
+/**
+ * DELETE /api/v1/notifications/:id
+ * Remove a single notification for the authenticated user
+ */
+export const deleteNotification = asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const userId = req.user._id
+
+  const notification = await InAppNotification.findOneAndDelete({ _id: id, userId })
+
+  if (!notification) {
+    return sendError(res, {
+      message: 'Notification not found or access denied',
+      statusCode: HTTP_STATUS.NOT_FOUND,
+    })
+  }
+
+  return sendSuccess(res, { message: 'Notification removed successfully' })
+})
+
+/**
+ * DELETE /api/v1/notifications
+ * Clear all notifications (or read-only notifications) for the authenticated user
+ * Query params: readOnly (boolean)
+ */
+export const clearAllNotifications = asyncHandler(async (req, res) => {
+  const { readOnly = false } = req.query
+  const userId = req.user._id
+
+  const query = { userId }
+  if (String(readOnly) === 'true') {
+    query.read = true
+  }
+
+  const result = await InAppNotification.deleteMany(query)
+
+  return sendSuccess(res, {
+    message: 'Notifications cleared successfully',
+    data: { deletedCount: result.deletedCount },
+  })
+})

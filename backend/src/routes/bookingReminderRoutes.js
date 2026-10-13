@@ -14,6 +14,8 @@ router.use(protect)
 router.get('/my-notifications', reminderController.getMyNotifications)
 router.patch('/my-notifications/:id/read', reminderController.markNotificationRead)
 router.post('/my-notifications/read-all', reminderController.markAllNotificationsRead)
+router.delete('/my-notifications/:id', reminderController.deleteNotification)
+router.delete('/my-notifications', reminderController.clearAllNotifications)
 
 /**
  * Admin management routes (Restricted to ADMIN role)

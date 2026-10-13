@@ -244,3 +244,39 @@ export const markAllNotificationsRead = asyncHandler(async (req, res) => {
 
   return sendSuccess(res, { message: 'All notifications marked as read' })
 })
+
+// @desc    Delete a single in-app notification
+// @route   DELETE /api/v1/reminders/my-notifications/:id
+// @access  Private (Customer / Labour / Contractor)
+export const deleteNotification = asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const userId = req.user._id
+
+  const notification = await InAppNotification.findOneAndDelete({ _id: id, userId })
+
+  if (!notification) {
+    return sendError(res, { message: 'Notification not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  return sendSuccess(res, { message: 'Notification removed successfully' })
+})
+
+// @desc    Clear notifications (optionally only read ones)
+// @route   DELETE /api/v1/reminders/my-notifications
+// @access  Private (Customer / Labour / Contractor)
+export const clearAllNotifications = asyncHandler(async (req, res) => {
+  const { readOnly = false } = req.query
+  const userId = req.user._id
+
+  const query = { userId }
+  if (String(readOnly) === 'true') {
+    query.read = true
+  }
+
+  const result = await InAppNotification.deleteMany(query)
+
+  return sendSuccess(res, {
+    message: 'Notifications cleared successfully',
+    data: { deletedCount: result.deletedCount },
+  })
+})

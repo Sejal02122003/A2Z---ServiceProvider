@@ -61,4 +61,9 @@ export const bookingReminderApi = {
     apiRequest('/reminders/my-notifications/read-all', {
       method: 'POST',
     }),
+
+  deleteNotification: (id) =>
+    apiRequest(`/reminders/my-notifications/${id}`, {
+      method: 'DELETE',
+    }),
 }
