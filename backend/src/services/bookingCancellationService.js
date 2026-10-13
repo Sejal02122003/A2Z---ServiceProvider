@@ -1456,7 +1456,7 @@ export async function processCustomerCancellation({
 
   // 10. Real-time Socket & Push Notifications
   import('../socket.js')
-    .then(({ emitToUser, getIO }) => {
+    .then(({ emitToUser, getIo, getIO }) => {
       emitToUser(customerId, 'BOOKING_STATUS_UPDATE', {
         bookingId: booking._id,
         status: 'CANCELLED',
@@ -1464,9 +1464,34 @@ export async function processCustomerCancellation({
         cancellationReason: finalReasonText,
       })
 
+      const vendorIdsToNotify = new Set()
       if (assignedVendorId) {
         const vid = typeof assignedVendorId === 'object' ? assignedVendorId._id : assignedVendorId
+        if (vid) vendorIdsToNotify.add(String(vid))
+      }
+      if (booking.laborId) {
+        const vid = typeof booking.laborId === 'object' ? booking.laborId._id : booking.laborId
+        if (vid) vendorIdsToNotify.add(String(vid))
+      }
+      if (booking.acceptedLabourId) {
+        const vid = typeof booking.acceptedLabourId === 'object' ? booking.acceptedLabourId._id : booking.acceptedLabourId
+        if (vid) vendorIdsToNotify.add(String(vid))
+      }
+      if (Array.isArray(booking.assignments)) {
+        booking.assignments.forEach((a) => {
+          const lId = a.labourId ? (typeof a.labourId === 'object' ? a.labourId._id : a.labourId) : null
+          if (lId) vendorIdsToNotify.add(String(lId))
+        })
+      }
+
+      for (const vid of vendorIdsToNotify) {
         emitToUser(vid, 'BOOKING_STATUS_UPDATE', {
+          bookingId: booking._id,
+          status: 'CANCELLED',
+          cancelledBy: 'CUSTOMER',
+          cancellationReason: finalReasonText,
+        })
+        emitToUser(vid, 'BOOKING_CANCELLED', {
           bookingId: booking._id,
           status: 'CANCELLED',
           cancelledBy: 'CUSTOMER',
@@ -1474,12 +1499,28 @@ export async function processCustomerCancellation({
         })
       }
 
-      if (previousStatus === 'BROADCASTING') {
-        const io = getIO()
+      try {
+        const ioGetter = getIo || getIO
+        const io = ioGetter ? ioGetter() : null
         if (io) {
-          io.emit('BOOKING_EXPIRED', { bookingId: String(booking._id) })
-          io.emit('BOOKING_CANCELLED', { bookingId: String(booking._id) })
+          io.emit('BOOKING_STATUS_UPDATE', {
+            bookingId: String(booking._id),
+            status: 'CANCELLED',
+            cancelledBy: 'CUSTOMER',
+            cancellationReason: finalReasonText,
+          })
+          io.emit('BOOKING_CANCELLED', {
+            bookingId: String(booking._id),
+            status: 'CANCELLED',
+            cancelledBy: 'CUSTOMER',
+            cancellationReason: finalReasonText,
+          })
+          if (previousStatus === 'BROADCASTING') {
+            io.emit('BOOKING_EXPIRED', { bookingId: String(booking._id) })
+          }
         }
+      } catch (ioErr) {
+        console.warn('[Socket Broadcast Warning]', ioErr?.message)
       }
     })
     .catch((err) => console.error('[Socket Warning]', err))

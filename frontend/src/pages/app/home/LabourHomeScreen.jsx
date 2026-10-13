@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   AlertCircle,
@@ -35,6 +35,7 @@ import {
   Timer,
   Wallet,
   Wrench,
+  X,
 } from 'lucide-react'
 import { KYC_STATUS } from '../../../constants/userRoles.js'
 import { AppPrimaryButton } from '../../../components/app/AppPrimaryButton.jsx'
@@ -132,6 +133,18 @@ function SafetyBannerIcon({ icon }) {
 export function LabourHomeScreen({ user }) {
   const reduce = useReducedMotion()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [cancellationNotice, setCancellationNotice] = useState(
+    location.state?.cancellationNotice || ''
+  )
+
+  useEffect(() => {
+    if (location.state?.cancellationNotice) {
+      setCancellationNotice(location.state.cancellationNotice)
+      window.history.replaceState({}, document.title)
+    }
+  }, [location.state])
+
   const now = useNow(1000)
   const [wallet, setWallet] = useState(readWalletState)
   const [jobs, setJobs] = useState({ offers: [], active: [], history: [] }) // legacy fallback if needed
@@ -393,6 +406,36 @@ export function LabourHomeScreen({ user }) {
         >
           {toast}
         </p>
+      ) : null}
+
+      {cancellationNotice ? (
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mx-4 rounded-2xl border border-rose-200/90 bg-rose-50/95 p-4 text-rose-900 shadow-sm backdrop-blur-xs"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-rose-100 p-2 text-rose-600 shrink-0">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-rose-900">Job Cancelled by Customer</p>
+                <p className="mt-0.5 text-xs text-rose-700 leading-relaxed">
+                  {cancellationNotice}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCancellationNotice('')}
+              className="rounded-lg p-1 text-rose-400 hover:bg-rose-100 hover:text-rose-700 transition"
+              aria-label="Dismiss notice"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </motion.div>
       ) : null}
 
       {/* 1. Header */}

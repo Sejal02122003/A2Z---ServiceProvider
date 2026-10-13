@@ -74,6 +74,22 @@ const STATUS_CONFIG = {
 
 const STEP_ORDER = ['ACCEPTED', 'EN_ROUTE', 'STARTED', 'COMPLETED']
 
+function isBookingCancelledForLabour(b, user) {
+  if (!b) return false
+  if (b.status === 'CANCELLED') return true
+  if (Array.isArray(b.assignments) && b.assignments.length > 0) {
+    if (user && user._id) {
+      const myAssignment = b.assignments.find((a) => {
+        const aId = typeof a.labourId === 'object' ? a.labourId?._id : a.labourId
+        return String(aId) === String(user._id)
+      })
+      if (myAssignment && myAssignment.status === 'CANCELLED') return true
+    }
+    if (b.assignments.every((a) => a.status === 'CANCELLED')) return true
+  }
+  return false
+}
+
 export function ActiveJob() {
   const { bookingId } = useParams()
   const navigate = useNavigate()
@@ -83,6 +99,17 @@ export function ActiveJob() {
   const [showPaymentWaiting, setShowPaymentWaiting] = useState(false)
   const mapRef = useRef(null)
   const markerInstance = useRef(null)
+
+  const redirectToHomeOnCancellation = useCallback((reason) => {
+    const finalReason = reason || 'This booking was cancelled by the customer.'
+    navigate('/app', {
+      replace: true,
+      state: {
+        cancelledBookingId: bookingId,
+        cancellationNotice: finalReason,
+      },
+    })
+  }, [bookingId, navigate])
 
   const [booking, setBooking] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -144,6 +171,10 @@ export function ActiveJob() {
       .then((res) => {
         if (cancelled) return
         const b = res.data?.booking
+        if (b && isBookingCancelledForLabour(b, user)) {
+          redirectToHomeOnCancellation(b.cancellationReason)
+          return
+        }
         setBooking(b)
         if (b) {
           loadMaterialsData(b)
@@ -156,14 +187,19 @@ export function ActiveJob() {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [bookingId, loadMaterialsData])
+  }, [bookingId, loadMaterialsData, redirectToHomeOnCancellation, user])
 
   // Socket updates
   useEffect(() => {
     if (!socket || !bookingId) return
 
     const handleStatusUpdate = (data) => {
-      if (data.bookingId === bookingId) {
+      if (String(data.bookingId) === String(bookingId)) {
+        if (data.status === 'CANCELLED') {
+          redirectToHomeOnCancellation(data.cancellationReason)
+          return
+        }
+
         setBooking((prev) => {
           if (!prev) return prev
           const newBooking = { ...prev, status: data.status, paymentStatus: data.paymentStatus || prev.paymentStatus }
@@ -190,6 +226,12 @@ export function ActiveJob() {
       }
     }
 
+    const handleBookingCancelled = (data) => {
+      if (String(data?.bookingId) === String(bookingId)) {
+        redirectToHomeOnCancellation(data?.cancellationReason || data?.reason)
+      }
+    }
+
     const handleMaterialUpdate = (data) => {
       if (String(data.bookingId) === String(bookingId) || String(data.requestId) === String(materialRequest?._id)) {
         if (data.request) {
@@ -205,12 +247,37 @@ export function ActiveJob() {
     }
 
     socket.on('BOOKING_STATUS_UPDATE', handleStatusUpdate)
+    socket.on('BOOKING_CANCELLED', handleBookingCancelled)
     socket.on('MATERIAL_REQUEST_UPDATED', handleMaterialUpdate)
     return () => {
       socket.off('BOOKING_STATUS_UPDATE', handleStatusUpdate)
+      socket.off('BOOKING_CANCELLED', handleBookingCancelled)
       socket.off('MATERIAL_REQUEST_UPDATED', handleMaterialUpdate)
     }
-  }, [socket, bookingId, materialRequest?._id, booking, loadMaterialsData, user])
+  }, [socket, bookingId, materialRequest?._id, booking, loadMaterialsData, user, redirectToHomeOnCancellation])
+
+  // Polling fallback to ensure labourer is redirected if customer cancels
+  useEffect(() => {
+    if (!bookingId) return
+    const pollId = setInterval(() => {
+      bookingsApi.getBookingStatus(bookingId)
+        .then((res) => {
+          const b = res.data?.booking
+          if (b && isBookingCancelledForLabour(b, user)) {
+            redirectToHomeOnCancellation(b.cancellationReason)
+          }
+        })
+        .catch(() => {})
+    }, 5000)
+    return () => clearInterval(pollId)
+  }, [bookingId, redirectToHomeOnCancellation, user])
+
+  // Reactive redirect if local booking is marked CANCELLED
+  useEffect(() => {
+    if (booking && isBookingCancelledForLabour(booking, user)) {
+      redirectToHomeOnCancellation(booking.cancellationReason)
+    }
+  }, [booking, redirectToHomeOnCancellation, user])
 
   const handleRequestMaterials = async () => {
     setRequestingMaterials(true)
@@ -385,6 +452,26 @@ export function ActiveJob() {
         <AppStackScreenHeader title="Active Job" backTo="/app" />
         <GlassPanel className="p-6 text-center">
           <p className="text-sm font-semibold text-rose-700">{error || 'Job not found'}</p>
+        </GlassPanel>
+      </div>
+    )
+  }
+
+  if (isBookingCancelledForLabour(booking, user)) {
+    return (
+      <div className="space-y-4">
+        <AppStackScreenHeader title="Booking Cancelled" backTo="/app" />
+        <GlassPanel className="p-8 text-center space-y-4 bg-rose-50/70 border-rose-200">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+            <X className="h-8 w-8" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">Booking Cancelled</h3>
+            <p className="mt-1 text-sm text-slate-600">
+              {booking.cancellationReason || 'This booking was cancelled by the customer.'}
+            </p>
+          </div>
+          <p className="text-xs text-slate-500">Redirecting to home screen...</p>
         </GlassPanel>
       </div>
     )

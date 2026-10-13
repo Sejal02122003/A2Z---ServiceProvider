@@ -61,6 +61,8 @@ export const getIo = () => {
   return io
 }
 
+export const getIO = getIo
+
 export const emitToUser = (userId, eventName, payload) => {
   if (io) {
     io.to(userId.toString()).emit(eventName, payload)
