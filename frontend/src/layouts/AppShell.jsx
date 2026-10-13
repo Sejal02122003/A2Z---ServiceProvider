@@ -19,21 +19,50 @@ import { readAppUserLocation } from '../lib/appUserLocationStorage.js'
 import { AppUserLocationModal } from '../components/app/AppUserLocationModal.jsx'
 import { BOOT_ROUTES } from '../constants/bootFlow.js'
 import { APP_HOME_LOCATION, APP_HOME_PATH, hasBookingFlowQuery } from '../lib/bookingFlowNavigation.js'
+import { notificationApi } from '../api/notificationApi.js'
+import { useSocket } from '../context/SocketContext.jsx'
 
 export function AppShell() {
   const { pathname, search } = useLocation()
   const navigate = useNavigate()
   const { logout, user, isGuest } = useAuth()
+  const socket = useSocket()
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [locationModalOpen, setLocationModalOpen] = useState(false)
   const [appLocation, setAppLocation] = useState(() => readAppUserLocation())
   const headerRef = useRef(null)
   const reduce = useReducedMotion()
 
+  useEffect(() => {
+    if (!user || isGuest) return
+    let cancelled = false
+    notificationApi.getUnreadCount()
+      .then((res) => {
+        if (!cancelled && res?.data?.unreadCount !== undefined) {
+          setUnreadNotifications(res.data.unreadCount)
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [user, isGuest, pathname])
+
+  useEffect(() => {
+    if (!socket) return
+    const onNew = () => setUnreadNotifications((c) => c + 1)
+    socket.on('NEW_IN_APP_NOTIFICATION', onNew)
+    socket.on('BOOKING_ACCEPTED', onNew)
+    return () => {
+      socket.off('NEW_IN_APP_NOTIFICATION', onNew)
+      socket.off('BOOKING_ACCEPTED', onNew)
+    }
+  }, [socket])
+
   const { headerTagline, bottomNav, drawerNav } = useMemo(() => getAppNavigation(user?.role), [user?.role])
 
   const isIndividualAppHome = (user?.role === USER_ROLES.CUSTOMER || user?.role === USER_ROLES.CONTRACTOR) && pathname === '/app'
   const isLabourAppHome = user?.role === USER_ROLES.LABOUR && pathname === '/app'
+  const isNotifications = pathname === '/app/notifications'
   const isLabourNotifications = user?.role === USER_ROLES.LABOUR && pathname === '/app/notifications'
   const isLabourJobs = user?.role === USER_ROLES.LABOUR && pathname === '/app/jobs'
   const isLabourEarnings = user?.role === USER_ROLES.LABOUR && pathname === '/app/earnings'
@@ -49,11 +78,11 @@ export function AppShell() {
     pathname === '/app/support' ||
     pathname === '/app/profile' ||
     pathname === '/app/wallet' ||
+    pathname === '/app/notifications' ||
     isLabourAppHome ||
     isLabourJobs ||
     isLabourEarnings ||
-    isLabourKyc ||
-    isLabourNotifications
+    isLabourKyc
   const title = getAppShellTitle(pathname)
   const drawerInitials = adminInitials(user)
   const profileImageUrl = user?.profileImageUrl?.trim()
@@ -391,11 +420,16 @@ export function AppShell() {
                   </div>
                 </button>
                 <Link
-                  to="/app/support"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition active:scale-95 hover:bg-white/25"
-                  aria-label="Support and notifications"
+                  to="/app/notifications"
+                  className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition active:scale-95 hover:bg-white/25"
+                  aria-label="Notifications"
                 >
                   <Bell className="h-5 w-5" aria-hidden />
+                  {unreadNotifications > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white shadow-sm ring-2 ring-brand">
+                      {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                    </span>
+                  )}
                 </Link>
                 <Link
                   to="/app/profile"

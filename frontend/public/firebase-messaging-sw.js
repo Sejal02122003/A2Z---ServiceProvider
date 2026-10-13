@@ -18,10 +18,37 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
   const notificationTitle = payload?.notification?.title || 'Notification';
+  const link = payload?.data?.link || (payload?.data?.bookingId ? `/app/tracking/${payload.data.bookingId}` : '/app');
+  
   const notificationOptions = {
     body: payload?.notification?.body || '',
-    icon: '/favicon.ico'
+    icon: '/favicon.ico',
+    badge: '/favicon.ico',
+    data: {
+      ...payload?.data,
+      link,
+    },
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
 });
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.link || '/app';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+

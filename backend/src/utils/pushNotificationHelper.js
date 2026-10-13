@@ -22,7 +22,14 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
 
     if (uniqueTokens.length === 0) {
       console.log(`No FCM tokens found for user ${userId}`);
-      return;
+      return {
+        success: false,
+        noTokens: true,
+        totalTokens: 0,
+        successCount: 0,
+        failureCount: 0,
+        message: 'No registered device tokens',
+      };
     }
 
     // Prepare message
@@ -46,15 +53,53 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
     }
 
     const response = await admin.messaging().sendEachForMulticast(message);
-    console.log(`Successfully sent: ${response.successCount} messages to user ${userId}`);
-    if (response.failureCount > 0) {
-      console.log(`Failed: ${response.failureCount} messages to user ${userId}`);
-      // Optional: Remove invalid tokens based on response.responses
+    console.log(`[FCM] Sent: ${response.successCount} success, ${response.failureCount} failed for user ${userId}`);
+
+    // Detect and deactivate/clean invalid or expired FCM tokens
+    let invalidTokensCleaned = 0;
+    if (response.failureCount > 0 && Array.isArray(response.responses)) {
+      const invalidTokens = [];
+      response.responses.forEach((resp, index) => {
+        if (!resp.success) {
+          const errCode = resp.error?.code;
+          if (
+            errCode === 'messaging/invalid-registration-token' ||
+            errCode === 'messaging/registration-token-not-registered'
+          ) {
+            invalidTokens.push(uniqueTokens[index]);
+          }
+        }
+      });
+
+      if (invalidTokens.length > 0) {
+        invalidTokensCleaned = invalidTokens.length;
+        console.log(`[FCM] Deactivating ${invalidTokensCleaned} stale/invalid FCM tokens for user ${userId}`);
+        await User.findByIdAndUpdate(userId, {
+          $pull: {
+            fcmTokens: { $in: invalidTokens },
+            fcmTokenMobile: { $in: invalidTokens },
+          },
+        }).catch((err) => console.warn(`[FCM] Error pruning invalid tokens:`, err.message));
+      }
     }
 
-    return response;
+    return {
+      success: response.successCount > 0,
+      totalTokens: uniqueTokens.length,
+      successCount: response.successCount,
+      failureCount: response.failureCount,
+      invalidTokensCleaned,
+      rawResponse: response,
+    };
   } catch (error) {
-    console.error(`Error sending notification to user ${userId}:`, error);
-    // Don't throw - notifications are usually non-critical side effects
+    console.warn(`[FCM Warning] Failed to send push notification to user ${userId}:`, error.message || error);
+    return {
+      success: false,
+      totalTokens: 0,
+      successCount: 0,
+      failureCount: 1,
+      error: error.message || String(error),
+    };
   }
 }
+

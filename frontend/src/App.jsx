@@ -64,14 +64,8 @@ function App() {
   useEffect(() => {
     initializePushNotifications();
     setupForegroundNotificationHandler((payload) => {
-      // You can replace this with a custom toast notification library like react-hot-toast if desired
-      if (payload?.notification) {
-        alert(`New Notification: ${payload.notification.title}\n${payload.notification.body}`);
-      }
-      if (payload.data?.link) {
-        // Optional navigation handling based on data payload
-        console.log('Navigating to', payload.data.link);
-      }
+      console.log('[PUSH] Foreground notification received:', payload);
+      window.dispatchEvent(new CustomEvent('a2z-push-notification', { detail: payload }));
     });
   }, []);
 

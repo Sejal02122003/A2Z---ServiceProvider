@@ -32,6 +32,7 @@ import { VendorMaterialsPage } from '../pages/app/VendorMaterialsPage.jsx'
 import { VendorTrialStatusPage } from '../pages/app/VendorTrialStatusPage.jsx'
 import VendorRewardsPage from '../pages/app/VendorRewardsPage.jsx'
 import LabourPenaltiesPage from '../pages/app/labour/LabourPenaltiesPage.jsx'
+import { CustomerNotificationsPage } from '../pages/app/CustomerNotificationsPage.jsx'
 import { USER_ROLES } from '../constants/userRoles.js'
 
 
@@ -41,6 +42,14 @@ function AppRoleWalletWrapper() {
     return <LaborWallet />
   }
   return <UserWalletPage />
+}
+
+function AppRoleNotificationsWrapper() {
+  const { user } = useAuth()
+  if (user?.role === USER_ROLES.LABOUR) {
+    return <LabourNotificationsPage />
+  }
+  return <CustomerNotificationsPage />
 }
 
 
@@ -262,8 +271,8 @@ export const appShellChildRoutes = (
     <Route
       path="notifications"
       element={
-        <RoleRoute allow={[USER_ROLES.LABOUR]}>
-          <LabourNotificationsPage />
+        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR, USER_ROLES.LABOUR]}>
+          <AppRoleNotificationsWrapper />
         </RoleRoute>
       }
     />

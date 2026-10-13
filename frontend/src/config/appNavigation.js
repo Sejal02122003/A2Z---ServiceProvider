@@ -17,6 +17,7 @@ import {
   Package,
   Award,
   Wallet,
+  Bell,
 } from 'lucide-react'
 import { USER_ROLES } from '../constants/userRoles.js'
 
@@ -36,6 +37,7 @@ const byRole = {
       { id: 'search', to: '/app/search', label: 'Search services', icon: Search },
       { id: 'billing', to: '/app/billing', label: 'Invoice & Billing', icon: FileText },
       { id: 'book', to: '/app/my-bookings', label: 'My bookings', icon: ClipboardList },
+      { id: 'notifications', to: '/app/notifications', label: 'Notifications', icon: Bell },
       { id: 'support', to: '/app/support', label: 'Support & issues', icon: LifeBuoy },
       { id: 'privacy', to: '/app/privacy-policy', label: 'Privacy Policy', icon: FileText },
       { id: 'terms', to: '/app/terms-conditions', label: 'Terms & Conditions', icon: FileText },

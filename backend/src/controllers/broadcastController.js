@@ -213,15 +213,15 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     assignedPricePerHour = booking.basePrice ? Math.round(booking.basePrice / bookingHours) : 0
   }
 
-  // Push to accepted lists
-  booking.acceptedLabourIds = booking.acceptedLabourIds || []
-  booking.acceptedLabourIds.push(labour._id)
+  // Determine total expected assignments to decide if fully ACCEPTED
+  const totalRequested = isContractorBooking
+    ? booking.contractorInfo.services.reduce((acc, s) => acc + (s.quantity || 1), 0)
+    : (booking.quantity || 1)
 
   const startOtp = Math.floor(1000 + Math.random() * 9000).toString()
   const completionOtp = Math.floor(1000 + Math.random() * 9000).toString()
 
-  booking.assignments = booking.assignments || []
-  booking.assignments.push({
+  const newAssignment = {
     labourId: labour._id,
     serviceId: assignedServiceId,
     serviceName: assignedServiceName,
@@ -229,23 +229,55 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     labourShare: assignedLabourShare,
     status: 'ACCEPTED',
     startOtp,
-    completionOtp
-  })
-
-  // For backward compatibility (quantity=1)
-  booking.acceptedLabourId = labour._id
-  booking.laborId = labour._id
-  
-  // Determine total expected assignments to decide if fully ACCEPTED
-  const totalRequested = isContractorBooking
-    ? booking.contractorInfo.services.reduce((acc, s) => acc + (s.quantity || 1), 0)
-    : (booking.quantity || 1)
-
-  if (booking.assignments.length >= totalRequested) {
-    booking.status = 'ACCEPTED'
+    completionOtp,
   }
 
-  await booking.save()
+  const willBeFullyAccepted = (booking.assignments?.length || 0) + 1 >= totalRequested
+  const setFields = {
+    acceptedLabourId: labour._id,
+    laborId: labour._id,
+  }
+  if (willBeFullyAccepted) {
+    setFields.status = 'ACCEPTED'
+  }
+
+  // Atomic conditional update to prevent double-assignment concurrent races
+  const updatedBooking = await Booking.findOneAndUpdate(
+    {
+      _id: bookingId,
+      status: 'BROADCASTING',
+      acceptedLabourIds: { $ne: labour._id },
+      $expr: {
+        $lt: [
+          { $size: { $ifNull: ['$acceptedLabourIds', []] } },
+          totalRequested,
+        ],
+      },
+    },
+    {
+      $push: {
+        acceptedLabourIds: labour._id,
+        assignments: newAssignment,
+      },
+      $set: setFields,
+    },
+    { new: true }
+  )
+
+  if (!updatedBooking) {
+    // Release cash reservation if concurrent accept race lost
+    if (booking.paymentMethod === 'CASH') {
+      const { releaseCashBookingCharges } = await import('../services/labourWalletService.js')
+      await releaseCashBookingCharges({ labourId: labour._id, bookingId: booking._id }).catch(() => {})
+    }
+    return sendError(res, {
+      message: 'Booking was already accepted by another partner or slots are full',
+      statusCode: HTTP_STATUS.CONFLICT,
+      code: 'BOOKING_ALREADY_ACCEPTED',
+    })
+  }
+
+  booking = updatedBooking
 
   // Auto-generate material requirement if service has mapped products
   import('../services/materialRequirementService.js')
@@ -257,7 +289,6 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     .catch(err => console.error('[Import Error]', err))
 
   // Increment subscription bookingsAccepted count
-
   if (accessCheck.subscription) {
     const { UserSubscription } = await import('../models/UserSubscription.js')
     await UserSubscription.findByIdAndUpdate(accessCheck.subscription._id, {
@@ -271,11 +302,20 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     $inc: { 'labourProfile.lifetimeBroadcastsAccepted': 1 }
   })
 
-  // Notify customer
+  // Trigger reliable booking confirmation notification to customer (Push + In-App Outbox)
+  import('../services/bookingNotificationService.js')
+    .then(({ sendBookingAcceptedNotification }) => {
+      sendBookingAcceptedNotification({
+        booking,
+        partner: labour,
+        assignment: newAssignment,
+      }).catch((err) => console.error('[Notification Dispatch Error on Accept]', err))
+    })
+    .catch((err) => console.error('[Import Error bookingNotificationService]', err))
+
+  // Notify sockets & expire broadcast for other partners if fully accepted
   import('../socket.js')
-    .then(({ emitToUser, getIo }) => {
-      emitToUser(booking.userId, 'BOOKING_ACCEPTED', { bookingId: booking._id, laborId: labour._id, quantity: booking.quantity, acceptedCount: booking.acceptedLabourIds.length })
-      
+    .then(({ getIo }) => {
       if (booking.status === 'ACCEPTED') {
         const io = getIo()
         if (io) {
