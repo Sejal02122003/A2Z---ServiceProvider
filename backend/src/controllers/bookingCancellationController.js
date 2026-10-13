@@ -10,6 +10,11 @@ import {
   waiveCancellationPenalty,
   getAdminCancellationOverviewStats,
   getAdminCancellationRecords,
+  evaluateCustomerCancellationPolicy,
+  getAdminCustomerCancellations,
+  getAdminCustomerCancellationHistory,
+  adminApplyCustomerRestriction,
+  adminLiftCustomerRestriction,
 } from '../services/bookingCancellationService.js'
 import { BookingCancellationRecord } from '../models/BookingCancellationRecord.js'
 
@@ -184,3 +189,68 @@ export const submitVendorCancellation = asyncHandler(async (req, res) => {
     data: result,
   })
 })
+
+/**
+ * 11. Customer: Check Active Cancellation Policy & Restriction Status
+ */
+export const getCustomerPolicyStatusController = asyncHandler(async (req, res) => {
+  const policyStatus = await evaluateCustomerCancellationPolicy(req.user._id)
+  return sendSuccess(res, { data: policyStatus })
+})
+
+/**
+ * 12. Admin: List Customers with Cancellation Records & Restriction Flags
+ */
+export const getAdminCustomerCancellationsController = asyncHandler(async (req, res) => {
+  const { page, limit, search, filter } = req.query
+  const data = await getAdminCustomerCancellations({ page, limit, search, filter })
+  return sendSuccess(res, { data })
+})
+
+/**
+ * 13. Admin: Get Detailed Customer Cancellation History & Policy Info
+ */
+export const getAdminCustomerHistoryController = asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const data = await getAdminCustomerCancellationHistory(id)
+  return sendSuccess(res, { data })
+})
+
+/**
+ * 14. Admin: Apply Customer Booking Restriction Manually
+ */
+export const adminRestrictCustomerController = asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { durationDays, reason, adminNote } = req.body
+
+  const result = await adminApplyCustomerRestriction(
+    id,
+    { durationDays, reason, adminNote },
+    req.user
+  )
+
+  return sendSuccess(res, {
+    message: result.message || 'Customer restricted successfully',
+    data: result,
+  })
+})
+
+/**
+ * 15. Admin: Lift Customer Booking Restriction Manually
+ */
+export const adminUnrestrictCustomerController = asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { reason, adminNote } = req.body
+
+  const result = await adminLiftCustomerRestriction(
+    id,
+    { reason, adminNote },
+    req.user
+  )
+
+  return sendSuccess(res, {
+    message: result.message || 'Customer restriction lifted successfully',
+    data: result,
+  })
+})
+

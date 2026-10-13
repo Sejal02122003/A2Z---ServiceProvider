@@ -173,6 +173,21 @@ const bookingCancellationRecordSchema = new mongoose.Schema(
     waivedAt: {
       type: Date,
     },
+    isCountedForPolicy: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
+    policyEvaluationSnapshot: {
+      eligibleCount: Number,
+      rollingWindowDays: Number,
+      warningThreshold: Number,
+      restrictionThreshold: Number,
+      warningTriggered: Boolean,
+      restrictionTriggered: Boolean,
+      restrictionMode: String,
+      actionTaken: String,
+    },
     // Deduplication key to prevent multiple records for same booking cancellation attempt
     dedupeKey: {
       type: String,
@@ -186,6 +201,7 @@ const bookingCancellationRecordSchema = new mongoose.Schema(
 
 bookingCancellationRecordSchema.index({ vendorId: 1, createdAt: -1 })
 bookingCancellationRecordSchema.index({ cancellationStatus: 1, createdAt: -1 })
+bookingCancellationRecordSchema.index({ customerId: 1, cancelledByRole: 1, createdAt: -1 })
 
 export const BookingCancellationRecord = mongoose.model(
   'BookingCancellationRecord',

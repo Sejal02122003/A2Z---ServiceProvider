@@ -94,6 +94,52 @@ const bookingCancellationSettingSchema = new mongoose.Schema(
         'Other',
       ],
     },
+    // Repeat Customer Cancellation Warning & Restriction Policy
+    customerWarningEnabled: {
+      type: Boolean,
+      default: true,
+    },
+    customerWarningThreshold: {
+      type: Number,
+      default: 3,
+      min: 1,
+    },
+    customerRestrictionThreshold: {
+      type: Number,
+      default: 5,
+      min: 1,
+    },
+    customerRollingWindowDays: {
+      type: Number,
+      default: 30,
+      min: 1,
+    },
+    customerRestrictionMode: {
+      type: String,
+      enum: ['WARNING_ONLY', 'TEMPORARY_RESTRICTION', 'MANUAL_REVIEW'],
+      default: 'WARNING_ONLY',
+    },
+    customerRestrictionDurationDays: {
+      type: Number,
+      default: 7,
+      min: 1,
+    },
+    customerPushNotificationsEnabled: {
+      type: Boolean,
+      default: true,
+    },
+    customerWarningMessage: {
+      type: String,
+      default:
+        'You have cancelled multiple bookings recently. Repeated cancellations may lead to temporary restrictions on your A2Z account.',
+      trim: true,
+    },
+    customerRestrictionMessage: {
+      type: String,
+      default:
+        'Your booking access has been temporarily restricted due to repeated cancellations under our cancellation policy.',
+      trim: true,
+    },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

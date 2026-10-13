@@ -33,6 +33,8 @@ export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
   const [error, setError] = useState('')
   const [successResult, setSuccessResult] = useState(null)
 
+  const [showPolicyConfirmDialog, setShowPolicyConfirmDialog] = useState(false)
+
   // Reset and fetch eligibility whenever opened
   useEffect(() => {
     if (!open || !booking?._id) {
@@ -41,6 +43,7 @@ export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
       setError('')
       setSubmitting(false)
       setSuccessResult(null)
+      setShowPolicyConfirmDialog(false)
       return
     }
 
@@ -50,6 +53,7 @@ export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
     setSelectedReason('')
     setReasonNote('')
     setSuccessResult(null)
+    setShowPolicyConfirmDialog(false)
 
     bookingsApi
       .getCancellationEligibility(booking._id)
@@ -77,18 +81,9 @@ export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
   const isOnlinePaid = booking.paymentMethod === 'ONLINE' && (booking.paymentStatus || '').toUpperCase() === 'PAID'
   const cancellationFee = eligibility?.cancellationFee || 0
   const estimatedRefund = Math.max(0, (booking.totalAmount || 0) - cancellationFee)
+  const customerPolicy = eligibility?.customerPolicy
 
-  const handleConfirmCancellation = async () => {
-    if (!selectedReason) {
-      setError('Please select a reason for cancellation.')
-      return
-    }
-
-    if (selectedReason === 'Other' && !reasonNote.trim()) {
-      setError('Please enter a description when selecting "Other".')
-      return
-    }
-
+  const executeCancellation = async () => {
     setError('')
     setSubmitting(true)
 
@@ -108,6 +103,7 @@ export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
       }
 
       setSuccessResult(cancellationData)
+      setShowPolicyConfirmDialog(false)
 
       if (onSuccess) {
         onSuccess(updatedBooking, cancellationData)
@@ -117,6 +113,26 @@ export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
       setError(msg)
       setSubmitting(false)
     }
+  }
+
+  const handleConfirmCancellation = async () => {
+    if (!selectedReason) {
+      setError('Please select a reason for cancellation.')
+      return
+    }
+
+    if (selectedReason === 'Other' && !reasonNote.trim()) {
+      setError('Please enter a description when selecting "Other".')
+      return
+    }
+
+    // Check if customer is approaching or at warning threshold
+    if (customerPolicy?.policyEnabled && (customerPolicy?.approachingThreshold || customerPolicy?.warningActive) && !showPolicyConfirmDialog) {
+      setShowPolicyConfirmDialog(true)
+      return
+    }
+
+    await executeCancellation()
   }
 
   const modalContent = (
@@ -169,6 +185,45 @@ export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
                   Your booking #{shortCode} has been cancelled successfully.
                 </p>
 
+                {/* Repeat Policy Warning Notice */}
+                {successResult.customerPolicy?.warningTriggered && (
+                  <div className="w-full mt-3 rounded-2xl bg-amber-50 border border-amber-200 p-4 text-left">
+                    <div className="flex items-start gap-2.5">
+                      <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-bold text-amber-900 uppercase tracking-wider">
+                          Cancellation Policy Warning
+                        </p>
+                        <p className="text-xs text-amber-800 font-medium mt-1 leading-relaxed">
+                          {successResult.customerPolicy.warningMessage ||
+                            'You have cancelled several bookings recently. Repeated cancellations may lead to temporary restrictions on your A2Z account.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Account Restriction Notice */}
+                {successResult.customerPolicy?.restrictionTriggered && (
+                  <div className="w-full mt-3 rounded-2xl bg-rose-50 border border-rose-200 p-4 text-left">
+                    <div className="flex items-start gap-2.5">
+                      <AlertCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-bold text-rose-900 uppercase tracking-wider">
+                          Booking Access Restricted
+                        </p>
+                        <p className="text-xs text-rose-800 font-medium mt-1 leading-relaxed">
+                          {successResult.customerPolicy.restrictionMessage ||
+                            'Your booking access has been temporarily restricted due to repeated cancellations under our cancellation policy.'}
+                        </p>
+                        <p className="text-[11px] text-rose-600 font-semibold mt-2">
+                          Existing confirmed bookings remain active. You can contact customer support if you need assistance.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Refund & Ledger Status */}
                 {booking.paymentMethod === 'ONLINE' && isOnlinePaid && (
                   <div className="w-full mt-3 rounded-2xl bg-blue-50/70 border border-blue-100 p-4 text-left">
@@ -206,6 +261,62 @@ export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
                   </button>
                 </div>
               </motion.div>
+            ) : showPolicyConfirmDialog ? (
+              // Pre-Cancellation Warning Confirmation Dialog
+              <div className="py-4 space-y-4">
+                <div className="rounded-2xl bg-amber-50 border border-amber-200 p-5 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700 shrink-0">
+                      <ShieldAlert className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-amber-950">
+                        Please Note Before Cancelling
+                      </h4>
+                      <p className="text-[11px] font-bold text-amber-800 uppercase tracking-wider mt-0.5">
+                        A2Z Cancellation Policy Warning
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-amber-900 font-medium leading-relaxed">
+                    You have cancelled several bookings recently. Another cancellation may trigger an account warning or temporary booking restriction under the A2Z cancellation policy.
+                  </p>
+
+                  <div className="rounded-xl bg-amber-100/70 p-3 text-xs text-amber-950 font-semibold flex items-center justify-between">
+                    <span>Recent cancellations:</span>
+                    <span className="font-bold">
+                      {customerPolicy?.eligibleCount || 0} in past {customerPolicy?.windowDays || 30} days
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowPolicyConfirmDialog(false)}
+                    disabled={submitting}
+                    className="flex-1 rounded-xl bg-slate-900 py-3 text-sm font-bold text-white hover:bg-slate-800 transition disabled:opacity-50"
+                  >
+                    Keep Booking
+                  </button>
+                  <button
+                    type="button"
+                    onClick={executeCancellation}
+                    disabled={submitting}
+                    className="flex-1 rounded-xl border border-rose-300 bg-rose-50 py-3 text-sm font-bold text-rose-700 hover:bg-rose-100 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin text-rose-600" />
+                        <span>Cancelling...</span>
+                      </>
+                    ) : (
+                      <span>Cancel Booking</span>
+                    )}
+                  </button>
+                </div>
+              </div>
             ) : loadingEligibility ? (
               <div className="py-12 flex flex-col items-center justify-center space-y-3 text-center">
                 <Loader2 className="h-8 w-8 animate-spin text-brand" />
@@ -252,6 +363,21 @@ export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
                   <div className="rounded-xl bg-rose-50 border border-rose-200 px-3.5 py-2.5 flex items-center gap-2 text-rose-800 text-xs font-semibold">
                     <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
                     <span>{error}</span>
+                  </div>
+                )}
+
+                {/* Repeat Policy Banner */}
+                {customerPolicy?.policyEnabled && (customerPolicy?.approachingThreshold || customerPolicy?.warningActive) && (
+                  <div className="rounded-2xl bg-amber-50 border border-amber-200/90 p-3.5 flex items-start gap-2.5 text-xs text-amber-900">
+                    <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">Cancellation Policy Notice: </span>
+                      <span className="font-medium">
+                        {customerPolicy.warningActive
+                          ? `You have cancelled ${customerPolicy.eligibleCount} bookings recently. Additional cancellations may trigger account restrictions.`
+                          : `You have cancelled ${customerPolicy.eligibleCount} bookings recently. Another cancellation will trigger a policy warning.`}
+                      </span>
+                    </div>
                   </div>
                 )}
 

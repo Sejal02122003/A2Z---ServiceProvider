@@ -10,6 +10,7 @@ import { Booking } from '../models/Booking.js'
 import { Wallet } from '../models/Wallet.js'
 import { WalletTransaction } from '../models/WalletTransaction.js'
 import { InAppNotification } from '../models/InAppNotification.js'
+import { User } from '../models/User.js'
 import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
 import { parseISTDateTime } from '../utils/dateHelper.js'
 
@@ -54,7 +55,61 @@ export async function updateBookingCancellationSettings(data, adminUser) {
     'customerCutoffMinutes',
     'customerCancellationFee',
     'customerAllowedReasons',
+    'customerWarningEnabled',
+    'customerWarningThreshold',
+    'customerRestrictionThreshold',
+    'customerRollingWindowDays',
+    'customerRestrictionMode',
+    'customerRestrictionDurationDays',
+    'customerPushNotificationsEnabled',
+    'customerWarningMessage',
+    'customerRestrictionMessage',
   ]
+
+  // Positive integer validations
+  if (data.customerWarningThreshold !== undefined) {
+    const val = Number(data.customerWarningThreshold)
+    if (!Number.isInteger(val) || val < 1) {
+      throw new Error('Warning threshold must be a positive integer (minimum 1)')
+    }
+  }
+  if (data.customerRestrictionThreshold !== undefined) {
+    const val = Number(data.customerRestrictionThreshold)
+    if (!Number.isInteger(val) || val < 1) {
+      throw new Error('Restriction threshold must be a positive integer (minimum 1)')
+    }
+  }
+  if (data.customerRollingWindowDays !== undefined) {
+    const val = Number(data.customerRollingWindowDays)
+    if (!Number.isInteger(val) || val < 1) {
+      throw new Error('Rolling window days must be a positive integer (minimum 1)')
+    }
+  }
+  if (data.customerRestrictionDurationDays !== undefined) {
+    const val = Number(data.customerRestrictionDurationDays)
+    if (!Number.isInteger(val) || val < 1) {
+      throw new Error('Restriction duration days must be a positive integer (minimum 1)')
+    }
+  }
+  if (data.customerRestrictionMode !== undefined) {
+    if (!['WARNING_ONLY', 'TEMPORARY_RESTRICTION', 'MANUAL_REVIEW'].includes(data.customerRestrictionMode)) {
+      throw new Error('Invalid restriction mode. Allowed: WARNING_ONLY, TEMPORARY_RESTRICTION, MANUAL_REVIEW')
+    }
+  }
+
+  // Ensure restriction threshold is not lower than warning threshold
+  const effectiveWarning =
+    data.customerWarningThreshold !== undefined
+      ? Number(data.customerWarningThreshold)
+      : Number(settings.customerWarningThreshold || 3)
+  const effectiveRestriction =
+    data.customerRestrictionThreshold !== undefined
+      ? Number(data.customerRestrictionThreshold)
+      : Number(settings.customerRestrictionThreshold || 5)
+
+  if (effectiveRestriction < effectiveWarning) {
+    throw new Error('Restriction threshold cannot be lower than warning threshold')
+  }
 
   allowedFields.forEach((field) => {
     if (data[field] !== undefined) {
@@ -986,6 +1041,8 @@ export async function getCustomerCancellationEligibility(bookingId, customerId, 
     }
   }
 
+  const customerPolicy = await evaluateCustomerCancellationPolicy(customerId, overrideTime)
+
   return {
     isEligible: true,
     code: 'ELIGIBLE',
@@ -1001,6 +1058,7 @@ export async function getCustomerCancellationEligibility(bookingId, customerId, 
     paymentStatus: booking.paymentStatus,
     totalAmount: booking.totalAmount || 0,
     refundNote,
+    customerPolicy,
   }
 }
 
@@ -1182,6 +1240,7 @@ export async function processCustomerCancellation({
       refundAmount,
       refundReference,
       dedupeKey,
+      createdAt: now,
     },
     { upsert: true, new: true }
   )
@@ -1232,12 +1291,162 @@ export async function processCustomerCancellation({
     })
     .catch((err) => console.error(err))
 
-  // 8. In-App Notification for customer
+  // 8. Repeat Customer Cancellation Policy Evaluation & Enforcement
+  const repeatSettings = await getBookingCancellationSettings()
+  const windowDays = Number(repeatSettings.customerRollingWindowDays || 30)
+  const currentCount = await countEligibleCustomerCancellations(customerId, windowDays, now)
+
+  let warningTriggered = false
+  let restrictionTriggered = false
+  let actionTaken = 'NONE'
+
+  if (repeatSettings.customerWarningEnabled) {
+    const customer = await User.findById(customerId)
+    if (customer) {
+      if (!customer.customerCancellationRestriction) {
+        customer.customerCancellationRestriction = {
+          isRestricted: false,
+          warningCount: 0,
+          history: [],
+        }
+      }
+
+      if (currentCount >= repeatSettings.customerRestrictionThreshold) {
+        if (repeatSettings.customerRestrictionMode === 'TEMPORARY_RESTRICTION') {
+          const durationDays = Number(repeatSettings.customerRestrictionDurationDays || 7)
+          const restrictedUntil = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000)
+
+          customer.customerCancellationRestriction.isRestricted = true
+          customer.customerCancellationRestriction.restrictedAt = now
+          customer.customerCancellationRestriction.restrictedUntil = restrictedUntil
+          customer.customerCancellationRestriction.restrictionReason =
+            repeatSettings.customerRestrictionMessage || 'Temporary restriction applied due to repeated booking cancellations.'
+          customer.customerCancellationRestriction.restrictedBy = 'SYSTEM_POLICY'
+          customer.customerCancellationRestriction.history.push({
+            action: 'RESTRICTED',
+            reason: `Reached cancellation threshold (${currentCount}/${repeatSettings.customerRestrictionThreshold}) within ${windowDays} days`,
+            restrictedUntil,
+            performedBy: 'SYSTEM_POLICY',
+            timestamp: now,
+          })
+          await customer.save()
+
+          try {
+            await InAppNotification.create({
+              userId: customerId,
+              title: 'Account Restriction Notice',
+              body:
+                repeatSettings.customerRestrictionMessage ||
+                'Your booking access has been temporarily restricted due to repeated cancellations under our cancellation policy.',
+              type: 'CUSTOMER_BOOKING_RESTRICTION_APPLIED',
+              bookingId: booking._id,
+            })
+            if (repeatSettings.customerPushNotificationsEnabled) {
+              sendNotificationToUser(customerId, {
+                title: 'Account Restriction Notice',
+                body:
+                  repeatSettings.customerRestrictionMessage ||
+                  'Your booking access has been temporarily restricted due to repeated cancellations under our cancellation policy.',
+                data: {
+                  type: 'CUSTOMER_BOOKING_RESTRICTION_APPLIED',
+                  restrictedUntil: restrictedUntil.toISOString(),
+                },
+              })
+            }
+          } catch (notifErr) {
+            console.warn('[Restriction Notification Warning]', notifErr?.message)
+          }
+
+          restrictionTriggered = true
+          actionTaken = 'TEMPORARY_RESTRICTION'
+        } else if (repeatSettings.customerRestrictionMode === 'MANUAL_REVIEW') {
+          customer.customerCancellationRestriction.history.push({
+            action: 'FLAGGED_FOR_REVIEW',
+            reason: `Reached cancellation threshold (${currentCount}/${repeatSettings.customerRestrictionThreshold}) for manual admin review`,
+            performedBy: 'SYSTEM_POLICY',
+            timestamp: now,
+          })
+          await customer.save()
+          restrictionTriggered = true
+          actionTaken = 'MANUAL_REVIEW'
+        } else {
+          actionTaken = 'WARNING_ONLY'
+        }
+      } else if (currentCount >= repeatSettings.customerWarningThreshold) {
+        const lastWarnThreshold = customer.customerCancellationRestriction.lastWarningThreshold || 0
+        if (lastWarnThreshold !== currentCount) {
+          customer.customerCancellationRestriction.warningCount =
+            (customer.customerCancellationRestriction.warningCount || 0) + 1
+          customer.customerCancellationRestriction.lastWarningAt = now
+          customer.customerCancellationRestriction.lastWarningThreshold = currentCount
+          customer.customerCancellationRestriction.history.push({
+            action: 'WARNED',
+            reason: `Warning threshold reached (${currentCount}/${repeatSettings.customerWarningThreshold}) within ${windowDays} days`,
+            performedBy: 'SYSTEM_POLICY',
+            timestamp: now,
+          })
+          await customer.save()
+
+          try {
+            await InAppNotification.create({
+              userId: customerId,
+              title: 'Cancellation Warning',
+              body:
+                repeatSettings.customerWarningMessage ||
+                'You have cancelled multiple bookings recently. Repeated cancellations may lead to temporary restrictions on your A2Z account.',
+              type: 'CUSTOMER_CANCELLATION_WARNING',
+              bookingId: booking._id,
+            })
+            if (repeatSettings.customerPushNotificationsEnabled) {
+              sendNotificationToUser(customerId, {
+                title: 'Cancellation Warning',
+                body:
+                  repeatSettings.customerWarningMessage ||
+                  'You have cancelled multiple bookings recently. Repeated cancellations may lead to temporary restrictions on your A2Z account.',
+                data: {
+                  type: 'CUSTOMER_CANCELLATION_WARNING',
+                  count: String(currentCount),
+                },
+              })
+            }
+          } catch (notifErr) {
+            console.warn('[Warning Notification Warning]', notifErr?.message)
+          }
+
+          warningTriggered = true
+          actionTaken = 'WARNED'
+        }
+      }
+    }
+  }
+
+  // Record policy snapshot
+  record.policyEvaluationSnapshot = {
+    eligibleCount: currentCount,
+    rollingWindowDays: windowDays,
+    warningThreshold: repeatSettings.customerWarningThreshold,
+    restrictionThreshold: repeatSettings.customerRestrictionThreshold,
+    warningTriggered,
+    restrictionTriggered,
+    restrictionMode: repeatSettings.customerRestrictionMode,
+    actionTaken,
+  }
+  record.isCountedForPolicy = true
+  await record.save()
+
+  // 9. In-App Notification for booking cancellation confirmation
   try {
+    let cancelNotificationBody = `Your booking #${shortCode} has been cancelled successfully.`
+    if (warningTriggered) {
+      cancelNotificationBody += ` Note: ${repeatSettings.customerWarningMessage}`
+    } else if (restrictionTriggered && repeatSettings.customerRestrictionMode === 'TEMPORARY_RESTRICTION') {
+      cancelNotificationBody += ` Note: ${repeatSettings.customerRestrictionMessage}`
+    }
+
     await InAppNotification.create({
       userId: customerId,
       title: 'Booking Cancelled',
-      body: `Your booking #${shortCode} has been cancelled successfully.`,
+      body: cancelNotificationBody,
       type: 'BOOKING_CANCELLED',
       bookingId: booking._id,
     })
@@ -1245,7 +1454,7 @@ export async function processCustomerCancellation({
     console.warn('[InAppNotification Warning]', err?.message)
   }
 
-  // 9. Real-time Socket & Push Notifications
+  // 10. Real-time Socket & Push Notifications
   import('../socket.js')
     .then(({ emitToUser, getIO }) => {
       emitToUser(customerId, 'BOOKING_STATUS_UPDATE', {
@@ -1306,6 +1515,412 @@ export async function processCustomerCancellation({
       reference: refundReference,
       note: eligibility.refundNote,
     },
+    customerPolicy: {
+      policyEnabled: repeatSettings.customerWarningEnabled,
+      eligibleCount: currentCount,
+      warningThreshold: repeatSettings.customerWarningThreshold,
+      restrictionThreshold: repeatSettings.customerRestrictionThreshold,
+      warningTriggered,
+      restrictionTriggered,
+      actionTaken,
+      warningMessage: warningTriggered ? repeatSettings.customerWarningMessage : null,
+      restrictionMessage:
+        restrictionTriggered && repeatSettings.customerRestrictionMode === 'TEMPORARY_RESTRICTION'
+          ? repeatSettings.customerRestrictionMessage
+          : null,
+    },
   }
 }
+
+/**
+ * 12. Count Eligible Customer Cancellations within Rolling Window
+ * Each booking contributes at most ONE eligible cancellation count.
+ */
+export async function countEligibleCustomerCancellations(customerId, windowDays = 30, beforeDate = new Date()) {
+  if (!customerId) return 0
+  const refDate = new Date(beforeDate)
+  const endDate = new Date(refDate.getTime() + 60 * 1000)
+  const startDate = new Date(refDate.getTime() - Number(windowDays || 30) * 24 * 60 * 60 * 1000)
+
+  // Use distinct bookingId to ensure database-level idempotency and deduplication
+  const distinctBookings = await BookingCancellationRecord.distinct('bookingId', {
+    customerId,
+    cancelledByRole: 'CUSTOMER',
+    cancellationStatus: CANCELLATION_STATUS.CANCELLED,
+    isCountedForPolicy: { $ne: false },
+    createdAt: { $gte: startDate, $lte: endDate },
+  })
+
+  return distinctBookings.length
+}
+
+/**
+ * 13. Dynamic Customer Booking Restriction Check with Inline Expiry
+ */
+export async function checkCustomerBookingRestriction(customerId) {
+  if (!customerId) return { isRestricted: false, restriction: null }
+  const user = await User.findById(customerId).select('customerCancellationRestriction fullName phone email')
+  if (!user || !user.customerCancellationRestriction?.isRestricted) {
+    return { isRestricted: false, restriction: null }
+  }
+
+  const restriction = user.customerCancellationRestriction
+  const now = new Date()
+
+  // Dynamic automatic expiration check: if restrictedUntil is set and in the past, auto-lift
+  if (restriction.restrictedUntil && now >= new Date(restriction.restrictedUntil)) {
+    restriction.isRestricted = false
+    restriction.history.push({
+      action: 'UNRESTRICTED',
+      reason: 'Temporary restriction period expired automatically',
+      restrictedUntil: restriction.restrictedUntil,
+      performedBy: 'SYSTEM_POLICY',
+      timestamp: now,
+    })
+    await user.save()
+
+    // Dispatch notification that access has been restored
+    try {
+      await InAppNotification.create({
+        userId: user._id,
+        title: 'Booking Access Restored',
+        body: 'Your temporary booking restriction has expired. You can now book services on A2Z again.',
+        type: 'CUSTOMER_BOOKING_ACCESS_RESTORED',
+      })
+      sendNotificationToUser(user._id, {
+        title: 'Booking Access Restored',
+        body: 'Your temporary booking restriction has expired. You can now book services on A2Z again.',
+        data: { type: 'CUSTOMER_BOOKING_ACCESS_RESTORED' },
+      })
+    } catch (notifErr) {
+      console.warn('[Access Restoration Notification Warning]', notifErr?.message)
+    }
+
+    return { isRestricted: false, restriction: null }
+  }
+
+  return {
+    isRestricted: true,
+    restriction: {
+      reason: restriction.restrictionReason,
+      restrictedAt: restriction.restrictedAt,
+      restrictedUntil: restriction.restrictedUntil,
+      restrictedBy: restriction.restrictedBy,
+      adminNote: restriction.adminNote,
+    },
+  }
+}
+
+/**
+ * 14. Evaluate Customer Cancellation Policy Status
+ */
+export async function evaluateCustomerCancellationPolicy(customerId, overrideTime = null) {
+  const settings = await getBookingCancellationSettings()
+  const now = overrideTime ? new Date(overrideTime) : new Date()
+
+  const windowDays = Number(settings.customerRollingWindowDays || 30)
+  const warningThreshold = Number(settings.customerWarningThreshold || 3)
+  const restrictionThreshold = Number(settings.customerRestrictionThreshold || 5)
+  const restrictionMode = settings.customerRestrictionMode || 'WARNING_ONLY'
+  const policyEnabled = Boolean(settings.customerWarningEnabled !== false)
+
+  const count = await countEligibleCustomerCancellations(customerId, windowDays, now)
+  const restrictionCheck = await checkCustomerBookingRestriction(customerId)
+
+  const approachingThreshold = policyEnabled && count >= Math.max(1, warningThreshold - 1) && count < warningThreshold
+  const warningActive = policyEnabled && count >= warningThreshold
+  const restrictionEligible = policyEnabled && count >= restrictionThreshold
+
+  return {
+    policyEnabled,
+    eligibleCount: count,
+    windowDays,
+    warningThreshold,
+    restrictionThreshold,
+    approachingThreshold,
+    warningActive,
+    restrictionEligible,
+    restrictionMode,
+    isRestricted: restrictionCheck.isRestricted,
+    restriction: restrictionCheck.restriction,
+    warningMessage: settings.customerWarningMessage,
+    restrictionMessage: settings.customerRestrictionMessage,
+  }
+}
+
+/**
+ * 15. Admin: List Customers with Cancellation Records & Stats
+ */
+export async function getAdminCustomerCancellations({
+  page = 1,
+  limit = 20,
+  search = '',
+  filter = 'ALL',
+}) {
+  const settings = await getBookingCancellationSettings()
+  const windowDays = Number(settings.customerRollingWindowDays || 30)
+
+  // Find all customer IDs who have cancellation records
+  const distinctCustomerIds = await BookingCancellationRecord.distinct('customerId', {
+    cancelledByRole: 'CUSTOMER',
+    cancellationStatus: CANCELLATION_STATUS.CANCELLED,
+  })
+
+  let userQuery = {
+    _id: { $in: distinctCustomerIds },
+  }
+
+  if (search) {
+    userQuery.$or = [
+      { fullName: { $regex: search, $options: 'i' } },
+      { name: { $regex: search, $options: 'i' } },
+      { phone: { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } },
+    ]
+  }
+
+  if (filter === 'RESTRICTED') {
+    userQuery['customerCancellationRestriction.isRestricted'] = true
+  } else if (filter === 'WARNED') {
+    userQuery['customerCancellationRestriction.warningCount'] = { $gt: 0 }
+  }
+
+  const users = await User.find(userQuery).select(
+    'fullName name phone email customerCancellationRestriction createdAt'
+  )
+
+  const enrichedList = await Promise.all(
+    users.map(async (u) => {
+      const activeCount = await countEligibleCustomerCancellations(u._id, windowDays)
+      const lastRecord = await BookingCancellationRecord.findOne({
+        customerId: u._id,
+        cancelledByRole: 'CUSTOMER',
+      })
+        .sort({ createdAt: -1 })
+        .populate('bookingId', 'bookingCode serviceName scheduledAt totalAmount')
+
+      const isRestricted = Boolean(
+        u.customerCancellationRestriction?.isRestricted &&
+          (!u.customerCancellationRestriction.restrictedUntil ||
+            new Date() < new Date(u.customerCancellationRestriction.restrictedUntil))
+      )
+
+      return {
+        customer: {
+          _id: u._id,
+          name: u.fullName || u.name || 'Customer',
+          phone: u.phone,
+          email: u.email,
+        },
+        activeCount,
+        windowDays,
+        warningThreshold: settings.customerWarningThreshold,
+        restrictionThreshold: settings.customerRestrictionThreshold,
+        warningCount: u.customerCancellationRestriction?.warningCount || 0,
+        lastWarningAt: u.customerCancellationRestriction?.lastWarningAt,
+        isRestricted,
+        restrictedAt: u.customerCancellationRestriction?.restrictedAt,
+        restrictedUntil: u.customerCancellationRestriction?.restrictedUntil,
+        restrictionReason: u.customerCancellationRestriction?.restrictionReason,
+        restrictedBy: u.customerCancellationRestriction?.restrictedBy,
+        lastCancellation: lastRecord,
+      }
+    })
+  )
+
+  let filtered = enrichedList
+  if (filter === 'HIGH_CANCELLATIONS') {
+    filtered = enrichedList.filter((item) => item.activeCount >= settings.customerWarningThreshold)
+  }
+
+  const p = Math.max(1, parseInt(page, 10) || 1)
+  const l = Math.max(1, parseInt(limit, 10) || 20)
+  const total = filtered.length
+  const paginated = filtered.slice((p - 1) * l, p * l)
+
+  return {
+    items: paginated,
+    pagination: {
+      page: p,
+      limit: l,
+      total,
+      pages: Math.ceil(total / l),
+    },
+    policy: {
+      warningThreshold: settings.customerWarningThreshold,
+      restrictionThreshold: settings.customerRestrictionThreshold,
+      windowDays,
+      restrictionMode: settings.customerRestrictionMode,
+    },
+  }
+}
+
+/**
+ * 16. Admin: Get Detailed Customer Cancellation History & Policy Info
+ */
+export async function getAdminCustomerCancellationHistory(customerId) {
+  const customer = await User.findById(customerId).select(
+    'fullName name phone email customerCancellationRestriction'
+  )
+  if (!customer) {
+    throw new Error('Customer not found')
+  }
+
+  const settings = await getBookingCancellationSettings()
+  const windowDays = Number(settings.customerRollingWindowDays || 30)
+  const activeCount = await countEligibleCustomerCancellations(customerId, windowDays)
+
+  const records = await BookingCancellationRecord.find({
+    customerId,
+    cancelledByRole: 'CUSTOMER',
+  })
+    .sort({ createdAt: -1 })
+    .populate('bookingId', 'bookingCode serviceName scheduledAt totalAmount paymentMethod status')
+
+  const restrictionCheck = await checkCustomerBookingRestriction(customerId)
+
+  return {
+    customer: {
+      _id: customer._id,
+      name: customer.fullName || customer.name || 'Customer',
+      phone: customer.phone,
+      email: customer.email,
+    },
+    activeCount,
+    windowDays,
+    warningThreshold: settings.customerWarningThreshold,
+    restrictionThreshold: settings.customerRestrictionThreshold,
+    restrictionMode: settings.customerRestrictionMode,
+    isRestricted: restrictionCheck.isRestricted,
+    restriction: restrictionCheck.restriction,
+    restrictionHistory: customer.customerCancellationRestriction?.history || [],
+    records,
+  }
+}
+
+/**
+ * 17. Admin: Manually Apply Customer Restriction
+ */
+export async function adminApplyCustomerRestriction(
+  customerId,
+  { durationDays, reason, adminNote },
+  adminUser
+) {
+  const customer = await User.findById(customerId)
+  if (!customer) {
+    throw new Error('Customer not found')
+  }
+
+  const now = new Date()
+  let restrictedUntil = null
+  if (durationDays && Number(durationDays) > 0) {
+    restrictedUntil = new Date(now.getTime() + Number(durationDays) * 24 * 60 * 60 * 1000)
+  }
+
+  if (!customer.customerCancellationRestriction) {
+    customer.customerCancellationRestriction = { history: [] }
+  }
+
+  customer.customerCancellationRestriction.isRestricted = true
+  customer.customerCancellationRestriction.restrictedAt = now
+  customer.customerCancellationRestriction.restrictedUntil = restrictedUntil
+  customer.customerCancellationRestriction.restrictionReason =
+    reason || 'Manually restricted by administrator due to repeat cancellations'
+  customer.customerCancellationRestriction.restrictedBy = 'ADMIN'
+  customer.customerCancellationRestriction.adminNote = adminNote || ''
+  customer.customerCancellationRestriction.history.push({
+    action: 'RESTRICTED',
+    reason: reason || 'Manual admin restriction',
+    restrictedUntil,
+    performedBy: 'ADMIN',
+    adminUserId: adminUser?._id,
+    timestamp: now,
+  })
+
+  await customer.save()
+
+  // Notification
+  try {
+    await InAppNotification.create({
+      userId: customer._id,
+      title: 'Account Restriction Notice',
+      body: reason || 'Your booking access has been restricted by platform administration.',
+      type: 'CUSTOMER_BOOKING_RESTRICTION_APPLIED',
+    })
+    sendNotificationToUser(customer._id, {
+      title: 'Account Restriction Notice',
+      body: reason || 'Your booking access has been restricted by platform administration.',
+      data: {
+        type: 'CUSTOMER_BOOKING_RESTRICTION_APPLIED',
+        restrictedUntil: restrictedUntil ? restrictedUntil.toISOString() : 'INDEFINITE',
+      },
+    })
+  } catch (err) {
+    console.warn('[Admin Restriction Notification Warning]', err?.message)
+  }
+
+  return {
+    success: true,
+    message: 'Customer restricted successfully',
+    customer: {
+      _id: customer._id,
+      restriction: customer.customerCancellationRestriction,
+    },
+  }
+}
+
+/**
+ * 18. Admin: Manually Lift Customer Restriction
+ */
+export async function adminLiftCustomerRestriction(customerId, { reason, adminNote }, adminUser) {
+  const customer = await User.findById(customerId)
+  if (!customer) {
+    throw new Error('Customer not found')
+  }
+
+  const now = new Date()
+  if (!customer.customerCancellationRestriction) {
+    customer.customerCancellationRestriction = { history: [] }
+  }
+
+  customer.customerCancellationRestriction.isRestricted = false
+  customer.customerCancellationRestriction.restrictedUntil = null
+  customer.customerCancellationRestriction.adminNote = adminNote || ''
+  customer.customerCancellationRestriction.history.push({
+    action: 'UNRESTRICTED',
+    reason: reason || 'Manual restriction lift by administrator',
+    performedBy: 'ADMIN',
+    adminUserId: adminUser?._id,
+    timestamp: now,
+  })
+
+  await customer.save()
+
+  // Notification
+  try {
+    await InAppNotification.create({
+      userId: customer._id,
+      title: 'Booking Access Restored',
+      body: 'Your booking access has been restored by platform administration. You can now place new bookings.',
+      type: 'CUSTOMER_BOOKING_RESTRICTION_LIFTED',
+    })
+    sendNotificationToUser(customer._id, {
+      title: 'Booking Access Restored',
+      body: 'Your booking access has been restored by platform administration. You can now place new bookings.',
+      data: { type: 'CUSTOMER_BOOKING_RESTRICTION_LIFTED' },
+    })
+  } catch (err) {
+    console.warn('[Admin Lift Restriction Notification Warning]', err?.message)
+  }
+
+  return {
+    success: true,
+    message: 'Customer restriction lifted successfully',
+    customer: {
+      _id: customer._id,
+      restriction: customer.customerCancellationRestriction,
+    },
+  }
+}
+
 

@@ -54,4 +54,31 @@ export const bookingCancellationApi = {
       method: 'POST',
       body: data,
     }),
+
+  // Customer Endpoints
+  getCustomerPolicyStatus: () =>
+    apiRequest('/booking-cancellations/customer/policy-status'),
+
+  // Admin Customer Cancellations Management
+  getAdminCustomerCancellations: (params = {}) => {
+    const qs = new URLSearchParams()
+    if (params.page) qs.set('page', params.page)
+    if (params.limit) qs.set('limit', params.limit)
+    if (params.search) qs.set('search', params.search)
+    if (params.filter && params.filter !== 'ALL') qs.set('filter', params.filter)
+    const query = qs.toString() ? `?${qs.toString()}` : ''
+    return apiRequest(`/booking-cancellations/admin/customer-cancellations${query}`)
+  },
+  getAdminCustomerHistory: (id) =>
+    apiRequest(`/booking-cancellations/admin/customers/${id}/history`),
+  adminRestrictCustomer: (id, data) =>
+    apiRequest(`/booking-cancellations/admin/customers/${id}/restrict`, {
+      method: 'POST',
+      body: data,
+    }),
+  adminUnrestrictCustomer: (id, data = {}) =>
+    apiRequest(`/booking-cancellations/admin/customers/${id}/unrestrict`, {
+      method: 'POST',
+      body: data,
+    }),
 }

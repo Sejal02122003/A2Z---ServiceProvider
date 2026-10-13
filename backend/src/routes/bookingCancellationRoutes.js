@@ -10,6 +10,11 @@ import {
   waivePenaltyController,
   getVendorEligibility,
   submitVendorCancellation,
+  getCustomerPolicyStatusController,
+  getAdminCustomerCancellationsController,
+  getAdminCustomerHistoryController,
+  adminRestrictCustomerController,
+  adminUnrestrictCustomerController,
 } from '../controllers/bookingCancellationController.js'
 import { protect, restrictTo } from '../middleware/auth.js'
 import { USER_ROLES } from '../constants/roles.js'
@@ -35,6 +40,11 @@ router.post(
 // -------------------------------------------------------------
 // CUSTOMER CANCELLATION ENDPOINTS
 // -------------------------------------------------------------
+router.get(
+  '/customer/policy-status',
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  getCustomerPolicyStatusController
+)
 router.get(
   '/customer/bookings/:bookingId/eligibility',
   restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
@@ -67,5 +77,9 @@ router.get('/admin/records/:id', getAdminRecordById)
 router.post('/admin/records/:id/approve', approveCancellationRequestController)
 router.post('/admin/records/:id/reject', rejectCancellationRequestController)
 router.post('/admin/records/:id/waive', waivePenaltyController)
+router.get('/admin/customer-cancellations', getAdminCustomerCancellationsController)
+router.get('/admin/customers/:id/history', getAdminCustomerHistoryController)
+router.post('/admin/customers/:id/restrict', adminRestrictCustomerController)
+router.post('/admin/customers/:id/unrestrict', adminUnrestrictCustomerController)
 
 export default router

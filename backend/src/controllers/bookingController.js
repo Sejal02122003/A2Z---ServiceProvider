@@ -14,6 +14,7 @@ import { recordLateFeeIncident, recordBounceIncident } from '../services/penalty
 import {
   getCustomerCancellationEligibility,
   processCustomerCancellation,
+  checkCustomerBookingRestriction,
 } from '../services/bookingCancellationService.js'
 
 export const calculateBill = asyncHandler(async (req, res) => {
@@ -205,11 +206,29 @@ export const calculateBill = asyncHandler(async (req, res) => {
       paymentModes: settings.paymentModes || { cashEnabled: true, onlineEnabled: true },
       breakdown,
       walletInfo,
+      restriction: await checkCustomerBookingRestriction(req.user?._id),
     }
   })
 })
 
 export const createBooking = asyncHandler(async (req, res) => {
+  // Check customer booking restriction under repeat cancellation policy
+  const restrictionStatus = await checkCustomerBookingRestriction(req.user._id)
+  if (restrictionStatus?.isRestricted) {
+    return sendError(res, {
+      message:
+        restrictionStatus.restriction?.reason ||
+        'Your account is currently restricted from creating new bookings due to repeated cancellations under our cancellation policy.',
+      statusCode: HTTP_STATUS.FORBIDDEN,
+      data: {
+        isRestricted: true,
+        restrictedUntil: restrictionStatus.restriction?.restrictedUntil,
+        reason: restrictionStatus.restriction?.reason,
+        restrictedBy: restrictionStatus.restriction?.restrictedBy,
+      },
+    })
+  }
+
   const { serviceId, type, scheduledAt, timeSlot, endTime, locationText, lat, lng, paymentMethod, notes, hours: rawHours = 1, quantity = 1, imageNames = [], contractorInfo } = req.body
   const hours = parseFloat(rawHours) || 1 // supports 0.5 = 30 min
 

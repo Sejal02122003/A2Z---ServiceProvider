@@ -24,8 +24,11 @@ import {
   User,
   Layers,
   Calendar,
-  AlertOctagon,
   Percent,
+  Users,
+  Bell,
+  ShieldX,
+  Unlock,
 } from 'lucide-react'
 import { bookingCancellationApi } from '../../api/bookingCancellationApi.js'
 import { ApiError } from '../../api/http.js'
@@ -104,6 +107,34 @@ export function AdminBookingCancellationPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [actionError, setActionError] = useState('')
 
+  // Customer Cancellations & Restrictions Tab State
+  const [customerItems, setCustomerItems] = useState([])
+  const [loadingCustomers, setLoadingCustomers] = useState(false)
+  const [customerFilter, setCustomerFilter] = useState('ALL')
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [customerPagination, setCustomerPagination] = useState({ page: 1, limit: 15, total: 0, pages: 1 })
+  const [customerPolicyMeta, setCustomerPolicyMeta] = useState(null)
+
+  // Customer Modals
+  const [customerHistoryModal, setCustomerHistoryModal] = useState({ open: false, data: null, loading: false })
+  const [restrictModal, setRestrictModal] = useState({
+    open: false,
+    customer: null,
+    durationDays: 7,
+    reason: '',
+    adminNote: '',
+    loading: false,
+    error: '',
+  })
+  const [unrestrictModal, setUnrestrictModal] = useState({
+    open: false,
+    customer: null,
+    reason: '',
+    adminNote: '',
+    loading: false,
+    error: '',
+  })
+
   // Fetch Stats
   const fetchOverview = useCallback(async () => {
     try {
@@ -140,6 +171,31 @@ export function AdminBookingCancellationPage() {
     [timingFilter, statusFilter, penaltyFilter, searchQuery, activeTab, pagination.limit]
   )
 
+  // Fetch Customer Cancellations
+  const fetchCustomerCancellations = useCallback(
+    async (page = 1) => {
+      setLoadingCustomers(true)
+      try {
+        const res = await bookingCancellationApi.getAdminCustomerCancellations({
+          page,
+          limit: customerPagination.limit,
+          search: customerSearch,
+          filter: customerFilter,
+        })
+        if (res.data) {
+          setCustomerItems(res.data.items || [])
+          setCustomerPagination(res.data.pagination || { page: 1, limit: 15, total: 0, pages: 1 })
+          setCustomerPolicyMeta(res.data.policy || null)
+        }
+      } catch (err) {
+        console.error('Failed to load customer cancellations:', err)
+      } finally {
+        setLoadingCustomers(false)
+      }
+    },
+    [customerSearch, customerFilter, customerPagination.limit]
+  )
+
   // Fetch Settings
   const fetchSettings = useCallback(async () => {
     setLoadingSettings(true)
@@ -162,10 +218,81 @@ export function AdminBookingCancellationPage() {
   useEffect(() => {
     if (activeTab === 'records' || activeTab === 'approvals') {
       fetchRecords(1)
+    } else if (activeTab === 'customers') {
+      fetchCustomerCancellations(1)
     } else if (activeTab === 'settings') {
       fetchSettings()
     }
-  }, [activeTab, fetchRecords, fetchSettings])
+  }, [activeTab, fetchRecords, fetchCustomerCancellations, fetchSettings])
+
+  // Customer History & Restriction Handlers
+  const handleOpenCustomerHistory = async (customerId) => {
+    setCustomerHistoryModal({ open: true, data: null, loading: true })
+    try {
+      const res = await bookingCancellationApi.getAdminCustomerHistory(customerId)
+      setCustomerHistoryModal({ open: true, data: res.data, loading: false })
+    } catch (err) {
+      console.error('Failed to load customer history:', err)
+      setCustomerHistoryModal({ open: false, data: null, loading: false })
+      alert('Failed to load customer cancellation history')
+    }
+  }
+
+  const handleApplyRestriction = async (e) => {
+    e.preventDefault()
+    if (!restrictModal.customer?._id) return
+    setRestrictModal((prev) => ({ ...prev, loading: true, error: '' }))
+    try {
+      await bookingCancellationApi.adminRestrictCustomer(restrictModal.customer._id, {
+        durationDays: Number(restrictModal.durationDays),
+        reason: restrictModal.reason.trim(),
+        adminNote: restrictModal.adminNote.trim(),
+      })
+      setRestrictModal({
+        open: false,
+        customer: null,
+        durationDays: 7,
+        reason: '',
+        adminNote: '',
+        loading: false,
+        error: '',
+      })
+      fetchCustomerCancellations(customerPagination.page)
+    } catch (err) {
+      setRestrictModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: err instanceof ApiError ? err.message : err.message || 'Failed to restrict customer',
+      }))
+    }
+  }
+
+  const handleLiftRestriction = async (e) => {
+    e.preventDefault()
+    if (!unrestrictModal.customer?._id) return
+    setUnrestrictModal((prev) => ({ ...prev, loading: true, error: '' }))
+    try {
+      await bookingCancellationApi.adminUnrestrictCustomer(unrestrictModal.customer._id, {
+        reason: unrestrictModal.reason.trim(),
+        adminNote: unrestrictModal.adminNote.trim(),
+      })
+      setUnrestrictModal({
+        open: false,
+        customer: null,
+        reason: '',
+        adminNote: '',
+        loading: false,
+        error: '',
+      })
+      fetchCustomerCancellations(customerPagination.page)
+    } catch (err) {
+      setUnrestrictModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: err instanceof ApiError ? err.message : err.message || 'Failed to lift restriction',
+      }))
+    }
+  }
 
   // Save Settings
   const handleSaveSettings = async (e) => {
@@ -342,6 +469,19 @@ export function AdminBookingCancellationPage() {
               {stats.pendingApprovalCount}
             </span>
           )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('customers')}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
+            activeTab === 'customers'
+              ? 'bg-brand text-white shadow-md shadow-brand/20'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Users className="h-4 w-4" />
+          Customer Cancellations & Restrictions
         </button>
 
         <button
@@ -601,6 +741,260 @@ export function AdminBookingCancellationPage() {
       )}
 
       {/* ======================================================== */}
+      {/* TAB: CUSTOMER CANCELLATIONS & RESTRICTION MANAGEMENT */}
+      {/* ======================================================== */}
+      {activeTab === 'customers' && (
+        <div className="space-y-4">
+          <GlassPanel className="p-4 border-slate-200/80">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              {/* Filter Pills */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { id: 'ALL', label: 'All Customers' },
+                  { id: 'HIGH_CANCELLATIONS', label: 'High Cancellations (≥ Warning)' },
+                  { id: 'WARNED', label: 'Warned Customers' },
+                  { id: 'RESTRICTED', label: 'Restricted Accounts' },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setCustomerFilter(f.id)}
+                    className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                      customerFilter === f.id
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative w-full lg:w-72">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search customer name, phone..."
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-4 text-xs font-semibold text-slate-800 placeholder-slate-400 outline-hidden focus:border-brand"
+                />
+              </div>
+            </div>
+
+            {/* Active Policy Summary Pill */}
+            {customerPolicyMeta && (
+              <div className="mt-3 flex items-center gap-2 rounded-xl bg-blue-50/70 border border-blue-100 px-3 py-2 text-[11px] font-semibold text-blue-900">
+                <ShieldAlert className="h-4 w-4 text-blue-600 shrink-0" />
+                <span>
+                  Active Repeat Policy: <b>{customerPolicyMeta.windowDays}d</b> rolling window • Warning at{' '}
+                  <b>{customerPolicyMeta.warningThreshold}</b> cancellations • Restriction threshold:{' '}
+                  <b>{customerPolicyMeta.restrictionThreshold}</b> cancellations (Mode:{' '}
+                  <span className="uppercase font-bold">{customerPolicyMeta.restrictionMode}</span>)
+                </span>
+              </div>
+            )}
+          </GlassPanel>
+
+          {/* Customers Table */}
+          <GlassPanel className="overflow-hidden border-slate-200/80 p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/70 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                    <th className="py-3 px-4">Customer</th>
+                    <th className="py-3 px-4">Rolling Cancellations</th>
+                    <th className="py-3 px-4">Warning Count</th>
+                    <th className="py-3 px-4">Restriction Status</th>
+                    <th className="py-3 px-4">Latest Cancellation</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
+                  {loadingCustomers ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-slate-400">
+                        <Loader2 className="mx-auto h-6 w-6 animate-spin text-brand" />
+                        <span className="mt-2 block font-bold">Loading customers...</span>
+                      </td>
+                    </tr>
+                  ) : customerItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-slate-400 font-bold">
+                        No customer cancellation records found matching criteria
+                      </td>
+                    </tr>
+                  ) : (
+                    customerItems.map((item) => {
+                      const c = item.customer || {}
+                      const isHigh = item.activeCount >= (item.warningThreshold || 3)
+                      const isRestricted = item.isRestricted
+                      return (
+                        <tr key={c._id} className="hover:bg-slate-50/60 transition">
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-2.5">
+                              <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 font-bold">
+                                {(c.name || 'C').charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-900 leading-tight">{c.name || 'Customer'}</p>
+                                <p className="text-[11px] text-slate-400">{c.phone || c.email || '—'}</p>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="py-3.5 px-4">
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-black border ${
+                                isHigh
+                                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                  : item.activeCount > 0
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              }`}
+                            >
+                              {item.activeCount} cancellations / {item.windowDays}d
+                            </span>
+                          </td>
+
+                          <td className="py-3.5 px-4">
+                            <div className="text-slate-800 font-bold">
+                              {item.warningCount > 0 ? (
+                                <span className="text-amber-700 font-black">{item.warningCount} times warned</span>
+                              ) : (
+                                <span className="text-slate-400 font-medium">None</span>
+                              )}
+                            </div>
+                            {item.lastWarningAt && (
+                              <p className="text-[10px] text-slate-400">Last: {formatDate(item.lastWarningAt)}</p>
+                            )}
+                          </td>
+
+                          <td className="py-3.5 px-4">
+                            {isRestricted ? (
+                              <div className="space-y-0.5">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 text-rose-800 border border-rose-200 px-2.5 py-0.5 text-[11px] font-black">
+                                  <ShieldX className="h-3 w-3" />
+                                  RESTRICTED
+                                </span>
+                                <p className="text-[10px] text-rose-600 font-semibold">
+                                  {item.restrictedUntil
+                                    ? `Until ${formatDate(item.restrictedUntil)}`
+                                    : 'Indefinite (Admin)'}
+                                </p>
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 text-[11px] font-bold">
+                                <CheckCircle2 className="h-3 w-3" />
+                                ACTIVE
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-3.5 px-4">
+                            {item.lastCancellation ? (
+                              <div>
+                                <p className="text-slate-800 font-bold leading-tight">
+                                  {item.lastCancellation.reason}
+                                </p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                  {formatDate(item.lastCancellation.createdAt)}
+                                </p>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+
+                          <td className="py-3.5 px-4 text-right space-x-1">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenCustomerHistory(c._id)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50 shadow-xs"
+                            >
+                              <Eye className="h-3 w-3" />
+                              History
+                            </button>
+
+                            {isRestricted ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setUnrestrictModal({
+                                    open: true,
+                                    customer: c,
+                                    reason: '',
+                                    adminNote: '',
+                                    loading: false,
+                                    error: '',
+                                  })
+                                }
+                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-extrabold text-white hover:bg-emerald-700 shadow-xs active:scale-95"
+                              >
+                                <Unlock className="h-3 w-3" />
+                                Lift Restriction
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setRestrictModal({
+                                    open: true,
+                                    customer: c,
+                                    durationDays: 7,
+                                    reason: 'Repeated cancellation policy violation',
+                                    adminNote: '',
+                                    loading: false,
+                                    error: '',
+                                  })
+                                }
+                                className="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-2.5 py-1.5 text-[11px] font-extrabold text-white hover:bg-rose-700 shadow-xs active:scale-95"
+                              >
+                                <Ban className="h-3 w-3" />
+                                Restrict
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {customerPagination.pages > 1 && (
+              <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-xs font-semibold text-slate-500">
+                <span>
+                  Showing page {customerPagination.page} of {customerPagination.pages} ({customerPagination.total} customers)
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={customerPagination.page <= 1}
+                    onClick={() => fetchCustomerCancellations(customerPagination.page - 1)}
+                    className="rounded-lg border border-slate-200 px-2.5 py-1 disabled:opacity-40 hover:bg-slate-50"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    disabled={customerPagination.page >= customerPagination.pages}
+                    onClick={() => fetchCustomerCancellations(customerPagination.page + 1)}
+                    className="rounded-lg border border-slate-200 px-2.5 py-1 disabled:opacity-40 hover:bg-slate-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </GlassPanel>
+        </div>
+      )}
+
+      {/* ======================================================== */}
       {/* TAB 3: POLICY & CUTOFF SETTINGS */}
       {/* ======================================================== */}
       {activeTab === 'settings' && (
@@ -810,6 +1204,208 @@ export function AdminBookingCancellationPage() {
                     />
                     <div className="h-6 w-11 rounded-full bg-slate-200 peer-checked:bg-emerald-600 peer-focus:outline-hidden after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full" />
                   </label>
+                </div>
+              </GlassPanel>
+
+              {/* Card 4: Customer Repeat Cancellation & Restriction Policy */}
+              <GlassPanel className="p-6 border-slate-200/80 space-y-6">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-900">
+                      Customer Repeat Cancellation & Restriction Policy
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Warn customers when they frequently cancel bookings and automatically or manually restrict new bookings.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex cursor-pointer items-center">
+                    <input
+                      type="checkbox"
+                      checked={settings.customerWarningEnabled !== false}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          customerWarningEnabled: e.target.checked,
+                        })
+                      }
+                      className="peer sr-only"
+                    />
+                    <div className="h-6 w-11 rounded-full bg-slate-200 peer-checked:bg-emerald-600 peer-focus:outline-hidden after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full" />
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                  {/* Warning Threshold */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      Warning Threshold (Cancellations)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={settings.customerWarningThreshold ?? 3}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          customerWarningThreshold: parseInt(e.target.value, 10) || 1,
+                        })
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden focus:border-brand"
+                    />
+                    <p className="text-[11px] font-medium text-slate-400 mt-1">
+                      Default: 3. Warns customer upon reaching this count.
+                    </p>
+                  </div>
+
+                  {/* Restriction Threshold */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      Restriction Threshold (Cancellations)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={settings.customerRestrictionThreshold ?? 5}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          customerRestrictionThreshold: parseInt(e.target.value, 10) || 1,
+                        })
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden focus:border-brand"
+                    />
+                    <p className="text-[11px] font-medium text-slate-400 mt-1">
+                      Default: 5. Triggers configured restriction action.
+                    </p>
+                  </div>
+
+                  {/* Rolling Window Days */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      Rolling Window (Days)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={settings.customerRollingWindowDays ?? 30}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          customerRollingWindowDays: parseInt(e.target.value, 10) || 1,
+                        })
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden focus:border-brand"
+                    />
+                    <p className="text-[11px] font-medium text-slate-400 mt-1">
+                      Default: 30 days. Older cancellations drop off automatically.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  {/* Restriction Mode */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      Restriction Action Mode
+                    </label>
+                    <select
+                      value={settings.customerRestrictionMode || 'WARNING_ONLY'}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          customerRestrictionMode: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden focus:border-brand"
+                    >
+                      <option value="WARNING_ONLY">Warning Only (Informational warning, no auto-block)</option>
+                      <option value="TEMPORARY_RESTRICTION">Temporary Restriction (Block new bookings for duration)</option>
+                      <option value="MANUAL_REVIEW">Manual Admin Review (Flag for admin signoff)</option>
+                    </select>
+                    <p className="text-[11px] font-medium text-slate-400 mt-1">
+                      Select policy enforcement level when restriction threshold is reached.
+                    </p>
+                  </div>
+
+                  {/* Restriction Duration Days */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      Restriction Duration (Days)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={settings.customerRestrictionDurationDays ?? 7}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          customerRestrictionDurationDays: parseInt(e.target.value, 10) || 1,
+                        })
+                      }
+                      disabled={settings.customerRestrictionMode !== 'TEMPORARY_RESTRICTION'}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden focus:border-brand disabled:opacity-50"
+                    />
+                    <p className="text-[11px] font-medium text-slate-400 mt-1">
+                      Default: 7 days. Only applies when Temporary Restriction mode is active.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Push Notifications Toggle */}
+                <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+                  <div>
+                    <h4 className="text-xs font-extrabold text-slate-800">
+                      Push & In-App Notifications
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Send FCM push alerts and in-app notifications to customers on warnings and restrictions.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex cursor-pointer items-center">
+                    <input
+                      type="checkbox"
+                      checked={settings.customerPushNotificationsEnabled !== false}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          customerPushNotificationsEnabled: e.target.checked,
+                        })
+                      }
+                      className="peer sr-only"
+                    />
+                    <div className="h-6 w-11 rounded-full bg-slate-200 peer-checked:bg-emerald-600 peer-focus:outline-hidden after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full" />
+                  </label>
+                </div>
+
+                {/* Messages */}
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 border-t border-slate-100 pt-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      Warning Message Displayed to Customer
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={settings.customerWarningMessage || ''}
+                      onChange={(e) =>
+                        setSettings({ ...settings, customerWarningMessage: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-medium text-slate-800 outline-hidden focus:border-brand"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      Restriction Message Displayed to Customer
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={settings.customerRestrictionMessage || ''}
+                      onChange={(e) =>
+                        setSettings({ ...settings, customerRestrictionMessage: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-medium text-slate-800 outline-hidden focus:border-brand"
+                    />
+                  </div>
                 </div>
               </GlassPanel>
 
@@ -1032,6 +1628,354 @@ export function AdminBookingCancellationPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: CUSTOMER CANCELLATION HISTORY & AUDIT LOG */}
+      {/* ======================================================== */}
+      {customerHistoryModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Customer Cancellation Profile & Audit History
+                </h3>
+                {customerHistoryModal.data?.customer && (
+                  <p className="text-xs font-semibold text-slate-400 mt-0.5">
+                    {customerHistoryModal.data.customer.name} • {customerHistoryModal.data.customer.phone || customerHistoryModal.data.customer.email}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setCustomerHistoryModal({ open: false, data: null, loading: false })}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {customerHistoryModal.loading ? (
+              <div className="py-12 text-center text-slate-400">
+                <Loader2 className="mx-auto h-6 w-6 animate-spin text-brand" />
+                <p className="mt-2 text-xs font-bold">Loading customer history...</p>
+              </div>
+            ) : customerHistoryModal.data ? (
+              <div className="space-y-4">
+                {/* Stats ribbon */}
+                <div className="grid grid-cols-3 gap-3 text-xs">
+                  <div className="rounded-xl bg-slate-50 p-3 border border-slate-100">
+                    <span className="text-slate-400 font-bold block mb-0.5">Rolling Cancellations</span>
+                    <span className="text-lg font-black text-slate-900">
+                      {customerHistoryModal.data.activeCount} / {customerHistoryModal.data.windowDays}d
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-3 border border-slate-100">
+                    <span className="text-slate-400 font-bold block mb-0.5">Policy Thresholds</span>
+                    <span className="text-xs font-bold text-slate-700">
+                      Warn: {customerHistoryModal.data.warningThreshold} • Restrict: {customerHistoryModal.data.restrictionThreshold}
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-3 border border-slate-100">
+                    <span className="text-slate-400 font-bold block mb-0.5">Restriction Status</span>
+                    {customerHistoryModal.data.isRestricted ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 text-rose-800 border border-rose-200 px-2 py-0.5 text-[10px] font-black">
+                        RESTRICTED
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 text-[10px] font-black">
+                        ACTIVE
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Cancellation Records */}
+                <div>
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-2">
+                    Customer Initiated Cancellations ({customerHistoryModal.data.records?.length || 0})
+                  </h4>
+                  <div className="rounded-xl border border-slate-100 overflow-hidden">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-400 border-b border-slate-100">
+                        <tr>
+                          <th className="py-2.5 px-3">Date</th>
+                          <th className="py-2.5 px-3">Booking</th>
+                          <th className="py-2.5 px-3">Reason</th>
+                          <th className="py-2.5 px-3">Refund Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                        {customerHistoryModal.data.records?.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="py-6 text-center text-slate-400">
+                              No customer cancellations on record
+                            </td>
+                          </tr>
+                        ) : (
+                          customerHistoryModal.data.records.map((r) => (
+                            <tr key={r._id} className="hover:bg-slate-50/50">
+                              <td className="py-2.5 px-3 whitespace-nowrap">{formatDate(r.createdAt)}</td>
+                              <td className="py-2.5 px-3 font-bold text-slate-900">
+                                #{String(r.bookingId?._id || r.bookingId).slice(-6).toUpperCase()}
+                              </td>
+                              <td className="py-2.5 px-3">{r.reason}</td>
+                              <td className="py-2.5 px-3">
+                                <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                                  {r.refundStatus || 'N/A'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Restriction & Warning Audit Trail */}
+                <div>
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-600 mb-2">
+                    Policy Actions & Restriction Audit Trail ({customerHistoryModal.data.restrictionHistory?.length || 0})
+                  </h4>
+                  <div className="space-y-2">
+                    {customerHistoryModal.data.restrictionHistory?.length === 0 ? (
+                      <p className="text-xs text-slate-400 font-medium py-2">No warning or restriction events logged yet.</p>
+                    ) : (
+                      customerHistoryModal.data.restrictionHistory.map((hist, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 flex items-start justify-between text-xs"
+                        >
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`rounded-md px-1.5 py-0.5 text-[10px] font-black ${
+                                  hist.action === 'RESTRICTED'
+                                    ? 'bg-rose-100 text-rose-800'
+                                    : hist.action === 'UNRESTRICTED'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-amber-100 text-amber-800'
+                                }`}
+                              >
+                                {hist.action}
+                              </span>
+                              <span className="font-bold text-slate-800">By: {hist.performedBy}</span>
+                            </div>
+                            <p className="text-slate-600 mt-1 font-medium">{hist.reason}</p>
+                            {hist.restrictedUntil && (
+                              <p className="text-[11px] text-rose-600 font-semibold mt-0.5">
+                                Restricted Until: {formatDate(hist.restrictedUntil)}
+                              </p>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-semibold whitespace-nowrap">
+                            {formatDate(hist.timestamp)}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="flex justify-end pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setCustomerHistoryModal({ open: false, data: null, loading: false })}
+                className="rounded-xl bg-slate-100 px-5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: APPLY MANUAL CUSTOMER RESTRICTION */}
+      {/* ======================================================== */}
+      {restrictModal.open && restrictModal.customer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <form
+            onSubmit={handleApplyRestriction}
+            className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-slate-900 font-extrabold text-base">
+                <Ban className="h-5 w-5 text-rose-600" />
+                Restrict Customer Booking Access
+              </div>
+              <button
+                type="button"
+                onClick={() => setRestrictModal({ open: false, customer: null, durationDays: 7, reason: '', adminNote: '', loading: false, error: '' })}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="rounded-2xl bg-rose-50/80 p-3.5 text-xs text-rose-900 space-y-1 border border-rose-100">
+              <p><b>Target Customer:</b> {restrictModal.customer.name}</p>
+              <p><b>Phone / Contact:</b> {restrictModal.customer.phone || restrictModal.customer.email}</p>
+              <p className="text-[11px] text-rose-700 mt-1">
+                This will prevent the customer from creating new bookings. Existing bookings remain intact.
+              </p>
+            </div>
+
+            {restrictModal.error && (
+              <p className="text-xs font-bold text-rose-600">{restrictModal.error}</p>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Restriction Duration
+              </label>
+              <select
+                value={restrictModal.durationDays}
+                onChange={(e) => setRestrictModal({ ...restrictModal, durationDays: Number(e.target.value) })}
+                className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-bold text-slate-800 outline-hidden focus:border-brand"
+              >
+                <option value={1}>1 Day</option>
+                <option value={3}>3 Days</option>
+                <option value={7}>7 Days (Standard)</option>
+                <option value={14}>14 Days</option>
+                <option value={30}>30 Days</option>
+                <option value={0}>Indefinite (Until Manually Lifted)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Mandatory Reason *
+              </label>
+              <input
+                type="text"
+                required
+                value={restrictModal.reason}
+                onChange={(e) => setRestrictModal({ ...restrictModal, reason: e.target.value })}
+                placeholder="Reason for restriction (visible to customer)..."
+                className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-medium text-slate-800 outline-hidden focus:border-brand"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Internal Admin Memo
+              </label>
+              <textarea
+                rows={2}
+                value={restrictModal.adminNote}
+                onChange={(e) => setRestrictModal({ ...restrictModal, adminNote: e.target.value })}
+                placeholder="Internal audit notes..."
+                className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-medium text-slate-800 outline-hidden focus:border-brand"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setRestrictModal({ open: false, customer: null, durationDays: 7, reason: '', adminNote: '', loading: false, error: '' })}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={restrictModal.loading}
+                className="flex items-center gap-1.5 rounded-xl bg-rose-600 px-5 py-2 text-xs font-extrabold text-white shadow-sm hover:bg-rose-700 transition active:scale-95 disabled:opacity-50"
+              >
+                {restrictModal.loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Apply Restriction
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: LIFT MANUAL CUSTOMER RESTRICTION */}
+      {/* ======================================================== */}
+      {unrestrictModal.open && unrestrictModal.customer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <form
+            onSubmit={handleLiftRestriction}
+            className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-slate-900 font-extrabold text-base">
+                <Unlock className="h-5 w-5 text-emerald-600" />
+                Lift Customer Restriction
+              </div>
+              <button
+                type="button"
+                onClick={() => setUnrestrictModal({ open: false, customer: null, reason: '', adminNote: '', loading: false, error: '' })}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="rounded-2xl bg-emerald-50/80 p-3.5 text-xs text-emerald-900 space-y-1 border border-emerald-100">
+              <p><b>Target Customer:</b> {unrestrictModal.customer.name}</p>
+              <p><b>Phone / Contact:</b> {unrestrictModal.customer.phone || unrestrictModal.customer.email}</p>
+              <p className="text-[11px] text-emerald-700 mt-1">
+                Lifting this restriction will immediately restore the customer's ability to create bookings.
+              </p>
+            </div>
+
+            {unrestrictModal.error && (
+              <p className="text-xs font-bold text-rose-600">{unrestrictModal.error}</p>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Reason for Restoring Access *
+              </label>
+              <input
+                type="text"
+                required
+                value={unrestrictModal.reason}
+                onChange={(e) => setUnrestrictModal({ ...unrestrictModal, reason: e.target.value })}
+                placeholder="Reason (e.g., Customer contacted support, policy reviewed)..."
+                className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-medium text-slate-800 outline-hidden focus:border-brand"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Internal Admin Memo
+              </label>
+              <textarea
+                rows={2}
+                value={unrestrictModal.adminNote}
+                onChange={(e) => setUnrestrictModal({ ...unrestrictModal, adminNote: e.target.value })}
+                placeholder="Internal audit notes..."
+                className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-medium text-slate-800 outline-hidden focus:border-brand"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setUnrestrictModal({ open: false, customer: null, reason: '', adminNote: '', loading: false, error: '' })}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={unrestrictModal.loading}
+                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2 text-xs font-extrabold text-white shadow-sm hover:bg-emerald-700 transition active:scale-95 disabled:opacity-50"
+              >
+                {unrestrictModal.loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Restore Booking Access
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

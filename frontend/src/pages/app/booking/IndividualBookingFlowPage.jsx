@@ -142,6 +142,7 @@ export function IndividualBookingFlowPage() {
   const [reviewQueue, setReviewQueue] = useState([])
   const [currentReviewIndex, setCurrentReviewIndex] = useState(0)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
+  const [restrictionError, setRestrictionError] = useState(null)
 
   const handleOpenReview = useCallback(() => {
     if (realUser?.role === 'contractor' && activeBooking?.assignments?.length > 0) {
@@ -805,7 +806,21 @@ export function IndividualBookingFlowPage() {
       goStep(draft.bookingType === 'scheduled' ? 'scheduled_success' : 'searching')
     } catch (err) {
       console.error(err)
-      alert(err.message || 'Failed to create booking')
+      const isRestricted =
+        err.status === 403 ||
+        err.statusCode === 403 ||
+        err.data?.isRestricted ||
+        String(err.message || '').toLowerCase().includes('restrict')
+
+      if (isRestricted) {
+        setRestrictionError({
+          message: err.message || 'Your account is currently restricted from creating new bookings.',
+          restrictedUntil: err.data?.restrictedUntil,
+          reason: err.data?.reason,
+        })
+      } else {
+        alert(err.message || 'Failed to create booking')
+      }
     } finally {
       setIsCreating(false)
     }
@@ -2146,6 +2161,56 @@ export function IndividualBookingFlowPage() {
             goStep('details')
           }}
         />
+
+        {restrictionError && (
+          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 text-center space-y-4"
+            >
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 border border-rose-100">
+                <AlertCircle className="h-8 w-8" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Booking Access Restricted</h3>
+                <p className="text-xs text-rose-700 font-semibold mt-1">Cancellation Policy Enforcement</p>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                {restrictionError.message}
+              </p>
+              {restrictionError.restrictedUntil && (
+                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-700">
+                  <span className="font-bold">Restricted Until: </span>
+                  <span>
+                    {new Date(restrictionError.restrictedUntil).toLocaleDateString()} {new Date(restrictionError.restrictedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              )}
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-left text-xs text-amber-900 space-y-1">
+                <p className="font-bold">Need assistance?</p>
+                <p className="text-[11px] text-amber-800">
+                  Existing confirmed bookings remain unaffected. If you believe this was an error or would like to request an account review, please contact A2Z Support.
+                </p>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRestrictionError(null)}
+                  className="flex-1 rounded-xl bg-slate-900 py-3 text-sm font-bold text-white hover:bg-slate-800 transition"
+                >
+                  Understood
+                </button>
+                <a
+                  href="tel:18001234567"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition flex items-center justify-center"
+                >
+                  Support
+                </a>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </div>
     </div>
   )
