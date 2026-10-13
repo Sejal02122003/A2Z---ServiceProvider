@@ -10,7 +10,30 @@ const router = Router()
 router.use(protect, restrictTo(USER_ROLES.ADMIN))
 
 router.get('/settings', adminWallet.getAdminWalletSettings)
-router.put('/settings', adminWallet.updateAdminWalletSettings)
+router.put(
+  '/settings',
+  [
+    body('welcomeBonusAmount')
+      .optional()
+      .custom((val) => {
+        const num = Number(val)
+        if (isNaN(num) || !Number.isInteger(num) || num < 500 || num > 1500) {
+          throw new Error('Welcome bonus amount must be a whole rupee amount between ₹500 and ₹1,500')
+        }
+        return true
+      }),
+    body('welcomeBonusEnabled')
+      .optional()
+      .isBoolean()
+      .withMessage('welcomeBonusEnabled must be a boolean'),
+    body('enabled')
+      .optional()
+      .isBoolean()
+      .withMessage('enabled must be a boolean'),
+  ],
+  validateRequest,
+  adminWallet.updateAdminWalletSettings
+)
 
 router.get('/labour-stats', adminWallet.getLabourWalletStats)
 router.get('/transactions', adminWallet.getAllWalletTransactions)

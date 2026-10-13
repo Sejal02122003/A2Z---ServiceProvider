@@ -141,19 +141,23 @@ export const registerVerify = asyncHandler(async (req, res) => {
     },
   })
 
-  // Credit welcome bonus for newly registered users
+  // Credit welcome bonus for newly registered customer accounts
   let welcomeBonus = null
-  try {
-    const { ensureWelcomeBonus } = await import('../services/userWalletService.js')
-    const bonusRes = await ensureWelcomeBonus(user._id)
-    if (bonusRes && bonusRes.credited) {
-      welcomeBonus = {
-        credited: true,
-        amount: bonusRes.bonusAmount,
+  if (user.role === USER_ROLES.CUSTOMER) {
+    try {
+      const { ensureWelcomeBonus } = await import('../services/userWalletService.js')
+      const bonusRes = await ensureWelcomeBonus(user._id)
+      if (bonusRes && bonusRes.credited) {
+        welcomeBonus = {
+          credited: true,
+          amount: bonusRes.bonusAmount,
+          balance: bonusRes.balanceAfter,
+          message: bonusRes.message || `₹${bonusRes.bonusAmount.toLocaleString('en-IN')} welcome bonus added to your wallet`,
+        }
       }
+    } catch (err) {
+      console.error('[AUTH_ERROR] Error in welcome bonus processing:', err)
     }
-  } catch (err) {
-    console.error('[AUTH_ERROR] Error in welcome bonus processing:', err)
   }
 
   const token = signAccessToken(user)

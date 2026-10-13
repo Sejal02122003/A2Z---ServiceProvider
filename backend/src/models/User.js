@@ -258,6 +258,19 @@ const userSchema = new mongoose.Schema(
         },
       ],
     },
+    welcomeBonusCredited: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    welcomeBonusAmount: {
+      type: Number,
+      default: 0,
+    },
+    welcomeBonusCreditedAt: {
+      type: Date,
+      default: null,
+    },
     labourProfile: labourProfileSchema,
     contractorProfile: contractorProfileSchema,
   },

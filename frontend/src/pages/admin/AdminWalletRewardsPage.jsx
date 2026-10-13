@@ -31,9 +31,12 @@ export default function AdminWalletRewardsPage() {
   // Settings State
   const [settings, setSettings] = useState({
     enabled: true,
-    welcomeBonusAmount: 100,
+    welcomeBonusEnabled: true,
+    welcomeBonusAmount: 1000,
     walletDiscountPercentage: 20,
-    minimumBookingAmount: 0
+    minimumBookingAmount: 0,
+    updatedAt: null,
+    updatedBy: null,
   });
 
   // Simulator State
@@ -65,11 +68,15 @@ export default function AdminWalletRewardsPage() {
       setLoading(true);
       const res = await walletsApi.getAdminWalletSettings();
       if (res.success && res.data) {
+        const s = res.data.settings || res.data;
         setSettings({
-          enabled: res.data.enabled !== undefined ? res.data.enabled : true,
-          welcomeBonusAmount: res.data.welcomeBonusAmount ?? 100,
-          walletDiscountPercentage: res.data.walletDiscountPercentage ?? 20,
-          minimumBookingAmount: res.data.minimumBookingAmount ?? 0
+          enabled: s.enabled !== undefined ? s.enabled : true,
+          welcomeBonusEnabled: s.welcomeBonusEnabled !== undefined ? s.welcomeBonusEnabled : true,
+          welcomeBonusAmount: s.welcomeBonusAmount ?? 1000,
+          walletDiscountPercentage: s.walletDiscountPercentage ?? 20,
+          minimumBookingAmount: s.minimumBookingAmount ?? 0,
+          updatedAt: s.updatedAt,
+          updatedBy: s.updatedBy,
         });
       }
     } catch (err) {
@@ -119,11 +126,34 @@ export default function AdminWalletRewardsPage() {
     setSuccessMsg('');
     setErrorMsg('');
 
+    const bonusVal = Number(settings.welcomeBonusAmount);
+    if (isNaN(bonusVal) || !Number.isInteger(bonusVal) || bonusVal < 500 || bonusVal > 1500) {
+      setErrorMsg('Welcome bonus amount must be a whole rupee amount between ₹500 and ₹1,500');
+      setSaving(false);
+      return;
+    }
+
     try {
-      const res = await walletsApi.updateAdminWalletSettings(settings);
+      const res = await walletsApi.updateAdminWalletSettings({
+        enabled: settings.enabled,
+        welcomeBonusEnabled: settings.welcomeBonusEnabled,
+        welcomeBonusAmount: bonusVal,
+        walletDiscountPercentage: Number(settings.walletDiscountPercentage),
+        minimumBookingAmount: Number(settings.minimumBookingAmount),
+      });
+
       if (res.success) {
-        setSuccessMsg('Wallet & Rewards settings updated successfully!');
-        setSettings(res.data);
+        const updated = res.data?.settings || res.data;
+        setSuccessMsg('Wallet & Welcome Bonus settings updated successfully!');
+        setSettings({
+          enabled: updated.enabled !== undefined ? updated.enabled : settings.enabled,
+          welcomeBonusEnabled: updated.welcomeBonusEnabled !== undefined ? updated.welcomeBonusEnabled : settings.welcomeBonusEnabled,
+          welcomeBonusAmount: updated.welcomeBonusAmount ?? bonusVal,
+          walletDiscountPercentage: updated.walletDiscountPercentage ?? settings.walletDiscountPercentage,
+          minimumBookingAmount: updated.minimumBookingAmount ?? settings.minimumBookingAmount,
+          updatedAt: updated.updatedAt,
+          updatedBy: updated.updatedBy,
+        });
       }
     } catch (err) {
       setErrorMsg(err.message || 'Failed to update settings');
@@ -290,29 +320,108 @@ export default function AdminWalletRewardsPage() {
               </div>
 
               {/* Setting A: Welcome Bonus */}
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
-                  <Gift className="w-4 h-4 text-amber-500" />
-                  Welcome Bonus Amount (₹)
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 font-semibold">
-                    ₹
+              <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/40 dark:bg-amber-950/20 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-amber-200/60 dark:border-amber-900/40">
+                  <div className="flex items-center gap-2">
+                    <Gift className="w-5 h-5 text-amber-500" />
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">Customer Welcome Bonus</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Awarded once per new verified customer account upon registration.</p>
+                    </div>
                   </div>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={settings.welcomeBonusAmount}
-                    onChange={(e) => setSettings({ ...settings, welcomeBonusAmount: Number(e.target.value) })}
-                    className="w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    placeholder="100"
-                    required
-                  />
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.welcomeBonusEnabled}
+                      onChange={(e) => setSettings({ ...settings, welcomeBonusEnabled: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                    <span className="ml-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {settings.welcomeBonusEnabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </label>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Amount automatically credited to new eligible users when they register for the first time.
-                </p>
+
+                {/* Currently Active Banner */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-900/80 border border-amber-200/80 dark:border-amber-800/40 text-xs shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full ${settings.enabled && settings.welcomeBonusEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">
+                      Currently Active Bonus:
+                    </span>
+                  </div>
+                  <div className="text-sm font-black text-amber-600 dark:text-amber-400">
+                    {settings.enabled && settings.welcomeBonusEnabled ? `₹${Number(settings.welcomeBonusAmount || 1000).toLocaleString('en-IN')}` : 'Inactive (Disabled)'}
+                  </div>
+                </div>
+
+                {/* Amount input & presets */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                      Bonus Credit Amount (₹500 - ₹1,500)
+                    </label>
+                    <span className="text-[11px] font-semibold text-slate-400">
+                      Whole rupees only
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 font-bold">
+                      ₹
+                    </div>
+                    <input
+                      type="number"
+                      min="500"
+                      max="1500"
+                      step="1"
+                      value={settings.welcomeBonusAmount}
+                      onChange={(e) => setSettings({ ...settings, welcomeBonusAmount: e.target.value === '' ? '' : Number(e.target.value) })}
+                      className="w-full pl-8 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      placeholder="1000"
+                      required
+                    />
+                  </div>
+
+                  {/* Preset Quick Buttons */}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {[500, 750, 1000, 1250, 1500].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setSettings({ ...settings, welcomeBonusAmount: preset })}
+                        className={`px-3 py-1 text-xs font-bold rounded-lg border transition-all ${
+                          Number(settings.welcomeBonusAmount) === preset
+                            ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-amber-400'
+                        }`}
+                      >
+                        ₹{preset.toLocaleString('en-IN')}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Real-time validation warning */}
+                  {(Number(settings.welcomeBonusAmount) < 500 || Number(settings.welcomeBonusAmount) > 1500 || !Number.isInteger(Number(settings.welcomeBonusAmount))) && (
+                    <p className="text-xs font-semibold text-rose-500 flex items-center gap-1 mt-1">
+                      <AlertCircle className="w-3.5 h-3.5" /> Amount must be a whole rupee value between ₹500 and ₹1,500.
+                    </p>
+                  )}
+                </div>
+
+                {/* Audit metadata */}
+                {(settings.updatedAt || settings.updatedBy) && (
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 pt-2 border-t border-amber-200/50 dark:border-amber-900/30 flex flex-wrap items-center justify-between gap-1">
+                    <span>
+                      Last Updated: {settings.updatedAt ? new Date(settings.updatedAt).toLocaleString('en-IN') : 'Default Config'}
+                    </span>
+                    {settings.updatedBy && (
+                      <span>
+                        Updated By: {settings.updatedBy.fullName || settings.updatedBy.email || 'Admin'}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Setting B: Max Wallet Discount Percentage */}

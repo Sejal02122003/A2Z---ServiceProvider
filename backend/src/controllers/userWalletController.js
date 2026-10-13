@@ -16,9 +16,6 @@ import {
 export const getMyUserWallet = asyncHandler(async (req, res) => {
   const userId = req.user._id
 
-  // Ensure welcome bonus if eligible
-  await ensureWelcomeBonus(userId)
-
   const wallet = await getOrCreateUserWallet(userId)
   const settings = await getWalletSettings()
 

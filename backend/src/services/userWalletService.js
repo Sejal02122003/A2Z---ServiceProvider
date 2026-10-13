@@ -7,7 +7,8 @@ import { User } from '../models/User.js'
 const DEFAULT_SETTINGS = {
   configKey: 'master_wallet_config',
   enabled: true,
-  welcomeBonusAmount: 100,
+  welcomeBonusEnabled: true,
+  welcomeBonusAmount: 1000,
   walletDiscountPercentage: 20,
   minimumBookingAmount: 0,
 }
@@ -17,6 +18,7 @@ const DEFAULT_SETTINGS = {
  */
 export async function getWalletSettings() {
   let settings = await WalletSetting.findOne({ configKey: 'master_wallet_config' })
+    .populate('updatedBy', 'fullName email')
   if (!settings) {
     settings = await WalletSetting.create(DEFAULT_SETTINGS)
   }
@@ -27,15 +29,27 @@ export async function getWalletSettings() {
  * Update wallet settings with validation
  */
 export async function updateWalletSettings(data, adminUserId) {
-  const { enabled, welcomeBonusAmount, walletDiscountPercentage, minimumBookingAmount, minimumLabourWalletBalance } = data
+  const {
+    enabled,
+    welcomeBonusEnabled,
+    welcomeBonusAmount,
+    walletDiscountPercentage,
+    minimumBookingAmount,
+    minimumLabourWalletBalance,
+  } = data
 
   const update = {}
   if (enabled !== undefined) update.enabled = Boolean(enabled)
+  if (welcomeBonusEnabled !== undefined) update.welcomeBonusEnabled = Boolean(welcomeBonusEnabled)
+
   if (welcomeBonusAmount !== undefined) {
     const num = Number(welcomeBonusAmount)
-    if (isNaN(num) || num < 0) throw new Error('Welcome bonus amount must be >= 0')
+    if (isNaN(num) || !Number.isInteger(num) || num < 500 || num > 1500) {
+      throw new Error('Welcome bonus amount must be a whole rupee amount between ₹500 and ₹1,500')
+    }
     update.welcomeBonusAmount = num
   }
+
   if (walletDiscountPercentage !== undefined) {
     const num = Number(walletDiscountPercentage)
     if (isNaN(num) || num < 0 || num > 100) throw new Error('Wallet discount percentage must be between 0 and 100')
@@ -57,7 +71,8 @@ export async function updateWalletSettings(data, adminUserId) {
     { configKey: 'master_wallet_config' },
     { $set: update },
     { new: true, upsert: true }
-  )
+  ).populate('updatedBy', 'fullName email')
+
   return settings
 }
 
@@ -82,31 +97,87 @@ export async function getOrCreateUserWallet(userId) {
  */
 export async function ensureWelcomeBonus(userId) {
   try {
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return { credited: false, reason: 'INVALID_USER_ID', bonusAmount: 0 }
+    }
+
     const settings = await getWalletSettings()
-    if (!settings.enabled || Number(settings.welcomeBonusAmount) <= 0) {
-      return { credited: false, reason: 'WALLET_DISABLED_OR_ZERO_BONUS', bonusAmount: 0 }
+    const isEnabled = Boolean(settings.enabled) && settings.welcomeBonusEnabled !== false
+    if (!isEnabled) {
+      return { credited: false, reason: 'FEATURE_DISABLED', bonusAmount: 0 }
     }
 
-    const bonusAmount = Number(settings.welcomeBonusAmount)
+    const bonusAmount = Number(settings.welcomeBonusAmount || 1000)
+    if (isNaN(bonusAmount) || bonusAmount < 500 || bonusAmount > 1500) {
+      return { credited: false, reason: 'INVALID_CONFIGURED_AMOUNT', bonusAmount: 0 }
+    }
 
-    // Check user eligibility flag
+    // 1. Fetch user and verify eligibility
     const user = await User.findById(userId)
-    if (!user || user.welcomeBonusCredited) {
-      return { credited: false, reason: 'ALREADY_CREDITED_OR_USER_NOT_FOUND', bonusAmount: 0 }
+    if (!user) {
+      return { credited: false, reason: 'USER_NOT_FOUND', bonusAmount: 0 }
     }
 
-    // Atomic update on User first to prevent race conditions
+    // Must be a customer account
+    if (user.role !== 'customer') {
+      return { credited: false, reason: 'ROLE_NOT_ELIGIBLE', bonusAmount: 0 }
+    }
+
+    // Must have phone verified
+    if (user.isPhoneVerified !== true) {
+      return { credited: false, reason: 'PHONE_NOT_VERIFIED', bonusAmount: 0 }
+    }
+
+    // If user already has welcomeBonusCredited flag marked
+    if (user.welcomeBonusCredited) {
+      return {
+        credited: false,
+        alreadyCredited: true,
+        reason: 'ALREADY_CREDITED',
+        bonusAmount: user.welcomeBonusAmount || bonusAmount,
+      }
+    }
+
+    // 2. Ledger-level duplicate verification: check existing WELCOME_BONUS transaction
+    const existingTx = await WalletTransaction.findOne({
+      userId,
+      $or: [
+        { context: 'WELCOME_BONUS' },
+        { idempotencyKey: `WELCOME_BONUS_${userId}` },
+      ],
+    })
+
+    if (existingTx) {
+      await User.findByIdAndUpdate(userId, {
+        $set: { welcomeBonusCredited: true, welcomeBonusAmount: existingTx.amount },
+      })
+      await Wallet.findOneAndUpdate({ userId }, { $set: { welcomeBonusCredited: true } })
+      return {
+        credited: false,
+        alreadyCredited: true,
+        reason: 'ALREADY_CREDITED_LEDGER_EXISTS',
+        bonusAmount: existingTx.amount,
+      }
+    }
+
+    // 3. Atomic lock on User to prevent concurrent race conditions
     const updatedUser = await User.findOneAndUpdate(
-      { _id: userId, welcomeBonusCredited: false },
-      { $set: { welcomeBonusCredited: true } },
+      { _id: userId, welcomeBonusCredited: { $ne: true } },
+      {
+        $set: {
+          welcomeBonusCredited: true,
+          welcomeBonusAmount: bonusAmount,
+          welcomeBonusCreditedAt: new Date(),
+        },
+      },
       { new: true }
     )
 
     if (!updatedUser) {
-      return { credited: false, reason: 'ALREADY_CREDITED_CONCURRENT', bonusAmount: 0 }
+      return { credited: false, alreadyCredited: true, reason: 'ALREADY_CREDITED_CONCURRENT', bonusAmount: 0 }
     }
 
-    // Get or create wallet
+    // 4. Get or create customer wallet
     let wallet = await Wallet.findOne({ userId })
     if (!wallet) {
       wallet = await Wallet.create({
@@ -118,38 +189,63 @@ export async function ensureWelcomeBonus(userId) {
     }
 
     if (wallet.welcomeBonusCredited) {
-      return { credited: false, reason: 'WALLET_ALREADY_CREDITED', bonusAmount: 0 }
+      return { credited: false, alreadyCredited: true, reason: 'WALLET_ALREADY_CREDITED', bonusAmount: 0 }
     }
 
-    const balanceBefore = wallet.balance || wallet.selfBalance || 0
+    const balanceBefore = wallet.balance !== undefined ? wallet.balance : (wallet.selfBalance || 0)
     const balanceAfter = balanceBefore + bonusAmount
+    const idempotencyKey = `WELCOME_BONUS_${userId}`
 
-    // Atomically increment wallet
-    await Wallet.updateOne(
-      { _id: wallet._id },
-      {
-        $inc: { balance: bonusAmount, selfBalance: bonusAmount },
-        $set: { welcomeBonusCredited: true },
+    // 5. Create transaction and increment wallet with database-level uniqueness
+    try {
+      const tx = await WalletTransaction.create({
+        walletId: wallet._id,
+        userId,
+        amount: bonusAmount,
+        type: 'CREDIT',
+        targetWallet: 'SELF',
+        context: 'WELCOME_BONUS',
+        balanceBefore,
+        balanceAfter,
+        referenceType: 'WELCOME_BONUS',
+        idempotencyKey,
+        description: `Welcome bonus of ₹${bonusAmount.toLocaleString('en-IN')} credited on registration`,
+        status: 'COMPLETED',
+      })
+
+      await Wallet.updateOne(
+        { _id: wallet._id },
+        {
+          $inc: { balance: bonusAmount, selfBalance: bonusAmount },
+          $set: { welcomeBonusCredited: true },
+        }
+      )
+
+      console.log(`[WALLET] Welcome bonus credited userId: ${userId} amount: ₹${bonusAmount}`)
+      return {
+        credited: true,
+        bonusAmount,
+        balanceBefore,
+        balanceAfter,
+        transactionId: tx._id,
+        message: `₹${bonusAmount.toLocaleString('en-IN')} welcome bonus added to your wallet`,
       }
-    )
-
-    // Create unique audit transaction
-    await WalletTransaction.create({
-      walletId: wallet._id,
-      userId,
-      amount: bonusAmount,
-      type: 'CREDIT',
-      targetWallet: 'SELF',
-      context: 'WELCOME_BONUS',
-      balanceBefore,
-      balanceAfter,
-      referenceType: 'WELCOME_BONUS',
-      description: `Welcome bonus of ₹${bonusAmount} credited on registration`,
-      status: 'COMPLETED',
-    })
-
-    console.log(`[WALLET] Welcome bonus credited userId: ${userId} amount: ${bonusAmount}`)
-    return { credited: true, bonusAmount, balanceAfter }
+    } catch (txErr) {
+      if (txErr.code === 11000 || txErr.message?.includes('duplicate key')) {
+        console.warn(`[WALLET_IDEMPOTENCY] Duplicate key detected on welcome bonus for user ${userId}`)
+        return {
+          credited: false,
+          alreadyCredited: true,
+          reason: 'DUPLICATE_KEY_ALREADY_CREDITED',
+          bonusAmount,
+        }
+      }
+      // Revert user flag if unexpected error occurred
+      await User.findByIdAndUpdate(userId, {
+        $set: { welcomeBonusCredited: false, welcomeBonusAmount: 0 },
+      })
+      throw txErr
+    }
   } catch (err) {
     console.error(`[WALLET_ERROR] Failed to credit welcome bonus for user ${userId}:`, err)
     return { credited: false, error: err.message, bonusAmount: 0 }

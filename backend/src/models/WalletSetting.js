@@ -12,10 +12,15 @@ const walletSettingSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    welcomeBonusEnabled: {
+      type: Boolean,
+      default: true,
+    },
     welcomeBonusAmount: {
       type: Number,
-      default: 100,
-      min: 0,
+      default: 1000,
+      min: 500,
+      max: 1500,
     },
     walletDiscountPercentage: {
       type: Number,

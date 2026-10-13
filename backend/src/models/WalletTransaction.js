@@ -113,6 +113,7 @@ const walletTransactionSchema = new mongoose.Schema(
 
 // Index for audit trails and idempotency
 walletTransactionSchema.index({ userId: 1, createdAt: -1 })
+walletTransactionSchema.index({ userId: 1, context: 1 })
 walletTransactionSchema.index({ labourId: 1, createdAt: -1 })
 walletTransactionSchema.index({ referenceId: 1, context: 1 })
 walletTransactionSchema.index({ bookingId: 1, context: 1 })

@@ -265,9 +265,12 @@ export function AuthEntryPage({ authGroup = 'users' }) {
           fullName: fullName.trim(),
         }
         const res = await verifyRegister(body)
-        const { token, user } = res.data
+        const { token, user, welcomeBonus } = res.data
         applySession(token, user)
         signedInUser = user
+        if (welcomeBonus?.credited) {
+          signedInUser.welcomeBonus = welcomeBonus
+        }
       }
 
         let returnPath = location.state?.from || getRoleHomePath(signedInUser.role)
@@ -286,7 +289,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
           setStep('work-setup')
           setBanner(null)
         } else {
-          navigate(returnPath, { replace: true })
+          navigate(returnPath, { replace: true, state: { welcomeBonus: signedInUser.welcomeBonus } })
         }
     } catch (e) {
       setBanner({

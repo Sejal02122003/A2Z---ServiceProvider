@@ -13,16 +13,18 @@ import {
   ChevronRight,
   Info
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { walletsApi } from '../../api/walletsApi';
 
 export default function UserWalletPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [welcomeAlert, setWelcomeAlert] = useState(location.state?.welcomeBonus || null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [wallet, setWallet] = useState({ balance: 0, welcomeBonusCredited: false });
   const [transactions, setTransactions] = useState([]);
-  const [settings, setSettings] = useState({ enabled: true, welcomeBonusAmount: 100, walletDiscountPercentage: 20 });
+  const [settings, setSettings] = useState({ enabled: true, welcomeBonusAmount: 1000, walletDiscountPercentage: 20 });
   const [error, setError] = useState('');
 
   const loadData = useCallback(async (isRefresh = false) => {
@@ -105,6 +107,30 @@ export default function UserWalletPage() {
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-primary-600' : ''}`} />
         </button>
       </div>
+
+      {/* Welcome Bonus Celebration Alert */}
+      {welcomeAlert?.credited && (
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 text-white p-4 shadow-lg shadow-amber-500/20 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-white/20 backdrop-blur-md flex-shrink-0">
+              <Gift className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="font-bold text-sm">🎉 Welcome Bonus Credited!</p>
+              <p className="text-xs text-white/90">
+                {welcomeAlert.message || `₹${Number(welcomeAlert.amount).toLocaleString('en-IN')} welcome bonus has been credited to your wallet.`}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setWelcomeAlert(null)}
+            className="p-1.5 hover:bg-white/20 rounded-lg text-white/80 hover:text-white transition-all text-xs font-semibold"
+            aria-label="Dismiss message"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Hero Wallet Card */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-primary-950 to-primary-900 text-white p-6 md:p-8 shadow-xl shadow-primary-950/20 border border-white/10">

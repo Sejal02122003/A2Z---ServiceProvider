@@ -87,7 +87,8 @@ async function runTests() {
     await updateWalletSettings({
       enabled: true,
       minimumLabourWalletBalance: 0,
-      welcomeBonusAmount: 0,
+      welcomeBonusEnabled: false,
+      welcomeBonusAmount: 1000,
     }, testAdmin._id)
 
     // Helper to create test booking
