@@ -11,12 +11,12 @@ export const requireLabourSubscription = async (req, res, next) => {
 
   // 1. Must have verified KYC & Identity (and not suspended/rejected)
   const isKycVerified = req.user.labourProfile?.kycStatus === KYC_STATUS.VERIFIED
-  const isIdentityVerified =
-    req.user.identityStatus === IDENTITY_STATUS.VERIFIED ||
-    (!req.user.identityStatus && isKycVerified)
   const isDisallowedIdentity =
     req.user.identityStatus === IDENTITY_STATUS.REJECTED ||
     req.user.identityStatus === IDENTITY_STATUS.SUSPENDED
+  const isIdentityVerified =
+    req.user.identityStatus === IDENTITY_STATUS.VERIFIED ||
+    (isKycVerified && !isDisallowedIdentity)
 
   if (!isKycVerified || !isIdentityVerified || isDisallowedIdentity) {
     return sendError(res, {

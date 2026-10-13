@@ -13,10 +13,11 @@ async function validateLabourBookingAccess(labour) {
 
   // 1. KYC and Identity check
   const isKycVerified = labour.labourProfile?.kycStatus === KYC_STATUS.VERIFIED
-  const isIdentityVerified =
-    labour.identityStatus === 'VERIFIED' || (!labour.identityStatus && isKycVerified)
   const isSuspendedOrRejected =
     labour.identityStatus === 'SUSPENDED' || labour.identityStatus === 'REJECTED'
+  const isIdentityVerified =
+    labour.identityStatus === 'VERIFIED' ||
+    (isKycVerified && !isSuspendedOrRejected)
 
   if (!isKycVerified || !isIdentityVerified || isSuspendedOrRejected) {
     return {
@@ -380,7 +381,8 @@ export const rejectBroadcast = asyncHandler(async (req, res) => {
   }
 
   // If everyone eligible has rejected it, fail it
-  if (booking.rejectedBy.length >= (booking.eligibleLabourCount || 0)) {
+  const rejectedCount = Array.isArray(booking.rejectedBy) ? booking.rejectedBy.length : 0
+  if (rejectedCount >= (booking.eligibleLabourCount || 0)) {
     booking.status = 'FAILED'
     await booking.save()
 

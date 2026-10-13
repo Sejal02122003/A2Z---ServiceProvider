@@ -129,6 +129,7 @@ const bookingSchema = new mongoose.Schema(
     },
     broadcastRadius: { type: Number },
     eligibleLabourCount: { type: Number, default: 0 },
+    rejectedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     
     // Support for Bulk Bookings (Contractor)
     quantity: { type: Number, default: 1, min: 1 },

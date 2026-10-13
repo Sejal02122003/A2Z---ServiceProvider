@@ -293,6 +293,30 @@ export function BroadcastPopup() {
                       Go to My Wallet to Recharge &rarr;
                     </button>
                   )}
+                  {error.toLowerCase().includes('subscription') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIncoming(null)
+                        navigate('/app/subscriptions')
+                      }}
+                      className="mt-1 block text-xs font-extrabold text-brand underline"
+                    >
+                      View Plans &amp; Subscribe &rarr;
+                    </button>
+                  )}
+                  {(error.toLowerCase().includes('kyc') || error.toLowerCase().includes('identity') || error.toLowerCase().includes('verification')) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIncoming(null)
+                        navigate('/app/kyc')
+                      }}
+                      className="mt-1 block text-xs font-extrabold text-brand underline"
+                    >
+                      Complete KYC / Identity Verification &rarr;
+                    </button>
+                  )}
                 </div>
               )}
 

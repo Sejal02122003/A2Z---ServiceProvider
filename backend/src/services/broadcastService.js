@@ -163,7 +163,7 @@ export async function startBroadcastCycle(bookingId) {
 
   // 3b. Subscription Eligibility Filter
   const subEligible = []
-  const today = new Date().toISOString().split('T')[0]
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
   const activeSubsMap = {} // Store to increment bookingsReceived later
   const isSubscriptionEnforced = settings?.isUserSubscriptionEnabled === true
 

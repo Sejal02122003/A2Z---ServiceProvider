@@ -51,7 +51,11 @@ export function restrictTo(...roles) {
       })
     }
     
-    fs.appendFileSync('/tmp/auth.log', `User role: ${req.user.role}, Allowed roles: ${lowerRoles.join(',')}\n`)
+    try {
+      fs.appendFileSync('/tmp/auth.log', `User role: ${req.user.role}, Allowed roles: ${lowerRoles.join(',')}\n`)
+    } catch {
+      // Safe fallback if /tmp is not available on environment
+    }
     if (!lowerRoles.includes(String(req.user.role).toLowerCase())) {
       return sendError(res, {
         message: 'You do not have permission for this action',
