@@ -251,9 +251,11 @@ export function IndividualBookingFlowPage() {
   useEffect(() => {
     if (!bookingEvent) return
     if (bookingEvent.type === 'BOOKING_ACCEPTED') {
+      const bId = activeBookingId || bookingEvent.data?.bookingId
+      if (bId) setActiveBookingId(bId)
       goStep('active')
-      if (realUser) {
-        bookingsApi.getBookingStatus(activeBookingId).then(res => {
+      if (realUser && bId) {
+        bookingsApi.getBookingStatus(bId).then(res => {
           if (res.data?.booking) setActiveBooking(res.data.booking)
         }).catch(err => console.error(err))
       }

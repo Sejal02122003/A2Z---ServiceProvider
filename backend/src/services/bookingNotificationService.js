@@ -30,30 +30,32 @@ function formatBookingDate(dateVal) {
 /**
  * Build concise, user-friendly notification text
  */
-export function buildBookingAcceptedContent({ booking, partner, serviceName }) {
+export function buildBookingAcceptedContent({ booking, partner, serviceName, startOtp }) {
   const partnerName = partner?.fullName || partner?.name || 'A service partner'
+  const partnerPhone = partner?.phone ? ` (Phone: ${partner.phone})` : ''
   const service = serviceName || 'your requested service'
   const title = 'Your booking has been confirmed!'
+  const otpNote = startOtp ? ` Start OTP: ${startOtp}` : ''
 
   let body = ''
   if (booking.type === 'INSTANT') {
-    body = `Great news! Your service partner ${partnerName} has accepted your instant booking for ${service}. They are on their way!`
+    body = `Great news! Your service partner ${partnerName}${partnerPhone} has accepted your instant booking for ${service}. They are on their way!${otpNote}`
   } else {
     const formattedDate = formatBookingDate(booking.scheduledAt || booking.date)
     const timeSlot = booking.timeSlot ? ` at ${booking.timeSlot}` : ''
     const schedulePart = formattedDate ? ` on ${formattedDate}${timeSlot}` : ''
-    body = `Great news! Your service partner ${partnerName} has accepted your booking for ${service}${schedulePart}.`
+    body = `Great news! Your service partner ${partnerName}${partnerPhone} has accepted your booking for ${service}${schedulePart}.${otpNote}`
   }
 
-  return { title, body, partnerName, service }
+  return { title, body, partnerName, partnerPhone, service, startOtp }
 }
 
 /**
  * Send booking accepted confirmation notification to customer
  * - Atomic idempotency key ensures no duplicate notifications
- * - In-app notification saved first (outbox / persistent feed)
+ * - Instant socket dispatch with full partner details (photo, phone, name, OTP)
+ * - In-app notification saved with full partner metadata
  * - FCM push sent with invalid-token cleanup
- * - Socket broadcast for real-time in-app updates
  * - Failure of push NEVER throws or rolls back acceptance
  */
 export async function sendBookingAcceptedNotification({ booking, partner, assignment = null }) {
@@ -66,6 +68,15 @@ export async function sendBookingAcceptedNotification({ booking, partner, assign
     const partnerId = partner?._id || booking.acceptedLabourId || booking.laborId
     const partnerDoc = partner || (partnerId ? await User.findById(partnerId).lean() : null)
 
+    const partnerName = partnerDoc?.fullName || partnerDoc?.name || 'Service Partner'
+    const partnerPhone = partnerDoc?.phone || ''
+    const partnerAvatar = partnerDoc?.profileImageUrl || ''
+    const partnerRating = partnerDoc?.labourProfile?.rating || partnerDoc?.rating || 4.8
+    const partnerExperience = partnerDoc?.labourProfile?.experienceYears || 0
+
+    const startOtp = assignment?.startOtp || booking.assignments?.[0]?.startOtp || booking.startOtp || ''
+    const completionOtp = assignment?.completionOtp || booking.assignments?.[0]?.completionOtp || booking.completionOtp || ''
+
     // Resolve service name
     let serviceName = assignment?.serviceName
     if (!serviceName && booking.serviceId) {
@@ -73,17 +84,51 @@ export async function sendBookingAcceptedNotification({ booking, partner, assign
       serviceName = svc?.name || 'Service'
     }
 
-    const { title, body, partnerName, service } = buildBookingAcceptedContent({
+    const { title, body } = buildBookingAcceptedContent({
       booking,
       partner: partnerDoc,
       serviceName,
+      startOtp,
     })
 
     // Construct stable idempotency key
     const version = (booking.acceptedLabourIds?.length || 1)
     const idempotencyKey = `BOOKING_ACCEPTED_${booking._id}_${partnerId}_v${version}`
 
-    // 1. Create In-App Notification (Persistent Feed / Outbox)
+    // 1. Dispatch Real-time Socket Event IMMEDIATELY to customer
+    try {
+      const { emitToUser } = await import('../socket.js')
+      emitToUser(booking.userId, 'BOOKING_ACCEPTED', {
+        bookingId: booking._id,
+        status: booking.status,
+        laborId: partnerDoc?._id,
+        partner: {
+          id: partnerDoc?._id,
+          name: partnerName,
+          phone: partnerPhone,
+          profileImageUrl: partnerAvatar,
+          rating: partnerRating,
+          experienceYears: partnerExperience,
+          serviceName,
+        },
+        partnerName,
+        partnerPhone,
+        partnerAvatar,
+        partnerRating,
+        partnerExperience,
+        serviceName,
+        startOtp,
+        completionOtp,
+        totalAmount: booking.totalAmount,
+        bookingType: booking.type,
+        scheduledAt: booking.scheduledAt,
+        timeSlot: booking.timeSlot,
+      })
+    } catch (sockErr) {
+      console.warn('[BOOKING_NOTIF] Socket emit warning:', sockErr.message)
+    }
+
+    // 2. Create In-App Notification (Persistent Feed / Outbox)
     let inAppRecord = null
     try {
       inAppRecord = await InAppNotification.create({
@@ -97,7 +142,14 @@ export async function sendBookingAcceptedNotification({ booking, partner, assign
         metadata: {
           partnerId: partnerDoc?._id,
           partnerName,
-          serviceName: service,
+          partnerPhone,
+          partnerAvatar,
+          partnerRating,
+          partnerExperience,
+          serviceName,
+          startOtp,
+          completionOtp,
+          totalAmount: booking.totalAmount,
           scheduledAt: booking.scheduledAt,
           date: booking.date,
           timeSlot: booking.timeSlot,
@@ -105,6 +157,12 @@ export async function sendBookingAcceptedNotification({ booking, partner, assign
           link: `/app/tracking/${booking._id}`,
         },
       })
+
+      // Also notify customer about new in-app notification record
+      try {
+        const { emitToUser } = await import('../socket.js')
+        emitToUser(booking.userId, 'NEW_IN_APP_NOTIFICATION', inAppRecord)
+      } catch {}
     } catch (dbErr) {
       // If unique constraint triggers (idempotency key collision on concurrent/retry request)
       if (dbErr.code === 11000) {
@@ -115,44 +173,31 @@ export async function sendBookingAcceptedNotification({ booking, partner, assign
       console.error('[BOOKING_NOTIF] Failed to save in-app notification:', dbErr.message)
     }
 
-    // 2. Prepare FCM Push Notification Payload
+    // 3. Prepare FCM Push Notification Payload
     const pushPayload = {
       title,
       body,
       data: {
         type: NOTIFICATION_TYPES.BOOKING_ACCEPTED,
         bookingId: String(booking._id),
+        partnerId: String(partnerDoc?._id || ''),
         partnerName: String(partnerName || ''),
-        serviceName: String(service || ''),
+        partnerPhone: String(partnerPhone || ''),
+        partnerAvatar: String(partnerAvatar || ''),
+        serviceName: String(serviceName || ''),
+        startOtp: String(startOtp || ''),
         link: `/app/tracking/${booking._id}`,
         scheduledAt: String(booking.scheduledAt || ''),
       },
     }
 
-    // 3. Dispatch FCM Push Notification (non-blocking for booking commit)
+    // 4. Dispatch FCM Push Notification (non-blocking for booking commit)
     let fcmResult = null
     try {
       fcmResult = await sendNotificationToUser(booking.userId, pushPayload)
     } catch (fcmErr) {
       console.warn(`[BOOKING_NOTIF] FCM push dispatch error for customer ${booking.userId}:`, fcmErr.message)
       fcmResult = { success: false, failureCount: 1, error: fcmErr.message }
-    }
-
-    // 4. Dispatch Real-time Socket Event
-    try {
-      const { emitToUser } = await import('../socket.js')
-      emitToUser(booking.userId, 'BOOKING_ACCEPTED', {
-        bookingId: booking._id,
-        laborId: partnerDoc?._id,
-        partnerName,
-        serviceName: service,
-        status: booking.status,
-      })
-      if (inAppRecord) {
-        emitToUser(booking.userId, 'NEW_IN_APP_NOTIFICATION', inAppRecord)
-      }
-    } catch (sockErr) {
-      console.warn('[BOOKING_NOTIF] Socket emit warning:', sockErr.message)
     }
 
     // 5. Update InAppNotification Delivery Metrics

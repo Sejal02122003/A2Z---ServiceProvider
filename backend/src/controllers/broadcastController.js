@@ -314,9 +314,28 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     })
     .catch((err) => console.error('[Import Error bookingNotificationService]', err))
 
-  // Notify sockets & expire broadcast for other partners if fully accepted
+  // Notify customer and expire broadcast for other partners if fully accepted
   import('../socket.js')
-    .then(({ getIo }) => {
+    .then(({ emitToUser, getIo }) => {
+      // Immediate direct socket emit to customer so UI reacts instantly
+      emitToUser(booking.userId, 'BOOKING_ACCEPTED', {
+        bookingId: booking._id,
+        status: booking.status,
+        laborId: labour._id,
+        partner: {
+          id: labour._id,
+          name: labour.fullName,
+          phone: labour.phone,
+          profileImageUrl: labour.profileImageUrl,
+        },
+        partnerName: labour.fullName,
+        partnerPhone: labour.phone,
+        partnerAvatar: labour.profileImageUrl,
+        serviceName: assignedServiceName || 'Service',
+        startOtp: newAssignment.startOtp,
+        completionOtp: newAssignment.completionOtp,
+      })
+
       if (booking.status === 'ACCEPTED') {
         const io = getIo()
         if (io) {

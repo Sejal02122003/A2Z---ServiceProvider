@@ -269,8 +269,8 @@ export function JobTracking() {
             <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Assigned Labour</p>
           </div>
           <div className="flex items-center gap-4 p-4">
-            {labor.profilePic ? (
-              <img src={labor.profileImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(labor.fullName || 'W')}`} alt="" className="h-14 w-14 rounded-2xl object-cover ring-2 ring-white" />
+            {labor.profileImageUrl || labor.profilePic ? (
+              <img src={labor.profileImageUrl || labor.profilePic} alt="" className="h-14 w-14 rounded-2xl object-cover ring-2 ring-white" />
             ) : (
               <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand/10 text-brand">
                 <User className="h-7 w-7" />

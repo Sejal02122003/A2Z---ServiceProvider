@@ -25,25 +25,25 @@ export function useBookingSocket(bookingId) {
     socket.on('connect_error', (err) => console.error('Socket error:', err))
 
     socket.on('BOOKING_BROADCAST_STARTED', (data) => {
-      if (!bookingId || data.bookingId === bookingId) {
+      if (!bookingId || String(data.bookingId) === String(bookingId)) {
         setBookingEvent({ type: 'BOOKING_BROADCAST_STARTED', data })
       }
     })
 
     socket.on('BOOKING_ACCEPTED', (data) => {
-      if (!bookingId || data.bookingId === bookingId) {
+      if (!bookingId || String(data.bookingId) === String(bookingId)) {
         setBookingEvent({ type: 'BOOKING_ACCEPTED', data })
       }
     })
 
     socket.on('BOOKING_FAILED', (data) => {
-      if (!bookingId || data.bookingId === bookingId) {
+      if (!bookingId || String(data.bookingId) === String(bookingId)) {
         setBookingEvent({ type: 'BOOKING_FAILED', data })
       }
     })
 
     socket.on('BOOKING_STATUS_UPDATE', (data) => {
-      if (!bookingId || data.bookingId === bookingId) {
+      if (!bookingId || String(data.bookingId) === String(bookingId)) {
         setBookingEvent({ type: 'BOOKING_STATUS_UPDATE', data })
       }
     })

@@ -13,6 +13,9 @@ import {
   Check,
   ArrowLeft,
   XCircle,
+  Phone,
+  KeyRound,
+  User,
 } from 'lucide-react'
 import { notificationApi } from '../../api/notificationApi.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
@@ -299,12 +302,65 @@ export function CustomerNotificationsPage() {
                       {notif.body}
                     </p>
 
+                    {/* Rich Partner Details Card for Accepted Bookings */}
+                    {isBookingAccepted && notif.metadata?.partnerName && (
+                      <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 space-y-2.5">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {notif.metadata.partnerAvatar ? (
+                              <img
+                                src={notif.metadata.partnerAvatar}
+                                alt={notif.metadata.partnerName}
+                                className="h-9 w-9 shrink-0 rounded-xl object-cover ring-1 ring-emerald-200"
+                              />
+                            ) : (
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-200/80 text-emerald-800 font-bold text-xs">
+                                {notif.metadata.partnerName.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-xs font-black text-slate-900 truncate">
+                                {notif.metadata.partnerName}
+                              </p>
+                              {notif.metadata.partnerPhone && (
+                                <p className="text-[11px] font-bold text-emerald-700">
+                                  {notif.metadata.partnerPhone}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {notif.metadata.partnerPhone && (
+                            <a
+                              href={`tel:${notif.metadata.partnerPhone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center gap-1 shrink-0 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-95 transition"
+                            >
+                              <Phone className="h-3 w-3" />
+                              Call
+                            </a>
+                          )}
+                        </div>
+
+                        {notif.metadata.startOtp && (
+                          <div className="flex items-center justify-between rounded-lg bg-white/90 border border-emerald-200/70 px-2.5 py-1.5">
+                            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                              <KeyRound className="h-3 w-3 text-emerald-600" /> Start Job OTP
+                            </span>
+                            <span className="font-mono text-xs font-black tracking-widest text-emerald-800">
+                              {notif.metadata.startOtp}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Metadata Pill / Booking Action */}
                     {hasBooking && (
                       <div className="mt-2.5 flex items-center justify-between text-[11px] font-bold text-brand">
                         <span className="inline-flex items-center gap-1">
                           <Sparkles className="h-3 w-3" />
-                          View Booking Details
+                          Track Booking Live
                         </span>
                         <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5 text-slate-400 group-hover:text-brand" />
                       </div>
