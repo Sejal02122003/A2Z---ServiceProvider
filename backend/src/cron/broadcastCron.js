@@ -7,39 +7,59 @@ import { User } from '../models/User.js'
 import { SystemSetting } from '../models/SystemSetting.js'
 
 export function initBroadcastCron() {
+  console.log('[CRON] Scheduled Broadcast Cron initialized (running every 60s).')
+
   // Run every minute
   cron.schedule('* * * * *', async () => {
     try {
       const now = new Date()
+      const nowIST = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'short', timeStyle: 'medium' }).format(now)
+
       // Clean up stuck BROADCASTING bookings
       // If a booking has been BROADCASTING for more than 10 minutes, mark as FAILED
       const tenMinsAgo = new Date(now.getTime() - 10 * 60 * 1000)
-      await Booking.updateMany(
+      const stuckRes = await Booking.updateMany(
         { status: 'BROADCASTING', updatedAt: { $lt: tenMinsAgo } },
         { $set: { status: 'FAILED' } }
       )
+      if (stuckRes.modifiedCount > 0) {
+        console.log(`[CRON ${nowIST}] Cleaned up ${stuckRes.modifiedCount} stuck BROADCASTING bookings to FAILED`)
+      }
 
-      // 61 mins from now (gives a 1-minute buffer so it reliably triggers before or exactly at the 1-hour mark)
-      const sixtyMinsFromNow = new Date(now.getTime() + 61 * 60 * 1000)
+      // 65 mins from now gives a 5-minute buffer so it reliably triggers before or exactly at the 1-hour mark
+      const sixtyFiveMinsFromNow = new Date(now.getTime() + 65 * 60 * 1000)
+      const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000)
       
       // Find all scheduled bookings that are in CREATED status
-      // where the scheduledAt is <= exactly 60 mins from now, but > now
-      // This means the job is supposed to start in 60 mins (1 hour) or less.
+      // where the scheduledAt is <= exactly 65 mins from now, but > 12 hours ago
       const bookingsToBroadcast = await Booking.find({
-        type: 'SCHEDULED',
-        status: 'CREATED',
+        type: { $in: ['SCHEDULED', 'scheduled'] },
+        status: { $in: ['CREATED', 'created'] },
         scheduledAt: { 
-          $lte: sixtyMinsFromNow,
-          $gt: new Date(now.getTime() - 12 * 60 * 60 * 1000) // Ensure we don't pick up severely outdated ones, but allow immediate timeslots
+          $lte: sixtyFiveMinsFromNow,
+          $gt: twelveHoursAgo
         }
       })
 
-      if (bookingsToBroadcast.length > 0) {
-        console.log(`[CRON] Found ${bookingsToBroadcast.length} scheduled bookings to broadcast.`)
-      }
+      // Count any future scheduled bookings still waiting (> 65 mins away)
+      const futureWaitingCount = await Booking.countDocuments({
+        type: { $in: ['SCHEDULED', 'scheduled'] },
+        status: { $in: ['CREATED', 'created'] },
+        scheduledAt: { $gt: sixtyFiveMinsFromNow }
+      })
+
+      const broadcastingCount = await Booking.countDocuments({
+        type: { $in: ['SCHEDULED', 'scheduled'] },
+        status: { $in: ['BROADCASTING', 'broadcasting'] }
+      })
+
+      console.log(`[CRON ${nowIST}] Broadcast Check: ${bookingsToBroadcast.length} booking(s) due (<= 65m away), ${futureWaitingCount} future booking(s) queued (${broadcastingCount} active BROADCASTING)`)
 
       for (const booking of bookingsToBroadcast) {
-        console.log(`[CRON] Broadcasting scheduled booking ${booking._id} scheduled for ${booking.scheduledAt}`)
+        const schedIST = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'short', timeStyle: 'medium' }).format(new Date(booking.scheduledAt))
+        const minsLeft = Math.round((new Date(booking.scheduledAt).getTime() - now.getTime()) / 60000)
+        console.log(`[CRON] >>> Triggering broadcast for booking ${booking._id}: scheduled for ${schedIST} (${minsLeft} mins from now), slot: "${booking.timeSlot}"`)
+        
         // The broadcast service will change status to BROADCASTING internally
         await startBroadcastCycle(booking._id).catch(err => {
           console.error(`[CRON] Failed to broadcast booking ${booking._id}:`, err)

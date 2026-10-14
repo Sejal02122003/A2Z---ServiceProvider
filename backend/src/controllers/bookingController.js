@@ -687,14 +687,24 @@ export const createBooking = asyncHandler(async (req, res) => {
 
 
   // Phase 3: Trigger the Broadcast Engine asynchronously
-  // Only trigger immediately for INSTANT bookings.
-  // SCHEDULED bookings will be handled by the broadcastCron job 1 hour before the time.
-  if (type === 'INSTANT') {
+  // Trigger immediately for INSTANT bookings OR SCHEDULED bookings that are already within the 1-hour window (<= 60 mins)
+  const isScheduled = type === 'SCHEDULED' || type === 'scheduled'
+  const isInstant = type === 'INSTANT' || type === 'instant'
+
+  const scheduledAtDate = booking.scheduledAt ? new Date(booking.scheduledAt) : null
+  const nowMs = Date.now()
+  const minutesUntilScheduled = scheduledAtDate ? Math.round((scheduledAtDate.getTime() - nowMs) / 60000) : 0
+
+  console.log(`[BOOKING_CREATE] Booking ${booking._id} created: type=${booking.type}, scheduledAt=${booking.scheduledAt}, timeSlot="${booking.timeSlot}", minutesUntilJob=${minutesUntilScheduled} mins`)
+
+  if (isInstant || (isScheduled && minutesUntilScheduled <= 65 && minutesUntilScheduled >= -120)) {
+    console.log(`[BOOKING_CREATE] Triggering immediate broadcast for booking ${booking._id} (isInstant=${isInstant}, minutesUntilJob=${minutesUntilScheduled}m)`)
     import('../services/broadcastService.js').then(({ startBroadcastCycle }) => {
-      startBroadcastCycle(booking._id).catch(err => console.error('Broadcast Error:', err))
+      startBroadcastCycle(booking._id).catch(err => console.error('[BOOKING_CREATE] Broadcast Error:', err))
     })
   } else {
-    // For scheduled, we can emit a socket event to let the user know it is confirmed and queued
+    // For scheduled bookings > 60 mins away, queue for broadcastCron to trigger 1 hour before scheduled time
+    console.log(`[BOOKING_CREATE] Scheduled booking ${booking._id} queued for broadcastCron (starts in ${minutesUntilScheduled}m). Broadcast will trigger exactly 1 hour before start time.`)
     import('../socket.js').then(({ emitToUser }) => {
       emitToUser(booking.userId, 'BOOKING_SCHEDULED_QUEUED', { bookingId: booking._id, scheduledAt: booking.scheduledAt })
     }).catch(err => console.error(err))

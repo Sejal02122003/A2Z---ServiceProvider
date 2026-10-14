@@ -104,11 +104,23 @@ export async function startBroadcastCycle(bookingId) {
     query.$or = matchOr
   }
 
+  console.log(`[BROADCAST] Searching potential labourers in bounding box: lat=[${bookingLat - bufferLatDiff}, ${bookingLat + bufferLatDiff}], lng=[${bookingLng - bufferLngDiff}, ${bookingLng + bufferLngDiff}], radius=${radiusKm}km`)
+  console.log(`[BROADCAST] Excluded user IDs: ${JSON.stringify(excludedUserIds)}`)
+  console.log(`[BROADCAST] Match criteria: ${JSON.stringify(matchOr)}`)
+
   const potentialLaborersRaw = await User.find(query).lean()
+  console.log(`[BROADCAST] Found ${potentialLaborersRaw.length} raw labourers matching role, active status, KYC, and service in bounding box:`, 
+    potentialLaborersRaw.map(l => ({ id: String(l._id), phone: l.phone, name: l.fullName })))
 
   const to24Hour = (timeStr) => {
     if (!timeStr) return ''
-    const match = timeStr.match(/(\d+):(\d+)\s?(AM|PM)?/i)
+    const s = String(timeStr).trim().toUpperCase()
+    if (s === 'MORNING') return '09:00'
+    if (s === 'AFTERNOON') return '13:00'
+    if (s === 'EVENING') return '17:00'
+    // If range like "10:00 AM – 1:00 PM" or "10:00 AM - 1:00 PM", take first part
+    const cleanStr = s.split(/[–\-]/)[0].trim()
+    const match = cleanStr.match(/(\d+):(\d+)\s?(AM|PM)?/i)
     if (!match) return timeStr
     let [ , h, m, ampm ] = match
     h = parseInt(h, 10)
@@ -116,7 +128,7 @@ export async function startBroadcastCycle(bookingId) {
       if (ampm.toUpperCase() === 'PM' && h < 12) h += 12
       if (ampm.toUpperCase() === 'AM' && h === 12) h = 0
     }
-    return `${String(h).padStart(2, '0')}:${m}`
+    return `${String(h).padStart(2, '0')}:${m.padStart(2, '0')}`
   }
 
   const getIstDayAndTime = (dateObj) => {
@@ -138,31 +150,63 @@ export async function startBroadcastCycle(bookingId) {
   const targetStartTimeStr = to24Hour(booking.timeSlot) || currentIstTimeStr
   const targetEndTimeStr = to24Hour(booking.endTime)
 
+  console.log(`[BROADCAST] Target context: type=${booking.type}, targetDay=${targetDayName}, targetStartTime=${targetStartTimeStr}, targetEndTime=${targetEndTimeStr || 'none'}, currentIST=${currentIstTimeStr}`)
+
   const potentialLaborers = potentialLaborersRaw.filter(labor => {
     const schedule = labor.labourProfile?.schedule || []
-    if (schedule.length === 0) return true // Assume available if no schedule set
+    if (schedule.length === 0) {
+      console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}): no custom schedule set, assuming available.`)
+      return true // Assume available if no schedule set
+    }
 
     const dayEntry = schedule.find(s => s.day === targetDayName)
-    if (!dayEntry || !dayEntry.isAvailable) return false
+    if (!dayEntry) {
+      console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}): no entry for ${targetDayName}, assuming available.`)
+      return true
+    }
+    if (dayEntry.isAvailable === false) {
+      console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}) EXCLUDED: isAvailable=false on ${targetDayName}`)
+      return false
+    }
     
     const sTime = to24Hour(dayEntry.startTime || '00:00')
     const eTime = to24Hour(dayEntry.endTime || '23:59')
     
     if (booking.type === 'INSTANT') {
       // For instant jobs, worker is available if current time falls within working shift
-      if (currentIstTimeStr < sTime || currentIstTimeStr > eTime) return false
+      if (currentIstTimeStr < sTime || currentIstTimeStr > eTime) {
+        console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}) EXCLUDED: current time ${currentIstTimeStr} outside instant shift ${sTime}-${eTime}`)
+        return false
+      }
       return true
     }
 
     // For scheduled jobs
-    if (targetStartTimeStr < sTime || targetStartTimeStr > eTime) return false
-    if (targetEndTimeStr && targetEndTimeStr > eTime) return false
+    // If worker's shift endTime is the standard schema default 17:00, allow flexible evening scheduled bookings up to 23:00
+    let effectiveEndTime = eTime
+    if (eTime === '17:00' && targetStartTimeStr > '17:00' && targetStartTimeStr <= '23:00') {
+      console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}): default shift 17:00 extended to 23:00 for evening scheduled booking at ${targetStartTimeStr}`)
+      effectiveEndTime = '23:00'
+    }
 
+    if (targetStartTimeStr && (targetStartTimeStr < sTime || targetStartTimeStr > effectiveEndTime)) {
+      console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}) EXCLUDED: scheduled start ${targetStartTimeStr} outside hours ${sTime}-${effectiveEndTime}`)
+      return false
+    }
+    if (targetEndTimeStr && targetEndTimeStr > effectiveEndTime) {
+      console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}) EXCLUDED: scheduled end ${targetEndTimeStr} exceeds shift end ${effectiveEndTime}`)
+      return false
+    }
+
+    console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}) MATCHED schedule: ${targetDayName} ${sTime}-${effectiveEndTime} covers target ${targetStartTimeStr}`)
     return true
   })
 
+  console.log(`[BROADCAST] Potential labourers after schedule filter: ${potentialLaborers.length}`)
+
   if (potentialLaborers.length === 0) {
-    await markBookingFailed(booking, 'No laborers in area')
+    console.warn(`[BROADCAST] Booking ${booking._id} FAILED: No laborers in area matching schedule for ${targetDayName} at ${targetStartTimeStr}`)
+    await markBookingFailed(booking, `No laborers in area available on ${targetDayName} at ${targetStartTimeStr}`)
     return
   }
 
@@ -174,6 +218,7 @@ export async function startBroadcastCycle(bookingId) {
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
   const activeSubsMap = {} // Store to increment bookingsReceived later
   const isSubscriptionEnforced = settings?.isUserSubscriptionEnabled === true
+  console.log(`[BROADCAST] Checking subscriptions: isSubscriptionEnforced=${isSubscriptionEnforced}, today=${today}`)
 
   if (!isSubscriptionEnforced) {
     // When subscription is disabled in settings, all available laborers are eligible
@@ -183,6 +228,7 @@ export async function startBroadcastCycle(bookingId) {
       const trialEnds = labor.labourProfile?.trialEndsAt
       const now = new Date()
       if (trialEnds && now <= new Date(trialEnds)) {
+        console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}) eligible via Free Trial (ends: ${trialEnds})`)
         subEligible.push(labor) // Free trial
         continue
       }
@@ -195,13 +241,19 @@ export async function startBroadcastCycle(bookingId) {
       })
       
       if (activeSub) {
+        console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}) eligible via Active Subscription`)
         subEligible.push(labor)
         activeSubsMap[labor._id] = activeSub
+      } else {
+        console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}) EXCLUDED: no active subscription or trial expired (trialEnds: ${trialEnds})`)
       }
     }
   }
 
+  console.log(`[BROADCAST] Eligible labourers after subscription filter: ${subEligible.length}`)
+
   if (subEligible.length === 0) {
+    console.warn(`[BROADCAST] Booking ${booking._id} FAILED: No eligible laborers found (Subscription / Trial Expired)`)
     await markBookingFailed(booking, 'No eligible laborers found (Subscription / Trial Expired)')
     return
   }
@@ -217,12 +269,16 @@ export async function startBroadcastCycle(bookingId) {
   
   const eligibleLaborers = subEligible.filter(labor => {
     const distData = distances.find(d => d.id === String(labor._id))
-    // Include them if distance is within radius. 
-    // If FALLBACK or error, we still include if Haversine said it's within radius
-    return distData && distData.distanceKm <= radiusKm
+    const distKm = distData ? distData.distanceKm : 999
+    const inRadius = distData && distData.distanceKm <= radiusKm
+    console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}): distance=${distKm.toFixed(1)}km, maxRadius=${radiusKm}km => inRadius=${inRadius}`)
+    return inRadius
   })
 
+  console.log(`[BROADCAST] Final eligible labourers within driving radius: ${eligibleLaborers.length}`)
+
   if (eligibleLaborers.length === 0) {
+    console.warn(`[BROADCAST] Booking ${booking._id} FAILED: No laborers within actual driving radius (${radiusKm}km)`)
     await markBookingFailed(booking, 'No laborers within actual driving radius')
     return
   }
@@ -364,8 +420,10 @@ export async function startBroadcastCycle(bookingId) {
           const bestEarning = servicesPayload.reduce((max, s) => Math.max(max, s.estimatedEarnings), 0)
 
           import('../socket.js').then(({ emitToUser }) => {
+            console.log(`[BROADCAST] Emitting BOOKING_RECEIVED to labour ${labor.fullName || labor.phone} (${labor._id}) for contractor booking ${booking._id}, earnings=₹${bestEarning}`)
             emitToUser(labor._id, 'BOOKING_RECEIVED', {
               bookingId: booking._id,
+              type: booking.type || 'SCHEDULED',
               customerName: booking.userId?.fullName || 'Customer',
               serviceName: servicesPayload.length === 1 ? servicesPayload[0].name : 'Multiple Services',
               services: servicesPayload,
@@ -382,16 +440,48 @@ export async function startBroadcastCycle(bookingId) {
           })
           
           sendNotificationToUser(labor._id, {
-            title: 'New Job Offer!',
+            title: booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer!',
             body: `New ${servicesPayload.length === 1 ? servicesPayload[0].name : 'Multiple Services'} job available near you. Estimated earnings: ₹${bestEarning}`,
             data: { type: 'booking_received', bookingId: String(booking._id) }
           })
+
+          // Create In-App Notification record for Labour Notification feed
+          const isContractorScheduled = booking.type === 'SCHEDULED' || booking.type === 'scheduled'
+          const contractorNotifTitle = isContractorScheduled ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡'
+          const contractorNotifBody = isContractorScheduled
+            ? `New ${servicesPayload.length === 1 ? servicesPayload[0].name : 'Multiple Services'} appointment scheduled for ${booking.timeSlot || 'Scheduled Time'}. Estimated earnings: ₹${bestEarning}. Tap to accept!`
+            : `New ${servicesPayload.length === 1 ? servicesPayload[0].name : 'Multiple Services'} job available near you. Estimated earnings: ₹${bestEarning}`
+
+          import('../models/InAppNotification.js').then(({ InAppNotification }) => {
+            InAppNotification.create({
+              userId: labor._id,
+              title: contractorNotifTitle,
+              body: contractorNotifBody,
+              type: 'BOOKING_STATUS',
+              bookingId: booking._id,
+              deliveryStatus: 'SENT',
+              metadata: {
+                bookingId: booking._id,
+                bookingType: booking.type,
+                scheduledAt: booking.scheduledAt,
+                timeSlot: booking.timeSlot,
+                earnings: bestEarning,
+                link: `/app/home`,
+              }
+            }).then((inAppRecord) => {
+              import('../socket.js').then(({ emitToUser }) => {
+                emitToUser(labor._id, 'NEW_IN_APP_NOTIFICATION', inAppRecord)
+              }).catch(err => console.error(err))
+            }).catch(err => console.error('[InAppNotification Create Error]', err))
+          }).catch(err => console.error(err))
         } else {
           // Single-service booking
           const singleShare = booking.laborShare || booking.basePrice || 0
           import('../socket.js').then(({ emitToUser }) => {
+            console.log(`[BROADCAST] Emitting BOOKING_RECEIVED to labour ${labor.fullName || labor.phone} (${labor._id}) for single-service booking ${booking._id}, service=${singleServiceName}, earnings=₹${singleShare}`)
             emitToUser(labor._id, 'BOOKING_RECEIVED', {
               bookingId: booking._id,
+              type: booking.type || 'SCHEDULED',
               customerName: booking.userId?.fullName || 'Customer',
               serviceName: singleServiceName,
               isContractorBooking: false,
@@ -407,10 +497,40 @@ export async function startBroadcastCycle(bookingId) {
           })
           
           sendNotificationToUser(labor._id, {
-            title: 'New Job Offer!',
+            title: booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer!',
             body: `New ${singleServiceName} job available near you. Estimated earnings: ₹${singleShare}`,
             data: { type: 'booking_received', bookingId: String(booking._id) }
           })
+
+          // Create In-App Notification record for Labour Notification feed
+          const isSingleScheduled = booking.type === 'SCHEDULED' || booking.type === 'scheduled'
+          const singleNotifTitle = isSingleScheduled ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡'
+          const singleNotifBody = isSingleScheduled
+            ? `New ${singleServiceName} appointment scheduled for ${booking.timeSlot || 'Scheduled Time'}. Estimated earnings: ₹${singleShare}. Tap to accept!`
+            : `New ${singleServiceName} job available near you. Estimated earnings: ₹${singleShare}`
+
+          import('../models/InAppNotification.js').then(({ InAppNotification }) => {
+            InAppNotification.create({
+              userId: labor._id,
+              title: singleNotifTitle,
+              body: singleNotifBody,
+              type: 'BOOKING_STATUS',
+              bookingId: booking._id,
+              deliveryStatus: 'SENT',
+              metadata: {
+                bookingId: booking._id,
+                bookingType: booking.type,
+                scheduledAt: booking.scheduledAt,
+                timeSlot: booking.timeSlot,
+                earnings: singleShare,
+                link: `/app/home`,
+              }
+            }).then((inAppRecord) => {
+              import('../socket.js').then(({ emitToUser }) => {
+                emitToUser(labor._id, 'NEW_IN_APP_NOTIFICATION', inAppRecord)
+              }).catch(err => console.error(err))
+            }).catch(err => console.error('[InAppNotification Create Error]', err))
+          }).catch(err => console.error(err))
         }
         
         const sub = activeSubsMap[labor._id]

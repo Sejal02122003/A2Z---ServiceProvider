@@ -20,6 +20,48 @@ export function BroadcastPopup() {
   const [responding, setResponding] = useState(false)
   const [error, setError] = useState('')
   const [selectedServiceId, setSelectedServiceId] = useState(null)
+  const audioCtxRef = useRef(null)
+
+  // Web Audio chime generator
+  const playAlertChime = useCallback(() => {
+    try {
+      const AudioCtxClass = window.AudioContext || window.webkitAudioContext
+      if (!AudioCtxClass) return
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new AudioCtxClass()
+      }
+      const ctx = audioCtxRef.current
+      if (ctx.state === 'suspended') {
+        ctx.resume()
+      }
+
+      const now = ctx.currentTime
+
+      const osc1 = ctx.createOscillator()
+      const gain1 = ctx.createGain()
+      osc1.type = 'triangle'
+      osc1.frequency.setValueAtTime(880, now) // A5
+      gain1.gain.setValueAtTime(0.35, now)
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.22)
+      osc1.connect(gain1)
+      gain1.connect(ctx.destination)
+      osc1.start(now)
+      osc1.stop(now + 0.22)
+
+      const osc2 = ctx.createOscillator()
+      const gain2 = ctx.createGain()
+      osc2.type = 'triangle'
+      osc2.frequency.setValueAtTime(1174.66, now + 0.18) // D6
+      gain2.gain.setValueAtTime(0.4, now + 0.18)
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45)
+      osc2.connect(gain2)
+      gain2.connect(ctx.destination)
+      osc2.start(now + 0.18)
+      osc2.stop(now + 0.45)
+    } catch (e) {
+      console.warn('[Broadcast Chime Error]', e)
+    }
+  }, [])
 
   // Only render for labour / worker users
   const isLabour = user?.role === USER_ROLES.LABOUR || user?.role === 'labour'
@@ -40,6 +82,18 @@ export function BroadcastPopup() {
       setError('')
       setResponding(false)
       setSelectedServiceId(null)
+      playAlertChime()
+
+      // Browser notification fallback if granted
+      if (window.Notification && Notification.permission === 'granted') {
+        try {
+          const title = data.type === 'SCHEDULED' ? 'Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡'
+          new Notification(title, {
+            body: `${data.serviceName || 'Service'} · ₹${data.estimatedEarnings || 0}`,
+            icon: '/favicon.ico'
+          })
+        } catch { /* ignore */ }
+      }
     }
 
     socket.on('BOOKING_RECEIVED', handleBroadcast)
@@ -52,7 +106,7 @@ export function BroadcastPopup() {
       socket.off('BOOKING_RECEIVED', handleBroadcast)
       socket.off('BOOKING_EXPIRED', handleExpired)
     }
-  }, [socket, isLabour])
+  }, [socket, isLabour, playAlertChime])
 
   // Countdown timer
   useEffect(() => {
@@ -153,12 +207,21 @@ export function BroadcastPopup() {
               {/* Header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand/10 text-brand">
-                    <Zap className="h-5 w-5" aria-hidden />
+                  <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                    incoming.type === 'SCHEDULED' ? 'bg-amber-500/10 text-amber-600' : 'bg-brand/10 text-brand'
+                  }`}>
+                    {incoming.type === 'SCHEDULED' ? <Clock className="h-5 w-5" aria-hidden /> : <Zap className="h-5 w-5" aria-hidden />}
                   </span>
                   <div>
-                    <p className="text-base font-extrabold text-slate-900">New Job!</p>
-                    <p className="text-xs text-slate-500">{incoming.type || 'INSTANT'} booking</p>
+                    <p className="text-base font-extrabold text-slate-900">
+                      {incoming.type === 'SCHEDULED' ? 'Scheduled Job Offer! 📅' : 'New Instant Job! ⚡'}
+                    </p>
+                    <p className="text-xs font-semibold text-slate-500">
+                      {incoming.type === 'SCHEDULED'
+                        ? `Starts at ${incoming.time || 'scheduled time'}`
+                        : 'Immediate arrival requested'
+                      }
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 ring-1 ring-amber-200/80">
