@@ -4,6 +4,7 @@ import { MaterialRequest } from '../models/MaterialRequest.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { createInventoryLog, recheckStockForPendingRequests } from '../services/materialRequirementService.js'
+export { deleteProduct } from './productController.js'
 
 export const addStock = asyncHandler(async (req, res) => {
   const { productId, quantity, remarks } = req.body

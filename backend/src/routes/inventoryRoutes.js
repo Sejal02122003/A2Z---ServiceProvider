@@ -15,5 +15,6 @@ router.get('/low-stock', inventoryController.getLowStockProducts)
 router.get('/transactions', inventoryController.getInventoryTransactions)
 router.get('/vendor-inventory', inventoryController.getVendorInventory)
 router.get('/dashboard-stats', inventoryController.getInventoryDashboardStats)
+router.delete('/:id', inventoryController.deleteProduct)
 
 export default router

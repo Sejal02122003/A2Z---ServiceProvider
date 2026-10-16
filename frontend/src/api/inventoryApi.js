@@ -41,6 +41,15 @@ export async function toggleProductStatus(id) {
   return res.data
 }
 
+export async function deleteProduct(id) {
+  const res = await apiRequest(`/products/${id}`, {
+    method: 'DELETE',
+  })
+  return res.data
+}
+
+export const deleteInventoryProduct = deleteProduct
+
 export async function fetchProductCategories() {
   const res = await apiRequest('/products/categories')
   return res.data?.categories || []

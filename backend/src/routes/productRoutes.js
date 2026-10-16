@@ -14,5 +14,6 @@ router.get('/:id', productController.getProductById)
 router.post('/', restrictTo(USER_ROLES.ADMIN), productController.createProduct)
 router.put('/:id', restrictTo(USER_ROLES.ADMIN), productController.updateProduct)
 router.patch('/:id/status', restrictTo(USER_ROLES.ADMIN), productController.toggleProductStatus)
+router.delete('/:id', restrictTo(USER_ROLES.ADMIN), productController.deleteProduct)
 
 export default router

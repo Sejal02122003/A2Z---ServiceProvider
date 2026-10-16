@@ -1,4 +1,6 @@
 import { Product } from '../models/Product.js'
+import { ServiceProduct } from '../models/ServiceProduct.js'
+import { MaterialRequest } from '../models/MaterialRequest.js'
 import { InventoryTransaction } from '../models/InventoryTransaction.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
@@ -215,4 +217,46 @@ export const toggleProductStatus = asyncHandler(async (req, res) => {
 export const getProductCategories = asyncHandler(async (req, res) => {
   const categories = await Product.distinct('category', { isActive: true })
   return sendSuccess(res, { data: { categories: categories.filter(Boolean) } })
+})
+
+export const deleteProduct = asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const product = await Product.findById(id)
+  if (!product) {
+    return sendError(res, { message: 'Product not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  // Check if there are active material requests referencing this product
+  const activeRequestsCount = await MaterialRequest.countDocuments({
+    $or: [
+      { 'items.productId': id },
+      { 'items.alternativeIssuedProductId': id },
+    ],
+    status: { $in: ['REQUESTED', 'WAITING_FOR_STOCK', 'READY_FOR_ISSUE', 'PARTIALLY_ISSUED', 'ISSUED', 'IN_USE'] },
+  })
+
+  if (activeRequestsCount > 0) {
+    return sendError(res, {
+      message: `Cannot delete '${product.name}' because it has ${activeRequestsCount} active material request(s) in progress. Please complete, return, or reject those requests first.`,
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+    })
+  }
+
+  // Remove any ServiceProduct mappings for this product
+  await ServiceProduct.deleteMany({ productId: id })
+
+  // Remove this product from alternativeProductIds of other products
+  await Product.updateMany(
+    { alternativeProductIds: id },
+    { $pull: { alternativeProductIds: id } }
+  )
+
+  // Delete the product itself
+  await Product.findByIdAndDelete(id)
+
+  return sendSuccess(res, {
+    message: `Product '${product.name}' (SKU: ${product.sku}) deleted successfully`,
+    data: { deletedProductId: id },
+  })
 })

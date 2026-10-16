@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
+import { useSearchParams, useLocation, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Package,
@@ -43,6 +43,7 @@ import {
   createProduct,
   updateProduct,
   toggleProductStatus,
+  deleteProduct,
   fetchProductCategories,
   fetchAllServiceProductMappings,
   fetchServiceProductMappings,
@@ -67,7 +68,9 @@ import { fetchAdminLabourCategoryTree } from '../../api/adminLabourCategoriesApi
 
 export function AdminInventoryHubPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const activeTab = searchParams.get('tab') || 'products'
+  const location = useLocation()
+  const pathTab = location.pathname.split('/admin/inventory/')[1]?.split('/')[0]
+  const activeTab = searchParams.get('tab') || pathTab || 'products'
 
   const [stats, setStats] = useState(null)
   const [loadingStats, setLoadingStats] = useState(false)
@@ -220,6 +223,94 @@ function StatMiniCard({ label, value, tone = 'blue', alert = false, isCurrency =
   )
 }
 
+function ConfirmDeleteModal({ product, onClose, onConfirm, busy }) {
+  if (!product) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 ring-8 ring-rose-50/50">
+            <Trash2 className="h-6 w-6" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Delete Inventory Product</h3>
+            <p className="text-xs text-slate-500">This action cannot be undone</p>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-2 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium text-slate-500">Product:</span>
+            <span className="font-bold text-slate-900">{product.name}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium text-slate-500">SKU:</span>
+            <span className="font-mono font-bold text-indigo-600">{product.sku}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium text-slate-500">Category:</span>
+            <span className="font-medium text-slate-700">{product.category || 'General'}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium text-slate-500">Current Stock:</span>
+            <span className={`font-black ${product.currentStock > 0 ? 'text-amber-600' : 'text-slate-700'}`}>
+              {product.currentStock ?? 0} {product.unit || 'units'}
+            </span>
+          </div>
+        </div>
+
+        {product.currentStock > 0 && (
+          <div className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-[11px] font-semibold text-amber-800">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <span>
+              Caution: This product has {product.currentStock} {product.unit || 'unit(s)'} in stock. Deleting it will permanently remove this record and unmap it from all services.
+            </span>
+          </div>
+        )}
+
+        <p className="mt-3 text-xs leading-relaxed text-slate-500">
+          Are you sure you want to delete this inventory item? Service material mappings linked to this product will also be removed.
+        </p>
+
+        <div className="mt-6 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition active:scale-95 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-rose-700 transition active:scale-95 disabled:opacity-50"
+          >
+            {busy ? (
+              <>
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                <span>Deleting...</span>
+              </>
+            ) : (
+              <>
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete Product</span>
+              </>
+            )}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
 // ==========================================
 // 1. PRODUCTS TAB
 // ==========================================
@@ -235,6 +326,8 @@ function ProductsTab({ onReloadStats, onToast }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [viewProduct, setViewProduct] = useState(null)
+  const [productToDelete, setProductToDelete] = useState(null)
+  const [deletingProduct, setDeletingProduct] = useState(false)
 
   const loadData = useCallback(async () => {
     try {
@@ -264,6 +357,22 @@ function ProductsTab({ onReloadStats, onToast }) {
       onReloadStats()
     } catch (err) {
       alert(err.message || 'Failed to toggle status')
+    }
+  }
+
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return
+    try {
+      setDeletingProduct(true)
+      await deleteProduct(productToDelete._id)
+      onToast(`Product "${productToDelete.name}" deleted successfully`)
+      setProductToDelete(null)
+      loadData()
+      onReloadStats()
+    } catch (err) {
+      alert(err.message || 'Failed to delete product')
+    } finally {
+      setDeletingProduct(false)
     }
   }
 
@@ -417,7 +526,7 @@ function ProductsTab({ onReloadStats, onToast }) {
                             type="button"
                             onClick={() => setViewProduct(p)}
                             title="View Details"
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-indigo-600"
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-indigo-600 transition"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
@@ -428,9 +537,17 @@ function ProductsTab({ onReloadStats, onToast }) {
                               setModalOpen(true)
                             }}
                             title="Edit Product"
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-blue-600"
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-blue-600 transition"
                           >
                             <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setProductToDelete(p)}
+                            title="Delete Product"
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </td>
@@ -469,6 +586,21 @@ function ProductsTab({ onReloadStats, onToast }) {
             setViewProduct(null)
             setModalOpen(true)
           }}
+          onDelete={() => {
+            const prod = viewProduct
+            setViewProduct(null)
+            setProductToDelete(prod)
+          }}
+        />
+      )}
+
+      {/* Confirm Delete Modal */}
+      {productToDelete && (
+        <ConfirmDeleteModal
+          product={productToDelete}
+          onClose={() => setProductToDelete(null)}
+          onConfirm={handleDeleteProduct}
+          busy={deletingProduct}
         />
       )}
     </div>
@@ -733,7 +865,7 @@ function ProductFormModal({ product, categories, allProducts, onClose, onSaved }
   )
 }
 
-function ProductDetailsModal({ productId, onClose, onEdit }) {
+function ProductDetailsModal({ productId, onClose, onEdit, onDelete }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -844,21 +976,33 @@ function ProductDetailsModal({ productId, onClose, onEdit }) {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={onEdit}
-                className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-700"
-              >
-                Edit Product
-              </button>
+            <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-4">
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition active:scale-95"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Delete Product</span>
+                </button>
+              )}
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-700 transition"
+                >
+                  Edit Product
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1831,6 +1975,8 @@ function StockManagementTab({ onReloadStats, onToast }) {
   const [search, setSearch] = useState('')
   const [restockModalProd, setRestockModalProd] = useState(null)
   const [adjustModalProd, setAdjustModalProd] = useState(null)
+  const [productToDelete, setProductToDelete] = useState(null)
+  const [deletingProduct, setDeletingProduct] = useState(false)
 
   const loadStock = useCallback(async () => {
     try {
@@ -1847,6 +1993,22 @@ function StockManagementTab({ onReloadStats, onToast }) {
   useEffect(() => {
     loadStock()
   }, [loadStock])
+
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return
+    try {
+      setDeletingProduct(true)
+      await deleteProduct(productToDelete._id)
+      onToast(`Product "${productToDelete.name}" deleted from inventory`)
+      setProductToDelete(null)
+      loadStock()
+      onReloadStats()
+    } catch (err) {
+      alert(err.message || 'Failed to delete inventory item')
+    } finally {
+      setDeletingProduct(false)
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -1945,6 +2107,14 @@ function StockManagementTab({ onReloadStats, onToast }) {
                           >
                             Adjust
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => setProductToDelete(p)}
+                            title="Delete from Inventory"
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1981,6 +2151,16 @@ function StockManagementTab({ onReloadStats, onToast }) {
             onReloadStats()
             onToast('Stock adjusted successfully')
           }}
+        />
+      )}
+
+      {/* Confirm Delete Modal */}
+      {productToDelete && (
+        <ConfirmDeleteModal
+          product={productToDelete}
+          onClose={() => setProductToDelete(null)}
+          onConfirm={handleDeleteProduct}
+          busy={deletingProduct}
         />
       )}
     </div>
@@ -2442,6 +2622,8 @@ function LowStockTab({ onReloadStats, onToast, onSwitchToStock }) {
   const [lowStockList, setLowStockList] = useState([])
   const [loading, setLoading] = useState(true)
   const [restockProd, setRestockProd] = useState(null)
+  const [productToDelete, setProductToDelete] = useState(null)
+  const [deletingProduct, setDeletingProduct] = useState(false)
 
   const loadLowStock = useCallback(async () => {
     try {
@@ -2458,6 +2640,22 @@ function LowStockTab({ onReloadStats, onToast, onSwitchToStock }) {
   useEffect(() => {
     loadLowStock()
   }, [loadLowStock])
+
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return
+    try {
+      setDeletingProduct(true)
+      await deleteProduct(productToDelete._id)
+      onToast(`Product "${productToDelete.name}" deleted successfully`)
+      setProductToDelete(null)
+      loadLowStock()
+      onReloadStats()
+    } catch (err) {
+      alert(err.message || 'Failed to delete product')
+    } finally {
+      setDeletingProduct(false)
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -2488,7 +2686,7 @@ function LowStockTab({ onReloadStats, onToast, onSwitchToStock }) {
                 <th className="px-4 py-3.5 text-center">Minimum Threshold</th>
                 <th className="px-4 py-3.5 text-center">Shortage to Minimum</th>
                 <th className="px-4 py-3.5 text-center">Status</th>
-                <th className="px-4 py-3.5 text-right">Action</th>
+                <th className="px-4 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -2538,13 +2736,23 @@ function LowStockTab({ onReloadStats, onToast, onSwitchToStock }) {
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setRestockProd(p)}
-                          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-700"
-                        >
-                          Restock Now
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setRestockProd(p)}
+                            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition"
+                          >
+                            Restock Now
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setProductToDelete(p)}
+                            title="Delete Product"
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -2566,6 +2774,16 @@ function LowStockTab({ onReloadStats, onToast, onSwitchToStock }) {
             onReloadStats()
             onToast('Stock replenished successfully')
           }}
+        />
+      )}
+
+      {/* Confirm Delete Modal */}
+      {productToDelete && (
+        <ConfirmDeleteModal
+          product={productToDelete}
+          onClose={() => setProductToDelete(null)}
+          onConfirm={handleDeleteProduct}
+          busy={deletingProduct}
         />
       )}
     </div>
