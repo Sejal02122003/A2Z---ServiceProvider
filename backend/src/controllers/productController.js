@@ -227,32 +227,38 @@ export const deleteProduct = asyncHandler(async (req, res) => {
     return sendError(res, { message: 'Product not found', statusCode: HTTP_STATUS.NOT_FOUND })
   }
 
-  // Check if there are active material requests referencing this product
-  const activeRequestsCount = await MaterialRequest.countDocuments({
-    $or: [
-      { 'items.productId': id },
-      { 'items.alternativeIssuedProductId': id },
-    ],
-    status: { $in: ['REQUESTED', 'WAITING_FOR_STOCK', 'READY_FOR_ISSUE', 'PARTIALLY_ISSUED', 'ISSUED', 'IN_USE'] },
-  })
-
-  if (activeRequestsCount > 0) {
-    return sendError(res, {
-      message: `Cannot delete '${product.name}' because it has ${activeRequestsCount} active material request(s) in progress. Please complete, return, or reject those requests first.`,
-      statusCode: HTTP_STATUS.BAD_REQUEST,
-    })
-  }
-
-  // Remove any ServiceProduct mappings for this product
+  // 1. Remove any ServiceProduct mappings for this product
   await ServiceProduct.deleteMany({ productId: id })
 
-  // Remove this product from alternativeProductIds of other products
+  // 2. Remove this product from alternativeProductIds of other products
   await Product.updateMany(
     { alternativeProductIds: id },
     { $pull: { alternativeProductIds: id } }
   )
 
-  // Delete the product itself
+  // 3. Clean up any material requests referencing this product
+  // Pull any items referencing this product
+  await MaterialRequest.updateMany(
+    { 'items.productId': id },
+    { $pull: { items: { productId: id } } }
+  )
+
+  // Unset alternativeIssuedProductId if it was this product
+  await MaterialRequest.updateMany(
+    { 'items.alternativeIssuedProductId': id },
+    { $unset: { 'items.$.alternativeIssuedProductId': '' } }
+  )
+
+  // Auto-cancel any open material requests that now have 0 items left
+  await MaterialRequest.updateMany(
+    { items: { $size: 0 }, status: { $nin: ['COMPLETED', 'CANCELLED', 'REJECTED'] } },
+    { $set: { status: 'CANCELLED', adminRemarks: 'Auto-cancelled: referenced product was deleted by admin' } }
+  )
+
+  // 4. Remove inventory ledger transactions for this product to keep audit clean
+  await InventoryTransaction.deleteMany({ productId: id })
+
+  // 5. Delete the product itself
   await Product.findByIdAndDelete(id)
 
   return sendSuccess(res, {
@@ -260,3 +266,4 @@ export const deleteProduct = asyncHandler(async (req, res) => {
     data: { deletedProductId: id },
   })
 })
+

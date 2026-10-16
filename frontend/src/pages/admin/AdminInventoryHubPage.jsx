@@ -223,7 +223,7 @@ function StatMiniCard({ label, value, tone = 'blue', alert = false, isCurrency =
   )
 }
 
-function ConfirmDeleteModal({ product, onClose, onConfirm, busy }) {
+function ConfirmDeleteModal({ product, onClose, onConfirm, busy, error }) {
   if (!product) return null
 
   return (
@@ -243,6 +243,13 @@ function ConfirmDeleteModal({ product, onClose, onConfirm, busy }) {
             <p className="text-xs text-slate-500">This action cannot be undone</p>
           </div>
         </div>
+
+        {error && (
+          <div className="mt-4 flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
 
         <div className="mt-4 space-y-2 rounded-2xl border border-slate-100 bg-slate-50 p-4">
           <div className="flex items-center justify-between text-xs">
@@ -269,7 +276,7 @@ function ConfirmDeleteModal({ product, onClose, onConfirm, busy }) {
           <div className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-[11px] font-semibold text-amber-800">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
             <span>
-              Caution: This product has {product.currentStock} {product.unit || 'unit(s)'} in stock. Deleting it will permanently remove this record and unmap it from all services.
+              Caution: This product has {product.currentStock} {product.unit || 'unit(s)'} in stock. Deleting it will permanently remove this record, any linked material requests, and service mappings.
             </span>
           </div>
         )}
@@ -328,6 +335,7 @@ function ProductsTab({ onReloadStats, onToast }) {
   const [viewProduct, setViewProduct] = useState(null)
   const [productToDelete, setProductToDelete] = useState(null)
   const [deletingProduct, setDeletingProduct] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const loadData = useCallback(async () => {
     try {
@@ -364,13 +372,14 @@ function ProductsTab({ onReloadStats, onToast }) {
     if (!productToDelete) return
     try {
       setDeletingProduct(true)
+      setDeleteError('')
       await deleteProduct(productToDelete._id)
       onToast(`Product "${productToDelete.name}" deleted successfully`)
       setProductToDelete(null)
       loadData()
       onReloadStats()
     } catch (err) {
-      alert(err.message || 'Failed to delete product')
+      setDeleteError(err.message || 'Failed to delete product')
     } finally {
       setDeletingProduct(false)
     }
@@ -598,9 +607,13 @@ function ProductsTab({ onReloadStats, onToast }) {
       {productToDelete && (
         <ConfirmDeleteModal
           product={productToDelete}
-          onClose={() => setProductToDelete(null)}
+          onClose={() => {
+            setProductToDelete(null)
+            setDeleteError('')
+          }}
           onConfirm={handleDeleteProduct}
           busy={deletingProduct}
+          error={deleteError}
         />
       )}
     </div>
@@ -1977,6 +1990,7 @@ function StockManagementTab({ onReloadStats, onToast }) {
   const [adjustModalProd, setAdjustModalProd] = useState(null)
   const [productToDelete, setProductToDelete] = useState(null)
   const [deletingProduct, setDeletingProduct] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const loadStock = useCallback(async () => {
     try {
@@ -1998,13 +2012,14 @@ function StockManagementTab({ onReloadStats, onToast }) {
     if (!productToDelete) return
     try {
       setDeletingProduct(true)
+      setDeleteError('')
       await deleteProduct(productToDelete._id)
       onToast(`Product "${productToDelete.name}" deleted from inventory`)
       setProductToDelete(null)
       loadStock()
       onReloadStats()
     } catch (err) {
-      alert(err.message || 'Failed to delete inventory item')
+      setDeleteError(err.message || 'Failed to delete inventory item')
     } finally {
       setDeletingProduct(false)
     }
@@ -2158,9 +2173,13 @@ function StockManagementTab({ onReloadStats, onToast }) {
       {productToDelete && (
         <ConfirmDeleteModal
           product={productToDelete}
-          onClose={() => setProductToDelete(null)}
+          onClose={() => {
+            setProductToDelete(null)
+            setDeleteError('')
+          }}
           onConfirm={handleDeleteProduct}
           busy={deletingProduct}
+          error={deleteError}
         />
       )}
     </div>
@@ -2624,6 +2643,7 @@ function LowStockTab({ onReloadStats, onToast, onSwitchToStock }) {
   const [restockProd, setRestockProd] = useState(null)
   const [productToDelete, setProductToDelete] = useState(null)
   const [deletingProduct, setDeletingProduct] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const loadLowStock = useCallback(async () => {
     try {
@@ -2645,13 +2665,14 @@ function LowStockTab({ onReloadStats, onToast, onSwitchToStock }) {
     if (!productToDelete) return
     try {
       setDeletingProduct(true)
+      setDeleteError('')
       await deleteProduct(productToDelete._id)
       onToast(`Product "${productToDelete.name}" deleted successfully`)
       setProductToDelete(null)
       loadLowStock()
       onReloadStats()
     } catch (err) {
-      alert(err.message || 'Failed to delete product')
+      setDeleteError(err.message || 'Failed to delete product')
     } finally {
       setDeletingProduct(false)
     }
@@ -2781,9 +2802,13 @@ function LowStockTab({ onReloadStats, onToast, onSwitchToStock }) {
       {productToDelete && (
         <ConfirmDeleteModal
           product={productToDelete}
-          onClose={() => setProductToDelete(null)}
+          onClose={() => {
+            setProductToDelete(null)
+            setDeleteError('')
+          }}
           onConfirm={handleDeleteProduct}
           busy={deletingProduct}
+          error={deleteError}
         />
       )}
     </div>
