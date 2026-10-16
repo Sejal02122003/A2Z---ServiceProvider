@@ -47,7 +47,7 @@ export function SearchableSelect({
 
       {isOpen && (
         <div
-          className="absolute z-50 mt-1 max-h-60 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg flex flex-col"
+          className="absolute left-0 right-0 z-50 mt-1 max-h-64 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl ring-1 ring-slate-900/10 flex flex-col"
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="bg-white px-2 py-2 border-b border-slate-100 shrink-0">

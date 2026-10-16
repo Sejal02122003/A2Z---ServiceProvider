@@ -1033,33 +1033,60 @@ function ServiceMaterialsTab({ onToast }) {
   const [mappings, setMappings] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(false)
+  const [loadingServices, setLoadingServices] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
 
   // Load services tree
   useEffect(() => {
+    let isMounted = true
+    setLoadingServices(true)
+
     fetchAdminLabourCategoryTree()
       .then((res) => {
-        const tree = res?.tree || []
+        if (!isMounted) return
+        const rawCategories =
+          res.data?.categories ||
+          res.data?.tree ||
+          res?.categories ||
+          res?.tree ||
+          []
+
         const flatServices = []
-        tree.forEach((cat) => {
-          cat.subcategories?.forEach((sub) => {
-            sub.services?.forEach((svc) => {
-              flatServices.push({
-                ...svc,
-                subName: sub.name,
-                catName: cat.name,
+        rawCategories.forEach((cat) => {
+          const catList = cat.categories || [cat]
+          catList.forEach((c) => {
+            ;(c.subcategories || []).forEach((sub) => {
+              ;(sub.services || []).forEach((svc) => {
+                flatServices.push({
+                  ...svc,
+                  subName: sub.name,
+                  catName: c.name,
+                })
               })
             })
           })
         })
+
+        // Sort alphabetically
+        flatServices.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+
         setServices(flatServices)
-        if (flatServices.length > 0 && !selectedServiceId) {
-          setSelectedServiceId(flatServices[0]._id)
+        if (flatServices.length > 0) {
+          setSelectedServiceId((prev) => (flatServices.some((s) => s._id === prev) ? prev : flatServices[0]._id))
         }
       })
-      .catch((err) => console.error(err))
+      .catch((err) => console.error('Failed to load services tree in inventory hub', err))
+      .finally(() => {
+        if (isMounted) setLoadingServices(false)
+      })
 
-    fetchProducts({ limit: 100, status: 'active' }).then((res) => setProducts(res?.products || []))
+    fetchProducts({ limit: 200, status: 'active' }).then((res) => {
+      if (isMounted) setProducts(res?.products || [])
+    })
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   const loadMappings = useCallback(async () => {
@@ -1095,24 +1122,34 @@ function ServiceMaterialsTab({ onToast }) {
   return (
     <div className="space-y-4">
       {/* Service Selector Header */}
-      <GlassPanel className="p-4">
+      <GlassPanel className="p-4 relative z-30">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-1 items-center gap-3">
-            <div className="min-w-[280px] flex-1 max-w-md">
+            <div className="min-w-[280px] flex-1 max-w-md relative z-30">
               <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                 Select Service to Configure Required Materials
               </label>
-              <select
-                value={selectedServiceId}
-                onChange={(e) => setSelectedServiceId(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-bold text-slate-900 focus:border-brand"
-              >
-                {services.map((s) => (
-                  <option key={s._id} value={s._id}>
-                    {s.name} ({s.subName})
-                  </option>
-                ))}
-              </select>
+              {loadingServices ? (
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-400">
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin text-slate-400" />
+                  <span>Loading services catalog...</span>
+                </div>
+              ) : services.length === 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-500">
+                  No services found in system
+                </div>
+              ) : (
+                <SearchableSelect
+                  options={services.map((s) => ({
+                    value: s._id,
+                    label: `${s.name} (${s.subName || s.catName || 'Service'})`,
+                  }))}
+                  value={selectedServiceId}
+                  onChange={(val) => setSelectedServiceId(val)}
+                  placeholder="Search and select a service..."
+                  className="w-full relative z-30"
+                />
+              )}
             </div>
           </div>
 
@@ -1128,7 +1165,7 @@ function ServiceMaterialsTab({ onToast }) {
       </GlassPanel>
 
       {/* Mapped Materials for this Service */}
-      <GlassPanel className="overflow-hidden p-0">
+      <GlassPanel className="overflow-hidden p-0 relative z-10">
         <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Wrench className="h-4 w-4 text-blue-600" />
@@ -1256,6 +1293,12 @@ function AddServiceMappingModal({ service, products, onClose, onSaved }) {
   const [isMandatory, setIsMandatory] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!productId && products.length > 0) {
+      setProductId(products[0]._id)
+    }
+  }, [products, productId])
 
   const selectedProd = products.find((p) => p._id === productId)
 
