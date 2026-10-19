@@ -47,6 +47,7 @@ import { useAuth } from '../../hooks/useAuth.js'
 import { setUser } from '../../store/slices/authSlice.js'
 import {
   fetchPartnerOnboardingStatus,
+  fetchAvailableTrialSlots,
   submitPartnerApplication,
   schedulePartnerTrialSlot,
   completePartnerTrial,
@@ -143,10 +144,12 @@ export function PartnerOnboardingStepper({ onFinish }) {
     d.setDate(d.getDate() + 1)
     return d.toISOString().split('T')[0]
   })
-  const [trialTimeSlot, setTrialTimeSlot] = useState('10:00 AM - 12:00 PM')
+  const [trialTimeSlot, setTrialTimeSlot] = useState('')
   const [trialLocation, setTrialLocation] = useState(
     'A2Z Partner Training & Evaluation Center, Sector 18, Noida'
   )
+  const [dynamicSlots, setDynamicSlots] = useState([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
 
   // Payment Form State
   const [paymentTab, setPaymentTab] = useState('OFFLINE')
@@ -166,6 +169,33 @@ export function PartnerOnboardingStepper({ onFinish }) {
     setTimeout(() => setToast({ type: '', message: '' }), 4500)
   }
 
+  // Refresh slots directly from admin configuration
+  const handleRefreshSlots = useCallback(async () => {
+    try {
+      setLoadingSlots(true)
+      const data = await fetchAvailableTrialSlots()
+      if (Array.isArray(data?.availableTrialSlots) && data.availableTrialSlots.length > 0) {
+        setDynamicSlots(data.availableTrialSlots)
+        setTrialTimeSlot((current) => {
+          const exists = data.availableTrialSlots.some(
+            (s) => s.id === current || s.label === current
+          )
+          return exists ? current : data.availableTrialSlots[0].id
+        })
+      } else {
+        setDynamicSlots([])
+        setTrialTimeSlot('')
+      }
+      if (data?.defaultHubLocation) {
+        setTrialLocation(data.defaultHubLocation)
+      }
+    } catch (err) {
+      console.warn('Could not refresh trial slots:', err)
+    } finally {
+      setLoadingSlots(false)
+    }
+  }, [])
+
   // Load Status
   const loadStatus = useCallback(async () => {
     try {
@@ -176,6 +206,32 @@ export function PartnerOnboardingStepper({ onFinish }) {
       // Auto-expand current active step
       const stepNum = res.currentStep <= 5 ? res.currentStep : 5
       setExpandedStep((prev) => (prev === null ? stepNum : prev))
+
+      // Dynamic Trial Slots & Hub Location from Admin
+      if (res.step4) {
+        if (Array.isArray(res.step4.availableTrialSlots) && res.step4.availableTrialSlots.length > 0) {
+          setDynamicSlots(res.step4.availableTrialSlots)
+          if (!res.step4.trialSlot?.timeSlot) {
+            setTrialTimeSlot(res.step4.availableTrialSlots[0].id)
+          }
+        } else {
+          setDynamicSlots([])
+          if (!res.step4.trialSlot?.timeSlot) {
+            setTrialTimeSlot('')
+          }
+        }
+        if (res.step4.trialSlot?.timeSlot) {
+          setTrialTimeSlot(res.step4.trialSlot.timeSlot)
+        }
+        if (res.step4.trialSlot?.date) {
+          setTrialDate(res.step4.trialSlot.date)
+        }
+        if (res.step4.trialSlot?.location) {
+          setTrialLocation(res.step4.trialSlot.location)
+        } else if (res.step4.defaultHubLocation) {
+          setTrialLocation(res.step4.defaultHubLocation)
+        }
+      }
 
       if (res.user) {
         dispatch(
@@ -207,6 +263,51 @@ export function PartnerOnboardingStepper({ onFinish }) {
       setLoading(false)
     }
   }, [dispatch])
+
+  // Auto-refresh trial slots whenever Step 4 is expanded
+  useEffect(() => {
+    if (expandedStep === 4) {
+      handleRefreshSlots()
+    }
+  }, [expandedStep, handleRefreshSlots])
+
+  // Auto-refresh when tab / window gains focus or real-time broadcast arrives from Admin
+  useEffect(() => {
+    let bc
+    try {
+      bc = new BroadcastChannel('a2z_trial_slots_channel')
+      bc.onmessage = () => {
+        handleRefreshSlots()
+      }
+    } catch {}
+
+    const onStorage = (e) => {
+      if (e.key === 'a2z_slots_last_updated') {
+        handleRefreshSlots()
+      }
+    }
+
+    const onFocus = () => {
+      handleRefreshSlots()
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        handleRefreshSlots()
+      }
+    }
+
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('storage', onStorage)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      if (bc) bc.close()
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('storage', onStorage)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [handleRefreshSlots])
 
   // Load Categories on mount
   useEffect(() => {
@@ -359,6 +460,10 @@ export function PartnerOnboardingStepper({ onFinish }) {
   // Step 4: Schedule Trial Slot
   const handleScheduleTrial = async (e) => {
     e?.preventDefault()
+    if (dynamicSlots.length === 0) {
+      showToast('error', 'No trial slots are currently available. Please wait for admin to create slots.')
+      return
+    }
     if (!trialDate || !trialTimeSlot) {
       showToast('error', 'Please select trial date and time slot.')
       return
@@ -1299,11 +1404,8 @@ export function PartnerOnboardingStepper({ onFinish }) {
             <div className="min-w-0 flex-1">
               <button
                 type="button"
-                disabled={!step3.isApproved}
                 onClick={() => setExpandedStep(expandedStep === 4 ? null : 4)}
-                className={`flex w-full items-center justify-between text-left group ${
-                  !step3.isApproved ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
+                className="flex w-full items-center justify-between text-left group"
               >
                 <div>
                   <p className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
@@ -1322,9 +1424,9 @@ export function PartnerOnboardingStepper({ onFinish }) {
                     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
                       Kit Payment Due
                     </span>
-                  ) : !step3.isApproved ? (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-                      Locked
+                  ) : step4.trialSlot?.status === 'SCHEDULED' ? (
+                    <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold text-cyan-800">
+                      Slot Booked
                     </span>
                   ) : (
                     <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-800">
@@ -1341,18 +1443,37 @@ export function PartnerOnboardingStepper({ onFinish }) {
 
               {/* Collapsible Card */}
               <AnimatePresence>
-                {expandedStep === 4 && step3.isApproved && (
+                {expandedStep === 4 && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
                     className="mt-3 overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm space-y-4"
                   >
+                    {!step3.isApproved && (
+                      <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200/80 p-2.5 text-xs text-amber-900">
+                        <Info className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                        <span className="text-[11px] font-medium leading-snug">
+                          Your KYC documents are in review. You can select and book your preferred trial timing slot below in advance.
+                        </span>
+                      </div>
+                    )}
                     {/* Trial Slot Section */}
                     <div>
-                      <h4 className="text-xs font-extrabold uppercase tracking-wide text-slate-700 flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5 text-brand" /> Trial Slot Details
-                      </h4>
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-extrabold uppercase tracking-wide text-slate-700 flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-brand" /> Trial Slot Details
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={handleRefreshSlots}
+                          className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-brand hover:bg-brand/10 transition"
+                          title="Refresh slots from admin"
+                        >
+                          <RefreshCw className={`h-3 w-3 ${loadingSlots ? 'animate-spin' : ''}`} />
+                          <span>Refresh</span>
+                        </button>
+                      </div>
                       <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
                         Schedule your practical demonstration slot at an A2Z partner evaluation hub.
                       </p>
@@ -1371,52 +1492,58 @@ export function PartnerOnboardingStepper({ onFinish }) {
                           />
                         </div>
 
-                        {/* Time Slot Selection (Stays 100% inside screen) */}
+                        {/* Time Slot Selection (Stays 100% inside screen & dynamic from Admin) */}
                         <div>
                           <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
                             Select Time Slot
                           </label>
                           <div className="space-y-1.5">
-                            {[
-                              { id: '10:00 AM - 12:00 PM', label: '10:00 AM – 12:00 PM', desc: 'Morning slot' },
-                              { id: '02:00 PM - 04:00 PM', label: '02:00 PM – 04:00 PM', desc: 'Afternoon slot' },
-                              { id: '04:00 PM - 06:00 PM', label: '04:00 PM – 06:00 PM', desc: 'Evening slot' },
-                            ].map((slot) => {
-                              const isSelected = trialTimeSlot === slot.id
-                              return (
-                                <button
-                                  type="button"
-                                  key={slot.id}
-                                  onClick={() => setTrialTimeSlot(slot.id)}
-                                  className={`w-full flex items-center justify-between rounded-xl border p-2.5 text-left transition ${
-                                    isSelected
-                                      ? 'border-brand bg-brand/10 text-brand ring-1 ring-brand/20 shadow-xs'
-                                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <div
-                                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition ${
-                                        isSelected
-                                          ? 'border-brand bg-brand text-white'
-                                          : 'border-slate-300 bg-white'
-                                      }`}
-                                    >
-                                      {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                            {dynamicSlots.length > 0 ? (
+                              dynamicSlots.map((slot) => {
+                                const isSelected = trialTimeSlot === slot.id || trialTimeSlot === slot.label
+                                return (
+                                  <button
+                                    type="button"
+                                    key={slot.id}
+                                    onClick={() => setTrialTimeSlot(slot.id)}
+                                    className={`w-full flex items-center justify-between rounded-xl border p-2.5 text-left transition ${
+                                      isSelected
+                                        ? 'border-brand bg-brand/10 text-brand ring-1 ring-brand/20 shadow-xs'
+                                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <div
+                                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition ${
+                                          isSelected
+                                            ? 'border-brand bg-brand text-white'
+                                            : 'border-slate-300 bg-white'
+                                        }`}
+                                      >
+                                        {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="text-xs font-bold leading-tight">{slot.label}</p>
+                                        {slot.desc && <p className="text-[10px] text-slate-400 mt-0.5">{slot.desc}</p>}
+                                      </div>
                                     </div>
-                                    <div className="min-w-0">
-                                      <p className="text-xs font-bold leading-tight">{slot.label}</p>
-                                      <p className="text-[10px] text-slate-400 mt-0.5">{slot.desc}</p>
-                                    </div>
-                                  </div>
-                                  {isSelected && (
-                                    <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-extrabold text-brand">
-                                      Selected
-                                    </span>
-                                  )}
-                                </button>
-                              )
-                            })}
+                                    {isSelected && (
+                                      <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-extrabold text-brand">
+                                        Selected
+                                      </span>
+                                    )}
+                                  </button>
+                                )
+                              })
+                            ) : (
+                              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-4 text-center">
+                                <Clock className="mx-auto h-5 w-5 text-slate-400 mb-1" />
+                                <p className="text-xs font-bold text-slate-700">No Trial Slots Available</p>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                  No slots are currently configured. Please check back shortly as the admin schedules evaluation timings.
+                                </p>
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -1435,10 +1562,14 @@ export function PartnerOnboardingStepper({ onFinish }) {
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
                           <button
                             type="submit"
-                            disabled={submitting}
-                            className="flex-1 rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-800 transition"
+                            disabled={submitting || dynamicSlots.length === 0}
+                            className="flex-1 rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {step4.trialSlot?.status === 'SCHEDULED' ? 'Update Trial Slot' : 'Confirm Trial Slot'}
+                            {dynamicSlots.length === 0
+                              ? 'No Slots Available'
+                              : step4.trialSlot?.status === 'SCHEDULED'
+                              ? 'Update Trial Slot'
+                              : 'Confirm Trial Slot'}
                           </button>
 
                           {/* Fast track evaluation button for testing/demo */}

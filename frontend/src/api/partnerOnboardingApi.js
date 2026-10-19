@@ -9,6 +9,14 @@ export async function fetchPartnerOnboardingStatus() {
 }
 
 /**
+ * Fetch latest trial slots and hub address configured by the Admin
+ */
+export async function fetchAvailableTrialSlots() {
+  const json = await apiRequest(`/users/trial-slots?_t=${Date.now()}`, { skipAuth: true })
+  return json.data
+}
+
+/**
  * Submit Partner Application (Category, services & service experience)
  * @param {{ services: Array<{ serviceId: string, subcategoryId?: string }>, experienceYears: number }} payload
  */

@@ -9,7 +9,7 @@ import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { populateLabourCategories } from '../utils/populateLabourCategories.js'
 import { isValidAadhaarLength, maskAadhaarLast4, normalizeAadhaar } from '../utils/aadhaar.js'
 import { normalizeStoredMediaUrl } from '../utils/mediaUrl.js'
-import { startVendorTrial } from '../services/trialEvaluationService.js'
+import { startVendorTrial, getTrialConfig } from '../services/trialEvaluationService.js'
 import { IDENTITY_STATUS } from '../constants/identityConstants.js'
 import { validateName } from '../utils/nameNormalization.js'
 import { IdentityVerification } from '../models/IdentityVerification.js'
@@ -1219,6 +1219,21 @@ export const getPartnerOnboardingStatus = asyncHandler(async (req, res) => {
   else if (!step5Complete) currentStep = 5
   else currentStep = 6 // All completed!
 
+  // Trial configuration and available slots
+  let availableTrialSlots = []
+  let trialHubLocations = []
+  let defaultHubLocation = 'A2Z Partner Training & Evaluation Center, Sector 18, Noida'
+  try {
+    const trialConfig = await getTrialConfig()
+    availableTrialSlots = (trialConfig?.partnerTrialSlots || []).filter((s) => s.isActive !== false)
+    trialHubLocations = (trialConfig?.partnerTrialHubLocations || []).filter((h) => h.isActive !== false)
+    if (trialConfig?.defaultHubLocation) {
+      defaultHubLocation = trialConfig.defaultHubLocation
+    }
+  } catch (err) {
+    console.error('Failed to load trialConfig for onboarding status:', err)
+  }
+
   return sendSuccess(res, {
     data: {
       currentStep,
@@ -1245,6 +1260,9 @@ export const getPartnerOnboardingStatus = asyncHandler(async (req, res) => {
         trialSlot,
         trialStatus,
         trialPassed,
+        availableTrialSlots,
+        trialHubLocations,
+        defaultHubLocation,
         paymentComplete,
         welcomeKitPayment: {
           status: welcomeKit.status || 'PENDING_PAYMENT',
@@ -1271,6 +1289,29 @@ export const getPartnerOnboardingStatus = asyncHandler(async (req, res) => {
 })
 
 /**
+ * GET /api/users/trial-slots
+ * Dedicated real-time available trial slots & evaluation hub location endpoint
+ */
+export const getAvailableTrialSlots = asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private')
+  res.set('Pragma', 'no-cache')
+  res.set('Expires', '0')
+
+  const trialConfig = await getTrialConfig()
+  const availableTrialSlots = (trialConfig?.partnerTrialSlots || []).filter((s) => s.isActive !== false)
+  const defaultHubLocation = trialConfig?.defaultHubLocation || 'A2Z Partner Training & Evaluation Center, Sector 18, Noida'
+  const partnerTrialHubLocations = trialConfig?.partnerTrialHubLocations || []
+
+  return sendSuccess(res, {
+    data: {
+      availableTrialSlots,
+      defaultHubLocation,
+      partnerTrialHubLocations,
+    },
+  })
+})
+
+/**
  * PATCH /api/users/me/trial-slot
  * Schedule trial slot (date, time, location)
  */
@@ -1288,11 +1329,21 @@ export const schedulePartnerTrialSlot = asyncHandler(async (req, res) => {
     return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
   }
 
+  let resolvedLocation = location ? String(location).trim() : ''
+  if (!resolvedLocation) {
+    try {
+      const trialConfig = await getTrialConfig()
+      resolvedLocation = trialConfig?.defaultHubLocation || 'A2Z Partner Training & Evaluation Center, Sector 18, Noida'
+    } catch {
+      resolvedLocation = 'A2Z Partner Training & Evaluation Center, Sector 18, Noida'
+    }
+  }
+
   user.labourProfile = user.labourProfile || {}
   user.labourProfile.trialSlot = {
     date: String(date).trim(),
     timeSlot: String(timeSlot).trim(),
-    location: location ? String(location).trim() : 'A2Z Partner Training & Evaluation Center, Sector 18, Noida',
+    location: resolvedLocation,
     status: 'SCHEDULED',
     scheduledAt: new Date(),
     notes: req.body.notes || '',

@@ -11,6 +11,17 @@ import { PaymentTransaction } from '../models/PaymentTransaction.js'
 import { createOrder, verifyPaymentSignature } from './paymentService.js'
 import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
 
+export const DEFAULT_PARTNER_TRIAL_SLOTS = []
+
+export const DEFAULT_HUB_LOCATIONS = [
+  {
+    name: 'Noida Evaluation Hub',
+    address: 'A2Z Partner Training & Evaluation Center, Sector 18, Noida',
+    city: 'Noida',
+    isActive: true,
+  },
+]
+
 /**
  * Fetch or initialize the active global TrialConfiguration
  */
@@ -28,7 +39,23 @@ export async function getTrialConfig() {
       adminApprovalRequired: true,
       finalFailureAutoBlock: false,
       evaluationMode: 'INDIVIDUAL_TRIAL_RATING',
+      partnerTrialSlots: [],
+      partnerTrialHubLocations: DEFAULT_HUB_LOCATIONS,
+      defaultHubLocation: 'A2Z Partner Training & Evaluation Center, Sector 18, Noida',
     })
+  } else {
+    let needsSave = false
+    if (!config.partnerTrialSlots) {
+      config.partnerTrialSlots = []
+      needsSave = true
+    }
+    if (!config.defaultHubLocation) {
+      config.defaultHubLocation = 'A2Z Partner Training & Evaluation Center, Sector 18, Noida'
+      needsSave = true
+    }
+    if (needsSave) {
+      await config.save()
+    }
   }
   return config
 }
@@ -47,6 +74,9 @@ export async function updateTrialConfig(updates, adminUser) {
     'adminApprovalRequired',
     'finalFailureAutoBlock',
     'evaluationMode',
+    'partnerTrialSlots',
+    'partnerTrialHubLocations',
+    'defaultHubLocation',
   ]
 
   const cleanUpdates = {}

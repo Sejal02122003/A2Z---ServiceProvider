@@ -57,6 +57,26 @@ const trialConfigurationSchema = new mongoose.Schema(
       enum: ['INDIVIDUAL_TRIAL_RATING', 'AVERAGE_RATING'],
       default: 'INDIVIDUAL_TRIAL_RATING',
     },
+    partnerTrialSlots: [
+      {
+        id: { type: String, required: true },
+        label: { type: String, required: true },
+        desc: { type: String, default: '' },
+        isActive: { type: Boolean, default: true },
+      },
+    ],
+    partnerTrialHubLocations: [
+      {
+        name: { type: String, required: true },
+        address: { type: String, required: true },
+        city: { type: String, default: '' },
+        isActive: { type: Boolean, default: true },
+      },
+    ],
+    defaultHubLocation: {
+      type: String,
+      default: 'A2Z Partner Training & Evaluation Center, Sector 18, Noida',
+    },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

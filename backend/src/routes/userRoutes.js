@@ -28,6 +28,12 @@ router.get(
 
 router.post('/test-notification', user.testNotification)
 
+// Publicly available trial slots and evaluation hub address (used during onboarding & registration)
+router.get(
+  '/trial-slots',
+  user.getAvailableTrialSlots,
+)
+
 router.use(protect)
 
 router.get('/me', user.getProfile)
@@ -95,6 +101,12 @@ router.post(
 // Partner Onboarding Flow Routes
 router.get(
   '/me/onboarding-status',
+  (req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private')
+    res.set('Pragma', 'no-cache')
+    res.set('Expires', '0')
+    next()
+  },
   restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),
   user.getPartnerOnboardingStatus,
 )
