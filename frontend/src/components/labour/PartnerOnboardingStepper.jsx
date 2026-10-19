@@ -55,7 +55,7 @@ import {
 } from '../../api/partnerOnboardingApi.js'
 import { submitLabourKycDocuments } from '../../api/userKycApi.js'
 import { fetchLabourCategoriesGrouped } from '../../api/labourCategoriesApi.js'
-import { uploadMedia } from '../../api/uploadApi.js'
+import { uploadMedia, uploadDocument } from '../../api/uploadApi.js'
 import { UPLOAD_FOLDERS } from '../../constants/uploadFolders.js'
 import { KYC_STATUS, USER_ROLES } from '../../constants/userRoles.js'
 
@@ -329,13 +329,27 @@ export function PartnerOnboardingStepper({ onFinish }) {
     if (!file) return
     try {
       setUploadingKyc(true)
-      const res = await uploadMedia(file, UPLOAD_FOLDERS.KYC_DOCUMENTS)
-      const url = res?.url || res?.data?.url
+      let res
+      try {
+        res = await uploadDocument(file, UPLOAD_FOLDERS.KYC_DOCUMENTS)
+      } catch (docErr) {
+        res = await uploadMedia(file, UPLOAD_FOLDERS.KYC_DOCUMENTS)
+      }
+      const url =
+        res?.data?.asset?.secureUrl ||
+        res?.data?.asset?.url ||
+        res?.asset?.secureUrl ||
+        res?.asset?.url ||
+        res?.url ||
+        res?.data?.url
       if (url) {
         setKycDocUrl(url)
-        showToast('success', 'KYC document uploaded!')
+        showToast('success', 'KYC document uploaded successfully!')
+      } else {
+        throw new Error('Upload succeeded but no file URL returned')
       }
     } catch (err) {
+      console.error('KYC upload failed:', err)
       showToast('error', err?.message || 'Upload failed')
     } finally {
       setUploadingKyc(false)
@@ -388,12 +402,21 @@ export function PartnerOnboardingStepper({ onFinish }) {
     try {
       setUploadingBill(true)
       const res = await uploadMedia(file, UPLOAD_FOLDERS.GENERAL_MEDIA)
-      const url = res?.url || res?.data?.url
+      const url =
+        res?.data?.asset?.secureUrl ||
+        res?.data?.asset?.url ||
+        res?.asset?.secureUrl ||
+        res?.asset?.url ||
+        res?.url ||
+        res?.data?.url
       if (url) {
         setBillReceiptUrl(url)
         showToast('success', 'Payment bill screenshot uploaded!')
+      } else {
+        throw new Error('Upload succeeded but no file URL returned')
       }
     } catch (err) {
+      console.error('Bill upload failed:', err)
       showToast('error', err?.message || 'Failed to upload bill')
     } finally {
       setUploadingBill(false)
@@ -917,23 +940,23 @@ export function PartnerOnboardingStepper({ onFinish }) {
                         <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
                           Years of Service Experience
                         </label>
-                        <div className="flex items-center gap-2">
+                        <div className="grid grid-cols-5 gap-1 sm:gap-2">
                           {[1, 2, 3, 5, 8].map((yr) => (
                             <button
                               type="button"
                               key={yr}
                               onClick={() => setExperienceYears(yr)}
-                              className={`flex-1 rounded-xl py-2 text-xs font-bold border transition ${
+                              className={`rounded-xl py-2 text-[10px] sm:text-xs font-bold border transition text-center ${
                                 experienceYears === yr
                                   ? 'border-brand bg-brand text-white shadow-xs'
                                   : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                               }`}
                             >
-                              {yr} {yr === 1 ? 'Year' : 'Years'}
+                              {yr} {yr === 1 ? 'Yr' : 'Yrs'}
                             </button>
                           ))}
                         </div>
-                        <div className="mt-2 flex items-center gap-2">
+                        <div className="mt-2.5 flex flex-wrap items-center gap-2">
                           <span className="text-xs text-slate-500">Or custom years:</span>
                           <input
                             type="number"
@@ -941,8 +964,9 @@ export function PartnerOnboardingStepper({ onFinish }) {
                             max="50"
                             value={experienceYears}
                             onChange={(e) => setExperienceYears(Number(e.target.value))}
-                            className="w-24 rounded-lg border border-slate-200 px-3 py-1 text-xs font-bold text-slate-800 outline-none focus:border-brand"
+                            className="w-20 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-800 outline-none focus:border-brand"
                           />
+                          <span className="text-xs font-medium text-slate-400">years</span>
                         </div>
                       </div>
 
@@ -1333,33 +1357,66 @@ export function PartnerOnboardingStepper({ onFinish }) {
                         Schedule your practical demonstration slot at an A2Z partner evaluation hub.
                       </p>
 
-                      <form onSubmit={handleScheduleTrial} className="mt-3 space-y-3">
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                              Slot Date
-                            </label>
-                            <input
-                              type="date"
-                              value={trialDate}
-                              onChange={(e) => setTrialDate(e.target.value)}
-                              className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-brand"
-                            />
-                          </div>
+                      <form onSubmit={handleScheduleTrial} className="mt-3 space-y-3.5">
+                        {/* Slot Date */}
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                            Slot Date
+                          </label>
+                          <input
+                            type="date"
+                            value={trialDate}
+                            onChange={(e) => setTrialDate(e.target.value)}
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-brand shadow-xs"
+                          />
+                        </div>
 
-                          <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                              Time Slot
-                            </label>
-                            <select
-                              value={trialTimeSlot}
-                              onChange={(e) => setTrialTimeSlot(e.target.value)}
-                              className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:border-brand"
-                            >
-                              <option value="10:00 AM - 12:00 PM">10:00 AM – 12:00 PM</option>
-                              <option value="02:00 PM - 04:00 PM">02:00 PM – 04:00 PM</option>
-                              <option value="04:00 PM - 06:00 PM">04:00 PM – 06:00 PM</option>
-                            </select>
+                        {/* Time Slot Selection (Stays 100% inside screen) */}
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                            Select Time Slot
+                          </label>
+                          <div className="space-y-1.5">
+                            {[
+                              { id: '10:00 AM - 12:00 PM', label: '10:00 AM – 12:00 PM', desc: 'Morning slot' },
+                              { id: '02:00 PM - 04:00 PM', label: '02:00 PM – 04:00 PM', desc: 'Afternoon slot' },
+                              { id: '04:00 PM - 06:00 PM', label: '04:00 PM – 06:00 PM', desc: 'Evening slot' },
+                            ].map((slot) => {
+                              const isSelected = trialTimeSlot === slot.id
+                              return (
+                                <button
+                                  type="button"
+                                  key={slot.id}
+                                  onClick={() => setTrialTimeSlot(slot.id)}
+                                  className={`w-full flex items-center justify-between rounded-xl border p-2.5 text-left transition ${
+                                    isSelected
+                                      ? 'border-brand bg-brand/10 text-brand ring-1 ring-brand/20 shadow-xs'
+                                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div
+                                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition ${
+                                        isSelected
+                                          ? 'border-brand bg-brand text-white'
+                                          : 'border-slate-300 bg-white'
+                                      }`}
+                                    >
+                                      {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-bold leading-tight">{slot.label}</p>
+                                      <p className="text-[10px] text-slate-400 mt-0.5">{slot.desc}</p>
+                                    </div>
+                                  </div>
+                                  {isSelected && (
+                                    <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-extrabold text-brand">
+                                      Selected
+                                    </span>
+                                  )}
+                                </button>
+                              )
+                            })}
                           </div>
                         </div>
 
@@ -1367,19 +1424,19 @@ export function PartnerOnboardingStepper({ onFinish }) {
                           <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
                             Hub / Center Location Address
                           </label>
-                          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 text-xs text-slate-700">
-                            <MapPin className="h-4 w-4 shrink-0 text-brand" />
-                            <span className="text-[11px] font-medium leading-tight">
+                          <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 text-xs text-slate-700">
+                            <MapPin className="h-4 w-4 shrink-0 text-brand mt-0.5" />
+                            <span className="text-[11px] font-medium leading-snug break-words">
                               {trialLocation}
                             </span>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
                           <button
                             type="submit"
                             disabled={submitting}
-                            className="flex-1 rounded-xl bg-slate-900 py-2 text-xs font-bold text-white shadow-xs hover:bg-slate-800"
+                            className="flex-1 rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-slate-800 transition"
                           >
                             {step4.trialSlot?.status === 'SCHEDULED' ? 'Update Trial Slot' : 'Confirm Trial Slot'}
                           </button>
@@ -1390,7 +1447,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                               type="button"
                               onClick={handleCompleteTrialEvaluation}
                               disabled={submitting}
-                              className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100"
+                              className="rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2.5 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100 transition text-center"
                             >
                               Pass Trial ✓
                             </button>
@@ -1440,22 +1497,22 @@ export function PartnerOnboardingStepper({ onFinish }) {
                         </p>
 
                         {/* Payment Method Tabs */}
-                        <div className="mt-3 flex rounded-xl border border-amber-200 bg-amber-50/50 p-1">
+                        <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl border border-amber-200 bg-amber-50/50 p-1">
                           <button
                             type="button"
                             onClick={() => setPaymentTab('OFFLINE')}
-                            className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition ${
+                            className={`rounded-lg py-1.5 px-1 text-[11px] sm:text-xs font-bold transition text-center truncate ${
                               paymentTab === 'OFFLINE'
                                 ? 'bg-white text-slate-900 shadow-xs'
                                 : 'text-slate-500 hover:text-slate-800'
                             }`}
                           >
-                            Offline / Upload Bill
+                            Offline / Hub Bill
                           </button>
                           <button
                             type="button"
                             onClick={() => setPaymentTab('ONLINE')}
-                            className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition ${
+                            className={`rounded-lg py-1.5 px-1 text-[11px] sm:text-xs font-bold transition text-center truncate ${
                               paymentTab === 'ONLINE'
                                 ? 'bg-white text-slate-900 shadow-xs'
                                 : 'text-slate-500 hover:text-slate-800'
@@ -1637,7 +1694,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                       </p>
 
                       {/* 4 Items Grid */}
-                      <div className="mt-3 grid grid-cols-2 gap-2">
+                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {/* Uniform */}
                         <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 p-2.5">
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
