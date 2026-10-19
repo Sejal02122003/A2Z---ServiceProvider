@@ -9,19 +9,31 @@ import { IndividualHomeScreen } from './home/IndividualHomeScreen.jsx'
 import { LabourHomeScreen } from './home/LabourHomeScreen.jsx'
 import { userSubscriptionApi } from '../../api/userSubscriptionApi.js'
 
+import { AppRouteLoader } from '../../components/app/AppRouteLoader.jsx'
+
 function LabourGate({ user }) {
   return <LabourHomeScreen user={user} />
 }
 
 export function AppHomePage() {
-  const { user } = useAuth()
+  const { user, loading, token } = useAuth()
 
-  const labourCategories = user?.labourProfile?.categoryIds
-  const needsWorkCategories =
-    user?.role === USER_ROLES.LABOUR && !(Array.isArray(labourCategories) && labourCategories.length > 0)
+  if (loading || (token && !user)) {
+    return <AppRouteLoader />
+  }
 
-  if (needsWorkCategories) {
-    return <Navigate to="/app/work-categories" replace />
+  if (user?.role === USER_ROLES.LABOUR) {
+    const kitReceived = Boolean(
+      user.welcomeKit?.isReceived ||
+      user.welcomeKit?.status === 'DELIVERED' ||
+      (user.welcomeKit?.uniformIssued && user.welcomeKit?.idCardIssued && user.welcomeKit?.bagIssued)
+    )
+    const labourCategories = user?.labourProfile?.categoryIds
+    const hasCategories = Array.isArray(labourCategories) && labourCategories.length > 0
+    if (!kitReceived || !hasCategories) {
+      return <Navigate to="/app/partner-onboarding" replace />
+    }
+    return <LabourGate user={user} />
   }
 
   if (!user || !user.role || user.role === USER_ROLES.CUSTOMER) {

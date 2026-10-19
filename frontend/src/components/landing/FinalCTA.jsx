@@ -51,7 +51,7 @@ export function FinalCTA() {
               <ButtonLink href="#services" variant="primary" className="!py-4 !text-base">
                 Book Now
               </ButtonLink>
-              <ButtonLink href="#app" variant="secondary" className="!py-4 !text-base">
+              <ButtonLink href="/labours/auth" variant="secondary" className="!py-4 !text-base">
                 Become a Labour Partner
               </ButtonLink>
             </div>

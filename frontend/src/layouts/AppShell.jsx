@@ -72,6 +72,8 @@ export function AppShell() {
     pathname.startsWith('/app/tracking') ||
     pathname.startsWith('/app/sub-category/') ||
     pathname.startsWith('/app/active-job') ||
+    pathname.startsWith('/app/partner-onboarding') ||
+    pathname.startsWith('/app/onboarding') ||
     pathname === '/app/bookings' ||
     pathname === '/app/my-bookings' ||
     pathname === '/app/search' ||
@@ -249,7 +251,7 @@ export function AppShell() {
   }, [appLocation, isIndividualAppHome, user?.currentLocation, user?.permanentAddress])
 
   return (
-    <div className="relative min-h-dvh w-full overflow-x-clip print:overflow-visible text-slate-900">
+    <div className="relative min-h-dvh w-full overflow-x-hidden print:overflow-visible text-slate-900">
       <AppAmbientBackground />
 
       <AnimatePresence>
@@ -343,7 +345,7 @@ export function AppShell() {
               <div className="border-t border-slate-200/70 bg-linear-to-t from-slate-50/50 to-white p-3">
                 {isGuest ? (
                   <Link
-                    to="/auth"
+                    to={user?.role === USER_ROLES.LABOUR ? '/labours/auth' : '/users/auth'}
                     onClick={() => setDrawerOpen(false)}
                     className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-brand/30 bg-brand/5 py-3 text-sm font-semibold text-brand shadow-sm transition hover:bg-brand/10"
                   >
@@ -476,18 +478,27 @@ export function AppShell() {
         ) : null}
 
         <main
-          className={`relative z-10 flex-1 px-4 pb-32 ${hideShellHeader
-            ? 'pt-[max(0.5rem,env(safe-area-inset-top,0px))]'
-            : isIndividualAppHome
-              ? 'pt-0'
-              : 'pt-4'
-            }`}
+          className={`relative z-10 flex-1 ${
+            pathname.startsWith('/app/partner-onboarding') || pathname.startsWith('/app/onboarding')
+              ? 'p-0 pb-16'
+              : `px-4 pb-32 ${hideShellHeader
+                  ? 'pt-[max(0.5rem,env(safe-area-inset-top,0px))]'
+                  : isIndividualAppHome
+                    ? 'pt-0'
+                    : 'pt-4'
+                }`
+          }`}
         >
           <AppPageTransition />
         </main>
       </div>
 
-      <AppBottomNav items={bottomNav} />
+      {!pathname.startsWith('/app/partner-onboarding') &&
+      !pathname.startsWith('/app/onboarding') &&
+      !pathname.startsWith('/app/booking/flow') &&
+      !pathname.startsWith('/app/active-job') ? (
+        <AppBottomNav items={bottomNav} />
+      ) : null}
 
       {isIndividualAppHome ? (
         <AppUserLocationModal

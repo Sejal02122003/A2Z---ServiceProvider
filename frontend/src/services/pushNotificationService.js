@@ -86,12 +86,14 @@ export async function registerFCMToken(forceUpdate = false) {
 
     const hasPermission = await requestNotificationPermission();
     if (!hasPermission) {
-      throw new Error('Notification permission was not granted by the browser.');
+      console.warn('Browser notification permission was not granted or was dismissed. Push notifications are disabled.');
+      return null;
     }
 
     const token = await getFCMToken();
     if (!token) {
-      throw new Error('Failed to retrieve FCM token from Firebase.');
+      console.warn('Could not retrieve FCM token from Firebase.');
+      return null;
     }
 
     const response = await apiRequest('/fcm-tokens/save', {
@@ -104,18 +106,22 @@ export async function registerFCMToken(forceUpdate = false) {
       console.log('FCM token registered with backend');
       return token;
     } else {
-      throw new Error(response?.message || 'Failed to register token with backend');
+      console.warn('Failed to register FCM token with backend:', response?.message);
+      return null;
     }
   } catch (error) {
-    console.error('Error registering FCM token:', error);
-    throw error;
+    console.warn('FCM token registration skipped or failed:', error?.message || error);
+    return null;
   }
 }
 
 // Send test push notification to the logged-in user
 export async function sendTestNotification() {
   // Ensure token is registered with backend
-  await registerFCMToken(true);
+  const token = await registerFCMToken(true);
+  if (!token) {
+    throw new Error('Please enable browser notification permissions in your browser address bar to test push notifications.');
+  }
 
   // Trigger backend test notification
   const response = await apiRequest('/fcm-tokens/test', {

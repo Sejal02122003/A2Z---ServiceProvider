@@ -61,7 +61,7 @@ export function useAuth() {
       
       // We delay it slightly to ensure Redux state is updated first, 
       // since registerFCMToken checks the store for auth token.
-      setTimeout(() => registerFCMToken(true).catch(console.error), 500)
+      setTimeout(() => registerFCMToken(true).catch(() => {}), 500)
     },
     [dispatch],
   )

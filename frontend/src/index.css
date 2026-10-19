@@ -23,7 +23,7 @@
 
 html {
   scroll-behavior: smooth;
-  overscroll-behavior-y: none;
+  height: auto;
 }
 
 h1, h2, h3, h4 {
@@ -33,19 +33,23 @@ h1, h2, h3, h4 {
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   font-family: var(--font-sans);
   background: var(--color-page);
   color: #0f172a;
   -webkit-font-smoothing: antialiased;
-  overflow-x: clip;
+  overflow-x: hidden;
+  overflow-y: auto;
   max-width: 100%;
-  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 #root {
-  overflow-x: clip;
+  overflow-x: hidden;
   position: relative;
   width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 ::selection {

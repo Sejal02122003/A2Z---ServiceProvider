@@ -39,13 +39,10 @@ export function Navbar() {
   const handleRegisterLabour = (e) => {
     if (e && e.preventDefault) e.preventDefault()
     if (user && user.role === USER_ROLES.LABOUR) {
-      window.location.href = '/app'
+      window.location.href = '/app/partner-onboarding'
       return
     }
-    logout().finally(() => {
-      writeBootRole(USER_ROLES.LABOUR)
-      window.location.href = '/app'
-    })
+    window.location.href = '/labours/auth'
   }
 
   useEffect(() => {

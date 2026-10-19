@@ -151,6 +151,12 @@ export function AuthEntryPage({ authGroup = 'users' }) {
     resetFlowToForm()
   }
 
+  useEffect(() => {
+    if (authGroup === 'labours' && role !== USER_ROLES.LABOUR) {
+      setRole(USER_ROLES.LABOUR)
+    }
+  }, [authGroup, role])
+
   async function handleSendOtp() {
     setBanner(null)
     setChallengeId(null)
@@ -180,9 +186,11 @@ export function AuthEntryPage({ authGroup = 'users' }) {
         const res = await requestLoginOtp({ phone: p, authGroup })
         setChallengeId(res.data?.challengeId ?? null)
       } else {
+        const registrationRole = authGroup === 'labours' ? USER_ROLES.LABOUR : role
         const res = await requestRegisterOtp({
           phone: p,
-          role,
+          role: registrationRole,
+          authGroup,
           fullName: fullName.trim() || undefined,
         })
         setChallengeId(res.data?.challengeId ?? null)
@@ -198,6 +206,25 @@ export function AuthEntryPage({ authGroup = 'users' }) {
         setBanner({
           variant: 'error',
           message: 'No account found for this mobile number. Please tap "Register" above to create an account.',
+        })
+      } else if (e instanceof ApiError && (e.code === 'USER_EXISTS' || e.statusCode === 409)) {
+        setBanner({
+          variant: 'error',
+          message: (
+            <span>
+              An account with this phone already exists.{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('login')
+                  setBanner(null)
+                }}
+                className="font-bold underline hover:opacity-80 ml-1 text-brand"
+              >
+                Switch to Login &rarr;
+              </button>
+            </span>
+          ),
         })
       } else if (e instanceof ApiError && e.code === 'WRONG_PORTAL') {
         const targetPortal = authGroup === 'users' ? 'Labour' : 'Customer'
@@ -246,7 +273,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
     try {
       let signedInUser
       if (mode === 'login') {
-        const res = await verifyLogin({ phone: p, code, challengeId })
+        const res = await verifyLogin({ phone: p, code, challengeId, authGroup })
         const { token, user } = res.data
         applySession(token, user)
         signedInUser = user
@@ -257,9 +284,11 @@ export function AuthEntryPage({ authGroup = 'users' }) {
           setBusy(false)
           return
         }
+        const registrationRole = authGroup === 'labours' ? USER_ROLES.LABOUR : role
         const body = {
           phone: p,
-          role,
+          role: registrationRole,
+          authGroup,
           code,
           challengeId,
           fullName: fullName.trim(),
@@ -273,25 +302,56 @@ export function AuthEntryPage({ authGroup = 'users' }) {
         }
       }
 
-        let returnPath = location.state?.from || getRoleHomePath(signedInUser.role)
-        if (mode === 'register' && (signedInUser.role === USER_ROLES.CUSTOMER || signedInUser.role === USER_ROLES.CONTRACTOR)) {
-          returnPath = '/app/profile'
-        }
-        if (mode === 'register' && signedInUser.role === USER_ROLES.LABOUR) {
-          returnPath = '/app/profile'
-          navigate(returnPath, { replace: true })
+      // Route Service Partners directly to the onboarding pipeline or labour home
+      const isLabour = authGroup === 'labours' || signedInUser.role === USER_ROLES.LABOUR
+      if (isLabour) {
+        const kitReceived = Boolean(
+          signedInUser.welcomeKit?.isReceived ||
+          signedInUser.welcomeKit?.status === 'DELIVERED' ||
+          (signedInUser.welcomeKit?.uniformIssued && signedInUser.welcomeKit?.idCardIssued && signedInUser.welcomeKit?.bagIssued)
+        )
+        if (!kitReceived) {
+          navigate('/app/partner-onboarding', { replace: true })
           return
         }
+        navigate('/app', { replace: true })
+        return
+      }
 
-        const needsWorkSetup =
-          signedInUser.role === USER_ROLES.LABOUR && !(signedInUser.labourProfile?.categoryIds?.length > 0)
-        if (needsWorkSetup) {
-          setStep('work-setup')
-          setBanner(null)
-        } else {
-          navigate(returnPath, { replace: true, state: { welcomeBonus: signedInUser.welcomeBonus } })
-        }
+      let returnPath = location.state?.from || getRoleHomePath(signedInUser.role)
+      if (mode === 'register' && (signedInUser.role === USER_ROLES.CUSTOMER || signedInUser.role === USER_ROLES.CONTRACTOR)) {
+        returnPath = '/app/profile'
+      }
+      navigate(returnPath, { replace: true, state: { welcomeBonus: signedInUser.welcomeBonus } })
     } catch (e) {
+      if (e instanceof ApiError && (e.code === 'USER_EXISTS' || e.statusCode === 409)) {
+        try {
+          const loginRes = await verifyLogin({ phone: p, code, challengeId, authGroup })
+          const { token, user } = loginRes.data
+          applySession(token, user)
+          const isLabour = authGroup === 'labours' || user.role === USER_ROLES.LABOUR
+          if (isLabour) {
+            const kitReceived = Boolean(
+              user.welcomeKit?.isReceived ||
+              user.welcomeKit?.status === 'DELIVERED' ||
+              (user.welcomeKit?.uniformIssued && user.welcomeKit?.idCardIssued && user.welcomeKit?.bagIssued)
+            )
+            const returnPath = !kitReceived ? '/app/partner-onboarding' : '/app'
+            navigate(returnPath, { replace: true })
+            return
+          }
+          const returnPath = getRoleHomePath(user.role)
+          navigate(returnPath, { replace: true })
+          return
+        } catch {
+          setBanner({
+            variant: 'error',
+            message: 'This account already exists. Please switch to Login above to sign in.',
+          })
+          setBusy(false)
+          return
+        }
+      }
       setBanner({
         variant: 'error',
         message: e instanceof ApiError ? e.message : 'Verification failed. Check the code and try again.',

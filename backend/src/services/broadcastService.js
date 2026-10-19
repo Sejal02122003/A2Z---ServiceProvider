@@ -70,6 +70,15 @@ export async function startBroadcastCycle(bookingId) {
     'labourProfile.kycStatus': 'verified',
     vendorStatus: { $nin: ['BLOCKED', 'REJECTED', 'FINAL_FAILURE', 'FINAL_CHANCE_PAYMENT_PENDING', 'TRIAL_PAUSED', 'PENDING_ADMIN_CONFIRMATION', 'ADMIN_REVIEW_REQUIRED'] },
     isActive: true,
+    $and: [
+      {
+        $or: [
+          { 'welcomeKit.isReceived': true },
+          { 'welcomeKit.status': 'DELIVERED' },
+          { 'welcomeKit.uniformIssued': true, 'welcomeKit.idCardIssued': true, 'welcomeKit.bagIssued': true }
+        ]
+      }
+    ],
     'labourProfile.currentLatitude': { $gte: bookingLat - bufferLatDiff, $lte: bookingLat + bufferLatDiff },
     'labourProfile.currentLongitude': { $gte: bookingLng - bufferLngDiff, $lte: bookingLng + bufferLngDiff }
   }

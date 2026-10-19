@@ -597,6 +597,44 @@ export function LabourHomeScreen({ user }) {
       </section>
 
       <div className="space-y-5 px-4">
+        {/* Service Partner Registration Flow Banner */}
+        {(!user?.welcomeKit?.isReceived && !(user?.welcomeKit?.uniformIssued && user?.welcomeKit?.idCardIssued && user?.welcomeKit?.bagIssued)) && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 p-4 text-white shadow-xl relative"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-400 text-slate-900 shadow-md">
+                  <Clock className="h-6 w-6 stroke-[2.5]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-300">
+                      Registration In Progress
+                    </span>
+                  </div>
+                  <h3 className="mt-1 text-sm sm:text-base font-black text-white">
+                    Steps for Service Partner Registration
+                  </h3>
+                  <p className="mt-0.5 text-[11px] text-slate-300 leading-snug">
+                    Complete your Application, KYC, Admin Review, Trial Slot & Welcome Kit to receive customer bookings.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/app/partner-onboarding')}
+                className="shrink-0 flex items-center gap-1 rounded-xl bg-amber-400 px-3 py-2 text-xs font-bold text-slate-950 shadow-md shadow-amber-400/20 transition hover:bg-amber-300 active:scale-95"
+              >
+                <span>View Steps</span>
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         {/* State: CONFIRMED Joining & Kit Collection Banner */}
         {isConfirmedPartner && (
           <motion.div

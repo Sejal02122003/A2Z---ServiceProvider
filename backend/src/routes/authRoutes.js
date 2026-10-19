@@ -30,6 +30,7 @@ router.post(
     validateOtpChallengeId,
     validateOtpCode,
     validateFullNameRequired,
+    validateAuthGroup,
   ],
   validateRequest,
   auth.registerVerify,
@@ -37,7 +38,12 @@ router.post(
 
 router.post('/login/request-otp', [validatePhoneBody, validateAuthGroup], validateRequest, auth.loginRequestOtp)
 
-router.post('/login/verify', [validatePhoneBody, validateOtpChallengeId, validateOtpCode], validateRequest, auth.loginVerify)
+router.post(
+  '/login/verify',
+  [validatePhoneBody, validateOtpChallengeId, validateOtpCode, validateAuthGroup],
+  validateRequest,
+  auth.loginVerify,
+)
 
 router.post('/admin/login', validateAdminLogin, validateRequest, auth.adminLogin)
 

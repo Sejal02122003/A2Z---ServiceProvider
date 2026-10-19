@@ -611,6 +611,28 @@ export function AppProfilePage() {
 
       {user?.role === USER_ROLES.LABOUR ? (
         <Link
+          to="/app/partner-onboarding"
+          className="flex items-center justify-between gap-3 rounded-2xl border border-brand/30 bg-gradient-to-r from-brand/10 via-white to-blue-50/50 p-4 shadow-sm transition hover:border-brand/50 active:scale-[0.99]"
+        >
+          <span className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand text-white shadow-xs">
+              <Sparkles className="h-5 w-5" />
+            </span>
+            <span className="text-left">
+              <span className="block text-sm font-black text-slate-900">
+                Steps for Service Partner Registration
+              </span>
+              <span className="block text-[11px] font-medium text-slate-600">
+                Application • KYC • Admin Approval • Trial Slot • Welcome Kit
+              </span>
+            </span>
+          </span>
+          <ChevronRight className="h-5 w-5 shrink-0 text-brand" />
+        </Link>
+      ) : null}
+
+      {user?.role === USER_ROLES.LABOUR ? (
+        <Link
           to="/app/kyc"
           className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3.5 shadow-sm transition active:scale-[0.99] ${
             labourKyc === KYC_STATUS.VERIFIED

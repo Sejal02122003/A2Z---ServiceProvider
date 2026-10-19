@@ -35,6 +35,7 @@ import LabourPenaltiesPage from '../pages/app/labour/LabourPenaltiesPage.jsx'
 import { CustomerNotificationsPage } from '../pages/app/CustomerNotificationsPage.jsx'
 import { ServicePackagesPage } from '../pages/app/ServicePackagesPage.jsx'
 import { PackageDetailsPage } from '../pages/app/PackageDetailsPage.jsx'
+import { PartnerOnboardingPage } from '../pages/app/PartnerOnboardingPage.jsx'
 import { USER_ROLES } from '../constants/userRoles.js'
 
 
@@ -292,6 +293,22 @@ export const appShellChildRoutes = (
       element={
         <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR, USER_ROLES.LABOUR]}>
           <AppRoleNotificationsWrapper />
+        </RoleRoute>
+      }
+    />
+    <Route
+      path="partner-onboarding"
+      element={
+        <RoleRoute allow={[USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR]}>
+          <PartnerOnboardingPage />
+        </RoleRoute>
+      }
+    />
+    <Route
+      path="onboarding"
+      element={
+        <RoleRoute allow={[USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR]}>
+          <PartnerOnboardingPage />
         </RoleRoute>
       }
     />

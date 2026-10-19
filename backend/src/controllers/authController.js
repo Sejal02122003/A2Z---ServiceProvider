@@ -64,12 +64,35 @@ export const registerRequestOtp = asyncHandler(async (req, res) => {
 
 /** POST /auth/register/verify */
 export const registerVerify = asyncHandler(async (req, res) => {
-  const { phone, code, role, fullName, companyName, gstNumber, businessName, challengeId } = req.body
+  const { phone, code, role, fullName, companyName, gstNumber, businessName, challengeId, authGroup } = req.body
+
+  const targetRole = (authGroup === 'labours' || role === USER_ROLES.LABOUR) ? USER_ROLES.LABOUR : role
 
   const existing = await User.findOne({ phone })
   if (existing) {
+    const otp = await validateOtpChallenge({ phone, purpose: 'register', code, challengeId })
+    if (otp.ok) {
+      await deleteOtpChallengeDoc(otp.doc)
+      existing.lastLoginAt = new Date()
+      if (targetRole === USER_ROLES.LABOUR) {
+        existing.role = USER_ROLES.LABOUR
+        if (!existing.labourProfile) existing.labourProfile = {}
+      } else if (role && existing.role !== role) {
+        existing.role = role
+      }
+      if (fullName && (!existing.fullName || existing.fullName === 'User')) {
+        existing.fullName = fullName.trim()
+      }
+      await existing.save()
+      const token = signAccessToken(existing)
+      return sendSuccess(res, {
+        message: 'Account already exists — logged in successfully',
+        statusCode: HTTP_STATUS.OK,
+        data: buildAuthPayload(existing, token),
+      })
+    }
     return sendError(res, {
-      message: 'Account already registered',
+      message: 'Account already registered. Please switch to login.',
       statusCode: HTTP_STATUS.CONFLICT,
       code: 'USER_EXISTS',
     })
@@ -95,7 +118,7 @@ export const registerVerify = asyncHandler(async (req, res) => {
 
   const doc = {
     phone,
-    role,
+    role: targetRole,
     fullName,
     isPhoneVerified: true,
     identityStatus: IDENTITY_STATUS.CONTACT_VERIFIED,
@@ -104,7 +127,7 @@ export const registerVerify = asyncHandler(async (req, res) => {
     lastLoginAt: new Date(),
   }
 
-  if (role === USER_ROLES.LABOUR) {
+  if (targetRole === USER_ROLES.LABOUR) {
     doc.labourProfile = {}
   }
 
@@ -113,8 +136,28 @@ export const registerVerify = asyncHandler(async (req, res) => {
     user = await User.create(doc)
   } catch (e) {
     if (e?.code === 11000) {
+      const fallback = await User.findOne({ phone })
+      if (fallback) {
+        if (targetRole === USER_ROLES.LABOUR) {
+          fallback.role = USER_ROLES.LABOUR
+          if (!fallback.labourProfile) fallback.labourProfile = {}
+        } else if (role && fallback.role !== role) {
+          fallback.role = role
+        }
+        if (fullName && (!fallback.fullName || fallback.fullName === 'User')) {
+          fallback.fullName = fullName.trim()
+        }
+        fallback.lastLoginAt = new Date()
+        await fallback.save()
+        const token = signAccessToken(fallback)
+        return sendSuccess(res, {
+          message: 'Account already exists — logged in successfully',
+          statusCode: HTTP_STATUS.OK,
+          data: buildAuthPayload(fallback, token),
+        })
+      }
       return sendError(res, {
-        message: 'Account already registered',
+        message: 'Account already registered. Please switch to login.',
         statusCode: HTTP_STATUS.CONFLICT,
         code: 'USER_EXISTS',
       })
@@ -197,16 +240,17 @@ export const loginRequestOtp = asyncHandler(async (req, res) => {
       code: 'USE_ADMIN_LOGIN',
     })
   }
+  const effectiveRole = authGroup === 'labours' ? USER_ROLES.LABOUR : user.role
   const { challengeId } = await createOtpChallenge(phone, 'login')
   return sendSuccess(res, {
     message: 'OTP sent to your mobile number',
-    data: { phone, role: user.role, challengeId },
+    data: { phone, role: effectiveRole, challengeId },
   })
 })
 
 /** POST /auth/login/verify */
 export const loginVerify = asyncHandler(async (req, res) => {
-  const { phone, code, challengeId } = req.body
+  const { phone, code, challengeId, authGroup } = req.body
   const user = await User.findOne({ phone })
   if (!user) {
     return sendError(res, {
@@ -245,6 +289,12 @@ export const loginVerify = asyncHandler(async (req, res) => {
   if (!user.identityStatus || user.identityStatus === IDENTITY_STATUS.UNVERIFIED) {
     user.identityStatus = IDENTITY_STATUS.CONTACT_VERIFIED
   }
+
+  if (authGroup === 'labours' && user.role !== USER_ROLES.LABOUR) {
+    user.role = USER_ROLES.LABOUR
+    if (!user.labourProfile) user.labourProfile = {}
+  }
+
   await user.save()
   await deleteOtpChallengeDoc(otp.doc)
 

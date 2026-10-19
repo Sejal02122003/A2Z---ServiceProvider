@@ -49,11 +49,13 @@ router.patch(
 router.patch(
   '/me/labour-categories',
   [
-    body('services').isArray({ min: 1 }).withMessage('Select at least one category'),
-    body('services.*.serviceId').isMongoId().withMessage('Invalid service ID'),
+    body('services').optional().isArray(),
+    body('services.*.serviceId').optional().isMongoId().withMessage('Invalid service ID'),
     body('services.*.subcategoryId').optional().isMongoId(),
     body('services.*.minPrice').optional().isNumeric(),
     body('services.*.maxPrice').optional().isNumeric(),
+    body('categoryIds').optional().isArray(),
+    body('subcategoryIds').optional().isArray(),
   ],
   validateRequest,
   user.updateLabourCategories,
@@ -90,6 +92,42 @@ router.post(
   user.submitLabourKycDocuments,
 )
 
+// Partner Onboarding Flow Routes
+router.get(
+  '/me/onboarding-status',
+  restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),
+  user.getPartnerOnboardingStatus,
+)
+
+router.patch(
+  '/me/trial-slot',
+  restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),
+  [
+    body('date').isString().notEmpty().withMessage('Date is required'),
+    body('timeSlot').isString().notEmpty().withMessage('Time slot is required'),
+    body('location').optional().isString(),
+  ],
+  validateRequest,
+  user.schedulePartnerTrialSlot,
+)
+
+router.post(
+  '/me/trial-complete',
+  restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),
+  user.completePartnerTrial,
+)
+
+router.post(
+  '/me/welcome-kit/payment',
+  restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),
+  user.submitPartnerWelcomeKitPayment,
+)
+
+router.post(
+  '/me/welcome-kit/confirm-receipt',
+  restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),
+  user.confirmPartnerWelcomeKitReceipt,
+)
 
 router.get('/', restrictTo(USER_ROLES.ADMIN), user.listUsers)
 

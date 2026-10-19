@@ -5,11 +5,11 @@ import { getRoleHomePath } from '../../lib/roleHomePath.js'
 import { AppRouteLoader } from '../app/AppRouteLoader.jsx'
 
 export function ProtectedRoute({ children, roles, allowGuest }) {
-  const { isAuthenticated, user, loading } = useAuth()
+  const { isAuthenticated, user, loading, token } = useAuth()
   const location = useLocation()
   const role = user?.role
 
-  if (loading) {
+  if (loading || (token && !user)) {
     return <AppRouteLoader />
   }
 

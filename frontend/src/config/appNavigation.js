@@ -18,6 +18,7 @@ import {
   Award,
   Wallet,
   Bell,
+  Sparkles,
 } from 'lucide-react'
 import { USER_ROLES } from '../constants/userRoles.js'
 
@@ -58,6 +59,7 @@ const byRole = {
     ],
     drawerNav: [
       { id: 'home', to: '/app', label: 'Home', icon: Home, end: true },
+      { id: 'onboarding', to: '/app/partner-onboarding', label: 'Registration Steps (Onboarding)', icon: Sparkles },
       { id: 'wallet', to: '/app/wallet', label: 'My Wallet & Recharge', icon: Wallet },
       { id: 'jobs', to: '/app/jobs', label: 'Assignments', icon: HardHat },
       { id: 'rewards', to: '/app/rewards', label: 'Rewards & Incentives', icon: Award },
@@ -89,6 +91,7 @@ export function getAppShellTitle(pathname) {
   if (pathname.startsWith('/app/materials')) return 'Materials'
   if (pathname.startsWith('/app/earnings')) return 'Earnings'
   if (pathname.startsWith('/app/kyc')) return 'KYC verification'
+  if (pathname.startsWith('/app/partner-onboarding') || pathname.startsWith('/app/onboarding')) return 'Registration Steps'
 
   if (pathname.startsWith('/app/notifications')) return 'Notifications'
   if (pathname.startsWith('/app/work-categories')) return 'Work types'

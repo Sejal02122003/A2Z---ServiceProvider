@@ -162,11 +162,17 @@ export const updateLabourCategories = asyncHandler(async (req, res) => {
     })
   }
 
-  const { services } = req.body
+  const { services, categoryIds: directCatIds, subcategoryIds: directSubcatIds } = req.body
   const uniqueServices = []
   const uniqueSubcategoryIds = new Set()
   const uniqueServiceIds = []
   
+  if (Array.isArray(directSubcatIds)) {
+    for (const sid of directSubcatIds) {
+      if (sid) uniqueSubcategoryIds.add(String(sid))
+    }
+  }
+
   if (Array.isArray(services)) {
     const seen = new Set()
     for (const svc of services) {
@@ -205,6 +211,26 @@ export const updateLabourCategories = asyncHandler(async (req, res) => {
     })
   }
   
+  // If no explicit services provided but subcategories selected, populate all services for those subcategories
+  if (uniqueServiceIds.length === 0 && subcatIdArray.length > 0) {
+    const subcatServices = await LabourService.find({
+      subcategoryId: { $in: subcatIdArray },
+      isActive: true,
+    }).lean()
+    for (const s of subcatServices) {
+      const sid = String(s._id)
+      if (!uniqueServiceIds.includes(sid)) {
+        uniqueServiceIds.push(sid)
+        uniqueServices.push({
+          serviceId: sid,
+          subcategoryId: String(s.subcategoryId),
+          minPrice: 0,
+          maxPrice: 0,
+        })
+      }
+    }
+  }
+
   const servicesInDb = await LabourService.find({
     _id: { $in: uniqueServiceIds },
     isActive: true,
@@ -218,17 +244,20 @@ export const updateLabourCategories = asyncHandler(async (req, res) => {
     })
   }
 
-  const hasTrade = uniqueServices.length > 0
+  const catIds = [...new Set([
+    ...subcategories.map(s => String(s.categoryId?._id || s.categoryId)),
+    ...(Array.isArray(directCatIds) ? directCatIds.map(String) : [])
+  ])]
+
+  const hasTrade = uniqueServices.length > 0 || subcatIdArray.length > 0 || catIds.length > 0
   if (!hasTrade) {
     return sendError(res, {
       message:
-        'Choose at least one job type (for example plumber, electrician, or construction helper). Profile tags alone are not enough for worksite matching.',
+        'Choose at least one job type or category. Profile tags alone are not enough for worksite matching.',
       statusCode: HTTP_STATUS.BAD_REQUEST,
       code: 'TRADE_REQUIRED',
     })
   }
-
-  const catIds = [...new Set(subcategories.map(s => String(s.categoryId?._id || s.categoryId)))]
 
   req.user.labourProfile = req.user.labourProfile || {}
   req.user.labourProfile.subcategoryIds = subcatIdArray
@@ -1054,9 +1083,13 @@ export const updatePartnerWelcomeKit = asyncHandler(async (req, res) => {
   }
 
   user.welcomeKit = {
+    ...(user.welcomeKit ? (typeof user.welcomeKit.toObject === 'function' ? user.welcomeKit.toObject() : user.welcomeKit) : {}),
     uniformIssued,
     idCardIssued,
     bagIssued,
+    productsIssued: req.body.productsIssued !== undefined ? Boolean(req.body.productsIssued) : Boolean(user.welcomeKit?.productsIssued),
+    isReceived: isComplete ? true : Boolean(user.welcomeKit?.isReceived),
+    status: isComplete ? 'DELIVERED' : (user.welcomeKit?.status || 'PENDING_PAYMENT'),
     issuedAt,
   }
 
@@ -1119,4 +1152,259 @@ export const getPartnerWelcomeKitStats = asyncHandler(async (req, res) => {
     },
   })
 })
+
+/**
+ * GET /api/users/me/onboarding-status
+ * Fetches the complete 5-step registration status for the logged in service partner
+ */
+export const getPartnerOnboardingStatus = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).lean()
+  if (!user) {
+    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  // Step 1: Category & Experience
+  const hasCategory = Boolean(
+    (user.labourProfile?.categoryIds && user.labourProfile.categoryIds.length > 0) ||
+    (user.labourProfile?.skills && user.labourProfile.skills.length > 0)
+  )
+  const experienceYears = user.labourProfile?.experienceYears ?? null
+  const step1Complete = Boolean(hasCategory && (experienceYears !== null && experienceYears !== undefined))
+
+  // Step 2: KYC Aadhaar & PAN
+  const kycStatus = user.labourProfile?.kycStatus || 'pending'
+  const hasAadhaar = Boolean(user.labourProfile?.aadhaarMasked)
+  const hasPan = Boolean(user.labourProfile?.panMasked)
+  const step2Complete = Boolean(
+    user.labourProfile?.kycSubmittedAt || hasAadhaar || hasPan || kycStatus === 'verified'
+  )
+
+  // Step 3: Admin Approval
+  const step3Approved = kycStatus === 'verified'
+  const step3Pending = kycStatus === 'pending' || (step2Complete && !step3Approved)
+  const step3Failed = kycStatus === 'failed'
+
+  // Step 4: Trial Slot & Joining Confirmation
+  const trialSlot = user.labourProfile?.trialSlot || { status: 'NOT_SCHEDULED' }
+  const trialStatus = user.vendorStatus || 'NOT_STARTED'
+  const trialPassed =
+    trialSlot.status === 'COMPLETED' ||
+    trialSlot.status === 'PASSED' ||
+    trialStatus === 'CONFIRMED' ||
+    trialStatus === 'TRIAL_COMPLETED'
+  const step4Complete = Boolean(trialPassed)
+
+  // Welcome Kit Payment
+  const welcomeKit = user.welcomeKit || {}
+  const paymentComplete = Boolean(
+    welcomeKit.status === 'PAID' ||
+    welcomeKit.status === 'PAYMENT_SUBMITTED' ||
+    welcomeKit.status === 'DISPATCHED' ||
+    welcomeKit.status === 'DELIVERED'
+  )
+
+  // Step 5: Welcome Kit Received
+  const kitReceived = Boolean(
+    welcomeKit.isReceived ||
+    welcomeKit.status === 'DELIVERED' ||
+    (welcomeKit.uniformIssued && welcomeKit.idCardIssued && welcomeKit.bagIssued)
+  )
+  const step5Complete = kitReceived
+
+  let currentStep = 1
+  if (!step1Complete) currentStep = 1
+  else if (!step2Complete) currentStep = 2
+  else if (!step3Approved) currentStep = 3
+  else if (!step4Complete || !paymentComplete) currentStep = 4
+  else if (!step5Complete) currentStep = 5
+  else currentStep = 6 // All completed!
+
+  return sendSuccess(res, {
+    data: {
+      currentStep,
+      step1: {
+        completed: step1Complete,
+        categoryCount: user.labourProfile?.categoryIds?.length || 0,
+        experienceYears,
+      },
+      step2: {
+        completed: step2Complete,
+        kycStatus,
+        hasAadhaar,
+        hasPan,
+      },
+      step3: {
+        status: kycStatus,
+        isApproved: step3Approved,
+        isPending: step3Pending,
+        isFailed: step3Failed,
+        reviewNote: user.labourProfile?.kycReviewNote,
+      },
+      step4: {
+        completed: step4Complete,
+        trialSlot,
+        trialStatus,
+        trialPassed,
+        paymentComplete,
+        welcomeKitPayment: {
+          status: welcomeKit.status || 'PENDING_PAYMENT',
+          method: welcomeKit.paymentMethod || 'NONE',
+          receiptUrl: welcomeKit.paymentReceiptUrl || '',
+        },
+      },
+      step5: {
+        completed: step5Complete,
+        welcomeKit,
+        isReadyForBookings: step5Complete,
+      },
+      user: {
+        _id: user._id,
+        phone: user.phone,
+        role: user.role,
+        fullName: user.fullName,
+        welcomeKit,
+        labourProfile: user.labourProfile,
+        vendorStatus: user.vendorStatus,
+      },
+    },
+  })
+})
+
+/**
+ * PATCH /api/users/me/trial-slot
+ * Schedule trial slot (date, time, location)
+ */
+export const schedulePartnerTrialSlot = asyncHandler(async (req, res) => {
+  const { date, timeSlot, location } = req.body
+  if (!date || !timeSlot) {
+    return sendError(res, {
+      message: 'Trial date and time slot are required',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+    })
+  }
+
+  const user = await User.findById(req.user._id)
+  if (!user) {
+    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  user.labourProfile = user.labourProfile || {}
+  user.labourProfile.trialSlot = {
+    date: String(date).trim(),
+    timeSlot: String(timeSlot).trim(),
+    location: location ? String(location).trim() : 'A2Z Partner Training & Evaluation Center, Sector 18, Noida',
+    status: 'SCHEDULED',
+    scheduledAt: new Date(),
+    notes: req.body.notes || '',
+  }
+
+  await user.save()
+
+  return sendSuccess(res, {
+    message: 'Trial slot scheduled successfully',
+    data: {
+      trialSlot: user.labourProfile.trialSlot,
+      user: user.toSafeObject(),
+    },
+  })
+})
+
+/**
+ * POST /api/users/me/trial-complete
+ * Mark trial slot evaluation passed / completed
+ */
+export const completePartnerTrial = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id)
+  if (!user) {
+    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  user.labourProfile = user.labourProfile || {}
+  const existingSlot = user.labourProfile.trialSlot || {}
+  user.labourProfile.trialSlot = {
+    ...existingSlot,
+    status: 'COMPLETED',
+    completedAt: new Date(),
+    notes: req.body.notes || 'Evaluation completed successfully',
+  }
+  user.vendorStatus = 'CONFIRMED'
+
+  await user.save()
+
+  return sendSuccess(res, {
+    message: 'Trial evaluation completed and account activated!',
+    data: {
+      trialSlot: user.labourProfile.trialSlot,
+      vendorStatus: user.vendorStatus,
+      user: user.toSafeObject(),
+    },
+  })
+})
+
+/**
+ * POST /api/users/me/welcome-kit/payment
+ * Submit payment for welcome kit (online confirmation or offline bill screenshot upload)
+ */
+export const submitPartnerWelcomeKitPayment = asyncHandler(async (req, res) => {
+  const { paymentMethod, paymentReceiptUrl, paymentNotes, deliveryAddress, deliveryCity, deliveryPincode } = req.body
+
+  const user = await User.findById(req.user._id)
+  if (!user) {
+    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  const isOnline = paymentMethod === 'ONLINE'
+  user.welcomeKit = user.welcomeKit || {}
+  user.welcomeKit.paymentMethod = isOnline ? 'ONLINE' : 'OFFLINE'
+  user.welcomeKit.status = isOnline ? 'PAID' : 'PAYMENT_SUBMITTED'
+  user.welcomeKit.paymentReceiptUrl = paymentReceiptUrl || user.welcomeKit.paymentReceiptUrl || ''
+  user.welcomeKit.paymentNotes = paymentNotes || ''
+  user.welcomeKit.paidAt = new Date()
+
+  if (deliveryAddress) user.welcomeKit.deliveryAddress = String(deliveryAddress).trim()
+  if (deliveryCity) user.welcomeKit.deliveryCity = String(deliveryCity).trim()
+  if (deliveryPincode) user.welcomeKit.deliveryPincode = String(deliveryPincode).trim()
+
+  await user.save()
+
+  return sendSuccess(res, {
+    message: isOnline ? 'Payment completed successfully!' : 'Payment bill submitted! Verification in progress.',
+    data: {
+      welcomeKit: user.welcomeKit,
+      user: user.toSafeObject(),
+    },
+  })
+})
+
+/**
+ * POST /api/users/me/welcome-kit/confirm-receipt
+ * Partner confirms delivery of their welcome kit (Uniform, bag, ID, products)
+ */
+export const confirmPartnerWelcomeKitReceipt = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id)
+  if (!user) {
+    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  user.welcomeKit = user.welcomeKit || {}
+  user.welcomeKit.isReceived = true
+  user.welcomeKit.status = 'DELIVERED'
+  user.welcomeKit.uniformIssued = true
+  user.welcomeKit.idCardIssued = true
+  user.welcomeKit.bagIssued = true
+  user.welcomeKit.productsIssued = true
+  user.welcomeKit.receivedAt = new Date()
+  user.welcomeKit.issuedAt = user.welcomeKit.issuedAt || new Date()
+
+  await user.save()
+
+  return sendSuccess(res, {
+    message: 'Welcome kit confirmed! You are now ready to accept bookings.',
+    data: {
+      welcomeKit: user.welcomeKit,
+      user: user.toSafeObject(),
+    },
+  })
+})
+
 
