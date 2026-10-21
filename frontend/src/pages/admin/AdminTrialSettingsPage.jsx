@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { vendorTrialApi } from '../../api/vendorTrialApi.js'
 import {
   Settings,
@@ -17,6 +18,8 @@ import {
   Edit2,
   Check,
   X,
+  Award,
+  ArrowRight,
 } from 'lucide-react'
 
 const SLOT_PRESETS = [
@@ -527,6 +530,28 @@ export function AdminTrialSettingsPage() {
                 Configure trial time slot timings and hub evaluation center addresses shown during partner registration (Step 4)
               </p>
             </div>
+          </div>
+
+          {/* Action Link to Candidate Evaluation Roster */}
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-cyan-200 bg-gradient-to-r from-cyan-50 via-sky-50 to-white p-4 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-600 text-white shrink-0 shadow-sm">
+                <Award className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-cyan-950">Evaluating Practical Trial Candidates</h3>
+                <p className="text-xs text-cyan-800">
+                  When partners select these slots, grade their demo and confirm their joining in the Labour & KYC Hub.
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/admin/labour?trial=scheduled"
+              className="inline-flex items-center gap-1.5 shrink-0 rounded-xl bg-cyan-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-cyan-800 transition active:scale-95"
+            >
+              <span>Evaluate Candidates</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
 
           <div className="space-y-6">

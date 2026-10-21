@@ -539,7 +539,7 @@ function mergeAnd(base, extraClauses) {
 
 /** Admin: list users with search, role, active/inactive, optional labour KYC filter, pagination */
 export const listUsers = asyncHandler(async (req, res) => {
-  const { search, role, status, kycStatus, freeTrialStatus, categoryId, location, kitStatus, page = 1, limit = 20 } = req.query
+  const { search, role, status, kycStatus, freeTrialStatus, trialSlotStatus, categoryId, location, kitStatus, page = 1, limit = 20 } = req.query
   const q = {}
   const andParts = []
 
@@ -643,6 +643,24 @@ export const listUsers = asyncHandler(async (req, res) => {
     }
   } else if (role) {
     q.role = role
+  }
+
+  if (trialSlotStatus && trialSlotStatus !== 'all') {
+    if (trialSlotStatus === 'scheduled') {
+      andParts.push({ 'labourProfile.trialSlot.status': 'SCHEDULED' })
+    } else if (trialSlotStatus === 'completed') {
+      andParts.push({ 'labourProfile.trialSlot.status': { $in: ['COMPLETED', 'PASSED'] } })
+    } else if (trialSlotStatus === 'failed') {
+      andParts.push({ 'labourProfile.trialSlot.status': 'FAILED' })
+    } else if (trialSlotStatus === 'not_scheduled') {
+      andParts.push({
+        $or: [
+          { 'labourProfile.trialSlot': { $exists: false } },
+          { 'labourProfile.trialSlot.status': { $exists: false } },
+          { 'labourProfile.trialSlot.status': 'NOT_SCHEDULED' },
+        ],
+      })
+    }
   }
 
   if (freeTrialStatus) {
@@ -1457,5 +1475,48 @@ export const confirmPartnerWelcomeKitReceipt = asyncHandler(async (req, res) => 
     },
   })
 })
+
+/**
+ * PATCH /api/users/:id/trial-evaluate
+ * Admin evaluates candidate practical demonstration at the Hub
+ * decision: 'passed' | 'failed'
+ */
+export const evaluatePartnerTrialAdmin = asyncHandler(async (req, res) => {
+  const { decision, notes } = req.body
+  const user = await User.findById(req.params.id)
+  if (!user) {
+    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  const profileKey = user.role === USER_ROLES.CONTRACTOR ? 'contractorProfile' : 'labourProfile'
+  user[profileKey] = user[profileKey] || {}
+  const profile = user[profileKey]
+  const existingSlot = profile.trialSlot || {}
+
+  const isPassed = decision === 'passed'
+  profile.trialSlot = {
+    ...existingSlot,
+    status: isPassed ? 'COMPLETED' : 'FAILED',
+    completedAt: new Date(),
+    evaluatedAt: new Date(),
+    evaluatedBy: req.user?._id,
+    notes: notes || (isPassed ? 'Practical evaluation passed' : 'Evaluation not cleared'),
+  }
+
+  if (isPassed) {
+    user.vendorStatus = 'CONFIRMED'
+  }
+
+  await user.save()
+
+  return sendSuccess(res, {
+    message: isPassed ? 'Trial evaluation marked as passed! Candidate joining confirmed.' : 'Trial marked as failed.',
+    data: {
+      user: user.toSafeObject(),
+      trialSlot: profile.trialSlot,
+    },
+  })
+})
+
 
 

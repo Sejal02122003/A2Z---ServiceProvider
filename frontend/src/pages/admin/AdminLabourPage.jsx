@@ -3,8 +3,13 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
   ArrowUpRight,
+  Award,
+  Calendar,
+  Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Clock,
   IdCard,
   Layers,
   Loader2,
@@ -15,7 +20,12 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { fetchAdminUserById, fetchAdminUsers, reviewLabourKycAdmin } from '../../api/adminUsersApi.js'
+import {
+  evaluateLabourTrialAdmin,
+  fetchAdminUserById,
+  fetchAdminUsers,
+  reviewLabourKycAdmin,
+} from '../../api/adminUsersApi.js'
 import { ApiError } from '../../api/http.js'
 import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
@@ -39,6 +49,12 @@ function readInitialKit(sp) {
 function readInitialStatus(sp) {
   const s = sp.get('status')?.toLowerCase()
   if (s === 'active' || s === 'inactive') return s
+  return 'all'
+}
+
+function readInitialTrial(sp) {
+  const t = sp.get('trial')?.toLowerCase()
+  if (t === 'scheduled' || t === 'completed' || t === 'failed' || t === 'not_scheduled') return t
   return 'all'
 }
 
@@ -78,6 +94,88 @@ function StatusPill({ active }) {
   )
 }
 
+function TrialSlotBadge({ trialSlot, onEvaluate }) {
+  const status = trialSlot?.status || 'NOT_SCHEDULED'
+
+  if (status === 'COMPLETED' || status === 'PASSED') {
+    return (
+      <div className="flex flex-col items-start gap-0.5">
+        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ring-1 bg-emerald-50 text-emerald-900 ring-emerald-200/80">
+          <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+          Trial Passed
+        </span>
+        {trialSlot.date && (
+          <span className="text-[10px] text-slate-500 font-medium">
+            {trialSlot.date} {trialSlot.timeSlot ? `• ${trialSlot.timeSlot}` : ''}
+          </span>
+        )}
+      </div>
+    )
+  }
+
+  if (status === 'SCHEDULED') {
+    return (
+      <div className="flex flex-col items-start gap-1.5">
+        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ring-1 bg-cyan-50 text-cyan-900 ring-cyan-200/90 shadow-2xs">
+          <Clock className="h-3 w-3 text-cyan-600" />
+          Demo Booked
+        </span>
+        <div className="text-[11px] font-bold text-slate-800 leading-tight">
+          <p>{trialSlot.date}</p>
+          <p className="text-[10px] font-medium text-slate-500">{trialSlot.timeSlot}</p>
+        </div>
+        {onEvaluate && (
+          <button
+            type="button"
+            onClick={onEvaluate}
+            className="inline-flex items-center gap-1 rounded-lg border border-brand/35 bg-brand/10 px-2.5 py-1 text-[11px] font-bold text-brand hover:bg-brand/20 transition shadow-2xs active:scale-95"
+            title="Evaluate Practical Trial Demo"
+          >
+            <Award className="h-3.5 w-3.5 text-brand" />
+            Evaluate Demo
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  if (status === 'FAILED') {
+    return (
+      <div className="flex flex-col items-start gap-1">
+        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ring-1 bg-rose-50 text-rose-900 ring-rose-200/80">
+          <X className="h-3 w-3 text-rose-600" />
+          Trial Failed
+        </span>
+        {onEvaluate && (
+          <button
+            type="button"
+            onClick={onEvaluate}
+            className="text-[11px] font-bold text-brand hover:underline"
+          >
+            Re-evaluate
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-slate-400">
+      <span>Not booked</span>
+      {onEvaluate && (
+        <button
+          type="button"
+          onClick={onEvaluate}
+          className="rounded border border-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 hover:text-slate-800 hover:border-slate-300"
+          title="Direct evaluate"
+        >
+          Evaluate
+        </button>
+      )}
+    </div>
+  )
+}
+
 function formatSkillLine(user) {
   const cats = user?.labourProfile?.categoryIds
   if (!Array.isArray(cats) || cats.length === 0) return '—'
@@ -104,6 +202,7 @@ export function AdminLabourPage() {
   const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('search')?.trim() || '')
   const [kycFilter, setKycFilter] = useState(() => readInitialKyc(searchParams))
   const [kitFilter, setKitFilter] = useState(() => readInitialKit(searchParams))
+  const [trialFilter, setTrialFilter] = useState(() => readInitialTrial(searchParams))
   const [status, setStatus] = useState(() => readInitialStatus(searchParams))
   const [locationFilter, setLocationFilter] = useState(() => searchParams.get('location') || '')
   const [debouncedLocation, setDebouncedLocation] = useState(() => searchParams.get('location') || '')
@@ -125,6 +224,14 @@ export function AdminLabourPage() {
   const [reviewNote, setReviewNote] = useState('')
   const [reviewBusy, setReviewBusy] = useState(false)
 
+  // Practical Trial Evaluation Modal State
+  const [trialModalUser, setTrialModalUser] = useState(null)
+  const [evalDecision, setEvalDecision] = useState('passed')
+  const [evalNotes, setEvalNotes] = useState('')
+  const [evalBusy, setEvalBusy] = useState(false)
+  const [evalError, setEvalError] = useState('')
+  const [actionToast, setActionToast] = useState('')
+
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 350)
     return () => window.clearTimeout(t)
@@ -137,19 +244,20 @@ export function AdminLabourPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch, debouncedLocation, kycFilter, kitFilter, status, activeTab])
+  }, [debouncedSearch, debouncedLocation, kycFilter, kitFilter, trialFilter, status, activeTab])
 
   useEffect(() => {
     const next = new URLSearchParams()
     if (debouncedSearch) next.set('search', debouncedSearch)
     if (kycFilter !== 'all') next.set('kyc', kycFilter)
     if (kitFilter !== 'all') next.set('kit', kitFilter)
+    if (trialFilter !== 'all') next.set('trial', trialFilter)
     if (status !== 'all') next.set('status', status)
     if (debouncedLocation) next.set('location', debouncedLocation)
     if (activeTab === 'contractor') next.set('tab', 'contractor')
     if (page > 1) next.set('page', String(page))
     setSearchParams(next, { replace: true })
-  }, [debouncedSearch, debouncedLocation, kycFilter, kitFilter, status, activeTab, page, setSearchParams])
+  }, [debouncedSearch, debouncedLocation, kycFilter, kitFilter, trialFilter, status, activeTab, page, setSearchParams])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -161,6 +269,7 @@ export function AdminLabourPage() {
         status,
         kycStatus: kycFilter,
         kitStatus: kitFilter,
+        trialSlotStatus: trialFilter,
         location: debouncedLocation,
         page,
         limit,
@@ -176,7 +285,52 @@ export function AdminLabourPage() {
     } finally {
       setLoading(false)
     }
-  }, [debouncedSearch, kycFilter, kitFilter, status, debouncedLocation, page, limit, activeTab])
+  }, [debouncedSearch, kycFilter, kitFilter, trialFilter, status, debouncedLocation, page, limit, activeTab])
+
+  const handleTrialEvaluateSubmit = async (e) => {
+    if (e) e.preventDefault()
+    if (!trialModalUser) return
+    setEvalBusy(true)
+    setEvalError('')
+    try {
+      await evaluateLabourTrialAdmin(trialModalUser._id, {
+        decision: evalDecision,
+        notes: evalNotes.trim(),
+      })
+      setItems((prev) =>
+        prev.map((item) => {
+          if (item._id !== trialModalUser._id) return item
+          const profileKey = item.role === USER_ROLES.CONTRACTOR ? 'contractorProfile' : 'labourProfile'
+          const currentProfile = item[profileKey] || {}
+          return {
+            ...item,
+            vendorStatus: evalDecision === 'passed' ? 'CONFIRMED' : item.vendorStatus,
+            [profileKey]: {
+              ...currentProfile,
+              trialSlot: {
+                ...(currentProfile.trialSlot || {}),
+                status: evalDecision === 'passed' ? 'COMPLETED' : 'FAILED',
+                completedAt: new Date().toISOString(),
+                evaluatedAt: new Date().toISOString(),
+                notes: evalNotes.trim() || (evalDecision === 'passed' ? 'Practical evaluation passed' : 'Evaluation not cleared'),
+              },
+            },
+          }
+        })
+      )
+      setActionToast(
+        evalDecision === 'passed'
+          ? `Practical trial passed for ${trialModalUser.fullName || 'partner'}! Joining confirmed.`
+          : `Trial marked as failed for ${trialModalUser.fullName || 'partner'}.`
+      )
+      setTimeout(() => setActionToast(''), 4500)
+      setTrialModalUser(null)
+    } catch (err) {
+      setEvalError(err instanceof ApiError ? err.message : err?.message || 'Failed to submit evaluation')
+    } finally {
+      setEvalBusy(false)
+    }
+  }
 
   useEffect(() => {
     load()
@@ -381,9 +535,29 @@ export function AdminLabourPage() {
         })}
       </div>
 
+      {actionToast && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center justify-between rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900 shadow-sm"
+        >
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+            <span>{actionToast}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActionToast('')}
+            className="text-emerald-700 hover:text-emerald-900 p-1 rounded-lg"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </motion.div>
+      )}
+
       <GlassPanel className="p-4 md:p-5">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
-          <div className="lg:col-span-2">
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+          <div className="sm:col-span-2 md:col-span-1 lg:col-span-1">
             <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Search</label>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -391,7 +565,7 @@ export function AdminLabourPage() {
                 type="search"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Name, email, or mobile…"
+                placeholder="Name, email, mobile…"
                 className="w-full appearance-none rounded-xl border border-slate-200/90 bg-white py-2.5 pl-10 pr-3 text-sm shadow-sm outline-none ring-slate-200/80 focus:ring-2 focus:ring-brand/35"
               />
             </div>
@@ -418,6 +592,27 @@ export function AdminLabourPage() {
                 <option value={KYC_STATUS.PENDING}>Pending</option>
                 <option value={KYC_STATUS.VERIFIED}>Verified</option>
                 <option value={KYC_STATUS.FAILED}>Failed</option>
+              </select>
+              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+                <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Trial Demo</label>
+            <div className="relative">
+              <select
+                value={trialFilter}
+                onChange={(e) => setTrialFilter(e.target.value)}
+                className="w-full appearance-none rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 pr-10 text-sm shadow-sm outline-none focus:ring-2 focus:ring-brand/35 font-medium"
+              >
+                <option value="all">All Demo States</option>
+                <option value="scheduled">Demo Booked (Awaiting Eval)</option>
+                <option value="completed">Trial Passed ✓</option>
+                <option value="failed">Trial Failed</option>
+                <option value="not_scheduled">Not Booked</option>
               </select>
               <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
                 <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -469,6 +664,7 @@ export function AdminLabourPage() {
         <p className="mt-4 text-xs font-medium text-slate-500">
           Showing {items.length} of {total} labour account{total === 1 ? '' : 's'}
           {debouncedSearch ? ` · matching “${debouncedSearch}”` : ''}
+          {trialFilter !== 'all' ? ` · demo filter: ${trialFilter}` : ''}
         </p>
       </GlassPanel>
 
@@ -478,12 +674,13 @@ export function AdminLabourPage() {
 
       <GlassPanel className="hidden overflow-hidden p-0 md:block">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-left text-sm">
+          <table className="w-full min-w-[1200px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200/80 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Phone</th>
                 <th className="px-4 py-3">KYC</th>
+                <th className="px-4 py-3">Trial Demo</th>
                 <th className="px-4 py-3">Welcome Kit</th>
                 {activeTab !== 'contractor' && <th className="px-4 py-3">Skill</th>}
                 <th className="px-4 py-3">Location</th>
@@ -496,7 +693,7 @@ export function AdminLabourPage() {
               {loading
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i} className="border-b border-slate-100">
-                      {Array.from({ length: activeTab === 'contractor' ? 8 : 9 }).map((__, j) => (
+                      {Array.from({ length: activeTab === 'contractor' ? 9 : 10 }).map((__, j) => (
                         <td key={j} className="px-4 py-3">
                           <div className="h-4 animate-pulse rounded bg-slate-200/80" />
                         </td>
@@ -514,6 +711,17 @@ export function AdminLabourPage() {
                       </td>
                       <td className="px-4 py-3">
                         <KycPill status={(u.contractorProfile || u.labourProfile)?.kycStatus} submittedAt={(u.contractorProfile || u.labourProfile)?.kycSubmittedAt} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <TrialSlotBadge
+                          trialSlot={(u.contractorProfile || u.labourProfile)?.trialSlot}
+                          onEvaluate={() => {
+                            setTrialModalUser(u)
+                            setEvalDecision('passed')
+                            setEvalNotes('')
+                            setEvalError('')
+                          }}
+                        />
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
@@ -595,6 +803,21 @@ export function AdminLabourPage() {
                   <span className="text-[11px] text-slate-500">Last: {formatLastLoginDisplay(u.lastLoginAt) || '—'}</span>
                 </div>
                 <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold">
+                    <Award className="h-3.5 w-3.5 text-amber-500" />
+                    <span>Demo:</span>
+                  </div>
+                  <TrialSlotBadge
+                    trialSlot={(u.contractorProfile || u.labourProfile)?.trialSlot}
+                    onEvaluate={() => {
+                      setTrialModalUser(u)
+                      setEvalDecision('passed')
+                      setEvalNotes('')
+                      setEvalError('')
+                    }}
+                  />
+                </div>
+                <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2.5">
                   <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
                     <Package className="h-3.5 w-3.5 text-slate-400" />
                     <span>Kit:</span>
@@ -786,6 +1009,168 @@ export function AdminLabourPage() {
             )
           }}
         />
+      )}
+
+      {trialModalUser && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-0 sm:p-4" role="dialog" aria-modal="true">
+          <button
+            type="button"
+            className="fixed inset-0 bg-slate-950/50 backdrop-blur-[2px]"
+            aria-label="Close"
+            disabled={evalBusy}
+            onClick={() => !evalBusy && setTrialModalUser(null)}
+          />
+          <motion.div
+            initial={reduce ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative z-10 w-full max-w-lg rounded-t-3xl sm:rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-2xl overflow-hidden max-h-[92vh] overflow-y-auto"
+          >
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3.5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 ring-1 ring-amber-200/60">
+                  <Award className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">Practical Demo Evaluation</h3>
+                  <p className="text-xs text-slate-500">In-person trade demonstration grading at Hub</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={evalBusy}
+                onClick={() => setTrialModalUser(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              {/* Candidate Info Card */}
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3.5 text-xs">
+                <div className="flex items-center justify-between font-bold text-slate-900 mb-2">
+                  <span className="text-sm font-extrabold text-slate-900">{trialModalUser.fullName || 'Partner'}</span>
+                  <span className="font-mono text-slate-600">+91 {trialModalUser.phone}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-slate-600 pt-2 border-t border-slate-200/60 text-[11px]">
+                  <div>
+                    <span className="text-slate-400 font-semibold block uppercase text-[9px]">Trade / Skill</span>
+                    <span className="font-semibold text-slate-800">{formatSkillLine(trialModalUser)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-semibold block uppercase text-[9px]">Location</span>
+                    <span className="font-semibold text-slate-800">{trialModalUser.city || trialModalUser.currentLocation || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-semibold block uppercase text-[9px]">Booked Slot Date</span>
+                    <span className="font-bold text-slate-900">
+                      {(trialModalUser.contractorProfile || trialModalUser.labourProfile)?.trialSlot?.date || 'Not booked'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-semibold block uppercase text-[9px]">Timing & Hub</span>
+                    <span className="font-bold text-slate-900">
+                      {(trialModalUser.contractorProfile || trialModalUser.labourProfile)?.trialSlot?.timeSlot || '—'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Decision Selector */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                  Evaluation Decision
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setEvalDecision('passed')}
+                    className={`flex flex-col items-start p-3 rounded-2xl border text-left transition ${
+                      evalDecision === 'passed'
+                        ? 'border-emerald-500 bg-emerald-50/80 ring-2 ring-emerald-500/30'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-900 text-xs">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      Pass Trial ✓
+                    </div>
+                    <p className="mt-1 text-[10px] text-emerald-800 leading-snug">
+                      Candidate demonstrated safe, quality workmanship. Confirms joining and unlocks Welcome Kit.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEvalDecision('failed')}
+                    className={`flex flex-col items-start p-3 rounded-2xl border text-left transition ${
+                      evalDecision === 'failed'
+                        ? 'border-rose-500 bg-rose-50/80 ring-2 ring-rose-500/30'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-rose-900 text-xs">
+                      <X className="h-4 w-4 text-rose-600" />
+                      Fail / Reject
+                    </div>
+                    <p className="mt-1 text-[10px] text-rose-800 leading-snug">
+                      Candidate did not meet trade standards. Must re-schedule practical demonstration.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Evaluator Notes */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1" htmlFor="eval-notes">
+                  Evaluator Remarks / Notes
+                </label>
+                <textarea
+                  id="eval-notes"
+                  rows={2}
+                  value={evalNotes}
+                  onChange={(e) => setEvalNotes(e.target.value)}
+                  placeholder="e.g. Demonstrated strong expertise in trade repairs, safety compliance, and passed the practical demo test."
+                  className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-brand/35 shadow-xs"
+                />
+              </div>
+
+              {evalError && (
+                <p className="rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800 font-medium">
+                  {evalError}
+                </p>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={evalBusy}
+                  onClick={() => setTrialModalUser(null)}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={evalBusy}
+                  onClick={handleTrialEvaluateSubmit}
+                  className={`flex items-center gap-1.5 rounded-xl px-5 py-2 text-xs font-bold text-white shadow-sm transition disabled:opacity-50 ${
+                    evalDecision === 'passed' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+                  }`}
+                >
+                  {evalBusy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : evalDecision === 'passed' ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <X className="h-4 w-4" />
+                  )}
+                  Confirm {evalDecision === 'passed' ? 'Passing Grade' : 'Rejection'}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   )

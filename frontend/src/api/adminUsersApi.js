@@ -17,6 +17,11 @@ export async function reviewLabourKycAdmin(userId, body) {
   return json.data?.user ?? null
 }
 
+export async function evaluateLabourTrialAdmin(userId, body) {
+  const json = await apiRequest(`/users/${userId}/trial-evaluate`, { method: 'PATCH', body })
+  return json.data ?? null
+}
+
 export function updateAdminUserStatus(userId, isActive) {
   return apiRequest(`/users/${userId}/status`, {
     method: 'PATCH',
@@ -38,6 +43,7 @@ export async function fetchAdminUsers(params = {}) {
   if (params.status && params.status !== 'all') sp.set('status', params.status)
   if (params.kycStatus && params.kycStatus !== 'all') sp.set('kycStatus', params.kycStatus)
   if (params.kitStatus && params.kitStatus !== 'all') sp.set('kitStatus', params.kitStatus)
+  if (params.trialSlotStatus && params.trialSlotStatus !== 'all') sp.set('trialSlotStatus', params.trialSlotStatus)
   if (params.freeTrialStatus && params.freeTrialStatus !== 'all') sp.set('freeTrialStatus', params.freeTrialStatus)
   if (params.categoryId && params.categoryId !== 'all') sp.set('categoryId', params.categoryId)
   if (params.location?.trim() && params.location !== 'all') sp.set('location', params.location.trim())

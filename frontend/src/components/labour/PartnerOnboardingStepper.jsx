@@ -1478,6 +1478,27 @@ export function PartnerOnboardingStepper({ onFinish }) {
                         Schedule your practical demonstration slot at an A2Z partner evaluation hub.
                       </p>
 
+                      {step4.trialSlot?.status === 'SCHEDULED' && !step4.completed && (
+                        <div className="mt-3 rounded-xl border border-cyan-200 bg-cyan-50/70 p-3 text-cyan-950">
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-1.5 text-xs font-bold text-cyan-900">
+                              <Clock className="h-4 w-4 text-cyan-600" /> Appointment Booked
+                            </span>
+                            <span className="rounded-full bg-cyan-200/80 px-2 py-0.5 text-[9px] font-extrabold uppercase text-cyan-800">
+                              Scheduled
+                            </span>
+                          </div>
+                          <div className="mt-2 text-[11px] text-cyan-900 space-y-0.5 bg-white/70 p-2 rounded-lg border border-cyan-100">
+                            <p><span className="font-semibold text-slate-600">Date:</span> {step4.trialSlot.date}</p>
+                            <p><span className="font-semibold text-slate-600">Timing:</span> {step4.trialSlot.timeSlot}</p>
+                            <p><span className="font-semibold text-slate-600">Hub:</span> {step4.trialSlot.location || step4.defaultHubLocation}</p>
+                          </div>
+                          <p className="mt-2 text-[10px] text-cyan-700 leading-snug">
+                            Please visit the evaluation hub at your scheduled timing for your practical demo. The center evaluator will grade your demo and approve your joining from the Admin panel.
+                          </p>
+                        </div>
+                      )}
+
                       <form onSubmit={handleScheduleTrial} className="mt-3 space-y-3.5">
                         {/* Slot Date */}
                         <div>
@@ -1572,15 +1593,17 @@ export function PartnerOnboardingStepper({ onFinish }) {
                               : 'Confirm Trial Slot'}
                           </button>
 
-                          {/* Fast track evaluation button for testing/demo */}
-                          {!step4.completed && (
+                          {/* Check Evaluation Status button (evaluation is performed by Admin) */}
+                          {step4.trialSlot?.status === 'SCHEDULED' && !step4.completed && (
                             <button
                               type="button"
-                              onClick={handleCompleteTrialEvaluation}
-                              disabled={submitting}
-                              className="rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2.5 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100 transition text-center"
+                              onClick={loadStatus}
+                              disabled={loading}
+                              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-cyan-200 bg-cyan-50 px-3.5 py-2.5 text-[11px] font-bold text-cyan-900 hover:bg-cyan-100 transition text-center"
+                              title="Check if Admin has completed your practical evaluation"
                             >
-                              Pass Trial ✓
+                              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                              <span>Check Evaluation Status</span>
                             </button>
                           )}
                         </div>

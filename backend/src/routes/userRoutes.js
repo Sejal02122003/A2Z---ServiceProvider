@@ -168,6 +168,18 @@ router.patch(
   user.updatePartnerWelcomeKit,
 )
 
+router.patch(
+  '/:id/trial-evaluate',
+  restrictTo(USER_ROLES.ADMIN),
+  validateUserIdParam,
+  [
+    body('decision').isIn(['passed', 'failed']).withMessage('decision must be passed or failed'),
+    body('notes').optional().trim().isLength({ max: 1000 }),
+  ],
+  validateRequest,
+  user.evaluatePartnerTrialAdmin,
+)
+
 router.get('/:id', restrictTo(USER_ROLES.ADMIN), validateUserIdParam, validateRequest, user.getUserById)
 
 router.delete('/:id', restrictTo(USER_ROLES.ADMIN), validateUserIdParam, validateRequest, user.deleteUser)

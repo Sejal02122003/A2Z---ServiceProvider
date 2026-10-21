@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, Loader2, User, Phone, Mail, Building2, MapPin, Briefcase, FileCheck, IndianRupee } from 'lucide-react'
+import { X, Loader2, User, Phone, Mail, Building2, MapPin, Briefcase, FileCheck, IndianRupee, Award } from 'lucide-react'
 import { fetchAdminUserById } from '../../../api/adminUsersApi.js'
 import { WelcomeKitCard } from '../../../components/admin/welcomeKit/WelcomeKitCard.jsx'
 
@@ -132,6 +132,40 @@ export function AdminUserViewModal({ userId, onClose }) {
                         </div>
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Practical Demonstration Trial Slot */}
+              {user.role === 'labour' && user.labourProfile?.trialSlot && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="flex items-center gap-2 font-bold text-slate-700">
+                      <Award className="size-5 text-amber-500" /> Practical Demonstration Trial
+                    </h4>
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
+                      user.labourProfile.trialSlot.status === 'COMPLETED'
+                        ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200'
+                        : user.labourProfile.trialSlot.status === 'SCHEDULED'
+                        ? 'bg-cyan-50 text-cyan-800 ring-1 ring-cyan-200'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {user.labourProfile.trialSlot.status}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Scheduled Date</p>
+                      <p className="font-semibold text-slate-800">{user.labourProfile.trialSlot.date || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Timing</p>
+                      <p className="font-semibold text-slate-800">{user.labourProfile.trialSlot.timeSlot || '—'}</p>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Hub Location</p>
+                      <p className="font-medium text-slate-700">{user.labourProfile.trialSlot.location || 'A2Z Hub'}</p>
+                    </div>
                   </div>
                 </div>
               )}
