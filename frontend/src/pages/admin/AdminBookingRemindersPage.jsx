@@ -397,7 +397,7 @@ export function AdminBookingRemindersPage() {
               >
                 <option value="ALL">All Roles</option>
                 <option value="CUSTOMER">Customer Reminders</option>
-                <option value="LABOUR">Labour / Vendor</option>
+                <option value="LABOUR">Service Provider / Vendor</option>
                 <option value="CONTRACTOR">Contractor</option>
               </select>
 
@@ -550,7 +550,7 @@ export function AdminBookingRemindersPage() {
               >
                 <option value="ALL">All Roles</option>
                 <option value="CUSTOMER">Customer</option>
-                <option value="LABOUR">Labour / Vendor</option>
+                <option value="LABOUR">Service Provider / Vendor</option>
               </select>
             </div>
           </div>
@@ -681,7 +681,7 @@ export function AdminBookingRemindersPage() {
 
               <label className="flex items-center justify-between p-4 rounded-2xl border border-gray-200 bg-gray-50/70 cursor-pointer">
                 <div>
-                  <span className="font-bold text-sm text-gray-900 block">Vendor / Labour Alerts</span>
+                  <span className="font-bold text-sm text-gray-900 block">Vendor / Service Provider Alerts</span>
                   <span className="text-xs text-gray-500">Dispatch reminders to assigned service partners</span>
                 </div>
                 <input

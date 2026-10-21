@@ -541,7 +541,7 @@ export function AdminTrialSettingsPage() {
               <div>
                 <h3 className="text-sm font-bold text-cyan-950">Evaluating Practical Trial Candidates</h3>
                 <p className="text-xs text-cyan-800">
-                  When partners select these slots, grade their demo and confirm their joining in the Labour & KYC Hub.
+                  When partners select these slots, grade their demo and confirm their joining in the Service Provider KYC Hub.
                 </p>
               </div>
             </div>

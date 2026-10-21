@@ -626,7 +626,7 @@ export function AdminSettingsPage() {
         <SettingsSection
           icon={AlertTriangle}
           title="Cancellation Penalty"
-          description="Fixed penalty charged to labourers for cancelling an accepted job"
+          description="Fixed penalty charged to service providers for cancelling an accepted job"
           accent="amber-600"
         >
           <div>

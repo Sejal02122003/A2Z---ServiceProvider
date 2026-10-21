@@ -207,7 +207,7 @@ export function AdminReportsPage() {
               <p className="text-2xl font-bold text-gray-900">{stats?.users?.customer || 0}</p>
             </div>
             <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 text-center">
-              <p className="text-sm text-gray-500 mb-1">Labour/Workers</p>
+              <p className="text-sm text-gray-500 mb-1">Service Providers</p>
               <p className="text-2xl font-bold text-gray-900">{stats?.users?.labour || 0}</p>
             </div>
             <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 text-center">
@@ -225,7 +225,7 @@ export function AdminReportsPage() {
               <span className="text-gray-500">Total Registered Accounts</span>
               <span className="font-semibold text-gray-900">{stats?.users?.total || 0}</span>
             </div>
-            {/* Visual Bar representation of Customer vs Labour */}
+            {/* Visual Bar representation of Customer vs Service Provider */}
             <div className="w-full h-2 bg-gray-200 rounded-full mt-3 overflow-hidden flex">
               <div 
                 className="h-full bg-brand-primary" 
@@ -235,7 +235,7 @@ export function AdminReportsPage() {
               <div 
                 className="h-full bg-orange-500" 
                 style={{ width: `${(stats?.users?.labour / Math.max(1, stats?.users?.total)) * 100}%` }}
-                title="Workers"
+                title="Service Providers"
               ></div>
               <div 
                 className="h-full bg-green-500 flex-1"
@@ -244,7 +244,7 @@ export function AdminReportsPage() {
             </div>
             <div className="flex justify-between text-xs text-gray-400 mt-2">
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-brand-primary"></span> Customers</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500"></span> Workers</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500"></span> Service Providers</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span> B2B</span>
             </div>
           </div>
@@ -344,7 +344,7 @@ export function AdminReportsPage() {
                     {reportType === 'users' && (
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900">{row.phone}</div>
-                        <div className="text-xs uppercase">{row.role}</div>
+                        <div className="text-xs uppercase">{row.role === 'labour' ? 'Service Provider' : row.role}</div>
                       </td>
                     )}
                     {reportType === 'bookings' && (

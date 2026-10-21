@@ -22,7 +22,7 @@ export const problemPoints = [
       'Calling multiple thekedars, waiting for callbacks, and coordinating shifts steals hours from your site.',
   },
   {
-    title: 'Unverified labour',
+    title: 'Unverified service providers',
     description:
       'No standard checks—skill claims are verbal, and replacements are hard to find on short notice.',
   },
@@ -74,7 +74,7 @@ export const comparisonRows = [
 export const howItWorksUsers = [
   {
     step: 1,
-    title: 'Select labour type',
+    title: 'Select service provider type',
     description: 'Pick mason, electrician, helper, or any trade your site needs today.',
     icon: 'layers',
   },
@@ -92,7 +92,7 @@ export const howItWorksUsers = [
   },
   {
     step: 4,
-    title: 'Labour arrives',
+    title: 'Service provider arrives',
     description: 'Track assignment status and get alerts when your crew checks in.',
     icon: 'truck',
   },
@@ -214,7 +214,7 @@ export const features = [
     icon: 'indian-rupee',
   },
   {
-    title: 'Emergency Labour',
+    title: 'Emergency Service Provider',
     description: 'Priority matching for breakdowns, shutdowns, and deadline crunches.',
     icon: 'siren',
   },
@@ -256,7 +256,7 @@ export const userTypes = [
   {
     title: 'Builders',
     description:
-      'Scale site staffing across phases with predictable labour supply, attendance visibility, and digital payment trails.',
+      'Scale site staffing across phases with predictable service provider supply, attendance visibility, and digital payment trails.',
     perks: ['Bulk shift planning', 'Supervisor-friendly handoffs', 'City-wide coverage'],
     icon: 'building-2',
   },
@@ -264,7 +264,7 @@ export const userTypes = [
     title: 'Contractors',
     description:
       'Win more projects knowing you can staff up fast with rated workers and emergency backup pools.',
-    perks: ['Priority labour pool', 'Skill-tagged search', 'Overtime tracking'],
+    perks: ['Priority service provider pool', 'Skill-tagged search', 'Overtime tracking'],
     icon: 'hard-hat',
   },
   {
@@ -275,7 +275,7 @@ export const userTypes = [
     icon: 'landmark',
   },
   {
-    title: 'Labourers',
+    title: 'Service Providers',
     description:
       'Get steady, dignified work near you—fair pay, digital records, and growth through ratings.',
     perks: ['Free registration', 'Skill badges', 'Faster payouts'],
@@ -303,7 +303,7 @@ export const testimonials = [
     name: 'Rahul Kulkarni',
     role: 'Site Engineer, Pune',
     quote:
-      'Transparent rates and Aadhaar-verified workers make it easier to clear security and client audits. The backup labour option saved us during a peak pour week.',
+      'Transparent rates and Aadhaar-verified workers make it easier to clear security and client audits. The backup service provider option saved us during a peak pour week.',
     rating: 5,
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rahul',
   },
@@ -317,7 +317,7 @@ export const testimonials = [
   },
   {
     name: 'Lakshmi Devi',
-    role: 'Labour partner, Bengaluru',
+    role: 'Service provider partner, Bengaluru',
     quote:
       'Earlier I waited near chowks hoping for work. Now I get matched jobs, clear hours, and money directly to my account.',
     rating: 5,
@@ -355,7 +355,7 @@ export const safetyPoints = [
 
 export const faqs = [
   {
-    q: 'How do I hire labour?',
+    q: 'How do I hire a service provider?',
     a: 'Choose your trade, pin your site, pick date & shift, and confirm. You’ll see starting rates before you pay. A supervisor can be added for handoffs.',
   },
   {
@@ -367,11 +367,11 @@ export const faqs = [
     a: 'UPI, popular cards, and net banking where enabled. Contractors can also request invoicing-friendly flows for larger engagements.',
   },
   {
-    q: 'Can I hire labour urgently?',
-    a: 'Use the Emergency Labour option for same-day or next-shift needs. Availability depends on your city—we surface realistic ETAs before confirmation.',
+    q: 'Can I hire a service provider urgently?',
+    a: 'Use the Emergency Service Provider option for same-day or next-shift needs. Availability depends on your city—we surface realistic ETAs before confirmation.',
   },
   {
-    q: 'How do labourers register?',
+    q: 'How do service providers register?',
     a: 'Download the app, create a profile, upload Aadhaar/KYC, and set your work radius. Once verified, you’ll start receiving nearby job alerts.',
   },
   {

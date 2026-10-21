@@ -318,7 +318,7 @@ export function AdminIdentityVerificationsPage() {
             >
               <option value="all">All Roles</option>
               <option value="customer">Customers</option>
-              <option value="labour">Labour / Workers</option>
+              <option value="labour">Service Providers</option>
               <option value="contractor">Contractors</option>
             </select>
           </div>

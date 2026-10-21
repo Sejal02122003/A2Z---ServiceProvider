@@ -13,7 +13,7 @@ export function AdminLabourDetailsModal({ data, onClose }) {
       <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-5">
           <div>
-            <h2 className="text-lg font-black text-slate-900">{labour.fullName || 'Labour Details'}</h2>
+            <h2 className="text-lg font-black text-slate-900">{labour.fullName || 'Service Provider Details'}</h2>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{assignment.status?.replace('_', ' ')}</p>
           </div>
           <button onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition">

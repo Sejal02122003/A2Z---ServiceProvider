@@ -254,7 +254,7 @@ export function LaborWallet() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <AppStackScreenHeader title="Labour Wallet" backTo="/app" />
+        <AppStackScreenHeader title="Service Provider Wallet" backTo="/app" />
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-brand" />
         </div>
@@ -265,7 +265,7 @@ export function LaborWallet() {
   if (error) {
     return (
       <div className="space-y-4">
-        <AppStackScreenHeader title="Labour Wallet" backTo="/app" />
+        <AppStackScreenHeader title="Service Provider Wallet" backTo="/app" />
         <GlassPanel className="p-6 text-center">
           <p className="text-sm font-semibold text-rose-700">{error}</p>
         </GlassPanel>
@@ -282,7 +282,7 @@ export function LaborWallet() {
 
   return (
     <div className="space-y-4 pb-8">
-      <AppStackScreenHeader title="Labour Wallet" backTo="/app" />
+      <AppStackScreenHeader title="Service Provider Wallet" backTo="/app" />
 
       {/* Main Available Balance Hero Card */}
       <motion.div

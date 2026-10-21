@@ -948,7 +948,7 @@ export function LabourHomeScreen({ user }) {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <p className="text-xs font-black tracking-tight text-white">Labour Subscription</p>
+                  <p className="text-xs font-black tracking-tight text-white">Service Provider Subscription</p>
                   <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[8px] font-extrabold uppercase tracking-wide text-blue-100">
                     Plans
                   </span>

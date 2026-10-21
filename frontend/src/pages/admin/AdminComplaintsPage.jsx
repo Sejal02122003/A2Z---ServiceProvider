@@ -18,7 +18,7 @@ const ROLE_FILTERS = ['ALL', 'customer', 'labour', 'contractor', 'contractor']
 const ROLE_LABELS = {
   ALL: 'All Roles',
   individual: 'Individuals',
-  labour: 'Labour',
+  labour: 'Service Provider',
   contractor: 'Contractor',
   contractor: 'Vendors'
 }

@@ -71,7 +71,7 @@ export function AdminUserViewModal({ userId, onClose }) {
                     <span className="flex items-center gap-1"><Phone className="size-4" /> {user.phone}</span>
                     {user.email && <span className="flex items-center gap-1"><Mail className="size-4" /> {user.email}</span>}
                     <span className="inline-flex items-center rounded-md bg-brand/10 px-2 py-0.5 text-xs font-bold text-brand uppercase tracking-wider">
-                      {user.role}
+                      {user.role === 'labour' ? 'Service Provider' : user.role}
                     </span>
                   </div>
                 </div>
@@ -102,11 +102,11 @@ export function AdminUserViewModal({ userId, onClose }) {
                 </div>
               )}
 
-              {/* Labour Profile */}
+              {/* Service Provider Profile */}
               {user.role === 'labour' && user.labourProfile && (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-4">
                   <h4 className="flex items-center gap-2 font-bold text-slate-700">
-                    <Briefcase className="size-5 text-brand" /> Labour Profile
+                    <Briefcase className="size-5 text-brand" /> Service Provider Profile
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                     <div>

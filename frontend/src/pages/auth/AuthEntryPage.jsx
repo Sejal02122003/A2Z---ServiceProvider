@@ -227,7 +227,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
           ),
         })
       } else if (e instanceof ApiError && e.code === 'WRONG_PORTAL') {
-        const targetPortal = authGroup === 'users' ? 'Labour' : 'Customer'
+        const targetPortal = authGroup === 'users' ? 'Service Provider' : 'Customer'
         const targetPath = authGroup === 'users' ? '/labours/auth' : '/users/auth'
         setBanner({
           variant: 'error',

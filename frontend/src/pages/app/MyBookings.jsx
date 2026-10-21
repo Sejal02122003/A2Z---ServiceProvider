@@ -81,7 +81,7 @@ export function MyBookings() {
           </button>
           <div className="flex flex-col justify-center">
             <h1 className="text-[20px] font-bold tracking-tight text-slate-900 leading-none mb-1.5">My bookings</h1>
-            <p className="text-[13px] font-medium text-slate-500 leading-none">Hire labour for your home or small site</p>
+            <p className="text-[13px] font-medium text-slate-500 leading-none">Hire service providers for your home or small site</p>
           </div>
         </div>
       </div>

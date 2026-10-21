@@ -23,7 +23,7 @@ import { CancelBookingModal } from '../../components/app/booking/CancelBookingMo
 const BOOKING_STEPS = [
   { id: 'CREATED', label: 'Booking Created' },
   { id: 'BROADCASTING', label: 'Searching for Workers' },
-  { id: 'ACCEPTED', label: 'Labour Accepted' },
+  { id: 'ACCEPTED', label: 'Service Provider Accepted' },
   { id: 'EN_ROUTE', label: 'On the Way' },
   { id: 'STARTED', label: 'Work Started' },
   { id: 'COMPLETED', label: 'Completed' },
@@ -319,7 +319,7 @@ export function JobTracking() {
       {labor && (
         <GlassPanel className="overflow-hidden p-0">
           <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Assigned Labour</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Assigned Service Provider</p>
           </div>
           <div className="flex items-center gap-4 p-4">
             {labor.profileImageUrl || labor.profilePic ? (
@@ -330,7 +330,7 @@ export function JobTracking() {
               </span>
             )}
             <div className="min-w-0 flex-1">
-              <p className="text-base font-extrabold text-slate-900">{labor.fullName || 'Labour'}</p>
+              <p className="text-base font-extrabold text-slate-900">{labor.fullName || 'Service Provider'}</p>
               {labor.phone && (
                 <a href={`tel:${labor.phone}`} className="mt-1 flex items-center gap-1 text-sm font-semibold text-brand">
                   <Phone className="h-3.5 w-3.5" aria-hidden />
@@ -399,7 +399,7 @@ export function JobTracking() {
             <div className="grid grid-cols-2 gap-3">
               {booking.assignments.map(a => (
                 <div key={a.labourId?._id || Math.random()} className="bg-white p-3 rounded-xl border border-brand/10 text-center shadow-sm">
-                  <p className="text-[10px] font-bold text-slate-500 mb-1 truncate">{a.labourId?.fullName || 'Labour'}</p>
+                  <p className="text-[10px] font-bold text-slate-500 mb-1 truncate">{a.labourId?.fullName || 'Service Provider'}</p>
                   <p className="text-xl font-black tracking-widest text-slate-900">{a.startOtp}</p>
                 </div>
               ))}
@@ -420,7 +420,7 @@ export function JobTracking() {
             <div className="grid grid-cols-2 gap-3">
               {booking.assignments.map(a => (
                 <div key={a.labourId?._id || Math.random()} className="bg-white p-3 rounded-xl border border-blue-600/10 text-center shadow-sm">
-                  <p className="text-[10px] font-bold text-slate-500 mb-1 truncate">{a.labourId?.fullName || 'Labour'}</p>
+                  <p className="text-[10px] font-bold text-slate-500 mb-1 truncate">{a.labourId?.fullName || 'Service Provider'}</p>
                   <p className="text-xl font-black tracking-widest text-slate-900">{a.completionOtp}</p>
                 </div>
               ))}

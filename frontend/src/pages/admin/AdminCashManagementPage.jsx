@@ -111,9 +111,9 @@ export function AdminCashManagementPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1">
             <GlassPanel className="p-6">
-              <h2 className="text-lg font-bold text-slate-800 mb-4">Labour Cash Limit</h2>
+              <h2 className="text-lg font-bold text-slate-800 mb-4">Service Provider Cash Limit</h2>
               <p className="text-sm text-slate-600 mb-6">
-                When a Labour collects cash, admin commission is added to their dues. 
+                When a Service Provider collects cash, admin commission is added to their dues. 
                 If total dues exceed this limit, they cannot accept new bookings.
               </p>
 
@@ -184,7 +184,7 @@ export function AdminCashManagementPage() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="Search Labour or ID..."
+                      placeholder="Search Service Provider or ID..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-9 pr-4 py-2 w-full bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand"
@@ -226,10 +226,10 @@ export function AdminCashManagementPage() {
                     <thead>
                       <tr className="border-b border-slate-200 text-sm text-slate-500">
                         <th className="pb-3 font-semibold px-4">Booking Info</th>
-                        <th className="pb-3 font-semibold px-4">Labour</th>
+                        <th className="pb-3 font-semibold px-4">Service Provider</th>
                         <th className="pb-3 font-semibold px-4">Service</th>
                         <th className="pb-3 font-semibold px-4 text-right">Total Cash</th>
-                        <th className="pb-3 font-semibold px-4 text-right" title="Amount added to Labour's wallet liability">Admin Dues</th>
+                        <th className="pb-3 font-semibold px-4 text-right" title="Amount added to Service Provider's wallet liability">Admin Dues</th>
                         <th className="pb-3 font-semibold px-4 text-center">Settlement Status</th>
                       </tr>
                     </thead>

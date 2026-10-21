@@ -93,7 +93,7 @@ export function AdminFreeTrialPage() {
           </span>
           <div>
             <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Free Trials</h1>
-            <p className="text-sm text-slate-500">Monitor labourer free trial statuses</p>
+            <p className="text-sm text-slate-500">Monitor service provider free trial statuses</p>
           </div>
         </div>
         <button
@@ -136,7 +136,7 @@ export function AdminFreeTrialPage() {
           </div>
         </div>
         <p className="mt-4 text-xs font-medium text-slate-500">
-          Showing {items.length} of {total} labourer{total === 1 ? '' : 's'}
+          Showing {items.length} of {total} service provider{total === 1 ? '' : 's'}
           {debouncedSearch ? ` · matching “${debouncedSearch}”` : ''}
         </p>
       </GlassPanel>

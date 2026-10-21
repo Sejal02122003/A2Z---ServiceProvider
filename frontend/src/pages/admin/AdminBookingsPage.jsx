@@ -269,7 +269,7 @@ function ContractorRequestsTab() {
                                     >
                                       <p className="text-sm font-extrabold text-slate-900">{c.fullName || 'Worker'}</p>
                                       <p className="text-[11px] font-medium text-slate-500 mt-1">{c.phone || 'No phone number'}</p>
-                                      <p className="text-xs font-bold text-brand mt-1 bg-brand/5 inline-block px-2 py-0.5 rounded-md">{c.services?.[0]?.name || c.serviceName || c.category || 'Specialist Labour'}</p>
+                                      <p className="text-xs font-bold text-brand mt-1 bg-brand/5 inline-block px-2 py-0.5 rounded-md">{c.services?.[0]?.name || c.serviceName || c.category || 'Specialist Service Provider'}</p>
                                       <div className="mt-3 flex justify-between items-center border-t border-slate-50 pt-3">
                                         <div className="flex flex-col gap-1 text-[11px]">
                                           <span className="font-semibold text-slate-600">Vendor Price: <span className="font-bold text-slate-800">₹{vendorFee.toLocaleString('en-IN')}</span></span>
@@ -436,7 +436,7 @@ function ContractorRequestsTab() {
                                 >
                                   <p className="text-sm font-extrabold text-slate-900">{c.fullName || 'Worker'}</p>
                                   <p className="text-[11px] font-medium text-slate-500 mt-1">{c.phone || 'No phone number'}</p>
-                                  <p className="text-xs font-bold text-brand mt-1 bg-brand/5 inline-block px-2 py-0.5 rounded-md">{c.services?.[0]?.name || c.serviceName || c.category || 'Specialist Labour'}</p>
+                                  <p className="text-xs font-bold text-brand mt-1 bg-brand/5 inline-block px-2 py-0.5 rounded-md">{c.services?.[0]?.name || c.serviceName || c.category || 'Specialist Service Provider'}</p>
                                   <div className="mt-3 flex justify-between items-center border-t border-slate-200/60 pt-3">
                                     <div className="flex flex-col gap-1 text-[11px]">
                                       <span className="font-semibold text-slate-600">Vendor Price: <span className="font-bold text-slate-800">₹{vendorFee.toLocaleString('en-IN')}</span></span>
@@ -573,7 +573,7 @@ function BookingDetailsModal({ booking, onClose }) {
 
           {booking.assignments && booking.assignments.length > 0 ? (
             <div className="border-t border-slate-100 pt-4">
-              <p className="text-slate-500 text-xs mb-2">Assigned Labour Crew</p>
+              <p className="text-slate-500 text-xs mb-2">Assigned Service Provider Crew</p>
               <div className="grid grid-cols-1 gap-4">
                 {(() => {
                   return booking.assignments.map((a, idx) => {
@@ -625,7 +625,7 @@ function BookingDetailsModal({ booking, onClose }) {
                             <p className="text-xs font-semibold text-brand mt-1 uppercase">{a.status}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-xs text-slate-500">Labour Share</p>
+                            <p className="text-xs text-slate-500">Service Provider Share</p>
                             <p className="font-bold text-sm text-brand">₹{share.toFixed(2)}</p>
                           </div>
                         </div>
@@ -667,7 +667,7 @@ function BookingDetailsModal({ booking, onClose }) {
             </div>
           ) : booking.laborId && (
             <div className="border-t border-slate-100 pt-4">
-              <p className="text-slate-500 text-xs mb-1">Assigned Labour</p>
+              <p className="text-slate-500 text-xs mb-1">Assigned Service Provider</p>
               <p className="font-semibold">{booking.laborId?.fullName}</p>
               <p className="text-slate-600">{booking.laborId?.phone}</p>
               {booking.laborId?.savedAddress?.text && (
@@ -718,7 +718,7 @@ function BookingDetailsModal({ booking, onClose }) {
             <p className="font-extrabold text-sm mb-2">Financial Breakdown</p>
             {completedBill.isContractorBooking && completedBill.deductedBasePrice > 0 ? (
               <div className="mb-2 rounded-md bg-amber-50 border border-amber-200 p-2 text-xs text-amber-800">
-                <span className="font-bold">Adjusted for Completed Work:</span> {completedBill.totalCompletedLabours} of {completedBill.totalRequestedLabours} labours completed. Unfulfilled service amount (-₹{completedBill.deductedBasePrice}) deducted.
+                <span className="font-bold">Adjusted for Completed Work:</span> {completedBill.totalCompletedLabours} of {completedBill.totalRequestedLabours} service providers completed. Unfulfilled service amount (-₹{completedBill.deductedBasePrice}) deducted.
               </div>
             ) : null}
             <div className="flex justify-between text-xs text-slate-600 py-1">
@@ -755,7 +755,7 @@ function BookingDetailsModal({ booking, onClose }) {
               </span>
             </div>
             <div className="flex justify-between text-xs text-slate-600 py-1">
-              <span>Labour Share:</span>
+              <span>Service Provider Share:</span>
               <span className="font-semibold text-green-600">
                 ₹{completedBill.isContractorBooking ? Math.round(completedBill.completedBasePrice * 0.90) : booking.laborShare}
               </span>

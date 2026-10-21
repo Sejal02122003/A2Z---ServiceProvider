@@ -146,7 +146,7 @@ export function AdminReviewsRatingsPage() {
                       <div className="flex items-start gap-2">
                         <User className="h-4 w-4 text-brand mt-0.5 shrink-0" />
                         <div className="min-w-0">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-brand/60">Reviewed (Labour/Vendor)</p>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-brand/60">Reviewed (Service Provider/Vendor)</p>
                           <p className="text-sm font-semibold text-slate-900 truncate">
                             {review.revieweeId?.fullName || review.revieweeId?.name || 'Unknown Worker'}
                           </p>

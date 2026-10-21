@@ -871,7 +871,7 @@ export function IndividualBookingFlowPage() {
   if (step === 'searching' && !noMatch) {
     return (
       <div className="pb-8">
-        <AppStackScreenHeader title="Matching labour" onBack={() => goStep('summary')} />
+        <AppStackScreenHeader title="Matching service provider" onBack={() => goStep('summary')} />
         <BookingServiceHighlight categoryName={draft.categoryName} serviceName={realUser?.role === 'contractor' && contractorServiceNames ? contractorServiceNames : draft.serviceName} />
 
         <div className="px-4 mt-6">
@@ -936,7 +936,7 @@ export function IndividualBookingFlowPage() {
         <AppStackScreenHeader title="No match" onBack={() => { window.scrollTo(0, 0); navigate('/app') }} />
         <GlassPanel className="p-6 text-center">
           <AlertCircle className="mx-auto h-10 w-10 text-amber-500" aria-hidden />
-          <p className="mt-3 text-sm font-bold text-slate-900">Labourers are currently not available</p>
+          <p className="mt-3 text-sm font-bold text-slate-900">Service providers are currently not available</p>
           <p className="mt-2 text-xs text-slate-600">Please try searching again in a few minutes.</p>
           <motion.div className="mt-5 flex flex-col gap-2">
             <BookingPrimaryButton type="button" onClick={() => { setNoMatch(false); confirmBooking() }}>
@@ -1082,7 +1082,7 @@ export function IndividualBookingFlowPage() {
         {step !== 'billing' && booking && booking.status !== 'CANCELLED' && booking.quantity > 1 ? (
           <div className="space-y-4">
             <div className="lc-booking-flow-card">
-              <p className="lc-booking-flow-label font-bold">Assigned Labourers ({booking.assignments?.length || 0} / {booking.quantity})</p>
+              <p className="lc-booking-flow-label font-bold">Assigned Service Providers ({booking.assignments?.length || 0} / {booking.quantity})</p>
             </div>
             {booking.assignments?.map((assignment, idx) => {
               const worker = assignment.labourId;
@@ -1276,7 +1276,7 @@ export function IndividualBookingFlowPage() {
                     <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                       <span className="font-extrabold text-slate-900 text-sm">Contractor Services Breakdown</span>
                       <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-                        {completedBill.totalCompletedLabours} / {completedBill.totalRequestedLabours} Labours Completed
+                        {completedBill.totalCompletedLabours} / {completedBill.totalRequestedLabours} Service Providers Completed
                       </span>
                     </div>
 
@@ -1300,7 +1300,7 @@ export function IndividualBookingFlowPage() {
                           </div>
 
                           <div className="mt-2 flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs">
-                            <span className="text-slate-600 font-medium">Labour Attendance:</span>
+                            <span className="text-slate-600 font-medium">Service Provider Attendance:</span>
                             {item.isFullyCompleted ? (
                               <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
                                 <Check className="h-3 w-3" /> {item.completedQty} / {item.requestedQty} Completed
@@ -1835,7 +1835,7 @@ export function IndividualBookingFlowPage() {
                               newList[idx] = { ...newList[idx], quantity: parseInt(e.target.value, 10) || 1 }
                               syncDraft({ contractorServices: newList })
                             }}
-                            placeholder="No. of Labour"
+                            placeholder="No. of Service Providers"
                             className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm font-semibold text-black outline-none focus:border-brand focus:ring-1 h-[46px]"
                           />
                         </div>

@@ -311,7 +311,7 @@ export function AdminLabourWalletPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-            Labour Wallet & Recovery Management
+            Service Provider Wallet & Recovery Management
           </h1>
           <p className="text-sm text-slate-500">
             Manage minimum balance settings, track platform charges recovery (Commission, Platform Fee, GST), process settlements and audit ledger.
@@ -352,14 +352,14 @@ export function AdminLabourWalletPage() {
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Labour Wallet Balances</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Service Provider Wallet Balances</p>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-3xl font-black text-slate-900">
               ₹{(stats?.totalLabourBalance || 0).toLocaleString('en-IN')}
             </span>
           </div>
           <p className="mt-1 text-[11px] text-slate-500">
-            Across {stats?.totalLabourAccounts || 0} active workers
+            Across {stats?.totalLabourAccounts || 0} active service providers
           </p>
         </div>
       </div>
@@ -399,7 +399,7 @@ export function AdminLabourWalletPage() {
           }`}
         >
           <UserCircle className="h-4 w-4" />
-          Labour Accounts & Balances
+          Service Provider Accounts & Balances
         </button>
 
         <button
@@ -443,7 +443,7 @@ export function AdminLabourWalletPage() {
                 <table className="w-full text-left text-sm text-slate-600">
                   <thead className="border-b border-slate-100 text-xs uppercase text-slate-400">
                     <tr>
-                      <th className="px-6 py-3 font-semibold">Labourer</th>
+                      <th className="px-6 py-3 font-semibold">Service Provider</th>
                       <th className="px-6 py-3 font-semibold">Amount</th>
                       <th className="px-6 py-3 font-semibold">Requested</th>
                       <th className="px-6 py-3 font-semibold text-right">Actions</th>
@@ -510,7 +510,7 @@ export function AdminLabourWalletPage() {
                 <thead className="border-b border-slate-100 text-xs uppercase text-slate-400">
                   <tr>
                     <th className="px-6 py-3 font-semibold">Request ID & Date</th>
-                    <th className="px-6 py-3 font-semibold">Labourer</th>
+                    <th className="px-6 py-3 font-semibold">Service Provider</th>
                     <th className="px-6 py-3 font-semibold">Amount</th>
                     <th className="px-6 py-3 font-semibold">Status</th>
                     <th className="px-6 py-3 font-semibold text-right">Actions</th>
@@ -643,7 +643,7 @@ export function AdminLabourWalletPage() {
                 <thead className="border-b border-slate-100 uppercase text-slate-400 bg-slate-50/50">
                   <tr>
                     <th className="px-4 py-3 font-semibold">Tx ID & Date</th>
-                    <th className="px-4 py-3 font-semibold">Labour User</th>
+                    <th className="px-4 py-3 font-semibold">Service Provider</th>
                     <th className="px-4 py-3 font-semibold">Context / Type</th>
                     <th className="px-4 py-3 font-semibold">Amount</th>
                     <th className="px-4 py-3 font-semibold">Breakdown (Comm / Fee / GST)</th>
@@ -753,7 +753,7 @@ export function AdminLabourWalletPage() {
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden p-6 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h3 className="font-bold text-slate-900">Labour Wallets Directory</h3>
+              <h3 className="font-bold text-slate-900">Service Provider Wallets Directory</h3>
               <p className="text-xs text-slate-500">
                 View individual worker balances, held charges, outstanding dues, and perform audited manual adjustments.
               </p>
@@ -764,7 +764,7 @@ export function AdminLabourWalletPage() {
                 <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search labourer..."
+                  placeholder="Search service provider..."
                   value={labourSearch}
                   onChange={(e) => setLabourSearch(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && fetchLabourUsers()}
@@ -786,12 +786,12 @@ export function AdminLabourWalletPage() {
                 Loading accounts...
               </div>
             ) : labourUsers.length === 0 ? (
-              <div className="p-8 text-center text-sm text-slate-500">No labour accounts found.</div>
+              <div className="p-8 text-center text-sm text-slate-500">No service provider accounts found.</div>
             ) : (
               <table className="w-full text-left text-xs text-slate-600">
                 <thead className="border-b border-slate-100 uppercase text-slate-400 bg-slate-50/50">
                   <tr>
-                    <th className="px-4 py-3 font-semibold">Labour Name</th>
+                    <th className="px-4 py-3 font-semibold">Service Provider Name</th>
                     <th className="px-4 py-3 font-semibold">Phone / Email</th>
                     <th className="px-4 py-3 font-semibold">Current Balance</th>
                     <th className="px-4 py-3 font-semibold">Total Credits</th>
@@ -842,7 +842,7 @@ export function AdminLabourWalletPage() {
       {activeTab === 'settings' && (
         <div className="max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
           <div className="border-b border-slate-100 pb-4">
-            <h3 className="text-lg font-bold text-slate-900">Labour Wallet Configuration</h3>
+            <h3 className="text-lg font-bold text-slate-900">Service Provider Wallet Configuration</h3>
             <p className="text-xs text-slate-500">
               Configure minimum required wallet balance and global wallet controls.
             </p>
@@ -864,7 +864,7 @@ export function AdminLabourWalletPage() {
             {/* Feature Toggle */}
             <div className="flex items-center justify-between rounded-xl border border-slate-200 p-4 bg-slate-50/50">
               <div>
-                <p className="text-sm font-bold text-slate-900">Enable Labour Wallet System</p>
+                <p className="text-sm font-bold text-slate-900">Enable Service Provider Wallet System</p>
                 <p className="text-xs text-slate-500">Enforce wallet balance and booking acceptance limits</p>
               </div>
               <input
@@ -878,10 +878,10 @@ export function AdminLabourWalletPage() {
             {/* Minimum Balance Input */}
             <div>
               <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                Minimum Required Labour Wallet Balance (₹)
+                Minimum Required Service Provider Wallet Balance (₹)
               </label>
               <p className="text-xs text-slate-400 mb-2">
-                Minimum balance a labourer must maintain in their wallet. Workers with balance below this cannot accept jobs.
+                Minimum balance a service provider must maintain in their wallet. Providers with balance below this cannot accept jobs.
               </p>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400">₹</span>
@@ -916,7 +916,7 @@ export function AdminLabourWalletPage() {
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="font-bold text-slate-900">Adjust Labour Balance</h3>
+                <h3 className="font-bold text-slate-900">Adjust Service Provider Balance</h3>
                 <p className="text-xs text-slate-500">{adjustModalUser.fullName} ({adjustModalUser.phone})</p>
               </div>
               <button

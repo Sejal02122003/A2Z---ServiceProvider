@@ -19,7 +19,7 @@ export function ProblemSection() {
         <SectionHeading
           titleId="problem-heading"
           eyebrow="The old way is broken"
-          title="Traditional labour hiring wasn’t built for modern sites"
+          title="Traditional service provider hiring wasn’t built for modern sites"
           subtitle="Chowks and informal networks still power much of India’s construction economy—but they break down when timelines, compliance, and cash flows matter."
           align="center"
         />

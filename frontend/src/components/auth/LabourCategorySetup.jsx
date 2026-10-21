@@ -418,7 +418,7 @@ export function LabourCategorySetup({ variant = 'app', onComplete }) {
 
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand">
-              {variant === 'auth' ? 'Worker setup' : 'Work Categories & Services'}
+              {variant === 'auth' ? 'Service Provider setup' : 'Work Categories & Services'}
             </p>
             <h2 className="text-lg font-black tracking-tight text-slate-900">
               {step === 'areas' ? 'Select Categories & Services' : activeGroup?.name}

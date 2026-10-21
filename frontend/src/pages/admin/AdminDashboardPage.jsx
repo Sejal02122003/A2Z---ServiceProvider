@@ -49,7 +49,7 @@ export function AdminDashboardPage() {
       tone: 'from-brand/20 to-blue-50' 
     },
     { 
-      label: 'Workers on roster', 
+      label: 'Service Providers on roster', 
       value: stats?.users?.labourers ?? '—', 
       hint: 'Registered workforce', 
       icon: Users, 

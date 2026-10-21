@@ -414,7 +414,7 @@ export function AdminLabourPage() {
     },
     {
       key: 'total',
-      label: activeTab === 'contractor' ? 'Contractor accounts' : 'Labour accounts',
+      label: activeTab === 'contractor' ? 'Contractor accounts' : 'Service Provider accounts',
       value: kycStats?.total ?? '—',
       hint: 'Search + account status',
       icon: Users,
@@ -470,7 +470,7 @@ export function AdminLabourPage() {
               : 'border-b-2 border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          Labour
+          Service Provider
         </button>
         <button
           onClick={() => setActiveTab('contractor')}
@@ -662,7 +662,7 @@ export function AdminLabourPage() {
           </div>
         </div>
         <p className="mt-4 text-xs font-medium text-slate-500">
-          Showing {items.length} of {total} labour account{total === 1 ? '' : 's'}
+          Showing {items.length} of {total} service provider account{total === 1 ? '' : 's'}
           {debouncedSearch ? ` · matching “${debouncedSearch}”` : ''}
           {trialFilter !== 'all' ? ` · demo filter: ${trialFilter}` : ''}
         </p>
@@ -774,7 +774,7 @@ export function AdminLabourPage() {
         {!loading && items.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
             <Users className="h-10 w-10 text-slate-300" aria-hidden />
-            <p className="font-semibold text-slate-700">No labour accounts match</p>
+            <p className="font-semibold text-slate-700">No service provider accounts match</p>
             <p className="max-w-sm text-xs text-slate-500">Try clearing search or widening KYC / kit / account filters.</p>
           </div>
         ) : null}
@@ -854,7 +854,7 @@ export function AdminLabourPage() {
         {!loading && items.length === 0 ? (
           <GlassPanel className="p-8 text-center">
             <Users className="mx-auto h-10 w-10 text-slate-300" />
-            <p className="mt-2 font-semibold text-slate-700">No labour accounts match</p>
+            <p className="mt-2 font-semibold text-slate-700">No service provider accounts match</p>
           </GlassPanel>
         ) : null}
       </div>

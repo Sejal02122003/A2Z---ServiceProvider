@@ -680,7 +680,7 @@ export function AdminLabourSubscriptionsPage() {
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
               <BadgeIndianRupee className="h-5 w-5" />
             </div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-900">Labour Subscriptions</h1>
+            <h1 className="text-2xl font-black tracking-tight text-slate-900">Service Provider Subscriptions</h1>
           </div>
           <p className="mt-1 text-xs sm:text-sm text-slate-500 font-medium">
             Daily subscription operations, fee management & refund processing

@@ -150,7 +150,7 @@ export function AdminLoginPage() {
           </Link>
           <span>•</span>
           <Link to="/labours/auth" className="transition hover:text-cyan-400">
-            Technician Login
+            Service Provider Login
           </Link>
           <span>•</span>
           <Link to="/" className="transition hover:text-cyan-400">

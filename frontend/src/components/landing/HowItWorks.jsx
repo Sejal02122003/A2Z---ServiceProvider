@@ -8,7 +8,7 @@ import { SectionHeading } from '../ui/SectionHeading'
 
 const tabs = [
   { id: 'users', label: 'For hirers', data: howItWorksUsers },
-  { id: 'labour', label: 'For labour partners', data: howItWorksLabourers },
+  { id: 'labour', label: 'For service providers', data: howItWorksLabourers },
 ]
 
 export function HowItWorks() {

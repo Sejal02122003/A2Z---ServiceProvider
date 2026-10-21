@@ -165,7 +165,7 @@ export function AdminBillingPage() {
                 <tr className="border-b border-gray-100 bg-gray-50/70">
                   <th className="text-left px-4 py-3.5 font-semibold text-gray-600">ID & Date</th>
                   <th className="text-left px-4 py-3.5 font-semibold text-gray-600">Client</th>
-                  <th className="text-left px-4 py-3.5 font-semibold text-gray-600">Labour(s)</th>
+                  <th className="text-left px-4 py-3.5 font-semibold text-gray-600">Service Provider(s)</th>
                   <th className="text-left px-4 py-3.5 font-semibold text-gray-600">Service Info</th>
                   <th className="text-right px-4 py-3.5 font-semibold text-gray-600">Amount Info</th>
                   <th className="text-left px-4 py-3.5 font-semibold text-gray-600">Status</th>

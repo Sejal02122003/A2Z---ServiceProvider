@@ -122,11 +122,11 @@ export function AdminCommissionFeePage() {
         if (b.assignments && b.assignments.length > 0) {
           const splitFee = fee / b.assignments.length
           b.assignments.forEach(a => {
-            const labourName = a.labourId?.fullName || a.labourId?.name || 'Unknown Labourer'
+            const labourName = a.labourId?.fullName || a.labourId?.name || 'Unknown Service Provider'
             labourMap.set(labourName, (labourMap.get(labourName) || 0) + splitFee)
           })
         } else {
-          const labourName = b.laborId?.fullName || 'Unknown Labourer'
+          const labourName = b.laborId?.fullName || 'Unknown Service Provider'
           labourMap.set(labourName, (labourMap.get(labourName) || 0) + fee)
         }
 
@@ -160,7 +160,7 @@ export function AdminCommissionFeePage() {
   const handleExportCSV = () => {
     if (filteredBookings.length === 0) return
     
-    const headers = ['Booking ID', 'Date', 'Customer Name', 'Labour Name', 'Service', 'Total Amount', 'Platform Fee', 'Commission', 'Labour Share']
+    const headers = ['Booking ID', 'Date', 'Customer Name', 'Service Provider Name', 'Service', 'Total Amount', 'Platform Fee', 'Commission', 'Service Provider Share']
     const rows = filteredBookings.map(b => [
       b._id,
       new Date(b.createdAt).toLocaleDateString(),
@@ -270,7 +270,7 @@ export function AdminCommissionFeePage() {
         <div className="rounded-2xl border border-amber-200 bg-amber-50/30 p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <Trophy className="h-5 w-5 text-amber-500" />
-            <h3 className="font-bold text-slate-900">Top Earner (Labourer)</h3>
+            <h3 className="font-bold text-slate-900">Top Earner (Service Provider)</h3>
           </div>
           {loading ? (
             <div className="animate-pulse text-sm text-slate-400">Loading leaderboard...</div>
@@ -340,7 +340,7 @@ export function AdminCommissionFeePage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input 
             type="text" 
-            placeholder="Search ID, customer, labour, service..." 
+            placeholder="Search ID, customer, service provider, service..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-9 pr-4 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-200"
@@ -363,7 +363,7 @@ export function AdminCommissionFeePage() {
                 <tr>
                   <th className="px-6 py-3 font-semibold">Booking ID & Date</th>
                   <th className="px-6 py-3 font-semibold">Customer</th>
-                  <th className="px-6 py-3 font-semibold">Labour</th>
+                  <th className="px-6 py-3 font-semibold">Service Provider</th>
                   <th className="px-6 py-3 font-semibold">Service</th>
                   <th className="px-6 py-3 font-semibold text-right">Commission</th>
                 </tr>
@@ -477,7 +477,7 @@ export function AdminCommissionFeePage() {
                 </div>
                 <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
                   <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-                    <Wrench className="h-3.5 w-3.5" /> Labour
+                    <Wrench className="h-3.5 w-3.5" /> Service Provider
                   </p>
                   {selectedBooking.assignments && selectedBooking.assignments.length > 0 ? (
                     <div className="flex flex-col gap-2">
@@ -529,7 +529,7 @@ export function AdminCommissionFeePage() {
                       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
                         <Wallet className="h-4 w-4" />
                       </div>
-                      <span className="font-semibold text-slate-700">Labour Share</span>
+                      <span className="font-semibold text-slate-700">Service Provider Share</span>
                     </div>
                     <span className="font-bold text-amber-600">₹{(selectedBooking.laborShare || 0).toLocaleString('en-IN')}</span>
                   </div>

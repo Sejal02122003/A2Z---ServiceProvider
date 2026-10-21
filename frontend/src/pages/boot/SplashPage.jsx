@@ -79,7 +79,7 @@ export function SplashPage() {
         <SplashAnimatedBrand className="mt-3 w-full px-1" onReady={() => setBrandReady(true)} />
 
         <p className="mt-5 max-w-[18rem] text-center text-sm font-medium leading-relaxed text-white/85">
-          Verified labour, attendance, and payouts — built for Indian construction sites.
+          Verified service providers, bookings, and fast payouts.
         </p>
 
         <button

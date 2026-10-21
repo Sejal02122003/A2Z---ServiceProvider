@@ -12,12 +12,12 @@ const ROLES = [
   {
     role: USER_ROLES.CUSTOMER,
     label: 'User',
-    hint: 'Hire labour',
+    hint: 'Hire service provider',
     icon: Home,
   },
   {
     role: USER_ROLES.LABOUR,
-    label: 'Labour',
+    label: 'Service Provider',
     hint: 'Find work',
     icon: HardHat,
   },
