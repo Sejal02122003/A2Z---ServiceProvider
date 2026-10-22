@@ -88,20 +88,40 @@ export function AdminPackagesPage() {
   useEffect(() => {
     fetchAdminLabourCategoryTree()
       .then((res) => {
-        const groups = res.data?.tree || []
+        const catList = res.data?.categories || res.data?.tree || (Array.isArray(res.data) ? res.data : [])
         const cats = []
         const services = []
-        groups.forEach((g) => {
-          ;(g.categories || []).forEach((c) => {
-            cats.push(c)
+        if (catList.length > 0 && catList[0]?.categories) {
+          catList.forEach((g) => {
+            ;(g.categories || []).forEach((c) => {
+              cats.push({ ...c, _id: String(c._id) })
+              ;(c.subcategories || []).forEach((sc) => {
+                ;(sc.services || []).forEach((srv) => {
+                  services.push({
+                    _id: String(srv._id),
+                    name: srv.name,
+                    categoryId: String(c._id),
+                    categoryName: c.name,
+                    subcategoryId: String(sc._id),
+                    subcategoryName: sc.name,
+                    basePrice: srv.basePrice || srv.hourlyPrice || 0,
+                    isActive: srv.isActive,
+                  })
+                })
+              })
+            })
+          })
+        } else {
+          catList.forEach((c) => {
+            cats.push({ ...c, _id: String(c._id) })
             ;(c.subcategories || []).forEach((sc) => {
               ;(sc.services || []).forEach((srv) => {
                 services.push({
-                  _id: srv._id,
+                  _id: String(srv._id),
                   name: srv.name,
-                  categoryId: c._id,
+                  categoryId: String(c._id),
                   categoryName: c.name,
-                  subcategoryId: sc._id,
+                  subcategoryId: String(sc._id),
                   subcategoryName: sc.name,
                   basePrice: srv.basePrice || srv.hourlyPrice || 0,
                   isActive: srv.isActive,
@@ -109,14 +129,14 @@ export function AdminPackagesPage() {
               })
             })
           })
-        })
+        }
         setCategoryTree(cats)
         setAllServices(services)
       })
       .catch((err) => console.error('Failed to load category tree:', err))
 
     adminZonesApi
-      .getZones()
+      .getActiveZones()
       .then((res) => {
         setActiveZones(res.data?.zones || [])
       })
@@ -150,6 +170,11 @@ export function AdminPackagesPage() {
   // Open Create Modal
   const openCreateModal = () => {
     setEditingPackageId(null)
+    const firstCat = categoryTree[0]
+    const initialServices = allServices.filter(
+      (s) => !firstCat || String(s.categoryId) === String(firstCat._id)
+    )
+    const firstSrv = initialServices[0] || allServices[0]
     setFormData({
       name: '',
       slug: '',
@@ -157,7 +182,7 @@ export function AdminPackagesPage() {
       shortDescription: '',
       imageUrl: '',
       images: [],
-      categoryId: categoryTree[0]?._id || '',
+      categoryId: firstCat ? String(firstCat._id) : '',
       subcategoryId: '',
       price: '',
       originalPrice: '',
@@ -168,14 +193,16 @@ export function AdminPackagesPage() {
       zones: [],
       validFrom: '',
       validUntil: '',
-      inclusions: [
-        {
-          serviceId: allServices[0]?._id || '',
-          name: allServices[0]?.name || '',
-          quantity: 1,
-          description: '',
-        },
-      ],
+      inclusions: firstSrv
+        ? [
+            {
+              serviceId: String(firstSrv._id),
+              name: firstSrv.name,
+              quantity: 1,
+              description: '',
+            },
+          ]
+        : [],
       exclusions: ['Parts and spare materials if required are charged separately'],
       termsAndConditions: ['Standard service guarantee applies', 'Rescheduling available up to 2 hours prior'],
       sortOrder: 0,
@@ -254,14 +281,17 @@ export function AdminPackagesPage() {
 
   // Inclusion handlers
   const addInclusion = () => {
-    const defaultSrv = allServices.find((s) => !formData.categoryId || s.categoryId === formData.categoryId) || allServices[0]
+    const matchingServices = allServices.filter(
+      (s) => !formData.categoryId || String(s.categoryId) === String(formData.categoryId)
+    )
+    const defaultSrv = matchingServices[0] || allServices[0]
     setFormData((prev) => ({
       ...prev,
       inclusions: [
         ...prev.inclusions,
         {
-          serviceId: defaultSrv?._id || '',
-          name: defaultSrv?.name || '',
+          serviceId: defaultSrv ? String(defaultSrv._id) : '',
+          name: defaultSrv ? defaultSrv.name : '',
           quantity: 1,
           description: '',
         },
@@ -273,7 +303,7 @@ export function AdminPackagesPage() {
     setFormData((prev) => {
       const updated = [...prev.inclusions]
       if (field === 'serviceId') {
-        const srv = allServices.find((s) => s._id === value)
+        const srv = allServices.find((s) => String(s._id) === String(value))
         updated[index] = {
           ...updated[index],
           serviceId: value,
@@ -305,6 +335,10 @@ export function AdminPackagesPage() {
       setFormError('Package Name is required.')
       return
     }
+    if (!formData.description.trim()) {
+      setFormError('Package Detailed Description is required.')
+      return
+    }
     if (!formData.categoryId) {
       setFormError('Please select a Category.')
       return
@@ -316,6 +350,12 @@ export function AdminPackagesPage() {
     if (formData.inclusions.length === 0) {
       setFormError('At least one included service is required.')
       return
+    }
+    for (const inc of formData.inclusions) {
+      if (!inc.serviceId) {
+        setFormError('Please select a service for all inclusions.')
+        return
+      }
     }
 
     setFormBusy(true)
@@ -393,7 +433,7 @@ export function AdminPackagesPage() {
   const estimatedSumPrice = useMemo(() => {
     let sum = 0
     formData.inclusions.forEach((inc) => {
-      const srv = allServices.find((s) => s._id === inc.serviceId)
+      const srv = allServices.find((s) => String(s._id) === String(inc.serviceId))
       if (srv) {
         sum += (srv.basePrice || 0) * (Number(inc.quantity) || 1)
       }
@@ -533,8 +573,24 @@ export function AdminPackagesPage() {
                 </tr>
               ) : packages.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    No service packages found.
+                  <td colSpan={7} className="py-14 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand/10 text-brand mb-3">
+                        <Package className="h-6 w-6" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-800">No Service Packages Found</p>
+                      <p className="text-xs text-slate-400 mt-1 max-w-sm">
+                        Create bundles with multiple services, promotional discounts, and custom badges for the customer mobile app.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={openCreateModal}
+                        className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-bold text-white shadow-sm hover:opacity-95 transition"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Create First Package
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -561,7 +617,7 @@ export function AdminPackagesPage() {
                       </div>
                     </td>
                     <td className="py-3 px-4 font-semibold text-slate-800">
-                      {pkg.categoryId?.name || '—'}
+                      {pkg.categoryId?.name || categoryTree.find((c) => String(c._id) === String(pkg.categoryId))?.name || '—'}
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex flex-col">
@@ -710,7 +766,30 @@ export function AdminPackagesPage() {
                   <select
                     required
                     value={formData.categoryId}
-                    onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                    onChange={(e) => {
+                      const newCatId = e.target.value
+                      const matchingServices = allServices.filter(
+                        (s) => !newCatId || String(s.categoryId) === String(newCatId)
+                      )
+                      const firstSrv = matchingServices[0] || allServices[0]
+                      setFormData((prev) => ({
+                        ...prev,
+                        categoryId: newCatId,
+                        inclusions:
+                          prev.inclusions.length > 0 && prev.inclusions[0].serviceId
+                            ? prev.inclusions
+                            : firstSrv
+                            ? [
+                                {
+                                  serviceId: String(firstSrv._id),
+                                  name: firstSrv.name,
+                                  quantity: 1,
+                                  description: '',
+                                },
+                              ]
+                            : [],
+                      }))
+                    }}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-brand"
                   >
                     <option value="">Select Category</option>
@@ -766,10 +845,11 @@ export function AdminPackagesPage() {
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
-                  Detailed Description
+                  Detailed Description *
                 </label>
                 <textarea
                   rows={2}
+                  required
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Detailed explanation of what the package covers..."
@@ -907,7 +987,7 @@ export function AdminPackagesPage() {
                         >
                           <option value="">Choose Service</option>
                           {allServices
-                            .filter((s) => !formData.categoryId || s.categoryId === formData.categoryId)
+                            .filter((s) => !formData.categoryId || String(s.categoryId) === String(formData.categoryId))
                             .map((srv) => (
                               <option key={srv._id} value={srv._id}>
                                 {srv.name} ({srv.categoryName} - ₹{srv.basePrice})
