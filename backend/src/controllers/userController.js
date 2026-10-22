@@ -1336,18 +1336,19 @@ export const getPartnerOnboardingStatus = asyncHandler(async (req, res) => {
   )
 
   // Step 3: Admin Approval
-  const step3Approved = kycStatus === 'verified'
-  const step3Pending = kycStatus === 'pending' || (step2Complete && !step3Approved)
-  const step3Failed = kycStatus === 'failed'
+  const step3Approved = Boolean(step2Complete && kycStatus === 'verified')
+  const step3Failed = Boolean(step2Complete && kycStatus === 'failed')
+  const step3Pending = Boolean(step2Complete && !step3Approved && !step3Failed)
 
   // Step 4: Trial Slot & Joining Confirmation
   const trialSlot = user.labourProfile?.trialSlot || { status: 'NOT_SCHEDULED' }
   const trialStatus = user.vendorStatus || 'NOT_STARTED'
   const trialPassed =
-    trialSlot.status === 'COMPLETED' ||
-    trialSlot.status === 'PASSED' ||
-    trialStatus === 'CONFIRMED' ||
-    trialStatus === 'TRIAL_COMPLETED'
+    step3Approved &&
+    (trialSlot.status === 'COMPLETED' ||
+      trialSlot.status === 'PASSED' ||
+      trialStatus === 'CONFIRMED' ||
+      trialStatus === 'TRIAL_COMPLETED')
   const step4Complete = Boolean(trialPassed)
 
   // Welcome Kit Payment - Only PAID, READY_FOR_DISPATCH, DISPATCHED, or DELIVERED means payment is verified/complete
@@ -1433,7 +1434,7 @@ export const getPartnerOnboardingStatus = asyncHandler(async (req, res) => {
         hasPan,
       },
       step3: {
-        status: kycStatus,
+        status: step2Complete ? kycStatus : 'locked',
         isApproved: step3Approved,
         isPending: step3Pending,
         isFailed: step3Failed,
@@ -1577,6 +1578,16 @@ export const schedulePartnerTrialSlot = asyncHandler(async (req, res) => {
     return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
   }
 
+  // Ensure Step 3 Admin Approval is verified before scheduling a trial slot
+  const isKycVerified = user.labourProfile?.kycStatus === 'verified'
+  if (!isKycVerified) {
+    return sendError(res, {
+      message: 'Step 4 is locked. Please wait for Admin Approval & Verification of your KYC documents (Step 3) before scheduling a trial slot.',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'STEP_LOCKED',
+    })
+  }
+
   let resolvedLocation = location ? String(location).trim() : ''
   if (!resolvedLocation) {
     try {
@@ -1652,6 +1663,16 @@ export const submitPartnerWelcomeKitPayment = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id)
   if (!user) {
     return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  // Ensure KYC is verified and previous steps completed
+  const isKycVerified = user.labourProfile?.kycStatus === 'verified'
+  if (!isKycVerified) {
+    return sendError(res, {
+      message: 'Welcome Kit step is locked. Please wait for KYC verification first.',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'STEP_LOCKED',
+    })
   }
 
   const isOnline = paymentMethod === 'ONLINE'

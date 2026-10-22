@@ -1273,7 +1273,13 @@ export function PartnerOnboardingStepper({ onFinish }) {
               <button
                 type="button"
                 disabled={!step1.completed}
-                onClick={() => setExpandedStep(expandedStep === 2 ? null : 2)}
+                onClick={() => {
+                  if (!step1.completed) {
+                    showToast('error', 'Step 2 is locked. Please submit your application in Step 1 first.')
+                    return
+                  }
+                  setExpandedStep(expandedStep === 2 ? null : 2)
+                }}
                 className={`flex w-full items-center justify-between text-left group ${
                   !step1.completed ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
@@ -1403,14 +1409,14 @@ export function PartnerOnboardingStepper({ onFinish }) {
               className={`flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full border-2 transition-all shadow-xs ${
                 step3.isApproved
                   ? 'border-emerald-500 bg-emerald-500 text-white'
-                  : step3.isPending
+                  : step2.completed && step3.isPending
                   ? 'border-orange-500 bg-orange-500 text-white ring-4 ring-orange-100'
                   : 'border-slate-300 bg-white text-slate-400'
               }`}
             >
               {step3.isApproved ? (
                 <Check className="h-4 w-4 stroke-[3]" />
-              ) : step3.isPending ? (
+              ) : step2.completed && step3.isPending ? (
                 <Clock className="h-4 w-4 stroke-[2.5] animate-pulse" />
               ) : (
                 <span className="h-2 w-2 rounded-full bg-slate-300" />
@@ -1422,7 +1428,13 @@ export function PartnerOnboardingStepper({ onFinish }) {
               <button
                 type="button"
                 disabled={!step2.completed}
-                onClick={() => setExpandedStep(expandedStep === 3 ? null : 3)}
+                onClick={() => {
+                  if (!step2.completed) {
+                    showToast('error', 'Step 3 is locked. Please submit KYC documents in Step 2 first.')
+                    return
+                  }
+                  setExpandedStep(expandedStep === 3 ? null : 3)
+                }}
                 className={`flex w-full items-center justify-between text-left group ${
                   !step2.completed ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
@@ -1436,7 +1448,11 @@ export function PartnerOnboardingStepper({ onFinish }) {
                   </h3>
                 </div>
                 <div className="flex items-center gap-2">
-                  {step3.isApproved ? (
+                  {!step2.completed ? (
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                      Locked
+                    </span>
+                  ) : step3.isApproved ? (
                     <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
                       Approved ✓
                     </span>
@@ -1554,8 +1570,17 @@ export function PartnerOnboardingStepper({ onFinish }) {
             <div className="min-w-0 flex-1">
               <button
                 type="button"
-                onClick={() => setExpandedStep(expandedStep === 4 ? null : 4)}
-                className="flex w-full items-center justify-between text-left group"
+                disabled={!step3.isApproved}
+                onClick={() => {
+                  if (!step3.isApproved) {
+                    showToast('error', 'Step 4 is locked. Please wait for Admin Approval & Verification (Step 3).')
+                    return
+                  }
+                  setExpandedStep(expandedStep === 4 ? null : 4)
+                }}
+                className={`flex w-full items-center justify-between text-left group ${
+                  !step3.isApproved ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               >
                 <div>
                   <p className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
@@ -1566,7 +1591,11 @@ export function PartnerOnboardingStepper({ onFinish }) {
                   </h3>
                 </div>
                 <div className="flex items-center gap-2">
-                  {step4.completed && step4.paymentComplete ? (
+                  {!step3.isApproved ? (
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                      Locked
+                    </span>
+                  ) : step4.completed && step4.paymentComplete ? (
                     <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
                       Paid & Confirmed
                     </span>
@@ -1593,21 +1622,13 @@ export function PartnerOnboardingStepper({ onFinish }) {
 
               {/* Collapsible Card */}
               <AnimatePresence>
-                {expandedStep === 4 && (
+                {expandedStep === 4 && step3.isApproved && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
                     className="mt-3 overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm space-y-4"
                   >
-                    {!step3.isApproved && (
-                      <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200/80 p-2.5 text-xs text-amber-900">
-                        <Info className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
-                        <span className="text-[11px] font-medium leading-snug">
-                          Your KYC documents are in review. You can select and book your preferred trial timing slot below in advance.
-                        </span>
-                      </div>
-                    )}
                     {/* Trial Slot Section */}
                     <div>
                       <div className="flex items-center justify-between">
@@ -2368,7 +2389,13 @@ export function PartnerOnboardingStepper({ onFinish }) {
               <button
                 type="button"
                 disabled={!(step4.completed && step4.paymentComplete)}
-                onClick={() => setExpandedStep(expandedStep === 5 ? null : 5)}
+                onClick={() => {
+                  if (!(step4.completed && step4.paymentComplete)) {
+                    showToast('error', 'Step 5 is locked. Please complete trial evaluation and payment verification in Step 4 first.')
+                    return
+                  }
+                  setExpandedStep(expandedStep === 5 ? null : 5)
+                }}
                 className={`flex w-full items-center justify-between text-left group ${
                   !(step4.completed && step4.paymentComplete) ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
