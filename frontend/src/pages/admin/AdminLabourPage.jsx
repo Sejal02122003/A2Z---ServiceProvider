@@ -30,7 +30,7 @@ import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { KYC_STATUS, USER_ROLES } from '../../constants/userRoles.js'
 import { formatLastLoginDisplay } from '../../lib/formatAdminLastLogin.js'
-import { KitStatusBadge } from '../../components/admin/welcomeKit/KitStatusBadge.jsx'
+import { KitStatusBadge, WorkflowStatusBadge } from '../../components/admin/welcomeKit/KitStatusBadge.jsx'
 import { WelcomeKitModal } from '../../components/admin/welcomeKit/WelcomeKitModal.jsx'
 
 function readInitialKyc(sp) {
@@ -626,14 +626,23 @@ export function AdminLabourPage() {
             </div>
           </div>
           <div>
-            <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Welcome Kit</label>
+            <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Kit & Payment Slip</label>
             <div className="relative">
               <select
                 value={kitFilter}
                 onChange={(e) => setKitFilter(e.target.value)}
-                className="w-full appearance-none rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 pr-10 text-sm shadow-sm outline-none focus:ring-2 focus:ring-brand/35"
+                className="w-full appearance-none rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 pr-10 text-sm shadow-sm outline-none focus:ring-2 focus:ring-brand/35 font-medium"
               >
-                <option value="all">All Kit States</option>
+                <option value="all">All Kit & Slip States</option>
+                <option value="payment_submitted">🧾 Slips Pending Review</option>
+                <option value="payment_pending">⏳ Payment Pending</option>
+                <option value="payment_rejected">❌ Payment Rejected</option>
+                <option value="address_pending">📍 Address Pending</option>
+                <option value="address_submitted">📮 Address Submitted</option>
+                <option value="ready_to_dispatch">📦 Ready to Dispatch</option>
+                <option value="dispatched">🚚 Dispatched</option>
+                <option value="delivered">✅ Delivered</option>
+                <option value="paid">✓ Payment Approved / Paid</option>
                 <option value="complete">Complete (All Issued)</option>
                 <option value="partial">Partially Issued</option>
                 <option value="not_issued">Not Issued</option>
@@ -685,7 +694,7 @@ export function AdminLabourPage() {
                 <th className="px-4 py-3">Phone</th>
                 <th className="px-4 py-3">KYC</th>
                 <th className="px-4 py-3">Trial Demo</th>
-                <th className="px-4 py-3">Welcome Kit</th>
+                <th className="px-4 py-3 min-w-[210px]">Kit & Payment Slip</th>
                 {activeTab !== 'contractor' && <th className="px-4 py-3">Skill</th>}
                 <th className="px-4 py-3">Location</th>
                 <th className="px-4 py-3">Review</th>
@@ -728,37 +737,86 @@ export function AdminLabourPage() {
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex flex-col gap-1.5 items-start">
-                          <div className="flex items-center gap-2">
+                        <div className="flex flex-col gap-2 items-start min-w-[200px]">
+                          {/* Row 1: Kit Status badge + Checklist edit */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <WorkflowStatusBadge welcomeKit={u.welcomeKit} />
                             <KitStatusBadge welcomeKit={u.welcomeKit} showItems={true} />
                             <button
                               type="button"
                               onClick={() => setKitModalUser(u)}
-                              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition"
-                              title="Update Kit & Slip"
+                              className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition cursor-pointer"
+                              title="Manage Welcome Kit & Dispatch"
                             >
-                              Edit
+                              Manage
                             </button>
                           </div>
-                          {u.welcomeKit?.status === 'PAYMENT_SUBMITTED' && (
-                            <button
-                              type="button"
-                              onClick={() => setKitModalUser(u)}
-                              className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-900 border border-amber-300 shadow-2xs hover:bg-amber-200 transition animate-pulse cursor-pointer"
-                              title="Click to review payment screenshot"
-                            >
-                              <span>🧾 Verify Slip</span>
-                            </button>
-                          )}
-                          {u.welcomeKit?.status === 'PAYMENT_REJECTED' && (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200">
-                              <span>❌ Slip Rejected</span>
-                            </span>
-                          )}
-                          {u.welcomeKit?.status === 'PAID' && (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200">
-                              <span>✓ ₹999 Paid</span>
-                            </span>
+
+                          {/* Row 2: Payment Slip Thumbnail & Status */}
+                          {u.welcomeKit?.paymentReceiptUrl ? (
+                            <div className="flex items-center gap-2 w-full pt-0.5">
+                              {/* Clickable Image Preview Thumbnail */}
+                              <div
+                                onClick={() => setKitModalUser(u)}
+                                className="relative h-11 w-11 shrink-0 cursor-pointer overflow-hidden rounded-lg border-2 border-brand/50 bg-slate-900/5 shadow-xs hover:border-brand hover:scale-105 transition group"
+                                title="Click to view payment slip screenshot"
+                              >
+                                <img
+                                  src={u.welcomeKit.paymentReceiptUrl}
+                                  alt="Payment slip"
+                                  className="h-full w-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] transition font-bold">
+                                  🔍
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col gap-0.5 min-w-0">
+                                {u.welcomeKit?.status === 'PAYMENT_SUBMITTED' ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setKitModalUser(u)}
+                                    className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-900 border border-amber-300 shadow-2xs hover:bg-amber-200 transition animate-pulse cursor-pointer"
+                                    title="Click to review and accept/reject"
+                                  >
+                                    <span>🧾 Review Slip</span>
+                                  </button>
+                                ) : u.welcomeKit?.status === 'PAYMENT_REJECTED' ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setKitModalUser(u)}
+                                    className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200 hover:bg-rose-100 transition cursor-pointer"
+                                    title="Payment slip rejected - click to view"
+                                  >
+                                    <span>❌ Slip Rejected</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setKitModalUser(u)}
+                                    className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer"
+                                    title="Payment slip verified - click to view"
+                                  >
+                                    <span>✓ View Slip (₹{u.welcomeKit?.paymentAmount || 999})</span>
+                                  </button>
+                                )}
+                                <span className="text-[10px] text-slate-400 font-mono truncate">
+                                  {u.welcomeKit?.paidAt ? new Date(u.welcomeKit.paidAt).toLocaleDateString() : 'Slip Uploaded'}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 text-[11px] pt-0.5">
+                              {u.welcomeKit?.status === 'PAID' || u.welcomeKit?.status === 'DELIVERED' || u.welcomeKit?.status === 'DISPATCHED' ? (
+                                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200">
+                                  ✓ Paid (Direct)
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 italic">
+                                  No slip uploaded
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
                       </td>
@@ -843,39 +901,69 @@ export function AdminLabourPage() {
                     }}
                   />
                 </div>
-                <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2.5">
-                  <div className="flex flex-col gap-1 text-xs">
-                    <div className="flex items-center gap-1.5 text-slate-500 font-semibold">
+                <div className="mt-2.5 flex items-start justify-between border-t border-slate-100 pt-2.5 gap-2">
+                  <div className="flex flex-col gap-1 text-xs min-w-0">
+                    <div className="flex items-center gap-1.5 text-slate-500 font-semibold flex-wrap">
                       <Package className="h-3.5 w-3.5 text-slate-400" />
                       <span>Kit:</span>
+                      <WorkflowStatusBadge welcomeKit={u.welcomeKit} />
                       <KitStatusBadge welcomeKit={u.welcomeKit} showItems={false} />
                     </div>
-                    {u.welcomeKit?.status === 'PAYMENT_SUBMITTED' && (
-                      <span className="text-[10px] font-bold text-amber-700 animate-pulse">
-                        🧾 Payment Slip Pending Review
-                      </span>
-                    )}
-                    {u.welcomeKit?.status === 'PAYMENT_REJECTED' && (
-                      <span className="text-[10px] font-bold text-rose-600">
-                        ❌ Slip Rejected
-                      </span>
-                    )}
-                    {u.welcomeKit?.status === 'PAID' && (
-                      <span className="text-[10px] font-bold text-emerald-700">
-                        ✓ ₹999 Verified
-                      </span>
+
+                    {u.welcomeKit?.paymentReceiptUrl ? (
+                      <div className="flex items-center gap-2 mt-1">
+                        <img
+                          src={u.welcomeKit.paymentReceiptUrl}
+                          alt="Slip"
+                          className="h-9 w-9 rounded-md object-cover border border-slate-200 shrink-0 cursor-pointer"
+                          onClick={() => setKitModalUser(u)}
+                        />
+                        <div className="min-w-0">
+                          {u.welcomeKit?.status === 'PAYMENT_SUBMITTED' ? (
+                            <span className="text-[10px] font-bold text-amber-700 animate-pulse block">
+                              🧾 Slip Needs Review
+                            </span>
+                          ) : u.welcomeKit?.status === 'PAYMENT_REJECTED' ? (
+                            <span className="text-[10px] font-bold text-rose-600 block">
+                              ❌ Slip Rejected
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-emerald-700 block">
+                              ✓ Slip Verified (₹{u.welcomeKit?.paymentAmount || 999})
+                            </span>
+                          )}
+                          <span className="text-[9px] text-slate-400 font-mono">
+                            {u.welcomeKit?.paidAt ? new Date(u.welcomeKit.paidAt).toLocaleDateString() : ''}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-0.5">
+                        {u.welcomeKit?.status === 'PAID' || u.welcomeKit?.status === 'DELIVERED' || u.welcomeKit?.status === 'DISPATCHED' ? (
+                          <span className="text-[10px] font-bold text-emerald-700">
+                            ✓ ₹999 Verified (Direct)
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic">
+                            No slip uploaded
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
+
                   <button
                     type="button"
                     onClick={() => setKitModalUser(u)}
-                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition shadow-2xs ${
+                    className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold transition shadow-2xs ${
                       u.welcomeKit?.status === 'PAYMENT_SUBMITTED'
-                        ? 'bg-amber-500 text-white hover:bg-amber-600'
+                        ? 'bg-amber-500 text-white hover:bg-amber-600 ring-2 ring-amber-300'
+                        : u.welcomeKit?.paymentReceiptUrl
+                        ? 'border border-brand/30 bg-brand/10 text-brand hover:bg-brand/15'
                         : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    {u.welcomeKit?.status === 'PAYMENT_SUBMITTED' ? 'Review Slip' : 'Manage Kit'}
+                    {u.welcomeKit?.status === 'PAYMENT_SUBMITTED' ? 'Review Slip' : u.welcomeKit?.paymentReceiptUrl ? 'View Slip' : 'Manage Kit'}
                   </button>
                 </div>
                 {(u.contractorProfile || u.labourProfile)?.kycStatus === KYC_STATUS.PENDING && (u.contractorProfile || u.labourProfile)?.kycSubmittedAt ? (

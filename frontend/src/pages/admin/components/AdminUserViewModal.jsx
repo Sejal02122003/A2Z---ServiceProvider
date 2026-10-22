@@ -170,7 +170,7 @@ export function AdminUserViewModal({ userId, onClose }) {
                 </div>
               )}
 
-              {user.role === 'labour' && (
+              {(user.role === 'labour' || user.role === 'contractor') && (
                 <WelcomeKitCard
                   user={user}
                   onUpdate={(updatedKit) => setUser({ ...user, welcomeKit: updatedKit })}

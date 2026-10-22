@@ -19,6 +19,7 @@ export function WelcomeKitCard({ user, onUpdate }) {
   const kit = user?.welcomeKit || {}
   const status = getKitStatusDerived(kit)
   const paymentStatus = kit.status || 'PENDING_PAYMENT'
+  const isApproved = paymentStatus === 'PAID' || paymentStatus === 'DELIVERED' || paymentStatus === 'DISPATCHED'
   const receiptUrl = kit.paymentReceiptUrl
 
   return (
@@ -47,7 +48,7 @@ export function WelcomeKitCard({ user, onUpdate }) {
         {/* Payment Verification Banner */}
         <div
           className={`mb-4 rounded-xl border p-3 flex items-center justify-between gap-3 ${
-            paymentStatus === 'PAID'
+            isApproved
               ? 'border-emerald-200 bg-emerald-50/60'
               : paymentStatus === 'PAYMENT_SUBMITTED'
               ? 'border-amber-200 bg-amber-50/70 ring-1 ring-amber-200/80'
@@ -60,12 +61,12 @@ export function WelcomeKitCard({ user, onUpdate }) {
             {receiptUrl ? (
               <div
                 onClick={() => setModalOpen(true)}
-                className="relative h-10 w-10 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-slate-300 bg-white shadow-2xs group"
-                title="Click to view slip in modal"
+                className="relative h-11 w-11 shrink-0 cursor-pointer overflow-hidden rounded-lg border-2 border-brand/40 bg-white shadow-2xs group"
+                title="Click to view full payment slip"
               >
-                <img src={receiptUrl} alt="Payment slip" className="h-full w-full object-cover" />
-                <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition">
-                  <Eye className="h-3 w-3" />
+                <img src={receiptUrl} alt="Payment slip" className="h-full w-full object-cover group-hover:scale-105 transition" />
+                <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition">
+                  <Eye className="h-4 w-4" />
                 </div>
               </div>
             ) : (
@@ -81,11 +82,11 @@ export function WelcomeKitCard({ user, onUpdate }) {
                 </span>
                 <span>•</span>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {kit.paymentMethod === 'ONLINE' ? 'Online' : 'Offline / Hub'}
+                  {kit.paymentMethod === 'ONLINE' ? 'Online' : 'Offline / Hub Slip'}
                 </span>
               </div>
-              <p className="text-xs font-black truncate text-slate-800">
-                {paymentStatus === 'PAID' && (
+              <div className="text-xs font-black truncate text-slate-800">
+                {isApproved && (
                   <span className="text-emerald-700 flex items-center gap-1">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     Payment Approved & Verified
@@ -103,10 +104,10 @@ export function WelcomeKitCard({ user, onUpdate }) {
                     Payment Slip Rejected
                   </span>
                 )}
-                {paymentStatus === 'PENDING_PAYMENT' && (
+                {!isApproved && paymentStatus !== 'PAYMENT_SUBMITTED' && paymentStatus !== 'PAYMENT_REJECTED' && (
                   <span className="text-slate-500">Not Paid Yet</span>
                 )}
-              </p>
+              </div>
             </div>
           </div>
 
@@ -116,10 +117,12 @@ export function WelcomeKitCard({ user, onUpdate }) {
             className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold transition shadow-2xs ${
               paymentStatus === 'PAYMENT_SUBMITTED'
                 ? 'bg-amber-600 text-white hover:bg-amber-700 ring-2 ring-amber-300'
+                : receiptUrl
+                ? 'border border-brand/30 bg-brand/10 text-brand hover:bg-brand/15'
                 : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
             }`}
           >
-            {paymentStatus === 'PAYMENT_SUBMITTED' ? 'Review Slip' : 'Details'}
+            {paymentStatus === 'PAYMENT_SUBMITTED' ? 'Review Slip' : receiptUrl ? 'View Slip' : 'Details'}
           </button>
         </div>
 

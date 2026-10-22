@@ -141,6 +141,18 @@ router.post(
   user.confirmPartnerWelcomeKitReceipt,
 )
 
+router.post(
+  '/me/welcome-kit/address',
+  restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),
+  user.submitPartnerWelcomeKitAddress,
+)
+
+router.put(
+  '/me/welcome-kit/address',
+  restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),
+  user.submitPartnerWelcomeKitAddress,
+)
+
 router.get('/', restrictTo(USER_ROLES.ADMIN), user.listUsers)
 
 router.patch(

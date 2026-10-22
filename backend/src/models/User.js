@@ -137,6 +137,57 @@ const contractorProfileSchema = new mongoose.Schema(
   { _id: false },
 )
 
+const welcomeKitAddressSchema = new mongoose.Schema(
+  {
+    recipientName: { type: String, trim: true, default: '' },
+    recipientPhone: { type: String, trim: true, default: '' },
+    houseNumber: { type: String, trim: true, default: '' },
+    streetArea: { type: String, trim: true, default: '' },
+    landmark: { type: String, trim: true, default: '' },
+    city: { type: String, trim: true, default: '' },
+    state: { type: String, trim: true, default: '' },
+    pincode: { type: String, trim: true, default: '' },
+  },
+  { _id: false },
+)
+
+const welcomeKitDispatchSchema = new mongoose.Schema(
+  {
+    courierCompany: { type: String, trim: true, default: '' },
+    trackingNumber: { type: String, trim: true, default: '' },
+    trackingUrl: { type: String, trim: true, default: '' },
+    dispatchDate: { type: Date, default: null },
+    estimatedDeliveryDate: { type: Date, default: null },
+    notes: { type: String, trim: true, default: '' },
+    dispatchedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    dispatchedAt: { type: Date, default: null },
+  },
+  { _id: false },
+)
+
+const welcomeKitDeliveryConfirmationSchema = new mongoose.Schema(
+  {
+    isConfirmed: { type: Boolean, default: false },
+    confirmedAt: { type: Date, default: null },
+    confirmedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    notes: { type: String, trim: true, default: '' },
+  },
+  { _id: false },
+)
+
+const welcomeKitAuditItemSchema = new mongoose.Schema(
+  {
+    action: { type: String, required: true },
+    performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    performedByName: { type: String, default: '' },
+    performedByRole: { type: String, default: '' },
+    timestamp: { type: Date, default: Date.now },
+    details: { type: String, default: '' },
+    metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
+  },
+  { _id: false },
+)
+
 const welcomeKitSchema = new mongoose.Schema(
   {
     uniformIssued: { type: Boolean, default: false },
@@ -145,7 +196,15 @@ const welcomeKitSchema = new mongoose.Schema(
     productsIssued: { type: Boolean, default: false },
     status: {
       type: String,
-      enum: ['PENDING_PAYMENT', 'PAYMENT_SUBMITTED', 'PAID', 'PAYMENT_REJECTED', 'DISPATCHED', 'DELIVERED'],
+      enum: [
+        'PENDING_PAYMENT',
+        'PAYMENT_SUBMITTED',
+        'PAID',
+        'PAYMENT_REJECTED',
+        'READY_FOR_DISPATCH',
+        'DISPATCHED',
+        'DELIVERED',
+      ],
       default: 'PENDING_PAYMENT',
     },
     paymentMethod: {
@@ -160,12 +219,54 @@ const welcomeKitSchema = new mongoose.Schema(
     paymentVerifiedAt: { type: Date, default: null },
     paymentVerifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     paidAt: { type: Date, default: null },
+
+    // Address Workflow
+    addressStatus: {
+      type: String,
+      enum: ['NOT_SUBMITTED', 'SUBMITTED', 'CORRECTION_REQUESTED', 'CONFIRMED'],
+      default: 'NOT_SUBMITTED',
+    },
+    address: {
+      type: welcomeKitAddressSchema,
+      default: () => ({}),
+    },
+    addressSubmittedAt: { type: Date, default: null },
+    addressCorrectionReason: { type: String, trim: true, default: '' },
+    addressCorrectionRequestedAt: { type: Date, default: null },
+    addressCorrectionRequestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    addressConfirmedAt: { type: Date, default: null },
+    addressConfirmedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    confirmedAddressSnapshot: {
+      type: welcomeKitAddressSchema,
+      default: null,
+    },
+
+    // Legacy fields for backward compatibility
     deliveryAddress: { type: String, trim: true },
     deliveryCity: { type: String, trim: true },
     deliveryPincode: { type: String, trim: true },
+
+    // Dispatch Details (Informational, No Live Tracking)
+    dispatchDetails: {
+      type: welcomeKitDispatchSchema,
+      default: () => ({}),
+    },
+
+    // Manual Delivery Confirmation (Admin only)
+    deliveryConfirmation: {
+      type: welcomeKitDeliveryConfirmationSchema,
+      default: () => ({}),
+    },
+
     isReceived: { type: Boolean, default: false },
     receivedAt: { type: Date, default: null },
     issuedAt: { type: Date, default: null },
+
+    // Audit Trail
+    auditTrail: {
+      type: [welcomeKitAuditItemSchema],
+      default: [],
+    },
   },
   { _id: false },
 )

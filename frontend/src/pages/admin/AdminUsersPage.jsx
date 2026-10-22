@@ -207,7 +207,19 @@ export function AdminUsersPage() {
                       </td>
                       <td className="max-w-[200px] truncate px-4 py-3 text-slate-600">{u.email || '—'}</td>
                       <td className="px-4 py-3">
-                        <RolePill role={u.role} />
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <RolePill role={u.role} />
+                          {u.welcomeKit?.paymentReceiptUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setViewingUser(u._id)}
+                              className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 transition cursor-pointer"
+                              title="Payment slip uploaded - click to view details"
+                            >
+                              🧾 Slip
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <StatusPill active={u.isActive !== false} />
@@ -269,6 +281,15 @@ export function AdminUsersPage() {
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <RolePill role={u.role} />
+                  {u.welcomeKit?.paymentReceiptUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setViewingUser(u._id)}
+                      className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300"
+                    >
+                      🧾 Payment Slip
+                    </button>
+                  )}
                   <span className="text-[11px] text-slate-500">
                     Last login: {formatLastLoginDisplay(u.lastLoginAt) || '—'}
                   </span>

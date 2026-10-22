@@ -57,3 +57,69 @@ export function KitStatusBadge({ welcomeKit, showItems = false }) {
     </div>
   )
 }
+
+export function WorkflowStatusBadge({ welcomeKit }) {
+  if (!welcomeKit) return null
+  const status = welcomeKit.status || 'PENDING_PAYMENT'
+  const addrStatus = welcomeKit.address?.status
+
+  if (status === 'DELIVERED') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 ring-1 ring-emerald-300">
+        <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+        Delivered
+      </span>
+    )
+  }
+  if (status === 'DISPATCHED') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800 ring-1 ring-purple-300">
+        Dispatched
+      </span>
+    )
+  }
+  if (status === 'READY_FOR_DISPATCH' || addrStatus === 'CONFIRMED') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-800 ring-1 ring-indigo-300">
+        Ready to Dispatch
+      </span>
+    )
+  }
+  if (addrStatus === 'SUBMITTED') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800 ring-1 ring-blue-300">
+        Address Submitted
+      </span>
+    )
+  }
+  if (addrStatus === 'CORRECTION_REQUESTED') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 ring-1 ring-amber-300">
+        Address Correction
+      </span>
+    )
+  }
+  if (status === 'PAID') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-200">
+        Payment Approved
+      </span>
+    )
+  }
+  if (status === 'PAYMENT_SUBMITTED') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800 ring-1 ring-amber-200 animate-pulse">
+        Slip Review
+      </span>
+    )
+  }
+  if (status === 'PAYMENT_REJECTED') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 ring-1 ring-rose-200">
+        Slip Rejected
+      </span>
+    )
+  }
+  return null
+}
+

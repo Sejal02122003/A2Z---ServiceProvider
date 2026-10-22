@@ -16,6 +16,15 @@ import { validateName } from '../utils/nameNormalization.js'
 import { IdentityVerification } from '../models/IdentityVerification.js'
 import { logIdentityAudit } from '../services/identityVerificationService.js'
 import { IDENTITY_AUDIT_ACTIONS } from '../models/IdentityAuditLog.js'
+import {
+  notifyPaymentApproved,
+  notifyPaymentRejected,
+  notifyAddressSubmitted,
+  notifyAddressCorrectionRequested,
+  notifyAddressConfirmed,
+  notifyWelcomeKitDispatched,
+  notifyWelcomeKitDelivered,
+} from '../services/welcomeKitNotificationService.js'
 
 const MAX_KYC_IMAGE_CHARS = 750_000
 
@@ -696,7 +705,38 @@ export const listUsers = asyncHandler(async (req, res) => {
   }
 
   if (kitStatus && kitStatus !== 'all') {
-    if (kitStatus === 'complete') {
+    if (kitStatus === 'payment_pending') {
+      andParts.push({ 'welcomeKit.status': { $in: ['PENDING_PAYMENT', 'PAYMENT_SUBMITTED'] } })
+    } else if (kitStatus === 'payment_submitted' || kitStatus === 'slip_pending') {
+      andParts.push({ 'welcomeKit.status': 'PAYMENT_SUBMITTED' })
+    } else if (kitStatus === 'payment_rejected') {
+      andParts.push({ 'welcomeKit.status': 'PAYMENT_REJECTED' })
+    } else if (kitStatus === 'address_pending') {
+      andParts.push({
+        'welcomeKit.status': { $in: ['PAID', 'READY_FOR_DISPATCH'] },
+        $or: [
+          { 'welcomeKit.addressStatus': 'NOT_SUBMITTED' },
+          { 'welcomeKit.addressStatus': { $exists: false } },
+        ],
+      })
+    } else if (kitStatus === 'address_submitted') {
+      andParts.push({ 'welcomeKit.addressStatus': 'SUBMITTED' })
+    } else if (kitStatus === 'ready_to_dispatch') {
+      andParts.push({
+        $or: [
+          { 'welcomeKit.status': 'READY_FOR_DISPATCH' },
+          { 'welcomeKit.addressStatus': 'CONFIRMED' },
+        ],
+      })
+    } else if (kitStatus === 'dispatched') {
+      andParts.push({ 'welcomeKit.status': 'DISPATCHED' })
+    } else if (kitStatus === 'delivered') {
+      andParts.push({ 'welcomeKit.status': 'DELIVERED' })
+    } else if (kitStatus === 'has_slip' || kitStatus === 'slip_uploaded') {
+      andParts.push({ 'welcomeKit.paymentReceiptUrl': { $exists: true, $ne: '' } })
+    } else if (kitStatus === 'paid' || kitStatus === 'payment_approved') {
+      andParts.push({ 'welcomeKit.status': { $in: ['PAID', 'READY_FOR_DISPATCH', 'DELIVERED', 'DISPATCHED'] } })
+    } else if (kitStatus === 'complete') {
       andParts.push({
         'welcomeKit.uniformIssued': true,
         'welcomeKit.idCardIssued': true,
@@ -1141,6 +1181,14 @@ export const getPartnerWelcomeKitStats = asyncHandler(async (req, res) => {
   let idCardCount = 0
   let bagCount = 0
 
+  let paymentPending = 0
+  let paymentRejected = 0
+  let addressPending = 0
+  let addressSubmitted = 0
+  let readyToDispatch = 0
+  let dispatched = 0
+  let delivered = 0
+
   for (const p of partners) {
     const kit = p.welcomeKit || {}
     const u = Boolean(kit.uniformIssued)
@@ -1158,6 +1206,17 @@ export const getPartnerWelcomeKitStats = asyncHandler(async (req, res) => {
     } else {
       notIssued++
     }
+
+    const st = kit.status || 'PENDING_PAYMENT'
+    const ast = kit.addressStatus || 'NOT_SUBMITTED'
+
+    if (st === 'PENDING_PAYMENT' || st === 'PAYMENT_SUBMITTED') paymentPending++
+    if (st === 'PAYMENT_REJECTED') paymentRejected++
+    if ((st === 'PAID' || st === 'READY_FOR_DISPATCH') && ast === 'NOT_SUBMITTED') addressPending++
+    if (ast === 'SUBMITTED' || ast === 'CORRECTION_REQUESTED') addressSubmitted++
+    if (st === 'READY_FOR_DISPATCH' || ast === 'CONFIRMED') readyToDispatch++
+    if (st === 'DISPATCHED') dispatched++
+    if (st === 'DELIVERED') delivered++
   }
 
   return sendSuccess(res, {
@@ -1169,6 +1228,13 @@ export const getPartnerWelcomeKitStats = asyncHandler(async (req, res) => {
       uniformIssued: uniformCount,
       idCardIssued: idCardCount,
       bagIssued: bagCount,
+      paymentPending,
+      paymentRejected,
+      addressPending,
+      addressSubmitted,
+      readyToDispatch,
+      dispatched,
+      delivered,
     },
   })
 })
@@ -1214,10 +1280,11 @@ export const getPartnerOnboardingStatus = asyncHandler(async (req, res) => {
     trialStatus === 'TRIAL_COMPLETED'
   const step4Complete = Boolean(trialPassed)
 
-  // Welcome Kit Payment - Only PAID, DISPATCHED, or DELIVERED means payment is verified/complete
+  // Welcome Kit Payment - Only PAID, READY_FOR_DISPATCH, DISPATCHED, or DELIVERED means payment is verified/complete
   const welcomeKit = user.welcomeKit || {}
   const paymentComplete = Boolean(
     welcomeKit.status === 'PAID' ||
+    welcomeKit.status === 'READY_FOR_DISPATCH' ||
     welcomeKit.status === 'DISPATCHED' ||
     welcomeKit.status === 'DELIVERED'
   )
@@ -1319,6 +1386,14 @@ export const getPartnerOnboardingStatus = asyncHandler(async (req, res) => {
           rejectionReason: welcomeKit.paymentRejectionReason || '',
           paidAt: welcomeKit.paidAt || null,
           verifiedAt: welcomeKit.paymentVerifiedAt || null,
+          addressStatus: welcomeKit.addressStatus || 'NOT_SUBMITTED',
+          address: welcomeKit.address || {},
+          addressSubmittedAt: welcomeKit.addressSubmittedAt || null,
+          addressCorrectionReason: welcomeKit.addressCorrectionReason || '',
+          confirmedAddressSnapshot: welcomeKit.confirmedAddressSnapshot || null,
+          dispatchDetails: welcomeKit.dispatchDetails || {},
+          deliveryConfirmation: welcomeKit.deliveryConfirmation || {},
+          auditTrail: welcomeKit.auditTrail || [],
           deliveryAddress: welcomeKit.deliveryAddress || '',
           deliveryCity: welcomeKit.deliveryCity || '',
           deliveryPincode: welcomeKit.deliveryPincode || '',
@@ -1522,6 +1597,18 @@ export const submitPartnerWelcomeKitPayment = asyncHandler(async (req, res) => {
   if (deliveryCity) user.welcomeKit.deliveryCity = String(deliveryCity).trim()
   if (deliveryPincode) user.welcomeKit.deliveryPincode = String(deliveryPincode).trim()
 
+  user.welcomeKit.auditTrail = user.welcomeKit.auditTrail || []
+  user.welcomeKit.auditTrail.push({
+    action: isOnline ? 'PAYMENT_ONLINE_COMPLETED' : 'PAYMENT_SLIP_SUBMITTED',
+    performedBy: user._id,
+    performedByName: user.fullName || user.phone || 'Partner',
+    performedByRole: user.role,
+    timestamp: new Date(),
+    details: isOnline
+      ? 'Welcome kit fee paid online successfully.'
+      : 'Offline payment slip screenshot uploaded for admin verification.',
+  })
+
   await user.save()
 
   return sendSuccess(res, {
@@ -1561,8 +1648,21 @@ export const verifyPartnerWelcomeKitPayment = asyncHandler(async (req, res) => {
   }
 
   user.welcomeKit = user.welcomeKit || {}
+  user.welcomeKit.auditTrail = user.welcomeKit.auditTrail || []
 
   if (normalizedAction === 'APPROVE' || normalizedAction === 'ACCEPT') {
+    // Prevent duplicate approval / state conflicts
+    const currentStatus = user.welcomeKit.status
+    if (['PAID', 'READY_FOR_DISPATCH', 'DISPATCHED', 'DELIVERED'].includes(currentStatus)) {
+      return sendSuccess(res, {
+        message: 'Payment has already been approved and verified.',
+        data: {
+          welcomeKit: user.welcomeKit,
+          user: user.toSafeObject(),
+        },
+      })
+    }
+
     user.welcomeKit.status = 'PAID'
     user.welcomeKit.paymentVerifiedAt = new Date()
     user.welcomeKit.paymentVerifiedBy = req.user._id
@@ -1573,14 +1673,68 @@ export const verifyPartnerWelcomeKitPayment = asyncHandler(async (req, res) => {
     if (notes && notes.trim()) {
       user.welcomeKit.paymentNotes = (user.welcomeKit.paymentNotes ? user.welcomeKit.paymentNotes + '\n' : '') + `[Admin Note]: ${notes.trim()}`
     }
+
+    user.welcomeKit.auditTrail.push({
+      action: 'PAYMENT_APPROVED',
+      performedBy: req.user._id,
+      performedByName: req.user.fullName || 'Admin',
+      performedByRole: req.user.role,
+      timestamp: new Date(),
+      details: notes ? `Payment slip approved. Note: ${notes.trim()}` : 'Payment slip approved successfully. Delivery address form unlocked.',
+    })
+
+    await user.save()
+
+    // Notify service provider (Title: Payment Slip Approved)
+    await notifyPaymentApproved(user._id)
+
+    return sendSuccess(res, {
+      message: 'Payment verified successfully! Welcome kit authorized.',
+      data: {
+        welcomeKit: user.welcomeKit,
+        user: user.toSafeObject(),
+      },
+    })
   } else if (normalizedAction === 'REJECT') {
+    // Validate non-empty rejection reason
+    const cleanReason = String(rejectionReason || notes || '').trim()
+    if (!cleanReason) {
+      return sendError(res, {
+        message: 'A non-empty rejection reason is required to reject a payment slip',
+        statusCode: HTTP_STATUS.BAD_REQUEST,
+        code: 'REJECTION_REASON_REQUIRED',
+      })
+    }
+
     user.welcomeKit.status = 'PAYMENT_REJECTED'
-    user.welcomeKit.paymentRejectionReason = rejectionReason?.trim() || 'Payment slip was rejected. Please re-upload a clear and valid payment receipt or screenshot.'
+    user.welcomeKit.paymentRejectionReason = cleanReason
     user.welcomeKit.paymentVerifiedAt = new Date()
     user.welcomeKit.paymentVerifiedBy = req.user._id
     if (notes && notes.trim()) {
       user.welcomeKit.paymentNotes = (user.welcomeKit.paymentNotes ? user.welcomeKit.paymentNotes + '\n' : '') + `[Admin Rejection Note]: ${notes.trim()}`
     }
+
+    user.welcomeKit.auditTrail.push({
+      action: 'PAYMENT_REJECTED',
+      performedBy: req.user._id,
+      performedByName: req.user.fullName || 'Admin',
+      performedByRole: req.user.role,
+      timestamp: new Date(),
+      details: `Payment slip rejected. Reason: ${cleanReason}`,
+    })
+
+    await user.save()
+
+    // Notify service provider (Title: Payment Slip Rejected)
+    await notifyPaymentRejected(user._id, cleanReason)
+
+    return sendSuccess(res, {
+      message: 'Payment screenshot rejected. Service partner has been notified to resubmit.',
+      data: {
+        welcomeKit: user.welcomeKit,
+        user: user.toSafeObject(),
+      },
+    })
   } else {
     return sendError(res, {
       message: "action must be 'APPROVE' or 'REJECT'",
@@ -1588,13 +1742,432 @@ export const verifyPartnerWelcomeKitPayment = asyncHandler(async (req, res) => {
       code: 'INVALID_ACTION',
     })
   }
+})
+
+/**
+ * POST /api/users/me/welcome-kit/address
+ * Service provider submits welcome kit delivery address
+ * (Unlocked ONLY after payment is approved)
+ */
+export const submitPartnerWelcomeKitAddress = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id)
+  if (!user) {
+    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  user.welcomeKit = user.welcomeKit || {}
+  const status = user.welcomeKit.status
+
+  // 1. Payment check: must be approved
+  const isPaid = ['PAID', 'READY_FOR_DISPATCH', 'DISPATCHED', 'DELIVERED'].includes(status)
+  if (!isPaid) {
+    return sendError(res, {
+      message: 'Payment slip must be approved before submitting your welcome kit delivery address.',
+      statusCode: HTTP_STATUS.FORBIDDEN,
+      code: 'PAYMENT_NOT_APPROVED',
+    })
+  }
+
+  // 2. Dispatch check: once dispatched, address cannot be changed
+  if (status === 'DISPATCHED' || status === 'DELIVERED') {
+    return sendError(res, {
+      message: 'Welcome kit has already been dispatched. Address cannot be modified after dispatch.',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'ALREADY_DISPATCHED',
+    })
+  }
+
+  // 3. Field collection & validation
+  const {
+    recipientName,
+    recipientPhone,
+    houseNumber,
+    streetArea,
+    landmark,
+    city,
+    state,
+    pincode,
+  } = req.body
+
+  if (!recipientName || typeof recipientName !== 'string' || recipientName.trim().length < 2) {
+    return sendError(res, {
+      message: 'Recipient full name is required (minimum 2 characters)',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_RECIPIENT_NAME',
+    })
+  }
+
+  const phoneDigits = String(recipientPhone || '').replace(/\D/g, '')
+  if (phoneDigits.length !== 10) {
+    return sendError(res, {
+      message: 'Recipient mobile number must be a valid 10-digit Indian phone number',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_RECIPIENT_PHONE',
+    })
+  }
+
+  if (!houseNumber || typeof houseNumber !== 'string' || houseNumber.trim().length === 0) {
+    return sendError(res, {
+      message: 'House / Flat / Building number is required',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_HOUSE_NUMBER',
+    })
+  }
+
+  if (!streetArea || typeof streetArea !== 'string' || streetArea.trim().length < 2) {
+    return sendError(res, {
+      message: 'Street and area name are required',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_STREET_AREA',
+    })
+  }
+
+  if (!city || typeof city !== 'string' || city.trim().length < 2) {
+    return sendError(res, {
+      message: 'City name is required',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_CITY',
+    })
+  }
+
+  if (!state || typeof state !== 'string' || state.trim().length < 2) {
+    return sendError(res, {
+      message: 'State name is required',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_STATE',
+    })
+  }
+
+  const cleanPin = String(pincode || '').trim()
+  if (!/^[1-9][0-9]{5}$/.test(cleanPin)) {
+    return sendError(res, {
+      message: 'PIN code must be a valid 6-digit Indian postal code',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_PINCODE',
+    })
+  }
+
+  const addressData = {
+    recipientName: recipientName.trim(),
+    recipientPhone: phoneDigits,
+    houseNumber: houseNumber.trim(),
+    streetArea: streetArea.trim(),
+    landmark: String(landmark || '').trim(),
+    city: city.trim(),
+    state: state.trim(),
+    pincode: cleanPin,
+  }
+
+  const isResubmission = user.welcomeKit.addressStatus === 'CORRECTION_REQUESTED'
+
+  user.welcomeKit.address = addressData
+  user.welcomeKit.addressStatus = 'SUBMITTED'
+  user.welcomeKit.addressSubmittedAt = new Date()
+  user.welcomeKit.addressCorrectionReason = ''
+
+  // Sync legacy fields
+  user.welcomeKit.deliveryAddress = `${addressData.houseNumber}, ${addressData.streetArea}${addressData.landmark ? `, Near ${addressData.landmark}` : ''}, ${addressData.city}, ${addressData.state} - ${addressData.pincode}`
+  user.welcomeKit.deliveryCity = addressData.city
+  user.welcomeKit.deliveryPincode = addressData.pincode
+
+  user.welcomeKit.auditTrail = user.welcomeKit.auditTrail || []
+  user.welcomeKit.auditTrail.push({
+    action: isResubmission ? 'ADDRESS_RESUBMITTED' : 'ADDRESS_SUBMITTED',
+    performedBy: user._id,
+    performedByName: user.fullName || user.phone || 'Partner',
+    performedByRole: user.role,
+    timestamp: new Date(),
+    details: `Delivery address submitted for ${addressData.recipientName} (${addressData.city}, PIN: ${addressData.pincode}).`,
+  })
 
   await user.save()
 
+  // Notify admin and partner
+  await notifyAddressSubmitted(user)
+
   return sendSuccess(res, {
-    message: normalizedAction === 'APPROVE' || normalizedAction === 'ACCEPT'
-      ? 'Payment verified successfully! Welcome kit authorized.'
-      : 'Payment screenshot rejected. Service partner will be prompted to re-upload.',
+    message: 'Welcome kit delivery address submitted successfully! Admin will review and prepare dispatch.',
+    data: {
+      address: user.welcomeKit.address,
+      addressStatus: user.welcomeKit.addressStatus,
+      welcomeKit: user.welcomeKit,
+    },
+  })
+})
+
+/**
+ * POST /api/service-partners/:partnerId/welcome-kit/request-address-correction
+ * Admin requests address correction from service partner
+ */
+export const requestPartnerAddressCorrection = asyncHandler(async (req, res) => {
+  const { partnerId } = req.params
+  const { reason } = req.body
+
+  if (!mongoose.Types.ObjectId.isValid(partnerId)) {
+    return sendError(res, { message: 'Invalid partner ID', statusCode: HTTP_STATUS.BAD_REQUEST })
+  }
+
+  const cleanReason = String(reason || '').trim()
+  if (!cleanReason) {
+    return sendError(res, {
+      message: 'A non-empty correction reason is required',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'REASON_REQUIRED',
+    })
+  }
+
+  const user = await User.findById(partnerId)
+  if (!user) {
+    return sendError(res, { message: 'Service partner not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  user.welcomeKit = user.welcomeKit || {}
+
+  if (user.welcomeKit.status === 'DISPATCHED' || user.welcomeKit.status === 'DELIVERED') {
+    return sendError(res, {
+      message: 'Cannot request address correction after welcome kit has been dispatched.',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+    })
+  }
+
+  user.welcomeKit.addressStatus = 'CORRECTION_REQUESTED'
+  user.welcomeKit.addressCorrectionReason = cleanReason
+  user.welcomeKit.addressCorrectionRequestedAt = new Date()
+  user.welcomeKit.addressCorrectionRequestedBy = req.user._id
+
+  user.welcomeKit.auditTrail = user.welcomeKit.auditTrail || []
+  user.welcomeKit.auditTrail.push({
+    action: 'ADDRESS_CORRECTION_REQUESTED',
+    performedBy: req.user._id,
+    performedByName: req.user.fullName || 'Admin',
+    performedByRole: req.user.role,
+    timestamp: new Date(),
+    details: `Address correction requested. Reason: ${cleanReason}`,
+  })
+
+  await user.save()
+
+  // Notify service provider
+  await notifyAddressCorrectionRequested(user._id, cleanReason)
+
+  return sendSuccess(res, {
+    message: 'Address correction requested. Service partner notified.',
+    data: {
+      welcomeKit: user.welcomeKit,
+    },
+  })
+})
+
+/**
+ * POST /api/service-partners/:partnerId/welcome-kit/confirm-address
+ * Admin confirms shipping address & marks kit ready for dispatch
+ */
+export const confirmPartnerWelcomeKitAddress = asyncHandler(async (req, res) => {
+  const { partnerId } = req.params
+
+  if (!mongoose.Types.ObjectId.isValid(partnerId)) {
+    return sendError(res, { message: 'Invalid partner ID', statusCode: HTTP_STATUS.BAD_REQUEST })
+  }
+
+  const user = await User.findById(partnerId)
+  if (!user) {
+    return sendError(res, { message: 'Service partner not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  user.welcomeKit = user.welcomeKit || {}
+  const addr = user.welcomeKit.address
+
+  if (!addr || !addr.recipientName || !addr.pincode) {
+    return sendError(res, {
+      message: 'Partner has not submitted a complete delivery address yet.',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'NO_ADDRESS',
+    })
+  }
+
+  user.welcomeKit.addressStatus = 'CONFIRMED'
+  user.welcomeKit.status = 'READY_FOR_DISPATCH'
+  user.welcomeKit.addressConfirmedAt = new Date()
+  user.welcomeKit.addressConfirmedBy = req.user._id
+  user.welcomeKit.confirmedAddressSnapshot = {
+    recipientName: addr.recipientName,
+    recipientPhone: addr.recipientPhone,
+    houseNumber: addr.houseNumber,
+    streetArea: addr.streetArea,
+    landmark: addr.landmark || '',
+    city: addr.city,
+    state: addr.state,
+    pincode: addr.pincode,
+  }
+
+  user.welcomeKit.auditTrail = user.welcomeKit.auditTrail || []
+  user.welcomeKit.auditTrail.push({
+    action: 'ADDRESS_CONFIRMED',
+    performedBy: req.user._id,
+    performedByName: req.user.fullName || 'Admin',
+    performedByRole: req.user.role,
+    timestamp: new Date(),
+    details: 'Shipping address confirmed by admin. Welcome kit marked ready for dispatch.',
+  })
+
+  await user.save()
+
+  // Notify partner
+  await notifyAddressConfirmed(user._id)
+
+  return sendSuccess(res, {
+    message: 'Shipping address confirmed! Welcome kit marked ready for dispatch.',
+    data: {
+      welcomeKit: user.welcomeKit,
+    },
+  })
+})
+
+/**
+ * POST /api/service-partners/:partnerId/welcome-kit/dispatch
+ * Admin records manual dispatch details (Informational only — No courier live tracking)
+ */
+export const dispatchPartnerWelcomeKit = asyncHandler(async (req, res) => {
+  const { partnerId } = req.params
+  const { courierCompany, trackingNumber, trackingUrl, dispatchDate, estimatedDeliveryDate, notes } = req.body
+
+  if (!mongoose.Types.ObjectId.isValid(partnerId)) {
+    return sendError(res, { message: 'Invalid partner ID', statusCode: HTTP_STATUS.BAD_REQUEST })
+  }
+
+  if (!courierCompany || typeof courierCompany !== 'string' || courierCompany.trim().length === 0) {
+    return sendError(res, {
+      message: 'Courier company name is required',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'COURIER_REQUIRED',
+    })
+  }
+
+  const cleanUrl = String(trackingUrl || '').trim()
+  if (cleanUrl) {
+    if (!/^https:\/\/[^\s$.?#].[^\s]*$/i.test(cleanUrl)) {
+      return sendError(res, {
+        message: 'Tracking URL must be a valid secure HTTPS link (e.g. https://www.delhivery.com/track/package/...)',
+        statusCode: HTTP_STATUS.BAD_REQUEST,
+        code: 'INVALID_HTTPS_URL',
+      })
+    }
+  }
+
+  const user = await User.findById(partnerId)
+  if (!user) {
+    return sendError(res, { message: 'Service partner not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  user.welcomeKit = user.welcomeKit || {}
+
+  // Guard against duplicate dispatch if already delivered
+  if (user.welcomeKit.status === 'DELIVERED') {
+    return sendError(res, {
+      message: 'Kit has already been delivered. Cannot change dispatch details.',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+    })
+  }
+
+  const dispatchObj = {
+    courierCompany: courierCompany.trim(),
+    trackingNumber: String(trackingNumber || '').trim(),
+    trackingUrl: cleanUrl,
+    dispatchDate: dispatchDate ? new Date(dispatchDate) : new Date(),
+    estimatedDeliveryDate: estimatedDeliveryDate ? new Date(estimatedDeliveryDate) : null,
+    notes: String(notes || '').trim(),
+    dispatchedBy: req.user._id,
+    dispatchedAt: new Date(),
+  }
+
+  user.welcomeKit.status = 'DISPATCHED'
+  user.welcomeKit.dispatchDetails = dispatchObj
+
+  user.welcomeKit.auditTrail = user.welcomeKit.auditTrail || []
+  user.welcomeKit.auditTrail.push({
+    action: 'DISPATCHED',
+    performedBy: req.user._id,
+    performedByName: req.user.fullName || 'Admin',
+    performedByRole: req.user.role,
+    timestamp: new Date(),
+    details: `Welcome kit marked as dispatched via ${dispatchObj.courierCompany}${dispatchObj.trackingNumber ? ` (AWB: ${dispatchObj.trackingNumber})` : ''}.${dispatchObj.notes ? ` Notes: ${dispatchObj.notes}` : ''}`,
+  })
+
+  await user.save()
+
+  // Notify service provider (Title: Welcome Kit Dispatched)
+  await notifyWelcomeKitDispatched(user._id, dispatchObj)
+
+  return sendSuccess(res, {
+    message: 'Welcome kit marked as dispatched successfully!',
+    data: {
+      welcomeKit: user.welcomeKit,
+    },
+  })
+})
+
+/**
+ * POST /api/service-partners/:partnerId/welcome-kit/confirm-delivery
+ * Explicit, authorized admin action to manually confirm welcome kit delivery
+ */
+export const confirmPartnerWelcomeKitDeliveryAdmin = asyncHandler(async (req, res) => {
+  const { partnerId } = req.params
+  const { notes } = req.body
+
+  if (!mongoose.Types.ObjectId.isValid(partnerId)) {
+    return sendError(res, { message: 'Invalid partner ID', statusCode: HTTP_STATUS.BAD_REQUEST })
+  }
+
+  const user = await User.findById(partnerId)
+  if (!user) {
+    return sendError(res, { message: 'Service partner not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  user.welcomeKit = user.welcomeKit || {}
+
+  // Prevent duplicate delivery confirmation
+  if (user.welcomeKit.status === 'DELIVERED' || user.welcomeKit.deliveryConfirmation?.isConfirmed) {
+    return sendError(res, {
+      message: 'Welcome kit delivery has already been confirmed.',
+      statusCode: HTTP_STATUS.CONFLICT,
+      code: 'ALREADY_DELIVERED',
+    })
+  }
+
+  const now = new Date()
+  user.welcomeKit.status = 'DELIVERED'
+  user.welcomeKit.isReceived = true
+  user.welcomeKit.receivedAt = now
+  user.welcomeKit.uniformIssued = true
+  user.welcomeKit.idCardIssued = true
+  user.welcomeKit.bagIssued = true
+  user.welcomeKit.productsIssued = true
+  user.welcomeKit.issuedAt = user.welcomeKit.issuedAt || now
+
+  user.welcomeKit.deliveryConfirmation = {
+    isConfirmed: true,
+    confirmedAt: now,
+    confirmedBy: req.user._id,
+    notes: String(notes || 'Delivery manually verified and confirmed by authorized admin.').trim(),
+  }
+
+  user.welcomeKit.auditTrail = user.welcomeKit.auditTrail || []
+  user.welcomeKit.auditTrail.push({
+    action: 'DELIVERED_CONFIRMED',
+    performedBy: req.user._id,
+    performedByName: req.user.fullName || 'Admin',
+    performedByRole: req.user.role,
+    timestamp: now,
+    details: `Welcome kit delivery confirmed by admin.${notes ? ` Notes: ${notes.trim()}` : ''}`,
+  })
+
+  await user.save()
+
+  // Notify service provider & admin (Title: Welcome Kit Delivered Successfully)
+  await notifyWelcomeKitDelivered(user)
+
+  return sendSuccess(res, {
+    message: 'Welcome kit delivery confirmed successfully! Partner profile activated for bookings.',
     data: {
       welcomeKit: user.welcomeKit,
       user: user.toSafeObject(),

@@ -46,4 +46,64 @@ router.patch(
   user.verifyPartnerWelcomeKitPayment,
 )
 
+/**
+ * POST /api/service-partners/:partnerId/welcome-kit/request-address-correction
+ * Admin requests address correction from service provider
+ */
+router.post(
+  '/:partnerId/welcome-kit/request-address-correction',
+  [
+    param('partnerId').isMongoId().withMessage('partnerId must be a valid MongoDB ObjectId'),
+    body('reason').trim().notEmpty().withMessage('reason is required to request address correction'),
+  ],
+  validateRequest,
+  user.requestPartnerAddressCorrection,
+)
+
+/**
+ * POST /api/service-partners/:partnerId/welcome-kit/confirm-address
+ * Admin confirms shipping address & marks kit ready for dispatch
+ */
+router.post(
+  '/:partnerId/welcome-kit/confirm-address',
+  [
+    param('partnerId').isMongoId().withMessage('partnerId must be a valid MongoDB ObjectId'),
+  ],
+  validateRequest,
+  user.confirmPartnerWelcomeKitAddress,
+)
+
+/**
+ * POST /api/service-partners/:partnerId/welcome-kit/dispatch
+ * Admin records manual dispatch details (Informational only — No live tracking)
+ */
+router.post(
+  '/:partnerId/welcome-kit/dispatch',
+  [
+    param('partnerId').isMongoId().withMessage('partnerId must be a valid MongoDB ObjectId'),
+    body('courierCompany').trim().notEmpty().withMessage('courierCompany is required'),
+    body('trackingNumber').optional().trim(),
+    body('trackingUrl').optional().trim(),
+    body('dispatchDate').optional().isISO8601().toDate(),
+    body('estimatedDeliveryDate').optional().isISO8601().toDate(),
+    body('notes').optional().trim(),
+  ],
+  validateRequest,
+  user.dispatchPartnerWelcomeKit,
+)
+
+/**
+ * POST /api/service-partners/:partnerId/welcome-kit/confirm-delivery
+ * Admin confirms delivery manually
+ */
+router.post(
+  '/:partnerId/welcome-kit/confirm-delivery',
+  [
+    param('partnerId').isMongoId().withMessage('partnerId must be a valid MongoDB ObjectId'),
+    body('notes').optional().trim(),
+  ],
+  validateRequest,
+  user.confirmPartnerWelcomeKitDeliveryAdmin,
+)
+
 export default router

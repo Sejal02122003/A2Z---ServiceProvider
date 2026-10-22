@@ -101,6 +101,28 @@ export async function submitWelcomeKitPayment(payload) {
 }
 
 /**
+ * Submit Welcome Kit delivery address (8 fields)
+ * (Unlocked ONLY after payment is approved)
+ * @param {{
+ *   recipientName: string,
+ *   mobileNumber: string,
+ *   houseBuilding: string,
+ *   streetArea: string,
+ *   landmark?: string,
+ *   city: string,
+ *   state: string,
+ *   pincode: string
+ * }} payload
+ */
+export async function submitWelcomeKitAddress(payload) {
+  const json = await apiRequest('/users/me/welcome-kit/address', {
+    method: 'POST',
+    body: payload,
+  })
+  return json.data
+}
+
+/**
  * Confirm Partner Welcome Kit delivery / receipt
  */
 export async function confirmWelcomeKitReceipt() {
@@ -109,3 +131,4 @@ export async function confirmWelcomeKitReceipt() {
   })
   return json.data
 }
+

@@ -55,6 +55,7 @@ import {
   schedulePartnerTrialSlot,
   completePartnerTrial,
   submitWelcomeKitPayment,
+  submitWelcomeKitAddress,
   confirmWelcomeKitReceipt,
 } from '../../api/partnerOnboardingApi.js'
 import { submitLabourKycDocuments } from '../../api/userKycApi.js'
@@ -165,12 +166,29 @@ export function PartnerOnboardingStepper({ onFinish }) {
   const [paymentNotes, setPaymentNotes] = useState('')
   const [reuploadMode, setReuploadMode] = useState(false)
 
-  // Delivery Address State
+  // Delivery Address State (Legacy fallback + 8-Field Schema)
   const [deliveryAddress, setDeliveryAddress] = useState(
     user?.savedAddress?.text || user?.permanentAddress || ''
   )
   const [deliveryCity, setDeliveryCity] = useState(user?.city || 'Noida')
   const [deliveryPincode, setDeliveryPincode] = useState('201301')
+
+  // Welcome Kit 8-Field Dedicated Address State
+  const [addressRecipientName, setAddressRecipientName] = useState(user?.fullName || '')
+  const [addressMobileNumber, setAddressMobileNumber] = useState(
+    user?.phone ? String(user.phone).replace(/\D/g, '').slice(-10) : ''
+  )
+  const [addressHouseBuilding, setAddressHouseBuilding] = useState('')
+  const [addressStreetArea, setAddressStreetArea] = useState('')
+  const [addressLandmark, setAddressLandmark] = useState('')
+  const [addressCity, setAddressCity] = useState(user?.city || '')
+  const [addressState, setAddressState] = useState(user?.state || '')
+  const [addressPincode, setAddressPincode] = useState(
+    user?.pincode ? String(user.pincode).slice(0, 6) : ''
+  )
+  const [addressSubmitting, setAddressSubmitting] = useState(false)
+  const [addressEditMode, setAddressEditMode] = useState(false)
+  const [addressValidationError, setAddressValidationError] = useState('')
 
   const showToast = (type, message) => {
     setToast({ type, message })
@@ -299,6 +317,18 @@ export function PartnerOnboardingStepper({ onFinish }) {
         }
         if (res.user.welcomeKit?.paymentReceiptUrl) {
           setBillReceiptUrl(res.user.welcomeKit.paymentReceiptUrl)
+        }
+
+        const wkAddr = res.welcomeKit?.address || res.user?.welcomeKit?.address
+        if (wkAddr && wkAddr.recipientName) {
+          setAddressRecipientName(wkAddr.recipientName)
+          if (wkAddr.mobileNumber) setAddressMobileNumber(wkAddr.mobileNumber)
+          if (wkAddr.houseBuilding) setAddressHouseBuilding(wkAddr.houseBuilding)
+          if (wkAddr.streetArea) setAddressStreetArea(wkAddr.streetArea)
+          if (wkAddr.landmark) setAddressLandmark(wkAddr.landmark)
+          if (wkAddr.city) setAddressCity(wkAddr.city)
+          if (wkAddr.state) setAddressState(wkAddr.state)
+          if (wkAddr.pincode) setAddressPincode(wkAddr.pincode)
         }
       }
       if (res.step4?.welcomeKitPayment?.receiptUrl) {
@@ -611,6 +641,67 @@ export function PartnerOnboardingStepper({ onFinish }) {
       showToast('error', err?.message || 'Failed to submit payment')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  // Step 5: Submit or update Welcome Kit Delivery Address (8 Fields)
+  const handleSubmitWelcomeKitAddress = async (e) => {
+    e?.preventDefault()
+    setAddressValidationError('')
+
+    if (!addressRecipientName.trim()) {
+      setAddressValidationError('Recipient Full Name is required.')
+      return
+    }
+    const cleanMobile = addressMobileNumber.replace(/\D/g, '')
+    if (cleanMobile.length !== 10) {
+      setAddressValidationError('Please enter a valid 10-digit mobile number.')
+      return
+    }
+    if (!addressHouseBuilding.trim()) {
+      setAddressValidationError('House / Flat / Building number is required.')
+      return
+    }
+    if (!addressStreetArea.trim()) {
+      setAddressValidationError('Street and Area is required.')
+      return
+    }
+    if (!addressCity.trim()) {
+      setAddressValidationError('City is required.')
+      return
+    }
+    if (!addressState.trim()) {
+      setAddressValidationError('State is required.')
+      return
+    }
+    const cleanPincode = addressPincode.replace(/\D/g, '')
+    if (cleanPincode.length !== 6 || !/^[1-9][0-9]{5}$/.test(cleanPincode)) {
+      setAddressValidationError('Please enter a valid 6-digit Indian PIN code.')
+      return
+    }
+
+    try {
+      setAddressSubmitting(true)
+      await submitWelcomeKitAddress({
+        recipientName: addressRecipientName.trim(),
+        mobileNumber: cleanMobile,
+        houseBuilding: addressHouseBuilding.trim(),
+        streetArea: addressStreetArea.trim(),
+        landmark: addressLandmark.trim(),
+        city: addressCity.trim(),
+        state: addressState.trim(),
+        pincode: cleanPincode,
+      })
+
+      setAddressEditMode(false)
+      showToast('success', 'Delivery address submitted successfully! Admin has been notified.')
+      await loadStatus()
+    } catch (err) {
+      console.error('Failed to submit address:', err)
+      setAddressValidationError(err?.message || 'Failed to submit address')
+      showToast('error', err?.message || 'Failed to submit address')
+    } finally {
+      setAddressSubmitting(false)
     }
   }
 
@@ -1878,7 +1969,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                       const kitRejectionReason = kitPayment.rejectionReason
 
                       // STATE 1: PAYMENT IS APPROVED & VERIFIED (PAID)
-                      if (kitPaymentStatus === 'PAID') {
+                      if (['PAID', 'READY_FOR_DISPATCH', 'DISPATCHED', 'DELIVERED'].includes(kitPaymentStatus)) {
                         return (
                           <div className="rounded-2xl border border-emerald-300 bg-gradient-to-br from-emerald-50/80 via-teal-50/40 to-white p-4 space-y-3 shadow-xs">
                             <div className="flex items-center justify-between pb-2 border-b border-emerald-100">
@@ -1894,8 +1985,19 @@ export function PartnerOnboardingStepper({ onFinish }) {
                             </div>
 
                             <p className="text-xs text-emerald-900 leading-relaxed">
-                              Your payment has been successfully approved! Your welcome kit dispatch is authorized. Please proceed to <strong>Step 5</strong> below to confirm kit delivery.
+                              Your payment slip has been approved successfully! Your welcome kit address submission form is now unlocked. Please proceed to <strong>Step 5</strong> below to submit your delivery address.
                             </p>
+
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedStep(5)}
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition cursor-pointer"
+                              >
+                                <span>Proceed to Delivery Address Form in Step 5</span>
+                                <ArrowRight className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
 
                             {kitPaymentReceiptUrl && (
                               <div className="flex items-center gap-3 bg-white/90 p-2.5 rounded-xl border border-emerald-200/80 text-xs">
@@ -2279,19 +2381,62 @@ export function PartnerOnboardingStepper({ onFinish }) {
                   </h3>
                 </div>
                 <div className="flex items-center gap-2">
-                  {step5.completed ? (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                      Active for Bookings 🚀
-                    </span>
-                  ) : !(step4.completed && step4.paymentComplete) ? (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-                      Locked
-                    </span>
-                  ) : (
-                    <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-800">
-                      Dispatched
-                    </span>
-                  )}
+                  {(() => {
+                    const wk = data?.welcomeKit || data?.user?.welcomeKit || {}
+                    const kitStatus = wk.status || 'PENDING_PAYMENT'
+                    const wkAddress = wk.address || {}
+                    const addressStatus = wkAddress.status || 'NOT_SUBMITTED'
+                    const isDispatched = kitStatus === 'DISPATCHED' || Boolean(wk.dispatch?.courierName)
+                    const isDelivered = kitStatus === 'DELIVERED' || Boolean(wk.deliveryConfirmation?.isConfirmed)
+
+                    if (step5.completed || isDelivered) {
+                      return (
+                        <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                          Active for Bookings 🚀
+                        </span>
+                      )
+                    }
+                    if (isDispatched) {
+                      return (
+                        <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-[10px] font-bold text-purple-800">
+                          Dispatched 🚚
+                        </span>
+                      )
+                    }
+                    if (kitStatus === 'READY_FOR_DISPATCH' || addressStatus === 'CONFIRMED') {
+                      return (
+                        <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-[10px] font-bold text-indigo-800">
+                          Ready for Dispatch 📦
+                        </span>
+                      )
+                    }
+                    if (addressStatus === 'SUBMITTED') {
+                      return (
+                        <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-bold text-blue-800">
+                          Address Submitted 📍
+                        </span>
+                      )
+                    }
+                    if (addressStatus === 'CORRECTION_REQUESTED') {
+                      return (
+                        <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-800 animate-pulse">
+                          Action Required ⚠️
+                        </span>
+                      )
+                    }
+                    if (!(step4.completed && step4.paymentComplete)) {
+                      return (
+                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-500">
+                          Locked 🔒
+                        </span>
+                      )
+                    }
+                    return (
+                      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
+                        Address Required 📝
+                      </span>
+                    )
+                  })()}
                   {expandedStep === 5 ? (
                     <ChevronDown className="h-4 w-4 text-slate-400" />
                   ) : (
@@ -2365,57 +2510,382 @@ export function PartnerOnboardingStepper({ onFinish }) {
                       </div>
                     </div>
 
-                    {/* Delivery Address Details */}
-                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-700">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                        <Truck className="h-3.5 w-3.5 text-brand" />
-                        <span>Delivery & Dispatch Address</span>
-                      </div>
-                      <p className="text-[11px] text-slate-600 mt-1">
-                        {deliveryAddress || 'Registered Hub Pickup / Current Partner Address'}
-                      </p>
-                    </div>
+                    {/* Welcome Kit 8-Field Delivery Address & Dispatch Section */}
+                    {(() => {
+                      const wk = data?.welcomeKit || data?.user?.welcomeKit || {}
+                      const kitStatus = wk.status || 'PENDING_PAYMENT'
+                      const wkAddress = wk.address || {}
+                      const addressStatus = wkAddress.status || 'NOT_SUBMITTED'
+                      const isAddressSubmitted = Boolean(wkAddress.recipientName && addressStatus !== 'NOT_SUBMITTED')
+                      const isDispatched = kitStatus === 'DISPATCHED' || Boolean(wk.dispatch?.courierName)
+                      const isDelivered = kitStatus === 'DELIVERED' || Boolean(wk.deliveryConfirmation?.isConfirmed)
 
-                    {/* Receipt Status / Confirm Action */}
-                    {step5.completed ? (
-                      <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-center">
-                        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-white shadow-md">
-                          <Sparkles className="h-5 w-5" />
+                      return (
+                        <div className="space-y-4 pt-1">
+                          {/* Case A: Address Correction Requested */}
+                          {addressStatus === 'CORRECTION_REQUESTED' && (
+                            <div className="rounded-2xl border-2 border-rose-300 bg-rose-50/70 p-4 space-y-3">
+                              <div className="flex items-center gap-2 text-rose-950 font-bold text-xs uppercase tracking-wide">
+                                <AlertTriangle className="h-4 w-4 text-rose-600" />
+                                <span>Address Correction Requested by Admin</span>
+                              </div>
+                              <div className="rounded-xl bg-white border border-rose-200 p-3 text-xs text-rose-900 space-y-1">
+                                <span className="font-bold text-[11px] text-rose-700">Admin Note:</span>
+                                <p className="font-semibold text-slate-800">
+                                  "{wkAddress.correctionReason || 'Please review and correct your shipping details.'}"
+                                </p>
+                              </div>
+                              <p className="text-[11px] text-slate-600">
+                                Please correct your 8-field delivery address below and click <strong>Submit Corrected Address</strong> to proceed.
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Case B: Address Not Submitted OR Edit Mode Active */}
+                          {(!isAddressSubmitted || addressEditMode || addressStatus === 'CORRECTION_REQUESTED') ? (
+                            <form onSubmit={handleSubmitWelcomeKitAddress} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-3.5 shadow-2xs">
+                              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="h-4 w-4 text-brand" />
+                                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                                    {addressStatus === 'CORRECTION_REQUESTED'
+                                      ? 'Correct Welcome Kit Delivery Address'
+                                      : isAddressSubmitted
+                                      ? 'Edit Delivery Address'
+                                      : 'Submit Welcome Kit Delivery Address (8 Fields)'}
+                                  </h4>
+                                </div>
+                                {addressEditMode && !isDispatched && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setAddressEditMode(false)}
+                                    className="text-xs text-slate-500 hover:text-slate-800 font-semibold cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                )}
+                              </div>
+
+                              <p className="text-[11px] text-slate-500 leading-snug">
+                                Enter your exact physical address for welcome kit dispatch. Please ensure PIN code and phone number are accurate.
+                              </p>
+
+                              {addressValidationError && (
+                                <div className="flex items-center gap-2 rounded-xl bg-rose-50 border border-rose-200 p-2.5 text-xs text-rose-800 font-medium">
+                                  <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                                  <span>{addressValidationError}</span>
+                                </div>
+                              )}
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {/* 1. Recipient Full Name */}
+                                <div>
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                                    Recipient Full Name *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={addressRecipientName}
+                                    onChange={(e) => setAddressRecipientName(e.target.value)}
+                                    placeholder="e.g. Ramesh Kumar"
+                                    required
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-brand"
+                                  />
+                                </div>
+
+                                {/* 2. Mobile Number (10 digits) */}
+                                <div>
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                                    Contact Mobile Number (10 Digits) *
+                                  </label>
+                                  <input
+                                    type="tel"
+                                    maxLength={10}
+                                    value={addressMobileNumber}
+                                    onChange={(e) => setAddressMobileNumber(e.target.value.replace(/\D/g, ''))}
+                                    placeholder="e.g. 9876543210"
+                                    required
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-brand font-mono"
+                                  />
+                                </div>
+
+                                {/* 3. House / Flat / Building */}
+                                <div>
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                                    House / Flat / Building No. *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={addressHouseBuilding}
+                                    onChange={(e) => setAddressHouseBuilding(e.target.value)}
+                                    placeholder="e.g. Flat 402, Shivam Apartments"
+                                    required
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-brand"
+                                  />
+                                </div>
+
+                                {/* 4. Street and Area */}
+                                <div>
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                                    Street & Area / Sector *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={addressStreetArea}
+                                    onChange={(e) => setAddressStreetArea(e.target.value)}
+                                    placeholder="e.g. Main Market Road, Sector 62"
+                                    required
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-brand"
+                                  />
+                                </div>
+
+                                {/* 5. Landmark */}
+                                <div>
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                                    Landmark (Optional)
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={addressLandmark}
+                                    onChange={(e) => setAddressLandmark(e.target.value)}
+                                    placeholder="e.g. Near Fortis Hospital"
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-brand"
+                                  />
+                                </div>
+
+                                {/* 6. City */}
+                                <div>
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                                    City *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={addressCity}
+                                    onChange={(e) => setAddressCity(e.target.value)}
+                                    placeholder="e.g. Noida"
+                                    required
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-brand"
+                                  />
+                                </div>
+
+                                {/* 7. State */}
+                                <div>
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                                    State *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={addressState}
+                                    onChange={(e) => setAddressState(e.target.value)}
+                                    placeholder="e.g. Uttar Pradesh"
+                                    required
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-brand"
+                                  />
+                                </div>
+
+                                {/* 8. Six-digit Indian PIN Code */}
+                                <div>
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                                    6-Digit Indian PIN Code *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    maxLength={6}
+                                    value={addressPincode}
+                                    onChange={(e) => setAddressPincode(e.target.value.replace(/\D/g, ''))}
+                                    placeholder="e.g. 201301"
+                                    required
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-brand font-mono"
+                                  />
+                                </div>
+                              </div>
+
+                              <button
+                                type="submit"
+                                disabled={addressSubmitting}
+                                className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand to-emerald-600 py-3 text-xs font-bold text-white shadow-md shadow-brand/20 hover:brightness-105 disabled:opacity-50 transition cursor-pointer"
+                              >
+                                {addressSubmitting ? (
+                                  <>
+                                    <RefreshCw className="h-4 w-4 animate-spin" />
+                                    <span>Submitting Delivery Address...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    <span>
+                                      {addressStatus === 'CORRECTION_REQUESTED'
+                                        ? 'Submit Corrected Address'
+                                        : isAddressSubmitted
+                                        ? 'Update Address'
+                                        : 'Save & Submit Delivery Address'}
+                                    </span>
+                                  </>
+                                )}
+                              </button>
+                            </form>
+                          ) : (
+                            /* Case C: Submitted Address Summary Card */
+                            <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-2xs">
+                              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="h-4 w-4 text-brand" />
+                                  <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                                    Welcome Kit Delivery Address
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  {addressStatus === 'CONFIRMED' || kitStatus === 'READY_FOR_DISPATCH' ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 ring-1 ring-emerald-300">
+                                      <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                                      Address Confirmed ✓
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-bold text-blue-800 ring-1 ring-blue-300">
+                                      <Clock className="h-3 w-3 text-blue-600" />
+                                      Submitted • Under Verification
+                                    </span>
+                                  )}
+
+                                  {!isDispatched && !isDelivered && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setAddressEditMode(true)}
+                                      className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                                    >
+                                      Edit
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs text-slate-700">
+                                <div>
+                                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Recipient</span>
+                                  <span className="font-semibold text-slate-900">{wkAddress.recipientName}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Contact Phone</span>
+                                  <span className="font-semibold text-slate-900 font-mono">+91 {wkAddress.mobileNumber}</span>
+                                </div>
+                                <div className="sm:col-span-2">
+                                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Shipping Location</span>
+                                  <span className="font-medium text-slate-800">
+                                    {wkAddress.houseBuilding}, {wkAddress.streetArea}
+                                    {wkAddress.landmark ? `, Landmark: ${wkAddress.landmark}` : ''}
+                                  </span>
+                                  <div className="font-bold text-slate-900 mt-0.5">
+                                    {wkAddress.city}, {wkAddress.state} — PIN: {wkAddress.pincode}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Case D: Manual Dispatch Details Card (When Dispatched) */}
+                          {isDispatched && (
+                            <div className="rounded-2xl border-2 border-purple-200 bg-gradient-to-br from-purple-50/70 via-indigo-50/30 to-white p-4 space-y-3 shadow-2xs">
+                              <div className="flex items-center justify-between pb-2 border-b border-purple-200">
+                                <div className="flex items-center gap-2 text-purple-950 font-bold text-xs uppercase tracking-wide">
+                                  <Truck className="h-4 w-4 text-purple-600" />
+                                  <span>Welcome Kit Dispatched 📦</span>
+                                </div>
+                                <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-[10px] font-bold text-purple-800 ring-1 ring-purple-300">
+                                  In Transit
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                <div>
+                                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Courier Company</span>
+                                  <span className="font-bold text-slate-900">{wk.dispatch?.courierName || 'Registered Courier'}</span>
+                                </div>
+                                {wk.dispatch?.trackingNumber && (
+                                  <div>
+                                    <span className="text-[10px] uppercase font-bold text-slate-400 block">AWB / Tracking No.</span>
+                                    <span className="font-mono font-bold text-purple-900">{wk.dispatch.trackingNumber}</span>
+                                  </div>
+                                )}
+                                <div>
+                                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Dispatch Date</span>
+                                  <span className="font-semibold text-slate-800">
+                                    {wk.dispatch?.dispatchDate ? new Date(wk.dispatch.dispatchDate).toLocaleDateString() : 'Recorded'}
+                                  </span>
+                                </div>
+                                {wk.dispatch?.estimatedDeliveryDate && (
+                                  <div>
+                                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Est. Delivery</span>
+                                    <span className="font-semibold text-slate-800">
+                                      {new Date(wk.dispatch.estimatedDeliveryDate).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {wk.dispatch?.trackingUrl && wk.dispatch.trackingUrl.startsWith('https://') && (
+                                <div className="pt-1">
+                                  <a
+                                    href={wk.dispatch.trackingUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-purple-700 transition cursor-pointer"
+                                  >
+                                    <span>Track on Courier Website</span>
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </a>
+                                </div>
+                              )}
+
+                              <p className="text-[10px] text-slate-400 italic">
+                                * Informational dispatch details recorded by A2Z operations team. No automated courier polling is enabled.
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Case E: Final Delivery Confirmation & Booking Activation */}
+                          {isDelivered || step5.completed ? (
+                            <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-center">
+                              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-white shadow-md">
+                                <Sparkles className="h-5 w-5" />
+                              </div>
+                              <h4 className="mt-2 text-sm font-black text-emerald-950">
+                                Welcome Kit Delivered Successfully!
+                              </h4>
+                              <p className="mt-1 text-xs text-emerald-700">
+                                Your profile is 100% verified and active. Customer bookings matching your trade will now appear in your live feed.
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (onFinish) onFinish()
+                                  else navigate('/app/jobs')
+                                }}
+                                className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700 cursor-pointer"
+                              >
+                                <span>Go to Bookings Dashboard</span>
+                                <ArrowRight className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={handleConfirmKitReceipt}
+                                disabled={submitting}
+                                className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 py-3 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:brightness-105 cursor-pointer"
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                                <span>I Have Received My Welcome Kit</span>
+                              </button>
+                              <p className="text-center text-[10px] text-slate-400">
+                                Tap after receiving your kit package from courier or picking it up from the hub.
+                              </p>
+                            </div>
+                          )}
                         </div>
-                        <h4 className="mt-2 text-sm font-black text-emerald-950">
-                          You Are Ready to Accept Bookings!
-                        </h4>
-                        <p className="mt-1 text-xs text-emerald-700">
-                          Your profile is 100% verified and active. Customer bookings matching your trade will now appear in your live feed.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (onFinish) onFinish()
-                            else navigate('/app/jobs')
-                          }}
-                          className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700"
-                        >
-                          <span>Go to Bookings Dashboard</span>
-                          <ArrowRight className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <button
-                          type="button"
-                          onClick={handleConfirmKitReceipt}
-                          disabled={submitting}
-                          className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 py-3 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:brightness-105"
-                        >
-                          <CheckCircle2 className="h-4 w-4" />
-                          <span>I Have Received My Welcome Kit</span>
-                        </button>
-                        <p className="text-center text-[10px] text-slate-400">
-                          Tap after receiving your kit package or picking it up from the hub.
-                        </p>
-                      </div>
-                    )}
+                      )
+                    })()}
                   </motion.div>
                 )}
               </AnimatePresence>
