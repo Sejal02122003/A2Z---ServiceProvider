@@ -52,13 +52,21 @@ export const listGrouped = asyncHandler(async (req, res) => {
 
   const servicesBySubcat = new Map()
   for (const s of services) {
+    const effectivePrice = Number(s.hourlyPrice || s.basePrice || s.pricePerUnit || 0)
     if (userZoneId && s.zones && s.zones.length > 0) {
       const zonePricing = s.zones.find(z => String(z.zone) === userZoneId)
       if (zonePricing && typeof zonePricing.price === 'number') {
         s.hourlyPrice = zonePricing.price
+        s.basePrice = zonePricing.price
+      } else {
+        if (!s.hourlyPrice && effectivePrice) s.hourlyPrice = effectivePrice
+        if (!s.basePrice && effectivePrice) s.basePrice = effectivePrice
       }
+    } else {
+      if (!s.hourlyPrice && effectivePrice) s.hourlyPrice = effectivePrice
+      if (!s.basePrice && effectivePrice) s.basePrice = effectivePrice
     }
-    delete s.basePrice
+
     const k = String(s.subcategoryId)
     if (!servicesBySubcat.has(k)) servicesBySubcat.set(k, [])
     servicesBySubcat.get(k).push(s)

@@ -34,17 +34,21 @@ export function getServiceOfferDetails(service) {
   let isHalfHour = false
 
   if (chargeType === 'UNIT_WISE') {
-    originalPrice = Number(service.pricePerUnit ?? service.basePrice ?? service.hourlyPrice ?? 0)
+    originalPrice = Number(service.pricePerUnit || service.basePrice || service.hourlyPrice || service.price || 0)
     unitLabel = unitName ? `/${unitName}` : '/unit'
   } else if (chargeType === 'NONE') {
-    originalPrice = Number(service.basePrice ?? service.hourlyPrice ?? service.pricePerUnit ?? 0)
+    originalPrice = Number(service.basePrice || service.hourlyPrice || service.pricePerUnit || service.price || 0)
     unitLabel = ''
   } else {
     // PER_HOUR
-    originalPrice = Number(service.hourlyPrice ?? service.basePrice ?? 0)
+    originalPrice = Number(service.hourlyPrice || service.basePrice || service.pricePerUnit || service.price || 0)
     isHalfHour = service.minHours === 0.5
     unitLabel = isHalfHour ? '/30min' : '/hr'
     unitDivider = isHalfHour ? 2 : 1
+  }
+
+  if (!originalPrice) {
+    originalPrice = Number(service.price || service.rate || service.amount || 0)
   }
 
   const discountType = service.discountType || 'PERCENTAGE'

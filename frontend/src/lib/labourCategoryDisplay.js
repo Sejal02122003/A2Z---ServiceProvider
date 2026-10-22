@@ -33,6 +33,7 @@ export function flattenTradeSubcategories(tradeGroups) {
         sortOrder: c.sortOrder ?? 0,
         groupId: g._id,
         groupName: g.name,
+        services: c.services || [],
       })
     }
   }

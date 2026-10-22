@@ -319,17 +319,18 @@ export const createService = asyncHandler(async (req, res) => {
     }
     image = normalized
   }
+  const effectiveVal = Number(basePrice || hourlyPrice || pricePerUnit || 0)
   const s = await LabourService.create({
     subcategoryId: subcat._id,
     name: name.trim(),
     description,
-    basePrice: Number(basePrice || hourlyPrice || pricePerUnit),
+    basePrice: Number(basePrice || effectiveVal),
     estimatedDurationMins: Number(estimatedDurationMins),
     iconUrl: image,
     chargeType: ['PER_HOUR', 'UNIT_WISE', 'NONE'].includes(chargeType) ? chargeType : 'PER_HOUR',
     unitName: String(unitName || '').trim(),
     pricePerUnit: Number(pricePerUnit || 0),
-    hourlyPrice: Number(hourlyPrice || 0),
+    hourlyPrice: Number(hourlyPrice || effectiveVal),
     minHours: Number(minHours),
     maxHours: Number(maxHours),
     discountType,
@@ -367,13 +368,15 @@ export const patchService = asyncHandler(async (req, res) => {
   const { name, description, basePrice, estimatedDurationMins, isActive, iconUrl, hourlyPrice, minHours, maxHours, discountType, discountValue, offerBadge, offerDescription, isAllZones, zones, chargeType, unitName, pricePerUnit } = req.body
   if (name != null) s.name = String(name).trim()
   if (description != null) s.description = String(description)
-  if (basePrice != null) s.basePrice = Number(basePrice)
   if (estimatedDurationMins != null) s.estimatedDurationMins = Number(estimatedDurationMins)
   if (isActive != null) s.isActive = Boolean(isActive)
   if (chargeType != null && ['PER_HOUR', 'UNIT_WISE', 'NONE'].includes(chargeType)) s.chargeType = chargeType
   if (unitName !== undefined) s.unitName = String(unitName || '').trim()
   if (pricePerUnit != null) s.pricePerUnit = Number(pricePerUnit)
+  if (basePrice != null) s.basePrice = Number(basePrice)
   if (hourlyPrice != null) s.hourlyPrice = Number(hourlyPrice)
+  if (!s.hourlyPrice && s.basePrice) s.hourlyPrice = s.basePrice
+  if (!s.basePrice && s.hourlyPrice) s.basePrice = s.hourlyPrice
   if (minHours != null) s.minHours = Number(minHours)
   if (maxHours != null) s.maxHours = Number(maxHours)
   if (discountType != null) s.discountType = discountType

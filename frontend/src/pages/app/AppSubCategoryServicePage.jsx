@@ -20,13 +20,15 @@ export function AppSubCategoryServicePage() {
   const [bookingService, setBookingService] = useState(null)
   
   const [cat, setCat] = useState(() => location.state?.cat || null)
-  const [loading, setLoading] = useState(() => !location.state?.cat)
-  const [fetchDone, setFetchDone] = useState(() => !!location.state?.cat)
+  const [loading, setLoading] = useState(() => !(location.state?.cat?.services?.length > 0))
+  const [fetchDone, setFetchDone] = useState(() => !!(location.state?.cat?.services?.length > 0))
 
   useEffect(() => {
     let cancelled = false
     const loc = readAppUserLocation()
-    setLoading(true)
+    if (!cat?.services?.length) {
+      setLoading(true)
+    }
     fetchLabourCategoriesGrouped(loc?.lat, loc?.lng, loc?.city, loc?.address)
       .then(res => {
         if (cancelled) return
@@ -57,7 +59,7 @@ export function AppSubCategoryServicePage() {
         }
       })
     return () => { cancelled = true }
-  }, [id, cat?._id])
+  }, [id])
 
   const handleQuickBookType = useCallback(
     (bookingType) => {
