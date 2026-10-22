@@ -76,6 +76,7 @@ export async function updateTrialConfig(updates, adminUser) {
     'evaluationMode',
     'partnerTrialSlots',
     'partnerTrialHubLocations',
+    'zoneVenues',
     'defaultHubLocation',
   ]
 

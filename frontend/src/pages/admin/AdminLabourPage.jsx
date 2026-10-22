@@ -123,6 +123,11 @@ function TrialSlotBadge({ trialSlot, onEvaluate }) {
         <div className="text-[11px] font-bold text-slate-800 leading-tight">
           <p>{trialSlot.date}</p>
           <p className="text-[10px] font-medium text-slate-500">{trialSlot.timeSlot}</p>
+          {trialSlot.zoneName && (
+            <p className="text-[10px] text-cyan-700 font-semibold mt-0.5">
+              📍 {trialSlot.zoneName}
+            </p>
+          )}
         </div>
         {onEvaluate && (
           <button

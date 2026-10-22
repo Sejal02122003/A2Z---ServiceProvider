@@ -6,7 +6,7 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 
 export const getActiveZones = asyncHandler(async (req, res) => {
-  const zones = await Zone.find({ isActive: true }).select('name polygon isActive').sort('name')
+  const zones = await Zone.find({ isActive: true }).select('name city state country description isActive').sort('name')
   return sendSuccess(res, { data: { zones } })
 })
 

@@ -19,6 +19,7 @@ import {
   CreditCard,
   FileCheck,
   FileText,
+  Globe,
   HardHat,
   HelpCircle,
   Home,
@@ -139,6 +140,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
   const [uploadingKyc, setUploadingKyc] = useState(false)
 
   // Step 4 Form State
+  const [trialDateFilter, setTrialDateFilter] = useState('ALL')
   const [trialDate, setTrialDate] = useState(() => {
     const d = new Date()
     d.setDate(d.getDate() + 1)
@@ -150,6 +152,9 @@ export function PartnerOnboardingStepper({ onFinish }) {
   )
   const [dynamicSlots, setDynamicSlots] = useState([])
   const [loadingSlots, setLoadingSlots] = useState(false)
+  const [trialZones, setTrialZones] = useState([])
+  const [trialZoneId, setTrialZoneId] = useState('ALL')
+  const [trialZoneName, setTrialZoneName] = useState('All Zones')
 
   // Payment Form State
   const [paymentTab, setPaymentTab] = useState('OFFLINE')
@@ -169,32 +174,49 @@ export function PartnerOnboardingStepper({ onFinish }) {
     setTimeout(() => setToast({ type: '', message: '' }), 4500)
   }
 
-  // Refresh slots directly from admin configuration
-  const handleRefreshSlots = useCallback(async () => {
+  // Refresh slots directly from admin configuration based on date and zone
+  const handleRefreshSlots = useCallback(async (customDate, customZoneId) => {
     try {
       setLoadingSlots(true)
-      const data = await fetchAvailableTrialSlots()
+      const d = typeof customDate === 'string' ? customDate : trialDateFilter
+      const z = typeof customZoneId === 'string' ? customZoneId : trialZoneId
+      const params = {}
+      if (d && d !== 'ALL') params.date = d
+      if (z && z !== 'ALL') params.zoneId = z
+
+      const data = await fetchAvailableTrialSlots(params)
       if (Array.isArray(data?.availableTrialSlots) && data.availableTrialSlots.length > 0) {
         setDynamicSlots(data.availableTrialSlots)
         setTrialTimeSlot((current) => {
-          const exists = data.availableTrialSlots.some(
+          const matched = data.availableTrialSlots.find(
             (s) => s.id === current || s.label === current
-          )
-          return exists ? current : data.availableTrialSlots[0].id
+          ) || data.availableTrialSlots[0]
+          if (matched?.centerAddress) {
+            setTrialLocation(matched.centerAddress)
+          } else if (data?.defaultHubLocation) {
+            setTrialLocation(data.defaultHubLocation)
+          }
+          if (matched?.date) {
+            setTrialDate(matched.date)
+          }
+          return matched ? matched.id : data.availableTrialSlots[0].id
         })
       } else {
         setDynamicSlots([])
         setTrialTimeSlot('')
+        if (data?.defaultHubLocation) {
+          setTrialLocation(data.defaultHubLocation)
+        }
       }
-      if (data?.defaultHubLocation) {
-        setTrialLocation(data.defaultHubLocation)
+      if (Array.isArray(data?.zones) && data.zones.length > 0) {
+        setTrialZones(data.zones)
       }
     } catch (err) {
       console.warn('Could not refresh trial slots:', err)
     } finally {
       setLoadingSlots(false)
     }
-  }, [])
+  }, [trialDateFilter, trialZoneId])
 
   // Load Status
   const loadStatus = useCallback(async () => {
@@ -207,12 +229,23 @@ export function PartnerOnboardingStepper({ onFinish }) {
       const stepNum = res.currentStep <= 5 ? res.currentStep : 5
       setExpandedStep((prev) => (prev === null ? stepNum : prev))
 
-      // Dynamic Trial Slots & Hub Location from Admin
+      // Dynamic Trial Slots, Zones & Hub Location from Admin
       if (res.step4) {
+        if (Array.isArray(res.step4.zones)) {
+          setTrialZones(res.step4.zones)
+        }
+        if (res.step4.trialSlot?.zoneId) {
+          setTrialZoneId(res.step4.trialSlot.zoneId)
+          setTrialZoneName(res.step4.trialSlot.zoneName || 'All Zones')
+        }
         if (Array.isArray(res.step4.availableTrialSlots) && res.step4.availableTrialSlots.length > 0) {
           setDynamicSlots(res.step4.availableTrialSlots)
           if (!res.step4.trialSlot?.timeSlot) {
-            setTrialTimeSlot(res.step4.availableTrialSlots[0].id)
+            const firstSlot = res.step4.availableTrialSlots[0]
+            setTrialTimeSlot(firstSlot.id)
+            if (firstSlot.centerAddress && !res.step4.trialSlot?.location) {
+              setTrialLocation(firstSlot.centerAddress)
+            }
           }
         } else {
           setDynamicSlots([])
@@ -475,6 +508,8 @@ export function PartnerOnboardingStepper({ onFinish }) {
         date: trialDate,
         timeSlot: trialTimeSlot,
         location: trialLocation,
+        zoneId: trialZoneId,
+        zoneName: trialZoneName,
       })
 
       showToast('success', 'Trial slot scheduled successfully!')
@@ -1466,7 +1501,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                         </h4>
                         <button
                           type="button"
-                          onClick={handleRefreshSlots}
+                          onClick={() => handleRefreshSlots('ALL', trialZoneId)}
                           className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold text-brand hover:bg-brand/10 transition"
                           title="Refresh slots from admin"
                         >
@@ -1488,10 +1523,31 @@ export function PartnerOnboardingStepper({ onFinish }) {
                               Scheduled
                             </span>
                           </div>
-                          <div className="mt-2 text-[11px] text-cyan-900 space-y-0.5 bg-white/70 p-2 rounded-lg border border-cyan-100">
-                            <p><span className="font-semibold text-slate-600">Date:</span> {step4.trialSlot.date}</p>
-                            <p><span className="font-semibold text-slate-600">Timing:</span> {step4.trialSlot.timeSlot}</p>
-                            <p><span className="font-semibold text-slate-600">Hub:</span> {step4.trialSlot.location || step4.defaultHubLocation}</p>
+                          <div className="mt-2 text-[11px] text-cyan-900 space-y-1.5 bg-white/90 p-3 rounded-xl border border-cyan-200 shadow-2xs">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                              <span className="font-semibold text-slate-500">Date:</span>
+                              <span className="font-bold text-slate-900">{step4.trialSlot.date}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-3.5 w-3.5 text-cyan-600 shrink-0" />
+                              <span className="font-semibold text-slate-500">Timing:</span>
+                              <span className="font-bold text-slate-900">{step4.trialSlot.timeSlot}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Building2 className="h-3.5 w-3.5 text-purple-600 shrink-0" />
+                              <span className="font-semibold text-slate-500">Zone:</span>
+                              <span className="font-bold text-slate-900">{step4.trialSlot.zoneName || 'All Zones'}</span>
+                            </div>
+                            <div className="flex items-start gap-2 pt-1 border-t border-cyan-100">
+                              <MapPin className="h-3.5 w-3.5 text-rose-500 shrink-0 mt-0.5" />
+                              <div className="min-w-0">
+                                <span className="font-semibold text-slate-500">Center Address: </span>
+                                <span className="font-bold text-slate-900 break-words">
+                                  {step4.trialSlot.location || step4.defaultHubLocation}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                           <p className="mt-2 text-[10px] text-cyan-700 leading-snug">
                             Please visit the evaluation hub at your scheduled timing for your practical demo. The center evaluator will grade your demo and approve your joining from the Admin panel.
@@ -1500,24 +1556,105 @@ export function PartnerOnboardingStepper({ onFinish }) {
                       )}
 
                       <form onSubmit={handleScheduleTrial} className="mt-3 space-y-3.5">
-                        {/* Slot Date */}
-                        <div>
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                            Slot Date
-                          </label>
-                          <input
-                            type="date"
-                            value={trialDate}
-                            onChange={(e) => setTrialDate(e.target.value)}
-                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-brand shadow-xs"
-                          />
+                        {/* Zone / Region & Date Selection */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {/* Zone Selection */}
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                              Evaluation Hub Zone
+                            </label>
+                            <select
+                              value={trialZoneId}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setTrialZoneId(val)
+                                const found = trialZones.find((z) => String(z._id) === val)
+                                const name = val === 'ALL' ? 'All Zones' : (found?.name || 'Selected Zone')
+                                setTrialZoneName(name)
+                                handleRefreshSlots(trialDateFilter, val)
+                              }}
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-brand shadow-xs"
+                            >
+                              <option value="ALL">🌐 All Available Zones</option>
+                              {trialZones.map((z) => (
+                                <option key={z._id} value={z._id}>
+                                  🏢 {z.name} ({z.city || z.state || 'Active Zone'})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Date Filter */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                Date Filter
+                              </label>
+                              {trialDateFilter !== 'ALL' && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setTrialDateFilter('ALL')
+                                    handleRefreshSlots('ALL', trialZoneId)
+                                  }}
+                                  className="text-[10px] font-bold text-brand hover:underline"
+                                >
+                                  Reset to All Dates
+                                </button>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={trialDateFilter === 'ALL' ? 'ALL' : 'SPECIFIC'}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  if (val === 'ALL') {
+                                    setTrialDateFilter('ALL')
+                                    handleRefreshSlots('ALL', trialZoneId)
+                                  } else {
+                                    setTrialDateFilter(trialDate)
+                                    handleRefreshSlots(trialDate, trialZoneId)
+                                  }
+                                }}
+                                className="w-1/2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:border-brand shadow-xs"
+                              >
+                                <option value="ALL">All Dates (Any)</option>
+                                <option value="SPECIFIC">Specific Date</option>
+                              </select>
+                              {trialDateFilter !== 'ALL' ? (
+                                <input
+                                  type="date"
+                                  value={trialDateFilter}
+                                  min={new Date().toISOString().split('T')[0]}
+                                  onChange={(e) => {
+                                    const val = e.target.value
+                                    setTrialDateFilter(val)
+                                    setTrialDate(val)
+                                    handleRefreshSlots(val, trialZoneId)
+                                  }}
+                                  className="w-1/2 rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-800 outline-none focus:border-brand shadow-xs"
+                                />
+                              ) : (
+                                <span className="w-1/2 flex items-center justify-center rounded-xl border border-dashed border-emerald-300 bg-emerald-50/70 px-2 py-2 text-[10px] font-bold text-emerald-800">
+                                  All Scheduled Dates ✓
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
 
                         {/* Time Slot Selection (Stays 100% inside screen & dynamic from Admin) */}
                         <div>
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                            Select Time Slot
-                          </label>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                              Select Time Slot ({dynamicSlots.length} available)
+                            </label>
+                            {trialZoneId !== 'ALL' && (
+                              <span className="text-[10px] font-semibold text-brand">
+                                Showing slots for {trialZoneName}
+                              </span>
+                            )}
+                          </div>
                           <div className="space-y-1.5">
                             {dynamicSlots.length > 0 ? (
                               dynamicSlots.map((slot) => {
@@ -1526,14 +1663,26 @@ export function PartnerOnboardingStepper({ onFinish }) {
                                   <button
                                     type="button"
                                     key={slot.id}
-                                    onClick={() => setTrialTimeSlot(slot.id)}
+                                    onClick={() => {
+                                      setTrialTimeSlot(slot.id)
+                                      if (slot.centerAddress) {
+                                        setTrialLocation(slot.centerAddress)
+                                      }
+                                      if (slot.date) {
+                                        setTrialDate(slot.date)
+                                      }
+                                      if (slot.zoneId && slot.zoneId !== 'ALL') {
+                                        setTrialZoneId(slot.zoneId)
+                                        if (slot.zoneName) setTrialZoneName(slot.zoneName)
+                                      }
+                                    }}
                                     className={`w-full flex items-center justify-between rounded-xl border p-2.5 text-left transition ${
                                       isSelected
                                         ? 'border-brand bg-brand/10 text-brand ring-1 ring-brand/20 shadow-xs'
                                         : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                                     }`}
                                   >
-                                    <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                       <div
                                         className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition ${
                                           isSelected
@@ -1543,13 +1692,38 @@ export function PartnerOnboardingStepper({ onFinish }) {
                                       >
                                         {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
                                       </div>
-                                      <div className="min-w-0">
-                                        <p className="text-xs font-bold leading-tight">{slot.label}</p>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          <p className="text-xs font-bold leading-tight">{slot.label}</p>
+                                          {(!slot.zoneId || slot.zoneId === 'ALL') ? (
+                                            <span className="rounded-md bg-purple-50 text-purple-700 border border-purple-200/80 px-1.5 py-0.5 text-[9px] font-bold inline-flex items-center gap-0.5">
+                                              <Globe className="h-2.5 w-2.5" /> All Zones
+                                            </span>
+                                          ) : (
+                                            <span className="rounded-md bg-cyan-50 text-cyan-800 border border-cyan-200/80 px-1.5 py-0.5 text-[9px] font-bold inline-flex items-center gap-0.5">
+                                              <Building2 className="h-2.5 w-2.5" /> {slot.zoneName}
+                                            </span>
+                                          )}
+                                          {slot.date ? (
+                                            <span className="rounded-md bg-amber-50 text-amber-900 border border-amber-200/80 px-1.5 py-0.5 text-[9px] font-bold inline-flex items-center gap-0.5">
+                                              <Calendar className="h-2.5 w-2.5" /> {slot.date}
+                                            </span>
+                                          ) : (
+                                            <span className="rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200/80 px-1.5 py-0.5 text-[9px] font-bold inline-flex items-center gap-0.5">
+                                              🔄 Everyday
+                                            </span>
+                                          )}
+                                        </div>
+                                        {/* Center address preview for this slot */}
+                                        <div className="flex items-center gap-1.5 text-[10px] text-slate-600 mt-1 font-medium">
+                                          <MapPin className="h-3 w-3 text-cyan-600 shrink-0" />
+                                          <span className="truncate">{slot.centerAddress || trialLocation}</span>
+                                        </div>
                                         {slot.desc && <p className="text-[10px] text-slate-400 mt-0.5">{slot.desc}</p>}
                                       </div>
                                     </div>
                                     {isSelected && (
-                                      <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-extrabold text-brand">
+                                      <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-extrabold text-brand ml-2">
                                         Selected
                                       </span>
                                     )}
@@ -1568,15 +1742,55 @@ export function PartnerOnboardingStepper({ onFinish }) {
                           </div>
                         </div>
 
-                        <div>
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                            Hub / Center Location Address
+                        {/* Evaluation Center Summary */}
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5">
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                            Assigned Reporting Center Details
                           </label>
-                          <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 text-xs text-slate-700">
-                            <MapPin className="h-4 w-4 shrink-0 text-brand mt-0.5" />
-                            <span className="text-[11px] font-medium leading-snug break-words">
-                              {trialLocation}
-                            </span>
+                          <div className="space-y-2 text-xs text-slate-700">
+                            <div className="flex items-center gap-2">
+                              <Building2 className="h-3.5 w-3.5 text-cyan-600 shrink-0" />
+                              <span className="font-semibold text-slate-500 text-[11px]">Reporting Zone:</span>
+                              <span className="font-bold text-slate-800 text-[11px]">{trialZoneName || 'All Zones'}</span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Calendar className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                              <span className="font-semibold text-slate-500 text-[11px]">Appointment Date:</span>
+                              {(() => {
+                                const selectedSlot = dynamicSlots.find(
+                                  (s) => s.id === trialTimeSlot || s.label === trialTimeSlot
+                                )
+                                if (selectedSlot?.date) {
+                                  return (
+                                    <span className="font-bold text-slate-900 text-[11px] inline-flex items-center gap-1.5">
+                                      <span>{selectedSlot.date}</span>
+                                      <span className="rounded-md bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.2 text-[9px] font-extrabold uppercase">
+                                        Admin Scheduled
+                                      </span>
+                                    </span>
+                                  )
+                                }
+                                return (
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="date"
+                                      min={new Date().toISOString().split('T')[0]}
+                                      value={trialDate}
+                                      onChange={(e) => setTrialDate(e.target.value)}
+                                      className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-slate-800 outline-none focus:border-brand shadow-2xs"
+                                    />
+                                    <span className="text-[10px] text-slate-500 font-semibold">(Everyday / Flexible)</span>
+                                  </div>
+                                )
+                              })()}
+                            </div>
+                            <div className="flex items-start gap-2 pt-1.5 border-t border-slate-200/70">
+                              <MapPin className="h-3.5 w-3.5 text-rose-500 shrink-0 mt-0.5" />
+                              <div className="min-w-0 flex-1">
+                                <span className="font-semibold text-slate-500 text-[11px]">Venue Address: </span>
+                                <span className="font-bold text-slate-900 text-[11px] break-words">{trialLocation}</span>
+                              </div>
+                            </div>
                           </div>
                         </div>
 

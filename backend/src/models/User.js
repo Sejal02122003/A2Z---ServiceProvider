@@ -92,6 +92,8 @@ const labourProfileSchema = new mongoose.Schema(
       date: { type: String, trim: true },
       timeSlot: { type: String, trim: true },
       location: { type: String, trim: true },
+      zoneId: { type: String, trim: true },
+      zoneName: { type: String, trim: true },
       status: {
         type: String,
         enum: ['NOT_SCHEDULED', 'SCHEDULED', 'COMPLETED', 'PASSED', 'FAILED'],

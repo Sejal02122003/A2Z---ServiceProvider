@@ -62,6 +62,10 @@ const trialConfigurationSchema = new mongoose.Schema(
         id: { type: String, required: true },
         label: { type: String, required: true },
         desc: { type: String, default: '' },
+        date: { type: String, default: '' }, // Specific YYYY-MM-DD or empty for all dates
+        zoneId: { type: String, default: 'ALL' }, // Specific Zone _id or 'ALL'
+        zoneName: { type: String, default: 'All Zones' }, // Human-readable zone name
+        centerAddress: { type: String, default: '' }, // Specific Center/Hub address for this slot/zone
         isActive: { type: Boolean, default: true },
       },
     ],
@@ -71,6 +75,13 @@ const trialConfigurationSchema = new mongoose.Schema(
         address: { type: String, required: true },
         city: { type: String, default: '' },
         isActive: { type: Boolean, default: true },
+      },
+    ],
+    zoneVenues: [
+      {
+        zoneId: { type: String, required: true },
+        zoneName: { type: String, default: '' },
+        venueAddress: { type: String, default: '' },
       },
     ],
     defaultHubLocation: {

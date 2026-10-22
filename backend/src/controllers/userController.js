@@ -1,5 +1,6 @@
 import mongoose from 'mongoose'
 import { User } from '../models/User.js'
+import { Zone } from '../models/Zone.js'
 import { SystemSetting } from '../models/SystemSetting.js'
 import { LabourCategory } from '../models/LabourCategory.js'
 import { LabourCategoryGroup, LABOUR_GROUP_KIND } from '../models/LabourCategoryGroup.js'
@@ -1241,13 +1242,41 @@ export const getPartnerOnboardingStatus = asyncHandler(async (req, res) => {
   let availableTrialSlots = []
   let trialHubLocations = []
   let defaultHubLocation = 'A2Z Partner Training & Evaluation Center, Sector 18, Noida'
+  let availableZones = []
   try {
-    const trialConfig = await getTrialConfig()
-    availableTrialSlots = (trialConfig?.partnerTrialSlots || []).filter((s) => s.isActive !== false)
-    trialHubLocations = (trialConfig?.partnerTrialHubLocations || []).filter((h) => h.isActive !== false)
+    const [trialConfig, zones] = await Promise.all([
+      getTrialConfig(),
+      Zone.find({ isActive: true }).select('name city state country isActive').sort('name'),
+    ])
     if (trialConfig?.defaultHubLocation) {
       defaultHubLocation = trialConfig.defaultHubLocation
     }
+    const userZoneId = user.labourProfile?.trialSlot?.zoneId
+    if (userZoneId && Array.isArray(trialConfig?.zoneVenues)) {
+      const zv = trialConfig.zoneVenues.find((v) => String(v.zoneId) === String(userZoneId))
+      if (zv && zv.venueAddress && zv.venueAddress.trim()) {
+        defaultHubLocation = zv.venueAddress.trim()
+      }
+    }
+    availableTrialSlots = (trialConfig?.partnerTrialSlots || [])
+      .filter((s) => s.isActive !== false)
+      .map((s) => {
+        const obj = s.toObject ? s.toObject() : { ...s }
+        if (!obj.zoneName && obj.zoneId && obj.zoneId !== 'ALL' && Array.isArray(zones)) {
+          const matched = zones.find((z) => String(z._id) === String(obj.zoneId))
+          if (matched) obj.zoneName = matched.name
+        }
+        if (!obj.centerAddress || !obj.centerAddress.trim()) {
+          if (obj.zoneId && obj.zoneId !== 'ALL' && Array.isArray(trialConfig?.zoneVenues)) {
+            const zv = trialConfig.zoneVenues.find((v) => String(v.zoneId) === String(obj.zoneId))
+            obj.centerAddress = (zv && zv.venueAddress && zv.venueAddress.trim()) || defaultHubLocation
+          } else {
+            obj.centerAddress = defaultHubLocation
+          }
+        }
+        return obj
+      })
+    availableZones = zones || []
   } catch (err) {
     console.error('Failed to load trialConfig for onboarding status:', err)
   }
@@ -1281,6 +1310,7 @@ export const getPartnerOnboardingStatus = asyncHandler(async (req, res) => {
         availableTrialSlots,
         trialHubLocations,
         defaultHubLocation,
+        zones: availableZones,
         paymentComplete,
         welcomeKitPayment: {
           status: welcomeKit.status || 'PENDING_PAYMENT',
@@ -1315,26 +1345,75 @@ export const getAvailableTrialSlots = asyncHandler(async (req, res) => {
   res.set('Pragma', 'no-cache')
   res.set('Expires', '0')
 
-  const trialConfig = await getTrialConfig()
-  const availableTrialSlots = (trialConfig?.partnerTrialSlots || []).filter((s) => s.isActive !== false)
-  const defaultHubLocation = trialConfig?.defaultHubLocation || 'A2Z Partner Training & Evaluation Center, Sector 18, Noida'
+  const { date, zoneId } = req.query
+
+  const [trialConfig, zones] = await Promise.all([
+    getTrialConfig(),
+    Zone.find({ isActive: true }).select('name city state country isActive').sort('name'),
+  ])
+
+  let availableTrialSlots = (trialConfig?.partnerTrialSlots || []).filter((s) => s.isActive !== false)
+
+  // Filter by date if provided (ignore 'ALL' or invalid objects)
+  if (date && typeof date === 'string' && date.trim() && date.trim() !== 'ALL' && date.trim() !== '[object Object]') {
+    const d = date.trim()
+    availableTrialSlots = availableTrialSlots.filter((s) => !s.date || s.date === 'ALL' || s.date === d)
+  }
+
+  // Filter by zoneId if provided (ignore 'ALL' or invalid objects)
+  if (zoneId && typeof zoneId === 'string' && zoneId.trim() && zoneId !== 'ALL' && zoneId.trim() !== '[object Object]') {
+    const zid = zoneId.trim()
+    availableTrialSlots = availableTrialSlots.filter((s) => !s.zoneId || s.zoneId === 'ALL' || s.zoneId === zid)
+  }
+
+  let defaultHubLocation = trialConfig?.defaultHubLocation || 'A2Z Partner Training & Evaluation Center, Sector 18, Noida'
+  if (zoneId && zoneId.trim() && zoneId !== 'ALL' && Array.isArray(trialConfig?.zoneVenues)) {
+    const zv = trialConfig.zoneVenues.find((v) => String(v.zoneId) === String(zoneId.trim()))
+    if (zv && zv.venueAddress && zv.venueAddress.trim()) {
+      defaultHubLocation = zv.venueAddress.trim()
+    }
+  }
   const partnerTrialHubLocations = trialConfig?.partnerTrialHubLocations || []
+
+  // Ensure each slot has centerAddress and zoneName populated
+  const populatedSlots = availableTrialSlots.map((s) => {
+    const obj = s.toObject ? s.toObject() : { ...s }
+    if (!obj.zoneName && obj.zoneId && obj.zoneId !== 'ALL') {
+      const matched = zones.find((z) => String(z._id) === String(obj.zoneId))
+      if (matched) obj.zoneName = matched.name
+    }
+    if (!obj.centerAddress || !obj.centerAddress.trim()) {
+      // Check if slot's specific zone has a configured venue
+      if (obj.zoneId && obj.zoneId !== 'ALL' && Array.isArray(trialConfig?.zoneVenues)) {
+        const zv = trialConfig.zoneVenues.find((v) => String(v.zoneId) === String(obj.zoneId))
+        if (zv && zv.venueAddress && zv.venueAddress.trim()) {
+          obj.centerAddress = zv.venueAddress.trim()
+        } else {
+          obj.centerAddress = defaultHubLocation
+        }
+      } else {
+        obj.centerAddress = defaultHubLocation
+      }
+    }
+    return obj
+  })
 
   return sendSuccess(res, {
     data: {
-      availableTrialSlots,
+      availableTrialSlots: populatedSlots,
       defaultHubLocation,
       partnerTrialHubLocations,
+      zones,
     },
   })
 })
 
 /**
  * PATCH /api/users/me/trial-slot
- * Schedule trial slot (date, time, location)
+ * Schedule trial slot (date, time, location, zone)
  */
 export const schedulePartnerTrialSlot = asyncHandler(async (req, res) => {
-  const { date, timeSlot, location } = req.body
+  const { date, timeSlot, location, zoneId, zoneName } = req.body
   if (!date || !timeSlot) {
     return sendError(res, {
       message: 'Trial date and time slot are required',
@@ -1362,6 +1441,8 @@ export const schedulePartnerTrialSlot = asyncHandler(async (req, res) => {
     date: String(date).trim(),
     timeSlot: String(timeSlot).trim(),
     location: resolvedLocation,
+    zoneId: zoneId ? String(zoneId).trim() : '',
+    zoneName: zoneName ? String(zoneName).trim() : '',
     status: 'SCHEDULED',
     scheduledAt: new Date(),
     notes: req.body.notes || '',

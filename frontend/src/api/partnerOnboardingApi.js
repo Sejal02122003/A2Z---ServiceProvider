@@ -10,9 +10,18 @@ export async function fetchPartnerOnboardingStatus() {
 
 /**
  * Fetch latest trial slots and hub address configured by the Admin
+ * @param {{ date?: string, zoneId?: string }} [params]
  */
-export async function fetchAvailableTrialSlots() {
-  const json = await apiRequest(`/users/trial-slots?_t=${Date.now()}`, { skipAuth: true })
+export async function fetchAvailableTrialSlots(params = {}) {
+  const sp = new URLSearchParams()
+  sp.set('_t', String(Date.now()))
+  if (params.date && typeof params.date === 'string' && params.date.trim() && params.date.trim() !== 'ALL') {
+    sp.set('date', params.date.trim())
+  }
+  if (params.zoneId && typeof params.zoneId === 'string' && params.zoneId.trim() && params.zoneId.trim() !== 'ALL') {
+    sp.set('zoneId', params.zoneId.trim())
+  }
+  const json = await apiRequest(`/users/trial-slots?${sp.toString()}`, { skipAuth: true })
   return json.data
 }
 

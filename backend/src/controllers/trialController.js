@@ -23,6 +23,7 @@ import { VendorTrial, VENDOR_TRIAL_STATUS } from '../models/VendorTrial.js'
 import { User } from '../models/User.js'
 import { TrialEvaluation } from '../models/TrialEvaluation.js'
 import { VendorWarning } from '../models/VendorWarning.js'
+import { Zone } from '../models/Zone.js'
 
 // ==================== ADMIN CONTROLLERS ====================
 
@@ -30,8 +31,11 @@ import { VendorWarning } from '../models/VendorWarning.js'
  * GET /api/v1/admin/trial-settings
  */
 export const getAdminTrialSettings = asyncHandler(async (req, res) => {
-  const config = await getTrialConfig()
-  return sendSuccess(res, { data: { settings: config } })
+  const [config, zones] = await Promise.all([
+    getTrialConfig(),
+    Zone.find({}).select('name city state country description isActive').sort('name'),
+  ])
+  return sendSuccess(res, { data: { settings: config, zones } })
 })
 
 /**
