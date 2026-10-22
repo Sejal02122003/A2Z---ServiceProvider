@@ -298,6 +298,7 @@ export const createService = asyncHandler(async (req, res) => {
     chargeType = 'PER_HOUR',
     unitName = '',
     pricePerUnit = 0,
+    subServices = [],
   } = req.body
   const subcat = await LabourSubcategory.findById(subcategoryId)
   if (!subcat) {
@@ -320,6 +321,20 @@ export const createService = asyncHandler(async (req, res) => {
     image = normalized
   }
   const effectiveVal = Number(basePrice || hourlyPrice || pricePerUnit || 0)
+  const normalizedSubServices = Array.isArray(subServices)
+    ? subServices
+        .filter(ss => ss && typeof ss.name === 'string' && ss.name.trim())
+        .map(ss => ({
+          name: ss.name.trim(),
+          description: String(ss.description || '').trim(),
+          price: Number(ss.price || 0),
+          originalPrice: Number(ss.originalPrice || ss.price || 0),
+          estimatedDurationMins: Number(ss.estimatedDurationMins || 30),
+          iconUrl: String(ss.iconUrl || '').trim(),
+          isActive: ss.isActive !== false,
+        }))
+    : []
+
   const s = await LabourService.create({
     subcategoryId: subcat._id,
     name: name.trim(),
@@ -339,6 +354,7 @@ export const createService = asyncHandler(async (req, res) => {
     offerDescription: String(offerDescription || '').trim(),
     isAllZones: Boolean(isAllZones),
     zones: Array.isArray(zones) ? zones : [],
+    subServices: normalizedSubServices,
     isActive: isActive !== undefined ? Boolean(isActive) : true,
   })
   return sendSuccess(res, { message: 'Service created', statusCode: HTTP_STATUS.CREATED, data: { service: s } })
@@ -365,7 +381,7 @@ export const patchService = asyncHandler(async (req, res) => {
   if (!s) {
     return sendError(res, { message: 'Service not found', statusCode: HTTP_STATUS.NOT_FOUND, code: 'NOT_FOUND' })
   }
-  const { name, description, basePrice, estimatedDurationMins, isActive, iconUrl, hourlyPrice, minHours, maxHours, discountType, discountValue, offerBadge, offerDescription, isAllZones, zones, chargeType, unitName, pricePerUnit } = req.body
+  const { name, description, basePrice, estimatedDurationMins, isActive, iconUrl, hourlyPrice, minHours, maxHours, discountType, discountValue, offerBadge, offerDescription, isAllZones, zones, chargeType, unitName, pricePerUnit, subServices } = req.body
   if (name != null) s.name = String(name).trim()
   if (description != null) s.description = String(description)
   if (estimatedDurationMins != null) s.estimatedDurationMins = Number(estimatedDurationMins)
@@ -385,6 +401,22 @@ export const patchService = asyncHandler(async (req, res) => {
   if (offerDescription !== undefined) s.offerDescription = String(offerDescription || '').trim()
   if (isAllZones != null) s.isAllZones = Boolean(isAllZones)
   if (zones != null && Array.isArray(zones)) s.zones = zones
+  if (subServices !== undefined) {
+    s.subServices = Array.isArray(subServices)
+      ? subServices
+          .filter(ss => ss && typeof ss.name === 'string' && ss.name.trim())
+          .map(ss => ({
+            ...(ss._id ? { _id: ss._id } : {}),
+            name: ss.name.trim(),
+            description: String(ss.description || '').trim(),
+            price: Number(ss.price || 0),
+            originalPrice: Number(ss.originalPrice || ss.price || 0),
+            estimatedDurationMins: Number(ss.estimatedDurationMins || 30),
+            iconUrl: String(ss.iconUrl || '').trim(),
+            isActive: ss.isActive !== false,
+          }))
+      : []
+  }
   if (iconUrl !== undefined) {
     const normalized = normalizeImageUrl(iconUrl)
     if (normalized === null) {

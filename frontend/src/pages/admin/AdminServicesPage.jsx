@@ -35,6 +35,7 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
   const [discountValue, setDiscountValue] = useState(0)
   const [zones, setZones] = useState([])
   const [iconUrl, setIconUrl] = useState('')
+  const [subServices, setSubServices] = useState([])
   const [isActive, setIsActive] = useState(true)
   const [uploadBusy, setUploadBusy] = useState(false)
   const [error, setError] = useState('')
@@ -55,6 +56,7 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
       setDiscountValue(0)
       setZones([])
       setIconUrl('')
+      setSubServices([])
       setIsActive(true)
       setError('')
     }
@@ -120,6 +122,16 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
         discountValue: Number(discountValue),
         isAllZones: zones.length === activeZones.length,
         zones,
+        subServices: subServices
+          .filter((ss) => ss.name && ss.name.trim())
+          .map((ss) => ({
+            name: ss.name.trim(),
+            description: String(ss.description || '').trim(),
+            price: Number(ss.price || 0),
+            originalPrice: Number(ss.originalPrice || ss.price || 0),
+            estimatedDurationMins: Number(ss.estimatedDurationMins || 30),
+            isActive: ss.isActive !== false,
+          })),
         iconUrl: iconUrl.trim() || undefined,
         isActive
       }
@@ -454,6 +466,135 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
                 </div>
               </div>
             </div>
+
+            {/* Sub-Services / Variants Section */}
+            <div className="col-span-2 space-y-3 rounded-2xl border border-indigo-100 bg-indigo-50/30 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-indigo-950">
+                    Sub-Services / Variants
+                  </label>
+                  <p className="text-[11px] text-slate-500">
+                    Add specific sub-services or options (e.g. Split AC, Window AC, Beard Trim) with their own pricing.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSubServices([...subServices, { name: '', price: 0, estimatedDurationMins: 30, description: '', isActive: true }])}
+                  className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Sub-Service
+                </button>
+              </div>
+
+              {subServices.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-indigo-200 bg-white/60 p-4 text-center">
+                  <p className="text-xs text-slate-500">No sub-services added yet. Click &quot;Add Sub-Service&quot; to configure options.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {subServices.map((subItem, idx) => (
+                    <div key={idx} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase">Sub-Service #{idx + 1}</span>
+                        <div className="flex items-center gap-3">
+                          <label className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-slate-600">
+                            <input
+                              type="checkbox"
+                              checked={subItem.isActive !== false}
+                              onChange={(e) => {
+                                const next = [...subServices];
+                                next[idx].isActive = e.target.checked;
+                                setSubServices(next);
+                              }}
+                              className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            Active
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSubServices(subServices.filter((_, i) => i !== idx));
+                            }}
+                            className="text-rose-500 hover:text-rose-700 p-1"
+                            title="Remove Sub-Service"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div className="sm:col-span-2">
+                          <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Sub-Service Name</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Split AC Deep Cleaning"
+                            value={subItem.name}
+                            onChange={(e) => {
+                              const next = [...subServices];
+                              next[idx].name = e.target.value;
+                              setSubServices(next);
+                            }}
+                            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/30"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Price (₹)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="Price"
+                            value={subItem.price}
+                            onChange={(e) => {
+                              const next = [...subServices];
+                              next[idx].price = Number(e.target.value);
+                              setSubServices(next);
+                            }}
+                            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/30"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Duration (mins)</label>
+                          <input
+                            type="number"
+                            min="5"
+                            placeholder="30"
+                            value={subItem.estimatedDurationMins || 30}
+                            onChange={(e) => {
+                              const next = [...subServices];
+                              next[idx].estimatedDurationMins = Number(e.target.value);
+                              setSubServices(next);
+                            }}
+                            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/30"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Description (Optional)</label>
+                          <input
+                            type="text"
+                            placeholder="Short details or inclusions"
+                            value={subItem.description || ''}
+                            onChange={(e) => {
+                              const next = [...subServices];
+                              next[idx].description = e.target.value;
+                              setSubServices(next);
+                            }}
+                            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/30"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="mt-6 flex justify-end gap-2 pt-2 border-t border-slate-100">
@@ -489,6 +630,7 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
   const [discountValue, setDiscountValue] = useState(0)
   const [zones, setZones] = useState([])
   const [iconUrl, setIconUrl] = useState('')
+  const [subServices, setSubServices] = useState([])
   const [isActive, setIsActive] = useState(true)
   const [uploadBusy, setUploadBusy] = useState(false)
   const [error, setError] = useState('')
@@ -515,6 +657,7 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
       setZones(safeZones)
       
       setIconUrl(service.iconUrl || '')
+      setSubServices(Array.isArray(service.subServices) ? service.subServices.map(ss => ({ ...ss })) : [])
       setIsActive(service.isActive ?? true)
       setError('')
     }
@@ -580,6 +723,17 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
         discountValue: Number(discountValue),
         isAllZones: zones.length === activeZones.length,
         zones,
+        subServices: subServices
+          .filter((ss) => ss.name && ss.name.trim())
+          .map((ss) => ({
+            ...(ss._id ? { _id: ss._id } : {}),
+            name: ss.name.trim(),
+            description: String(ss.description || '').trim(),
+            price: Number(ss.price || 0),
+            originalPrice: Number(ss.originalPrice || ss.price || 0),
+            estimatedDurationMins: Number(ss.estimatedDurationMins || 30),
+            isActive: ss.isActive !== false,
+          })),
         iconUrl: iconUrl.trim() || undefined,
         isActive
       }
@@ -914,6 +1068,135 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
                 </div>
               </div>
             </div>
+
+            {/* Sub-Services / Variants Section */}
+            <div className="col-span-2 space-y-3 rounded-2xl border border-indigo-100 bg-indigo-50/30 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-indigo-950">
+                    Sub-Services / Variants
+                  </label>
+                  <p className="text-[11px] text-slate-500">
+                    Add specific sub-services or options (e.g. Split AC, Window AC, Beard Trim) with their own pricing.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSubServices([...subServices, { name: '', price: 0, estimatedDurationMins: 30, description: '', isActive: true }])}
+                  className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Sub-Service
+                </button>
+              </div>
+
+              {subServices.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-indigo-200 bg-white/60 p-4 text-center">
+                  <p className="text-xs text-slate-500">No sub-services configured for this service. Click &quot;Add Sub-Service&quot; to configure options.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {subServices.map((subItem, idx) => (
+                    <div key={idx} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase">Sub-Service #{idx + 1}</span>
+                        <div className="flex items-center gap-3">
+                          <label className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-slate-600">
+                            <input
+                              type="checkbox"
+                              checked={subItem.isActive !== false}
+                              onChange={(e) => {
+                                const next = [...subServices];
+                                next[idx].isActive = e.target.checked;
+                                setSubServices(next);
+                              }}
+                              className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            Active
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSubServices(subServices.filter((_, i) => i !== idx));
+                            }}
+                            className="text-rose-500 hover:text-rose-700 p-1"
+                            title="Remove Sub-Service"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div className="sm:col-span-2">
+                          <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Sub-Service Name</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Split AC Deep Cleaning"
+                            value={subItem.name}
+                            onChange={(e) => {
+                              const next = [...subServices];
+                              next[idx].name = e.target.value;
+                              setSubServices(next);
+                            }}
+                            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/30"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Price (₹)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="Price"
+                            value={subItem.price}
+                            onChange={(e) => {
+                              const next = [...subServices];
+                              next[idx].price = Number(e.target.value);
+                              setSubServices(next);
+                            }}
+                            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/30"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Duration (mins)</label>
+                          <input
+                            type="number"
+                            min="5"
+                            placeholder="30"
+                            value={subItem.estimatedDurationMins || 30}
+                            onChange={(e) => {
+                              const next = [...subServices];
+                              next[idx].estimatedDurationMins = Number(e.target.value);
+                              setSubServices(next);
+                            }}
+                            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/30"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Description (Optional)</label>
+                          <input
+                            type="text"
+                            placeholder="Short details or inclusions"
+                            value={subItem.description || ''}
+                            onChange={(e) => {
+                              const next = [...subServices];
+                              next[idx].description = e.target.value;
+                              setSubServices(next);
+                            }}
+                            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/30"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="mt-6 flex justify-end gap-2 pt-2 border-t border-slate-100">
@@ -1041,6 +1324,40 @@ function ViewServiceModal({ open, service, onClose }) {
                   }`}>
                     {displayData.isActive ? 'Active' : 'Hidden'}
                   </span>
+                </div>
+
+                {/* Sub-Services / Variants */}
+                <div className="pt-3 border-t border-slate-200/80">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Sub-Services / Variants
+                    </p>
+                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                      {(displayData.subServices || []).length} items
+                    </span>
+                  </div>
+
+                  {(displayData.subServices || []).length === 0 ? (
+                    <p className="text-xs text-slate-400 italic">No sub-services configured for this service.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {displayData.subServices.map((ss, idx) => (
+                        <div key={idx} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2.5 shadow-xs">
+                          <div className="min-w-0 pr-2">
+                            <p className="text-xs font-bold text-slate-800 truncate">{ss.name}</p>
+                            {ss.description && <p className="text-[10px] text-slate-500 truncate mt-0.5">{ss.description}</p>}
+                            <span className="inline-block text-[10px] text-slate-400 font-medium mt-0.5">⏱️ {ss.estimatedDurationMins || 30} mins</span>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-xs font-bold text-blue-600 font-mono">₹{ss.price}</span>
+                            <span className={`block text-[9px] font-bold ${ss.isActive !== false ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {ss.isActive !== false ? 'Active' : 'Hidden'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </>
@@ -1385,7 +1702,17 @@ export function AdminServicesPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-900">{s.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-slate-900">{s.name}</p>
+                        {Array.isArray(s.subServices) && s.subServices.length > 0 && (
+                          <span
+                            title={s.subServices.map(ss => `${ss.name} (₹${ss.price})`).join(', ')}
+                            className="inline-flex items-center rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-200/70"
+                          >
+                            {s.subServices.length} sub-svc
+                          </span>
+                        )}
+                      </div>
                       {s.description && <p className="text-xs text-slate-500 truncate max-w-[200px]">{s.description}</p>}
                     </td>
                     <td className="px-4 py-3">

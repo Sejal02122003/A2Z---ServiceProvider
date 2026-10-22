@@ -65,6 +65,8 @@ export function AppSubCategoryServicePage() {
     (bookingType) => {
       if (!bookingService || !cat) return
       const prev = readBookingDraft() || {}
+      const subSvc = bookingService.selectedSubService
+      const sName = subSvc ? `${bookingService.name} (${subSvc.name})` : (bookingService.name || '')
       writeBookingDraft({
         ...prev,
         entryPoint: 'category',
@@ -73,7 +75,10 @@ export function AppSubCategoryServicePage() {
         categoryId: String(cat._id),
         categoryName: cat.name || '',
         serviceId: String(bookingService._id),
-        serviceName: bookingService.name || '',
+        serviceName: sName,
+        subServiceId: subSvc ? String(subSvc._id) : undefined,
+        subServiceName: subSvc ? subSvc.name : undefined,
+        subServicePrice: subSvc ? subSvc.price : undefined,
         bookingType,
         matchMode: 'smart',
         selectedWorkers: [],
@@ -215,6 +220,11 @@ export function AppSubCategoryServicePage() {
                           {offer.hasOffer && (
                             <ServiceOfferBadge label={offer.offerBadge} variant="compact" />
                           )}
+                          {Array.isArray(service.subServices) && service.subServices.length > 0 && (
+                            <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-200/60">
+                              {service.subServices.filter(ss => ss.isActive !== false).length} options
+                            </span>
+                          )}
                         </div>
                         {service.description && !isExpanded ? (
                           <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{service.description}</p>
@@ -302,6 +312,59 @@ export function AppSubCategoryServicePage() {
                             </span>
                           </div>
                         </div>
+
+                        {/* Sub-Services / Variants List */}
+                        {Array.isArray(service.subServices) && service.subServices.filter(ss => ss.isActive !== false).length > 0 && (
+                          <div className="space-y-2 pt-3 border-t border-slate-200/80">
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Choose Option / Sub-Service
+                              </p>
+                              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200/60">
+                                {service.subServices.filter(ss => ss.isActive !== false).length} options
+                              </span>
+                            </div>
+                            <div className="grid gap-2">
+                              {service.subServices.filter(ss => ss.isActive !== false).map((subItem) => (
+                                <div
+                                  key={subItem._id}
+                                  className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-xs hover:border-brand/40 transition"
+                                >
+                                  <div className="min-w-0 pr-2">
+                                    <h4 className="text-sm font-bold text-slate-900 truncate">{subItem.name}</h4>
+                                    {subItem.description && (
+                                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{subItem.description}</p>
+                                    )}
+                                    <span className="inline-block text-[11px] font-medium text-slate-400 mt-0.5">
+                                      ⏱️ {subItem.estimatedDurationMins || 30} mins
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-3 shrink-0">
+                                    <div className="text-right">
+                                      <span className="font-mono text-sm font-black text-blue-600">
+                                        ₹{subItem.price}
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setBookingService({
+                                          ...service,
+                                          selectedSubService: subItem,
+                                        })
+                                        setBookingTypeOpen(true)
+                                      }}
+                                      className="rounded-lg bg-brand px-3 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95 hover:bg-brand/90"
+                                    >
+                                      Book
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                         <div className="flex justify-end pt-2">
                           <button

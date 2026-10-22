@@ -19,7 +19,7 @@ import {
 } from '../services/bookingCancellationService.js'
 
 export const calculateBill = asyncHandler(async (req, res) => {
-  const { serviceId, packageId, hours: rawHours = 1, quantity = 1, address, contractorServices } = req.body
+  const { serviceId, subServiceId, packageId, hours: rawHours = 1, quantity = 1, address, contractorServices } = req.body
   const hours = parseFloat(rawHours) || 1 // supports 0.5 = 30 min
 
   let matchedZone = null
@@ -176,7 +176,7 @@ export const calculateBill = asyncHandler(async (req, res) => {
   // ----------------------------------------------------
   // CASE 2: Individual / Contractor Standard Services
   // ----------------------------------------------------
-  const resolveHourlyRate = async (sId) => {
+  const resolveHourlyRate = async (sId, ssId = subServiceId) => {
     const service = await LabourService.findById(sId)
     let hourlyRate = 0
     let originalHourlyRate = 0
@@ -186,14 +186,25 @@ export const calculateBill = asyncHandler(async (req, res) => {
     let name = ''
     let categoryId = null
     if (service) {
-      originalHourlyRate = service.hourlyPrice || service.basePrice || 0
+      if (ssId && Array.isArray(service.subServices)) {
+        const foundSub = service.subServices.find(ss => String(ss._id) === String(ssId))
+        if (foundSub) {
+          originalHourlyRate = foundSub.price
+          name = `${service.name} (${foundSub.name})`
+        } else {
+          originalHourlyRate = service.hourlyPrice || service.basePrice || 0
+          name = service.name
+        }
+      } else {
+        originalHourlyRate = service.hourlyPrice || service.basePrice || 0
+        name = service.name
+      }
       discountType = service.discountType || 'PERCENTAGE'
       discountValue = Number(service.discountValue || 0)
       offerBadge = service.offerBadge || ''
-      name = service.name
       const sub = await LabourSubcategory.findById(service.subcategoryId)
       if (sub) categoryId = sub.categoryId
-      if (matchedZone && service.zones && service.zones.length > 0) {
+      if (matchedZone && service.zones && service.zones.length > 0 && !ssId) {
         const zonePricing = service.zones.find(z => String(z.zone) === String(matchedZone._id))
         if (zonePricing && typeof zonePricing.price === 'number') {
           originalHourlyRate = zonePricing.price
@@ -525,12 +536,17 @@ export const createBooking = asyncHandler(async (req, res) => {
     bookingSubcategoryId = service.subcategoryId
     bookingServiceId = service._id
 
-    const resolveHourlyRate = async (sId) => {
+    const resolveHourlyRate = async (sId, ssId = req.body.subServiceId) => {
       let hrRate = 0
       const srv = await LabourService.findById(sId)
       if (srv) {
         let baseRate = srv.hourlyPrice || srv.basePrice || 0
-        if (matchingZone && srv.zones && srv.zones.length > 0) {
+        if (ssId && Array.isArray(srv.subServices)) {
+          const foundSub = srv.subServices.find(ss => String(ss._id) === String(ssId))
+          if (foundSub) {
+            baseRate = foundSub.price
+          }
+        } else if (matchingZone && srv.zones && srv.zones.length > 0) {
           const zonePricing = srv.zones.find(z => String(z.zone) === String(matchingZone._id))
           if (zonePricing && typeof zonePricing.price === 'number') {
             baseRate = zonePricing.price
@@ -637,6 +653,8 @@ export const createBooking = asyncHandler(async (req, res) => {
     userId: req.user._id,
     subcategoryId: bookingSubcategoryId,
     serviceId: bookingServiceId,
+    subServiceId: req.body.subServiceId || undefined,
+    subServiceName: req.body.subServiceName || undefined,
     type,
     scheduledAt: type === 'SCHEDULED' ? parseISTDateTime(scheduledAt, timeSlot) : undefined,
     timeSlot: type === 'SCHEDULED' ? timeSlot : (type === 'INSTANT' ? timeSlot : undefined),

@@ -524,6 +524,7 @@ export function IndividualBookingFlowPage() {
       const hours = draft.bookingType === 'instant' ? (draft.hours || draft.minHours || 1) : (days > 0 ? days * 8 : (kind === 'few_hours' ? (draft.hours || draft.minHours || 1) : (kind === 'half_day' ? 4 : 8)))
       bookingsApi.calculateBill({
         serviceId: draft.serviceId || draft.categoryId,
+        subServiceId: draft.subServiceId || undefined,
         packageId: draft.packageId || packageIdParam || undefined,
         hours,
         quantity: draft.quantity || 1,
@@ -723,6 +724,7 @@ export function IndividualBookingFlowPage() {
       const hours = draft.bookingType === 'instant' ? (draft.hours || draft.minHours || 1) : (days > 0 ? days * 8 : (kind === 'few_hours' ? (draft.hours || draft.minHours || 1) : (kind === 'half_day' ? 4 : 8)))
       const res = await bookingsApi.calculateBill({
         serviceId: draft.serviceId || draft.categoryId, // Fallback
+        subServiceId: draft.subServiceId || undefined,
         packageId: draft.packageId || packageIdParam || undefined,
         hours,
         quantity: draft.quantity || 1,
@@ -778,6 +780,8 @@ export function IndividualBookingFlowPage() {
       const hours = draft.bookingType === 'instant' ? (draft.hours || draft.minHours || 1) : (days > 0 ? days * 8 : (kind === 'few_hours' ? (draft.hours || draft.minHours || 1) : (kind === 'half_day' ? 4 : 8)))
       const payload = {
         serviceId: draft.serviceId || draft.categoryId,
+        subServiceId: draft.subServiceId || undefined,
+        subServiceName: draft.subServiceName || undefined,
         packageId: draft.packageId || packageIdParam || undefined,
         type: draft.bookingType === 'scheduled' ? 'SCHEDULED' : 'INSTANT',
         locationText: draft.address.trim(),

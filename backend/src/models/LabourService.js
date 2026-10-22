@@ -101,6 +101,44 @@ const labourServiceSchema = new mongoose.Schema(
         }
       }
     ],
+    subServices: [
+      {
+        name: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        description: {
+          type: String,
+          trim: true,
+          default: '',
+        },
+        price: {
+          type: Number,
+          required: true,
+          default: 0,
+          min: 0,
+        },
+        originalPrice: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+        estimatedDurationMins: {
+          type: Number,
+          default: 30,
+        },
+        iconUrl: {
+          type: String,
+          trim: true,
+          default: '',
+        },
+        isActive: {
+          type: Boolean,
+          default: true,
+        },
+      },
+    ],
   },
   { timestamps: true }
 )
