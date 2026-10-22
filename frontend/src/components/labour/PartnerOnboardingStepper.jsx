@@ -41,6 +41,8 @@ import {
   User,
   Wrench,
   X,
+  XCircle,
+  Eye,
   HeartHandshake,
   Layers,
 } from 'lucide-react'
@@ -161,6 +163,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
   const [billReceiptUrl, setBillReceiptUrl] = useState('')
   const [uploadingBill, setUploadingBill] = useState(false)
   const [paymentNotes, setPaymentNotes] = useState('')
+  const [reuploadMode, setReuploadMode] = useState(false)
 
   // Delivery Address State
   const [deliveryAddress, setDeliveryAddress] = useState(
@@ -288,6 +291,18 @@ export function PartnerOnboardingStepper({ onFinish }) {
         if (res.user.welcomeKit?.deliveryAddress) {
           setDeliveryAddress(res.user.welcomeKit.deliveryAddress)
         }
+        if (res.user.welcomeKit?.deliveryCity) {
+          setDeliveryCity(res.user.welcomeKit.deliveryCity)
+        }
+        if (res.user.welcomeKit?.deliveryPincode) {
+          setDeliveryPincode(res.user.welcomeKit.deliveryPincode)
+        }
+        if (res.user.welcomeKit?.paymentReceiptUrl) {
+          setBillReceiptUrl(res.user.welcomeKit.paymentReceiptUrl)
+        }
+      }
+      if (res.step4?.welcomeKitPayment?.receiptUrl) {
+        setBillReceiptUrl(res.step4.welcomeKitPayment.receiptUrl)
       }
     } catch (err) {
       console.error('Failed to load onboarding status:', err)
@@ -581,9 +596,17 @@ export function PartnerOnboardingStepper({ onFinish }) {
         deliveryPincode,
       })
 
-      showToast('success', 'Welcome kit payment submitted! Tracking ready.')
+      setReuploadMode(false)
+      showToast(
+        'success',
+        paymentTab === 'ONLINE'
+          ? 'Payment completed successfully!'
+          : 'Payment slip submitted! Admin verification in progress.'
+      )
       await loadStatus()
-      setExpandedStep(5) // Move to Step 5
+      if (paymentTab === 'ONLINE') {
+        setExpandedStep(5)
+      }
     } catch (err) {
       showToast('error', err?.message || 'Failed to submit payment')
     } finally {
@@ -1848,69 +1871,175 @@ export function PartnerOnboardingStepper({ onFinish }) {
                     )}
 
                     {/* Payment for Welcome Kit */}
-                    {step4.completed && (
-                      <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/60 via-orange-50/30 to-white p-3.5">
-                        <div className="flex items-center justify-between pb-2 border-b border-amber-100">
-                          <div className="flex items-center gap-1.5 text-amber-950">
-                            <Package className="h-4 w-4 text-amber-600" />
-                            <h4 className="text-xs font-black uppercase tracking-wide">
-                              Make Payment for Welcome Kit
-                            </h4>
-                          </div>
-                          <span className="text-xs font-black text-amber-700">₹999</span>
-                        </div>
+                    {step4.completed && (() => {
+                      const kitPayment = step4.welcomeKitPayment || {}
+                      const kitPaymentStatus = kitPayment.status || 'PENDING_PAYMENT'
+                      const kitPaymentReceiptUrl = kitPayment.receiptUrl || billReceiptUrl
+                      const kitRejectionReason = kitPayment.rejectionReason
 
-                        <p className="mt-2 text-[11px] text-slate-600 leading-snug">
-                          Covers branded uniform, partner ID lanyard, toolkit gear bag, and starter consumables kit.
-                        </p>
-
-                        {/* Payment Method Tabs */}
-                        <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl border border-amber-200 bg-amber-50/50 p-1">
-                          <button
-                            type="button"
-                            onClick={() => setPaymentTab('OFFLINE')}
-                            className={`rounded-lg py-1.5 px-1 text-[11px] sm:text-xs font-bold transition text-center truncate ${
-                              paymentTab === 'OFFLINE'
-                                ? 'bg-white text-slate-900 shadow-xs'
-                                : 'text-slate-500 hover:text-slate-800'
-                            }`}
-                          >
-                            Offline / Hub Bill
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setPaymentTab('ONLINE')}
-                            className={`rounded-lg py-1.5 px-1 text-[11px] sm:text-xs font-bold transition text-center truncate ${
-                              paymentTab === 'ONLINE'
-                                ? 'bg-white text-slate-900 shadow-xs'
-                                : 'text-slate-500 hover:text-slate-800'
-                            }`}
-                          >
-                            Online (UPI / Card)
-                          </button>
-                        </div>
-
-                        {paymentTab === 'OFFLINE' ? (
-                          <div className="mt-3 space-y-2.5">
-                            <div className="flex items-start gap-2 rounded-xl bg-white p-2.5 border border-slate-200 text-xs text-slate-700">
-                              <QrCode className="h-8 w-8 text-slate-800 shrink-0" />
-                              <div className="text-[11px] leading-tight">
-                                <p className="font-bold text-slate-900">Center QR / Hub Payment</p>
-                                <p className="text-slate-500 mt-0.5">Pay ₹999 at the center desk or scan QR, then upload the receipt screenshot.</p>
+                      // STATE 1: PAYMENT IS APPROVED & VERIFIED (PAID)
+                      if (kitPaymentStatus === 'PAID') {
+                        return (
+                          <div className="rounded-2xl border border-emerald-300 bg-gradient-to-br from-emerald-50/80 via-teal-50/40 to-white p-4 space-y-3 shadow-xs">
+                            <div className="flex items-center justify-between pb-2 border-b border-emerald-100">
+                              <div className="flex items-center gap-2 text-emerald-950 font-bold">
+                                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                                <span className="text-xs uppercase tracking-wide">
+                                  Welcome Kit Payment Verified & Approved
+                                </span>
                               </div>
+                              <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-800 border border-emerald-200">
+                                ₹999 Paid ✓
+                              </span>
                             </div>
 
-                            <div>
-                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                                Upload Bill or Screenshot
+                            <p className="text-xs text-emerald-900 leading-relaxed">
+                              Your payment has been successfully approved! Your welcome kit dispatch is authorized. Please proceed to <strong>Step 5</strong> below to confirm kit delivery.
+                            </p>
+
+                            {kitPaymentReceiptUrl && (
+                              <div className="flex items-center gap-3 bg-white/90 p-2.5 rounded-xl border border-emerald-200/80 text-xs">
+                                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-emerald-200 bg-slate-100">
+                                  <img src={kitPaymentReceiptUrl} alt="Verified payment slip" className="h-full w-full object-cover" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-bold text-slate-800">Verified Payment Slip</p>
+                                  <a
+                                    href={kitPaymentReceiptUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-brand font-semibold text-[11px] inline-flex items-center gap-1 hover:underline"
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                    <span>View Uploaded Screenshot</span>
+                                  </a>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      }
+
+                      // STATE 2: PAYMENT IS UNDER REVIEW BY ADMIN (PAYMENT_SUBMITTED)
+                      if (kitPaymentStatus === 'PAYMENT_SUBMITTED' && !reuploadMode) {
+                        return (
+                          <div className="rounded-2xl border-2 border-amber-300 bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-white p-4 space-y-3 shadow-xs">
+                            <div className="flex items-center justify-between pb-2 border-b border-amber-200">
+                              <div className="flex items-center gap-2 text-amber-950 font-bold">
+                                <Clock className="h-5 w-5 text-amber-600 animate-pulse" />
+                                <span className="text-xs uppercase tracking-wide">
+                                  Payment Slip Submitted • Under Admin Review
+                                </span>
+                              </div>
+                              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-black text-amber-900 border border-amber-200">
+                                Pending Verification
+                              </span>
+                            </div>
+
+                            <p className="text-xs text-slate-700 leading-relaxed">
+                              Your welcome kit payment slip for <strong>₹999</strong> has been uploaded. An administrator is currently verifying your payment screenshot. Once approved, Step 5 will unlock immediately.
+                            </p>
+
+                            {kitPaymentReceiptUrl && (
+                              <div className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-amber-200 shadow-2xs">
+                                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                                  <img src={kitPaymentReceiptUrl} alt="Submitted payment slip" className="h-full w-full object-cover" />
+                                </div>
+                                <div className="min-w-0 flex-1 text-xs">
+                                  <p className="font-bold text-slate-800">Payment Screenshot Submitted</p>
+                                  <a
+                                    href={kitPaymentReceiptUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-brand font-semibold text-[11px] inline-flex items-center gap-1 hover:underline"
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                    <span>View Full Screenshot</span>
+                                  </a>
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="pt-1 flex items-center justify-between text-xs">
+                              <button
+                                type="button"
+                                onClick={() => setReuploadMode(true)}
+                                className="font-bold text-amber-800 hover:text-amber-950 underline cursor-pointer"
+                              >
+                                Need to upload a different payment slip?
+                              </button>
+                              <button
+                                type="button"
+                                onClick={loadStatus}
+                                className="inline-flex items-center gap-1 font-semibold text-slate-500 hover:text-slate-800"
+                              >
+                                <RefreshCw className="h-3 w-3" />
+                                Check Status
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      }
+
+                      // STATE 3: PAYMENT IS REJECTED BY ADMIN (PAYMENT_REJECTED)
+                      if (kitPaymentStatus === 'PAYMENT_REJECTED') {
+                        return (
+                          <div className="rounded-2xl border-2 border-rose-300 bg-gradient-to-br from-rose-50 via-red-50/40 to-white p-4 space-y-3.5 shadow-sm">
+                            <div className="flex items-center justify-between pb-2 border-b border-rose-200">
+                              <div className="flex items-center gap-2 text-rose-950 font-bold">
+                                <XCircle className="h-5 w-5 text-rose-600" />
+                                <span className="text-xs uppercase tracking-wide">
+                                  Payment Screenshot Rejected by Admin
+                                </span>
+                              </div>
+                              <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-extrabold text-rose-800 border border-rose-200">
+                                Action Required
+                              </span>
+                            </div>
+
+                            {/* Rejection Note from Admin */}
+                            <div className="rounded-xl border border-rose-200 bg-white p-3 text-xs text-rose-900 space-y-1 shadow-2xs">
+                              <div className="flex items-center gap-1.5 font-bold text-rose-700 text-[11px] uppercase tracking-wide">
+                                <AlertTriangle className="h-3.5 w-3.5 text-rose-600" />
+                                <span>Rejection Reason:</span>
+                              </div>
+                              <p className="text-xs font-semibold text-slate-800 pl-5">
+                                "{kitRejectionReason || 'The payment screenshot provided was unclear, invalid, or could not be verified. Please upload the correct payment slip.'}"
+                              </p>
+                            </div>
+
+                            {/* Previous Rejected Screenshot */}
+                            {kitPaymentReceiptUrl && (
+                              <div className="flex items-center gap-3 bg-rose-50/70 p-2.5 rounded-xl border border-rose-200 text-xs">
+                                <div className="relative h-12 w-12 shrink-0 rounded-lg overflow-hidden border border-rose-300 bg-white">
+                                  <img src={kitPaymentReceiptUrl} alt="Rejected payment slip" className="h-full w-full object-cover opacity-60" />
+                                  <div className="absolute inset-0 bg-rose-950/40 flex items-center justify-center text-white text-[8px] font-black uppercase">
+                                    Rejected
+                                  </div>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-bold text-slate-800">Previously Uploaded Slip</p>
+                                  <p className="text-[11px] text-slate-500">Please re-upload a clear screenshot showing full transaction & UTR.</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Re-upload Correct Payment Screenshot */}
+                            <div className="space-y-2 pt-1">
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                                Upload Correct Payment Slip or Screenshot
                               </label>
-                              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-amber-300 bg-white p-3 text-xs text-amber-900 hover:bg-amber-50">
+                              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-rose-300 bg-white p-3 text-xs text-rose-900 hover:bg-rose-50 transition">
                                 {uploadingBill ? (
-                                  <RefreshCw className="h-4 w-4 animate-spin text-amber-600" />
+                                  <RefreshCw className="h-4 w-4 animate-spin text-rose-600" />
                                 ) : (
-                                  <Upload className="h-4 w-4 text-amber-600" />
+                                  <Upload className="h-4 w-4 text-rose-600" />
                                 )}
-                                <span>{billReceiptUrl ? 'Screenshot Uploaded ✓' : 'Tap to Upload Screenshot'}</span>
+                                <span className="font-bold">
+                                  {billReceiptUrl && billReceiptUrl !== kitPaymentReceiptUrl
+                                    ? 'Correct Screenshot Uploaded ✓'
+                                    : 'Tap to Select & Upload Correct Slip'}
+                                </span>
                                 <input
                                   type="file"
                                   accept="image/*"
@@ -1918,63 +2047,190 @@ export function PartnerOnboardingStepper({ onFinish }) {
                                   className="hidden"
                                 />
                               </label>
-                            </div>
 
-                            <div>
-                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                                Delivery Address for Kit Dispatch
-                              </label>
-                              <input
-                                type="text"
-                                value={deliveryAddress}
-                                onChange={(e) => setDeliveryAddress(e.target.value)}
-                                placeholder="House/Flat No, Street, Area"
-                                className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-brand"
-                              />
-                            </div>
+                              {billReceiptUrl && billReceiptUrl !== kitPaymentReceiptUrl && (
+                                <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 p-2 text-xs text-emerald-800">
+                                  <Check className="h-4 w-4 text-emerald-600 shrink-0" />
+                                  <span className="truncate">New slip ready! Click submit below to re-verify.</span>
+                                </div>
+                              )}
 
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                                  Delivery Address for Kit Dispatch
+                                </label>
+                                <input
+                                  type="text"
+                                  value={deliveryAddress}
+                                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                                  placeholder="House/Flat No, Street, Area"
+                                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-brand"
+                                />
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={handleSubmitWelcomeKitPayment}
+                                disabled={submitting || !billReceiptUrl || billReceiptUrl === kitPaymentReceiptUrl}
+                                className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 py-3 text-xs font-bold text-white shadow-md shadow-rose-600/20 hover:brightness-105 disabled:opacity-50"
+                              >
+                                {submitting ? (
+                                  <>
+                                    <RefreshCw className="h-4 w-4 animate-spin" />
+                                    <span>Submitting Corrected Slip...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    <span>Submit Corrected Payment Slip</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      }
+
+                      // STATE 4: INITIAL PAYMENT FORM (PENDING_PAYMENT or REUPLOAD MODE)
+                      return (
+                        <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/60 via-orange-50/30 to-white p-3.5 space-y-3">
+                          <div className="flex items-center justify-between pb-2 border-b border-amber-100">
+                            <div className="flex items-center gap-1.5 text-amber-950">
+                              <Package className="h-4 w-4 text-amber-600" />
+                              <h4 className="text-xs font-black uppercase tracking-wide">
+                                Make Payment for Welcome Kit
+                              </h4>
+                            </div>
+                            <span className="text-xs font-black text-amber-700">₹999</span>
+                          </div>
+
+                          <p className="text-[11px] text-slate-600 leading-snug">
+                            Covers branded uniform, partner ID lanyard, toolkit gear bag, and starter consumables kit.
+                          </p>
+
+                          {/* Payment Method Tabs */}
+                          <div className="grid grid-cols-2 gap-1 rounded-xl border border-amber-200 bg-amber-50/50 p-1">
                             <button
                               type="button"
-                              onClick={handleSubmitWelcomeKitPayment}
-                              disabled={submitting || !billReceiptUrl}
-                              className="w-full rounded-xl bg-amber-500 py-2.5 text-xs font-bold text-white shadow-md shadow-amber-500/20 hover:bg-amber-600 disabled:opacity-50"
+                              onClick={() => setPaymentTab('OFFLINE')}
+                              className={`rounded-lg py-1.5 px-1 text-[11px] sm:text-xs font-bold transition text-center truncate ${
+                                paymentTab === 'OFFLINE'
+                                  ? 'bg-white text-slate-900 shadow-xs'
+                                  : 'text-slate-500 hover:text-slate-800'
+                              }`}
                             >
-                              Submit Payment & Proceed
+                              Offline / Hub Bill
                             </button>
-                          </div>
-                        ) : (
-                          <div className="mt-3 space-y-2.5">
-                            <div className="rounded-xl bg-white p-2.5 border border-slate-200 text-xs text-slate-700">
-                              <p className="font-bold text-slate-900">Instant Online Activation</p>
-                              <p className="text-[11px] text-slate-500 mt-0.5">Pay ₹999 securely via UPI or Card to immediately authorize welcome kit dispatch.</p>
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                                Delivery Address for Kit Dispatch
-                              </label>
-                              <input
-                                type="text"
-                                value={deliveryAddress}
-                                onChange={(e) => setDeliveryAddress(e.target.value)}
-                                placeholder="House/Flat No, Street, Area"
-                                className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-brand"
-                              />
-                            </div>
-
                             <button
                               type="button"
-                              onClick={handleSubmitWelcomeKitPayment}
-                              disabled={submitting}
-                              className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-50"
+                              onClick={() => setPaymentTab('ONLINE')}
+                              className={`rounded-lg py-1.5 px-1 text-[11px] sm:text-xs font-bold transition text-center truncate ${
+                                paymentTab === 'ONLINE'
+                                  ? 'bg-white text-slate-900 shadow-xs'
+                                  : 'text-slate-500 hover:text-slate-800'
+                              }`}
                             >
-                              <CreditCard className="h-4 w-4" />
-                              <span>Pay ₹999 & Authorize Dispatch</span>
+                              Online (UPI / Card)
                             </button>
                           </div>
-                        )}
-                      </div>
-                    )}
+
+                          {paymentTab === 'OFFLINE' ? (
+                            <div className="space-y-2.5">
+                              <div className="flex items-start gap-2 rounded-xl bg-white p-2.5 border border-slate-200 text-xs text-slate-700">
+                                <QrCode className="h-8 w-8 text-slate-800 shrink-0" />
+                                <div className="text-[11px] leading-tight">
+                                  <p className="font-bold text-slate-900">Center QR / Hub Payment</p>
+                                  <p className="text-slate-500 mt-0.5">Pay ₹999 at the center desk or scan QR, then upload the receipt screenshot.</p>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                                  Upload Bill or Screenshot
+                                </label>
+                                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-amber-300 bg-white p-3 text-xs text-amber-900 hover:bg-amber-50">
+                                  {uploadingBill ? (
+                                    <RefreshCw className="h-4 w-4 animate-spin text-amber-600" />
+                                  ) : (
+                                    <Upload className="h-4 w-4 text-amber-600" />
+                                  )}
+                                  <span>{billReceiptUrl ? 'Screenshot Uploaded ✓' : 'Tap to Upload Screenshot'}</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleBillFileUpload}
+                                    className="hidden"
+                                  />
+                                </label>
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                                  Delivery Address for Kit Dispatch
+                                </label>
+                                <input
+                                  type="text"
+                                  value={deliveryAddress}
+                                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                                  placeholder="House/Flat No, Street, Area"
+                                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-brand"
+                                />
+                              </div>
+
+                              <div className="flex gap-2">
+                                {reuploadMode && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setReuploadMode(false)}
+                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                                  >
+                                    Cancel
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={handleSubmitWelcomeKitPayment}
+                                  disabled={submitting || !billReceiptUrl}
+                                  className="flex-1 rounded-xl bg-amber-500 py-2.5 text-xs font-bold text-white shadow-md shadow-amber-500/20 hover:bg-amber-600 disabled:opacity-50"
+                                >
+                                  {submitting ? 'Submitting...' : 'Submit Payment Slip & Proceed'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-2.5">
+                              <div className="rounded-xl bg-white p-2.5 border border-slate-200 text-xs text-slate-700">
+                                <p className="font-bold text-slate-900">Instant Online Activation</p>
+                                <p className="text-[11px] text-slate-500 mt-0.5">Pay ₹999 securely via UPI or Card to immediately authorize welcome kit dispatch.</p>
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                                  Delivery Address for Kit Dispatch
+                                </label>
+                                <input
+                                  type="text"
+                                  value={deliveryAddress}
+                                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                                  placeholder="House/Flat No, Street, Area"
+                                  className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-800 outline-none focus:border-brand"
+                                />
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={handleSubmitWelcomeKitPayment}
+                                disabled={submitting}
+                                className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                <CreditCard className="h-4 w-4" />
+                                <span>Pay ₹999 & Authorize Dispatch</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </motion.div>
                 )}
               </AnimatePresence>

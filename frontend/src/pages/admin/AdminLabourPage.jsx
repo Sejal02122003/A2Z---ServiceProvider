@@ -4,7 +4,6 @@ import { motion, useReducedMotion } from 'framer-motion'
 import {
   ArrowUpRight,
   Award,
-  Calendar,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -729,16 +728,38 @@ export function AdminLabourPage() {
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <KitStatusBadge welcomeKit={u.welcomeKit} showItems={true} />
-                          <button
-                            type="button"
-                            onClick={() => setKitModalUser(u)}
-                            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition"
-                            title="Update Kit"
-                          >
-                            Edit
-                          </button>
+                        <div className="flex flex-col gap-1.5 items-start">
+                          <div className="flex items-center gap-2">
+                            <KitStatusBadge welcomeKit={u.welcomeKit} showItems={true} />
+                            <button
+                              type="button"
+                              onClick={() => setKitModalUser(u)}
+                              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition"
+                              title="Update Kit & Slip"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                          {u.welcomeKit?.status === 'PAYMENT_SUBMITTED' && (
+                            <button
+                              type="button"
+                              onClick={() => setKitModalUser(u)}
+                              className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-900 border border-amber-300 shadow-2xs hover:bg-amber-200 transition animate-pulse cursor-pointer"
+                              title="Click to review payment screenshot"
+                            >
+                              <span>🧾 Verify Slip</span>
+                            </button>
+                          )}
+                          {u.welcomeKit?.status === 'PAYMENT_REJECTED' && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200">
+                              <span>❌ Slip Rejected</span>
+                            </span>
+                          )}
+                          {u.welcomeKit?.status === 'PAID' && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200">
+                              <span>✓ ₹999 Paid</span>
+                            </span>
+                          )}
                         </div>
                       </td>
                       {activeTab !== 'contractor' && (
@@ -823,17 +844,38 @@ export function AdminLabourPage() {
                   />
                 </div>
                 <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2.5">
-                  <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
-                    <Package className="h-3.5 w-3.5 text-slate-400" />
-                    <span>Kit:</span>
-                    <KitStatusBadge welcomeKit={u.welcomeKit} showItems={false} />
+                  <div className="flex flex-col gap-1 text-xs">
+                    <div className="flex items-center gap-1.5 text-slate-500 font-semibold">
+                      <Package className="h-3.5 w-3.5 text-slate-400" />
+                      <span>Kit:</span>
+                      <KitStatusBadge welcomeKit={u.welcomeKit} showItems={false} />
+                    </div>
+                    {u.welcomeKit?.status === 'PAYMENT_SUBMITTED' && (
+                      <span className="text-[10px] font-bold text-amber-700 animate-pulse">
+                        🧾 Payment Slip Pending Review
+                      </span>
+                    )}
+                    {u.welcomeKit?.status === 'PAYMENT_REJECTED' && (
+                      <span className="text-[10px] font-bold text-rose-600">
+                        ❌ Slip Rejected
+                      </span>
+                    )}
+                    {u.welcomeKit?.status === 'PAID' && (
+                      <span className="text-[10px] font-bold text-emerald-700">
+                        ✓ ₹999 Verified
+                      </span>
+                    )}
                   </div>
                   <button
                     type="button"
                     onClick={() => setKitModalUser(u)}
-                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition shadow-2xs ${
+                      u.welcomeKit?.status === 'PAYMENT_SUBMITTED'
+                        ? 'bg-amber-500 text-white hover:bg-amber-600'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
                   >
-                    Manage Kit
+                    {u.welcomeKit?.status === 'PAYMENT_SUBMITTED' ? 'Review Slip' : 'Manage Kit'}
                   </button>
                 </div>
                 {(u.contractorProfile || u.labourProfile)?.kycStatus === KYC_STATUS.PENDING && (u.contractorProfile || u.labourProfile)?.kycSubmittedAt ? (

@@ -145,7 +145,7 @@ const welcomeKitSchema = new mongoose.Schema(
     productsIssued: { type: Boolean, default: false },
     status: {
       type: String,
-      enum: ['PENDING_PAYMENT', 'PAYMENT_SUBMITTED', 'PAID', 'DISPATCHED', 'DELIVERED'],
+      enum: ['PENDING_PAYMENT', 'PAYMENT_SUBMITTED', 'PAID', 'PAYMENT_REJECTED', 'DISPATCHED', 'DELIVERED'],
       default: 'PENDING_PAYMENT',
     },
     paymentMethod: {
@@ -156,6 +156,9 @@ const welcomeKitSchema = new mongoose.Schema(
     paymentAmount: { type: Number, default: 999 },
     paymentReceiptUrl: { type: String, maxlength: 2048 },
     paymentNotes: { type: String, trim: true },
+    paymentRejectionReason: { type: String, trim: true, default: '' },
+    paymentVerifiedAt: { type: Date, default: null },
+    paymentVerifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     paidAt: { type: Date, default: null },
     deliveryAddress: { type: String, trim: true },
     deliveryCity: { type: String, trim: true },

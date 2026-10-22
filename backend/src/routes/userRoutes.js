@@ -169,6 +169,19 @@ router.patch(
 )
 
 router.patch(
+  '/:id/welcome-kit/verify-payment',
+  restrictTo(USER_ROLES.ADMIN),
+  validateUserIdParam,
+  [
+    body('action').isIn(['APPROVE', 'REJECT', 'ACCEPT']).withMessage('action must be APPROVE or REJECT'),
+    body('rejectionReason').optional().trim().isLength({ max: 500 }),
+    body('notes').optional().trim().isLength({ max: 500 }),
+  ],
+  validateRequest,
+  user.verifyPartnerWelcomeKitPayment,
+)
+
+router.patch(
   '/:id/trial-evaluate',
   restrictTo(USER_ROLES.ADMIN),
   validateUserIdParam,

@@ -41,7 +41,7 @@ export function AdminLoginPage() {
       {/* Background Decorative Ambient Glows */}
       <div className="pointer-events-none absolute -top-40 -left-40 h-96 w-96 rounded-full bg-cyan-500/15 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-blue-600/15 blur-3xl" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/40 via-slate-950/80 to-slate-950" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(15,23,42,0.6)_0%,_rgba(2,6,23,0.95)_60%,_#020617_100%)]" />
 
       <motion.div
         initial={{ opacity: 0, y: 15 }}

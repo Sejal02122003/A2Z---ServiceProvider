@@ -30,4 +30,20 @@ router.patch(
   user.updatePartnerWelcomeKit,
 )
 
+/**
+ * PATCH /api/service-partners/:partnerId/welcome-kit/verify-payment
+ * Admin accepts or rejects the welcome kit offline payment screenshot
+ */
+router.patch(
+  '/:partnerId/welcome-kit/verify-payment',
+  [
+    param('partnerId').isMongoId().withMessage('partnerId must be a valid MongoDB ObjectId'),
+    body('action').isIn(['APPROVE', 'REJECT', 'ACCEPT']).withMessage('action must be APPROVE or REJECT'),
+    body('rejectionReason').optional().trim().isLength({ max: 500 }),
+    body('notes').optional().trim().isLength({ max: 500 }),
+  ],
+  validateRequest,
+  user.verifyPartnerWelcomeKitPayment,
+)
+
 export default router

@@ -1108,7 +1108,7 @@ export const updatePartnerWelcomeKit = asyncHandler(async (req, res) => {
     bagIssued,
     productsIssued: req.body.productsIssued !== undefined ? Boolean(req.body.productsIssued) : Boolean(user.welcomeKit?.productsIssued),
     isReceived: isComplete ? true : Boolean(user.welcomeKit?.isReceived),
-    status: isComplete ? 'DELIVERED' : (user.welcomeKit?.status || 'PENDING_PAYMENT'),
+    status: isComplete ? 'DELIVERED' : (req.body.status || user.welcomeKit?.status || 'PENDING_PAYMENT'),
     issuedAt,
   }
 
@@ -1117,6 +1117,7 @@ export const updatePartnerWelcomeKit = asyncHandler(async (req, res) => {
   return sendSuccess(res, {
     message: 'Welcome kit updated successfully',
     data: {
+      welcomeKit: user.welcomeKit,
       uniformIssued: user.welcomeKit.uniformIssued,
       idCardIssued: user.welcomeKit.idCardIssued,
       bagIssued: user.welcomeKit.bagIssued,
@@ -1213,11 +1214,10 @@ export const getPartnerOnboardingStatus = asyncHandler(async (req, res) => {
     trialStatus === 'TRIAL_COMPLETED'
   const step4Complete = Boolean(trialPassed)
 
-  // Welcome Kit Payment
+  // Welcome Kit Payment - Only PAID, DISPATCHED, or DELIVERED means payment is verified/complete
   const welcomeKit = user.welcomeKit || {}
   const paymentComplete = Boolean(
     welcomeKit.status === 'PAID' ||
-    welcomeKit.status === 'PAYMENT_SUBMITTED' ||
     welcomeKit.status === 'DISPATCHED' ||
     welcomeKit.status === 'DELIVERED'
   )
@@ -1316,6 +1316,12 @@ export const getPartnerOnboardingStatus = asyncHandler(async (req, res) => {
           status: welcomeKit.status || 'PENDING_PAYMENT',
           method: welcomeKit.paymentMethod || 'NONE',
           receiptUrl: welcomeKit.paymentReceiptUrl || '',
+          rejectionReason: welcomeKit.paymentRejectionReason || '',
+          paidAt: welcomeKit.paidAt || null,
+          verifiedAt: welcomeKit.paymentVerifiedAt || null,
+          deliveryAddress: welcomeKit.deliveryAddress || '',
+          deliveryCity: welcomeKit.deliveryCity || '',
+          deliveryPincode: welcomeKit.deliveryPincode || '',
         },
       },
       step5: {
@@ -1509,6 +1515,7 @@ export const submitPartnerWelcomeKitPayment = asyncHandler(async (req, res) => {
   user.welcomeKit.status = isOnline ? 'PAID' : 'PAYMENT_SUBMITTED'
   user.welcomeKit.paymentReceiptUrl = paymentReceiptUrl || user.welcomeKit.paymentReceiptUrl || ''
   user.welcomeKit.paymentNotes = paymentNotes || ''
+  user.welcomeKit.paymentRejectionReason = '' // Clear any previous rejection
   user.welcomeKit.paidAt = new Date()
 
   if (deliveryAddress) user.welcomeKit.deliveryAddress = String(deliveryAddress).trim()
@@ -1519,6 +1526,75 @@ export const submitPartnerWelcomeKitPayment = asyncHandler(async (req, res) => {
 
   return sendSuccess(res, {
     message: isOnline ? 'Payment completed successfully!' : 'Payment bill submitted! Verification in progress.',
+    data: {
+      welcomeKit: user.welcomeKit,
+      user: user.toSafeObject(),
+    },
+  })
+})
+
+/**
+ * PATCH /api/service-partners/:partnerId/welcome-kit/verify-payment
+ * or PATCH /api/users/:id/welcome-kit/verify-payment
+ * Admin accepts or rejects the welcome kit offline payment screenshot
+ */
+export const verifyPartnerWelcomeKitPayment = asyncHandler(async (req, res) => {
+  const partnerId = req.params.partnerId || req.params.id
+  if (!mongoose.Types.ObjectId.isValid(partnerId)) {
+    return sendError(res, {
+      message: 'Invalid service partner ID',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_ID',
+    })
+  }
+
+  const { action, rejectionReason, notes } = req.body
+  const normalizedAction = String(action || '').toUpperCase()
+
+  const user = await User.findById(partnerId)
+  if (!user) {
+    return sendError(res, {
+      message: 'Service partner not found',
+      statusCode: HTTP_STATUS.NOT_FOUND,
+      code: 'PARTNER_NOT_FOUND',
+    })
+  }
+
+  user.welcomeKit = user.welcomeKit || {}
+
+  if (normalizedAction === 'APPROVE' || normalizedAction === 'ACCEPT') {
+    user.welcomeKit.status = 'PAID'
+    user.welcomeKit.paymentVerifiedAt = new Date()
+    user.welcomeKit.paymentVerifiedBy = req.user._id
+    user.welcomeKit.paymentRejectionReason = ''
+    if (!user.welcomeKit.paidAt) {
+      user.welcomeKit.paidAt = new Date()
+    }
+    if (notes && notes.trim()) {
+      user.welcomeKit.paymentNotes = (user.welcomeKit.paymentNotes ? user.welcomeKit.paymentNotes + '\n' : '') + `[Admin Note]: ${notes.trim()}`
+    }
+  } else if (normalizedAction === 'REJECT') {
+    user.welcomeKit.status = 'PAYMENT_REJECTED'
+    user.welcomeKit.paymentRejectionReason = rejectionReason?.trim() || 'Payment slip was rejected. Please re-upload a clear and valid payment receipt or screenshot.'
+    user.welcomeKit.paymentVerifiedAt = new Date()
+    user.welcomeKit.paymentVerifiedBy = req.user._id
+    if (notes && notes.trim()) {
+      user.welcomeKit.paymentNotes = (user.welcomeKit.paymentNotes ? user.welcomeKit.paymentNotes + '\n' : '') + `[Admin Rejection Note]: ${notes.trim()}`
+    }
+  } else {
+    return sendError(res, {
+      message: "action must be 'APPROVE' or 'REJECT'",
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_ACTION',
+    })
+  }
+
+  await user.save()
+
+  return sendSuccess(res, {
+    message: normalizedAction === 'APPROVE' || normalizedAction === 'ACCEPT'
+      ? 'Payment verified successfully! Welcome kit authorized.'
+      : 'Payment screenshot rejected. Service partner will be prompted to re-upload.',
     data: {
       welcomeKit: user.welcomeKit,
       user: user.toSafeObject(),
