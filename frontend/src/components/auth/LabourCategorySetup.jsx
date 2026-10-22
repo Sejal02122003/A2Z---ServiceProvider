@@ -356,8 +356,9 @@ export function LabourCategorySetup({ variant = 'app', onComplete }) {
         }
       }
 
+      const isSubcatOnly = String(id) === String(subcategoryId)
       servicesPayload.push({
-        serviceId: id,
+        serviceId: isSubcatOnly ? undefined : id,
         subcategoryId: subcategoryId,
         minPrice: 0,
         maxPrice: 0,

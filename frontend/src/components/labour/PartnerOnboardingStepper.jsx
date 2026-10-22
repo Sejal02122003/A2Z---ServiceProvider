@@ -431,8 +431,9 @@ export function PartnerOnboardingStepper({ onFinish }) {
               })
             } else {
               services.push({
-                serviceId: String(subcat._id),
                 subcategoryId: String(subcat._id),
+                minPrice: 0,
+                maxPrice: 0,
               })
             }
           }

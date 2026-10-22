@@ -173,10 +173,10 @@ export const updateLabourCategories = asyncHandler(async (req, res) => {
   }
 
   const { services, categoryIds: directCatIds, subcategoryIds: directSubcatIds } = req.body
-  const uniqueServices = []
+  const rawServices = []
   const uniqueSubcategoryIds = new Set()
-  const uniqueServiceIds = []
-  
+  const rawServiceIds = new Set()
+
   if (Array.isArray(directSubcatIds)) {
     for (const sid of directSubcatIds) {
       if (sid) uniqueSubcategoryIds.add(String(sid))
@@ -184,29 +184,36 @@ export const updateLabourCategories = asyncHandler(async (req, res) => {
   }
 
   if (Array.isArray(services)) {
-    const seen = new Set()
     for (const svc of services) {
-      const sId = svc.serviceId || svc.subcategoryId // Fallback for backwards compatibility
-      if (sId && !seen.has(String(sId))) {
-        seen.add(String(sId))
-        
-        if (svc.serviceId) uniqueServiceIds.push(String(svc.serviceId))
-        if (svc.subcategoryId) uniqueSubcategoryIds.add(String(svc.subcategoryId))
-        
-        uniqueServices.push({
-          serviceId: svc.serviceId ? String(svc.serviceId) : undefined,
-          subcategoryId: svc.subcategoryId ? String(svc.subcategoryId) : undefined,
-          minPrice: Number(svc.minPrice) || 0,
-          maxPrice: Number(svc.maxPrice) || 0,
-        })
+      if (!svc) continue
+      const subId = svc.subcategoryId ? String(svc.subcategoryId) : null
+      const sId = svc.serviceId ? String(svc.serviceId) : null
+
+      if (subId) {
+        uniqueSubcategoryIds.add(subId)
       }
+
+      // Only treat sId as candidate serviceId if it exists and is distinct from subcategoryId
+      if (sId && sId !== subId) {
+        rawServiceIds.add(sId)
+      } else if (sId && !subId) {
+        // Fallback: sId could be a serviceId or a subcategoryId
+        rawServiceIds.add(sId)
+      }
+
+      rawServices.push({
+        serviceId: sId && sId !== subId ? sId : undefined,
+        subcategoryId: subId || (sId ? sId : undefined),
+        minPrice: Number(svc.minPrice) || 0,
+        maxPrice: Number(svc.maxPrice) || 0,
+      })
     }
   }
 
   // Dynamically import LabourSubcategory and LabourService
   const { LabourSubcategory } = await import('../models/LabourSubcategory.js')
   const { LabourService } = await import('../models/LabourService.js')
-  
+
   const subcatIdArray = Array.from(uniqueSubcategoryIds)
   const subcategories = await LabourSubcategory.find({
     _id: { $in: subcatIdArray },
@@ -220,33 +227,23 @@ export const updateLabourCategories = asyncHandler(async (req, res) => {
       code: 'INVALID_CATEGORIES',
     })
   }
-  
-  // If no explicit services provided but subcategories selected, populate all services for those subcategories
-  if (uniqueServiceIds.length === 0 && subcatIdArray.length > 0) {
-    const subcatServices = await LabourService.find({
-      subcategoryId: { $in: subcatIdArray },
-      isActive: true,
-    }).lean()
-    for (const s of subcatServices) {
-      const sid = String(s._id)
-      if (!uniqueServiceIds.includes(sid)) {
-        uniqueServiceIds.push(sid)
-        uniqueServices.push({
-          serviceId: sid,
-          subcategoryId: String(s.subcategoryId),
-          minPrice: 0,
-          maxPrice: 0,
-        })
-      }
-    }
-  }
 
-  const servicesInDb = await LabourService.find({
-    _id: { $in: uniqueServiceIds },
-    isActive: true,
-  })
-  
-  if (servicesInDb.length !== uniqueServiceIds.length && uniqueServiceIds.length > 0) {
+  const validSubcatIdSet = new Set(subcategories.map((s) => String(s._id)))
+
+  // Remove any ID that is actually a subcategory ID from the candidate service IDs
+  const candidateServiceIds = Array.from(rawServiceIds).filter(
+    (id) => !validSubcatIdSet.has(id) && !uniqueSubcategoryIds.has(id)
+  )
+
+  // Query database for candidate services
+  const servicesInDb = candidateServiceIds.length > 0
+    ? await LabourService.find({
+        _id: { $in: candidateServiceIds },
+        isActive: true,
+      })
+    : []
+
+  if (servicesInDb.length !== candidateServiceIds.length && candidateServiceIds.length > 0) {
     return sendError(res, {
       message: 'One or more services are invalid or inactive',
       statusCode: HTTP_STATUS.BAD_REQUEST,
@@ -254,12 +251,85 @@ export const updateLabourCategories = asyncHandler(async (req, res) => {
     })
   }
 
+  const finalServiceIds = servicesInDb.map((s) => String(s._id))
+  const finalServiceIdSet = new Set(finalServiceIds)
+  const finalPricing = []
+  const seenPricingKeys = new Set()
+
+  for (const s of servicesInDb) {
+    const sId = String(s._id)
+    const subId = String(s.subcategoryId)
+    const key = `${subId}_${sId}`
+    if (!seenPricingKeys.has(key)) {
+      seenPricingKeys.add(key)
+      const clientMatch = rawServices.find(
+        (rs) => rs.serviceId === sId && (!rs.subcategoryId || rs.subcategoryId === subId)
+      )
+      finalPricing.push({
+        serviceId: s._id,
+        subcategoryId: s.subcategoryId,
+        minPrice: clientMatch?.minPrice || s.basePrice || 0,
+        maxPrice: clientMatch?.maxPrice || s.basePrice || 0,
+      })
+    }
+  }
+
+  // For any selected subcategories that didn't have explicit services provided,
+  // automatically include their active services if they exist in DB
+  if (subcatIdArray.length > 0) {
+    const subcatsNeedingServices = subcatIdArray.filter(
+      (subId) => !finalPricing.some((p) => String(p.subcategoryId) === subId && p.serviceId)
+    )
+    if (subcatsNeedingServices.length > 0) {
+      const autoServices = await LabourService.find({
+        subcategoryId: { $in: subcatsNeedingServices },
+        isActive: true,
+      }).lean()
+
+      for (const s of autoServices) {
+        const sid = String(s._id)
+        const subId = String(s.subcategoryId)
+        const key = `${subId}_${sid}`
+        if (!finalServiceIdSet.has(sid)) {
+          finalServiceIdSet.add(sid)
+          finalServiceIds.push(sid)
+        }
+        if (!seenPricingKeys.has(key)) {
+          seenPricingKeys.add(key)
+          finalPricing.push({
+            serviceId: s._id,
+            subcategoryId: s.subcategoryId,
+            minPrice: s.basePrice || 0,
+            maxPrice: s.basePrice || 0,
+          })
+        }
+      }
+    }
+  }
+
+  // Also record pricing entry for any subcategories that have 0 services in DB
+  for (const sub of subcategories) {
+    const subId = String(sub._id)
+    const hasAnyPricing = finalPricing.some((p) => String(p.subcategoryId) === subId)
+    if (!hasAnyPricing) {
+      const key = `${subId}_subcat_only`
+      if (!seenPricingKeys.has(key)) {
+        seenPricingKeys.add(key)
+        finalPricing.push({
+          subcategoryId: sub._id,
+          minPrice: 0,
+          maxPrice: 0,
+        })
+      }
+    }
+  }
+
   const catIds = [...new Set([
-    ...subcategories.map(s => String(s.categoryId?._id || s.categoryId)),
+    ...subcategories.map((s) => String(s.categoryId?._id || s.categoryId)),
     ...(Array.isArray(directCatIds) ? directCatIds.map(String) : [])
   ])]
 
-  const hasTrade = uniqueServices.length > 0 || subcatIdArray.length > 0 || catIds.length > 0
+  const hasTrade = finalPricing.length > 0 || subcatIdArray.length > 0 || catIds.length > 0
   if (!hasTrade) {
     return sendError(res, {
       message:
@@ -272,8 +342,8 @@ export const updateLabourCategories = asyncHandler(async (req, res) => {
   req.user.labourProfile = req.user.labourProfile || {}
   req.user.labourProfile.subcategoryIds = subcatIdArray
   req.user.labourProfile.categoryIds = catIds
-  req.user.labourProfile.serviceIds = uniqueServiceIds
-  req.user.labourProfile.servicePricing = uniqueServices
+  req.user.labourProfile.serviceIds = finalServiceIds
+  req.user.labourProfile.servicePricing = finalPricing
   await req.user.save()
   await populateLabourCategories(req.user)
 
