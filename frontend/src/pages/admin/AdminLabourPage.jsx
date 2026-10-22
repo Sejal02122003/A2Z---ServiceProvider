@@ -1135,13 +1135,17 @@ export function AdminLabourPage() {
       {kitModalUser && (
         <WelcomeKitModal
           user={kitModalUser}
-          onClose={() => setKitModalUser(null)}
+          onClose={() => {
+            setKitModalUser(null)
+            load()
+          }}
           onSuccess={(updatedKit) => {
             setItems((prev) =>
               prev.map((item) =>
                 item._id === kitModalUser._id ? { ...item, welcomeKit: updatedKit } : item
               )
             )
+            load()
           }}
         />
       )}

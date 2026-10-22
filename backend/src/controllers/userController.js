@@ -1635,7 +1635,7 @@ export const verifyPartnerWelcomeKitPayment = asyncHandler(async (req, res) => {
     })
   }
 
-  const { action, rejectionReason, notes } = req.body
+  const { action, rejectionReason, notes, paymentReceiptUrl } = req.body
   const normalizedAction = String(action || '').toUpperCase()
 
   const user = await User.findById(partnerId)
@@ -1649,6 +1649,57 @@ export const verifyPartnerWelcomeKitPayment = asyncHandler(async (req, res) => {
 
   user.welcomeKit = user.welcomeKit || {}
   user.welcomeKit.auditTrail = user.welcomeKit.auditTrail || []
+
+  if (normalizedAction === 'ATTACH_SLIP') {
+    if (!paymentReceiptUrl) {
+      return sendError(res, {
+        message: 'paymentReceiptUrl is required',
+        statusCode: HTTP_STATUS.BAD_REQUEST,
+      })
+    }
+    user.welcomeKit.paymentReceiptUrl = String(paymentReceiptUrl).trim()
+    user.welcomeKit.paymentMethod = 'OFFLINE'
+    user.welcomeKit.status = 'PAYMENT_SUBMITTED'
+    user.welcomeKit.paidAt = new Date()
+    user.welcomeKit.paymentRejectionReason = ''
+    user.welcomeKit.auditTrail.push({
+      action: 'PAYMENT_SLIP_ATTACHED',
+      performedBy: req.user._id,
+      performedByName: req.user.fullName || 'Admin',
+      performedByRole: req.user.role,
+      timestamp: new Date(),
+      details: 'Payment slip screenshot attached by administrator.',
+    })
+    await user.save()
+    return sendSuccess(res, {
+      message: 'Payment slip attached successfully! Ready for verification.',
+      data: {
+        welcomeKit: user.welcomeKit,
+        user: user.toSafeObject(),
+      },
+    })
+  }
+
+  if (normalizedAction === 'RESET_TO_REVIEW') {
+    user.welcomeKit.status = 'PAYMENT_SUBMITTED'
+    user.welcomeKit.paymentRejectionReason = ''
+    user.welcomeKit.auditTrail.push({
+      action: 'PAYMENT_RESET_TO_REVIEW',
+      performedBy: req.user._id,
+      performedByName: req.user.fullName || 'Admin',
+      performedByRole: req.user.role,
+      timestamp: new Date(),
+      details: 'Payment slip status reset to Review Pending by administrator.',
+    })
+    await user.save()
+    return sendSuccess(res, {
+      message: 'Status reset to Review Pending successfully.',
+      data: {
+        welcomeKit: user.welcomeKit,
+        user: user.toSafeObject(),
+      },
+    })
+  }
 
   if (normalizedAction === 'APPROVE' || normalizedAction === 'ACCEPT') {
     // Prevent duplicate approval / state conflicts

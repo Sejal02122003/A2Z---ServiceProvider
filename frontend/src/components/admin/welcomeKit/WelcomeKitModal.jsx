@@ -1,4 +1,4 @@
-import { useState, useId } from 'react'
+import { useState, useId, useEffect, useRef } from 'react'
 import {
   X,
   Package,
@@ -23,6 +23,10 @@ import {
   Building2,
   Phone,
   User as UserIcon,
+  Upload,
+  Sparkles,
+  RefreshCw,
+  Image as ImageIcon,
 } from 'lucide-react'
 import {
   updatePartnerWelcomeKit,
@@ -32,7 +36,13 @@ import {
   dispatchPartnerWelcomeKit,
   confirmPartnerWelcomeKitDeliveryAdmin,
 } from '../../../api/servicePartnerApi.js'
+import { fetchAdminUserById } from '../../../api/adminUsersApi.js'
+import { uploadMedia } from '../../../api/uploadApi.js'
+import { UPLOAD_FOLDERS } from '../../../constants/uploadFolders.js'
 import { KitStatusBadge, getKitStatusDerived } from './KitStatusBadge.jsx'
+
+const SAMPLE_SLIP_URL =
+  'https://res.cloudinary.com/tvtogzo3/image/upload/v1792661202/A2Z/general-media/6ad2103d6862c25f09edc6f2/1792661201054-28c64558a120-scaled-207623.jpg'
 
 const COMMON_REJECTION_REASONS = [
   'Screenshot is blurry or unreadable',
@@ -62,6 +72,9 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
   const [successMsg, setSuccessMsg] = useState(null)
 
   // Payment Verification State
+  const fileInputRef = useRef(null)
+  const [uploadingSlip, setUploadingSlip] = useState(false)
+  const [fetchingFresh, setFetchingFresh] = useState(false)
   const [paymentActionBusy, setPaymentActionBusy] = useState(false)
   const [showRejectForm, setShowRejectForm] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
@@ -94,6 +107,49 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
   // Delivery Confirmation State
   const [showDeliveryConfirmDialog, setShowDeliveryConfirmDialog] = useState(false)
   const [deliveryActionBusy, setDeliveryActionBusy] = useState(false)
+
+  // Synchronize state when user prop updates
+  useEffect(() => {
+    if (user?.welcomeKit) {
+      setCurrentKit(user.welcomeKit)
+      setUniformIssued(Boolean(user.welcomeKit.uniformIssued))
+      setIdCardIssued(Boolean(user.welcomeKit.idCardIssued))
+      setBagIssued(Boolean(user.welcomeKit.bagIssued))
+      if (user.welcomeKit.dispatch) {
+        setDispatchCourierName(user.welcomeKit.dispatch.courierName || '')
+        setDispatchTrackingNumber(user.welcomeKit.dispatch.trackingNumber || '')
+        setDispatchTrackingUrl(user.welcomeKit.dispatch.trackingUrl || '')
+      }
+    }
+  }, [user])
+
+  // Always fetch latest data on modal mount so fresh DB receipts are immediately visible
+  async function refreshUserData() {
+    if (!user?._id) return
+    setFetchingFresh(true)
+    try {
+      const freshUser = await fetchAdminUserById(user._id)
+      if (freshUser?.welcomeKit) {
+        setCurrentKit(freshUser.welcomeKit)
+        setUniformIssued(Boolean(freshUser.welcomeKit.uniformIssued))
+        setIdCardIssued(Boolean(freshUser.welcomeKit.idCardIssued))
+        setBagIssued(Boolean(freshUser.welcomeKit.bagIssued))
+        if (freshUser.welcomeKit.dispatch) {
+          setDispatchCourierName(freshUser.welcomeKit.dispatch.courierName || '')
+          setDispatchTrackingNumber(freshUser.welcomeKit.dispatch.trackingNumber || '')
+          setDispatchTrackingUrl(freshUser.welcomeKit.dispatch.trackingUrl || '')
+        }
+      }
+    } catch (err) {
+      console.warn('Could not refresh partner data in modal:', err)
+    } finally {
+      setFetchingFresh(false)
+    }
+  }
+
+  useEffect(() => {
+    refreshUserData()
+  }, [user?._id])
 
   if (!user) return null
 
@@ -143,6 +199,99 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
     }
   }
 
+  // Upload or replace payment slip on partner's behalf
+  async function handleFileUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setError(null)
+    setSuccessMsg(null)
+    setUploadingSlip(true)
+    try {
+      const uploadedUrl = await uploadMedia(file, UPLOAD_FOLDERS.GENERAL_MEDIA || 'general-media')
+      if (!uploadedUrl) {
+        throw new Error('Failed to obtain image URL from upload service')
+      }
+
+      const res = await verifyPartnerWelcomeKitPayment(user._id, {
+        action: 'ATTACH_SLIP',
+        paymentReceiptUrl: uploadedUrl,
+      })
+
+      const updated = res?.welcomeKit || {
+        ...currentKit,
+        paymentReceiptUrl: uploadedUrl,
+        paymentMethod: 'OFFLINE',
+        status: 'PAYMENT_SUBMITTED',
+        paidAt: new Date(),
+        paymentRejectionReason: '',
+      }
+      setCurrentKit(updated)
+      setShowRejectForm(false)
+      setSuccessMsg('Payment slip uploaded successfully! You can now verify, approve, or reject it.')
+      if (onSuccess) onSuccess(updated)
+    } catch (err) {
+      setError(err?.message || 'Failed to upload payment slip')
+    } finally {
+      setUploadingSlip(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  // One-click attach of verified demo receipt for immediate testing
+  async function handleAttachSampleSlip() {
+    setError(null)
+    setSuccessMsg(null)
+    setUploadingSlip(true)
+    try {
+      const res = await verifyPartnerWelcomeKitPayment(user._id, {
+        action: 'ATTACH_SLIP',
+        paymentReceiptUrl: SAMPLE_SLIP_URL,
+      })
+
+      const updated = res?.welcomeKit || {
+        ...currentKit,
+        paymentReceiptUrl: SAMPLE_SLIP_URL,
+        paymentMethod: 'OFFLINE',
+        status: 'PAYMENT_SUBMITTED',
+        paidAt: new Date(),
+        paymentRejectionReason: '',
+      }
+      setCurrentKit(updated)
+      setShowRejectForm(false)
+      setSuccessMsg('Sample payment slip attached! Admin can now test verifying, approving, or rejecting it.')
+      if (onSuccess) onSuccess(updated)
+    } catch (err) {
+      setError(err?.message || 'Failed to attach sample slip')
+    } finally {
+      setUploadingSlip(false)
+    }
+  }
+
+  // Reset payment slip status back to Review Pending
+  async function handleResetToReview() {
+    setError(null)
+    setSuccessMsg(null)
+    setPaymentActionBusy(true)
+    try {
+      const res = await verifyPartnerWelcomeKitPayment(user._id, {
+        action: 'RESET_TO_REVIEW',
+      })
+      const updated = res?.welcomeKit || {
+        ...currentKit,
+        status: 'PAYMENT_SUBMITTED',
+        paymentRejectionReason: '',
+      }
+      setCurrentKit(updated)
+      setShowRejectForm(false)
+      setSuccessMsg('Status reset to "Review Pending". Admin can now re-evaluate and approve or reject.')
+      if (onSuccess) onSuccess(updated)
+    } catch (err) {
+      setError(err?.message || 'Failed to reset status')
+    } finally {
+      setPaymentActionBusy(false)
+    }
+  }
+
   // Handle Admin Payment Decision (APPROVE or REJECT)
   async function handlePaymentDecision(action) {
     setError(null)
@@ -185,7 +334,7 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
           ...currentKit,
           status: 'PAID',
           paymentRejectionReason: '',
-          paidAt: new Date(),
+          paidAt: currentKit.paidAt || new Date(),
         }
         setCurrentKit(updated)
         setShowRejectForm(false)
@@ -488,31 +637,53 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
                     </p>
                   </div>
 
-                  {/* Status Badge */}
-                  {isPaymentApproved && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800 ring-1 ring-emerald-300">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                      Approved ✓
-                    </span>
-                  )}
-                  {paymentStatus === 'PAYMENT_SUBMITTED' && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900 ring-1 ring-amber-300 animate-pulse">
-                      <Clock className="h-3.5 w-3.5 text-amber-600" />
-                      Pending Verification
-                    </span>
-                  )}
-                  {paymentStatus === 'PAYMENT_REJECTED' && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-800 ring-1 ring-rose-300">
-                      <XCircle className="h-3.5 w-3.5 text-rose-600" />
-                      Slip Rejected
-                    </span>
-                  )}
-                  {!isPaymentApproved && paymentStatus !== 'PAYMENT_SUBMITTED' && paymentStatus !== 'PAYMENT_REJECTED' && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-600">
-                      Payment Pending
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={refreshUserData}
+                      disabled={fetchingFresh}
+                      title="Refresh partner status from database"
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${fetchingFresh ? 'animate-spin text-brand' : ''}`} />
+                      <span>{fetchingFresh ? 'Refreshing...' : 'Refresh'}</span>
+                    </button>
+
+                    {/* Status Badge */}
+                    {isPaymentApproved && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800 ring-1 ring-emerald-300">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                        Approved ✓
+                      </span>
+                    )}
+                    {paymentStatus === 'PAYMENT_SUBMITTED' && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900 ring-1 ring-amber-300 animate-pulse">
+                        <Clock className="h-3.5 w-3.5 text-amber-600" />
+                        Needs Review
+                      </span>
+                    )}
+                    {paymentStatus === 'PAYMENT_REJECTED' && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-800 ring-1 ring-rose-300">
+                        <XCircle className="h-3.5 w-3.5 text-rose-600" />
+                        Slip Rejected
+                      </span>
+                    )}
+                    {!isPaymentApproved && paymentStatus !== 'PAYMENT_SUBMITTED' && paymentStatus !== 'PAYMENT_REJECTED' && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-600">
+                        Payment Pending
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {/* Hidden File Input for uploading / replacing slip */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/jpg"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
 
                 {/* Payment Meta Info */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs bg-slate-50 p-3.5 rounded-xl border border-slate-200">
@@ -537,40 +708,63 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
                 {/* Screenshot Preview */}
                 {receiptUrl ? (
                   <div className="space-y-3">
-                    <div className="relative group overflow-hidden rounded-xl border border-slate-200 bg-slate-900/5 aspect-video max-h-64 flex items-center justify-center">
+                    <div className="relative group overflow-hidden rounded-2xl border-2 border-slate-200 bg-slate-900/5 aspect-video max-h-72 flex items-center justify-center shadow-inner">
                       <img
                         src={receiptUrl}
                         alt="Welcome kit payment slip"
-                        className="w-full h-full object-contain cursor-pointer transition group-hover:scale-102"
+                        className="w-full h-full object-contain cursor-pointer transition duration-300 group-hover:scale-102"
                         onClick={() => setShowFullReceipt(true)}
                       />
                       <div
                         onClick={() => setShowFullReceipt(true)}
-                        className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 text-white font-bold text-xs transition cursor-pointer"
+                        className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 text-white font-bold text-xs transition duration-200 cursor-pointer backdrop-blur-[1px]"
                       >
-                        <ZoomIn className="h-4 w-4" />
-                        <span>Click to Enlarge Full Slip</span>
+                        <ZoomIn className="h-5 w-5" />
+                        <span>Click to Enlarge Full Slip Screenshot</span>
+                      </div>
+                      <div className="absolute top-2 left-2 pointer-events-none">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-900/80 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs backdrop-blur-xs">
+                          <Eye className="h-3 w-3 text-brand" />
+                          Proof Slip ₹{currentKit?.paymentAmount || 999}
+                        </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setShowFullReceipt(true)}
+                          className="inline-flex items-center gap-1.5 font-bold text-brand hover:underline cursor-pointer"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          View Full Resolution Slip
+                        </button>
+                        <span className="text-slate-300">•</span>
+                        <a
+                          href={receiptUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-800"
+                        >
+                          <span>Open in new tab</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+
                       <button
                         type="button"
-                        onClick={() => setShowFullReceipt(true)}
-                        className="inline-flex items-center gap-1.5 font-bold text-brand hover:underline cursor-pointer"
+                        disabled={uploadingSlip || paymentActionBusy}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
                       >
-                        <Eye className="h-3.5 w-3.5" />
-                        View Full Screen Resolution Slip
+                        {uploadingSlip ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" />
+                        ) : (
+                          <Upload className="h-3.5 w-3.5 text-slate-500" />
+                        )}
+                        <span>{uploadingSlip ? 'Uploading...' : 'Replace / Change Slip'}</span>
                       </button>
-                      <a
-                        href={receiptUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-800"
-                      >
-                        <span>Open in new tab</span>
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
                     </div>
 
                     {/* Rejection notice if previously rejected */}
@@ -587,39 +781,56 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
                     {/* Verification Action Buttons */}
                     <div className="pt-2 border-t border-slate-100">
                       {!showRejectForm ? (
-                        <div className="flex items-center gap-3">
-                          {/* Accept Button */}
-                          <button
-                            type="button"
-                            onClick={() => handlePaymentDecision('APPROVE')}
-                            disabled={paymentActionBusy || isPaymentApproved}
-                            className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-3 px-4 text-xs font-bold transition shadow-sm cursor-pointer ${
-                              isPaymentApproved
-                                ? 'bg-emerald-100 text-emerald-800 cursor-default ring-1 ring-emerald-300'
-                                : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98]'
-                            }`}
-                          >
-                            {paymentActionBusy ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <CheckCircle2 className="h-4 w-4" />
-                            )}
-                            <span>{isPaymentApproved ? 'Payment Approved & Verified ✓' : 'Approve Payment Slip'}</span>
-                          </button>
+                        <div className="space-y-2">
+                          <div className="flex flex-col sm:flex-row items-center gap-3">
+                            {/* Accept / Approve Button */}
+                            <button
+                              type="button"
+                              onClick={() => handlePaymentDecision('APPROVE')}
+                              disabled={paymentActionBusy || isPaymentApproved}
+                              className={`w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl py-3 px-4 text-xs font-bold transition shadow-sm cursor-pointer ${
+                                isPaymentApproved
+                                  ? 'bg-emerald-100 text-emerald-800 cursor-default ring-1 ring-emerald-300'
+                                  : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98]'
+                              }`}
+                            >
+                              {paymentActionBusy ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="h-4 w-4" />
+                              )}
+                              <span>{isPaymentApproved ? 'Payment Slip Approved & Verified ✓' : 'Approve Payment Slip'}</span>
+                            </button>
 
-                          {/* Reject Button */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowRejectForm(true)
-                              setRejectionReason(COMMON_REJECTION_REASONS[0])
-                            }}
-                            disabled={paymentActionBusy}
-                            className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white py-3 px-4 text-xs font-bold text-rose-700 hover:bg-rose-50 active:scale-[0.98] transition cursor-pointer"
-                          >
-                            <XCircle className="h-4 w-4 text-rose-600" />
-                            <span>{paymentStatus === 'PAYMENT_REJECTED' ? 'Change Rejection Reason' : 'Reject Slip'}</span>
-                          </button>
+                            {/* Reject Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowRejectForm(true)
+                                setRejectionReason(COMMON_REJECTION_REASONS[0])
+                              }}
+                              disabled={paymentActionBusy}
+                              className="w-full sm:flex-1 flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white py-3 px-4 text-xs font-bold text-rose-700 hover:bg-rose-50 active:scale-[0.98] transition cursor-pointer"
+                            >
+                              <XCircle className="h-4 w-4 text-rose-600" />
+                              <span>{paymentStatus === 'PAYMENT_REJECTED' ? 'Change Rejection Reason' : 'Reject Slip'}</span>
+                            </button>
+                          </div>
+
+                          {/* Extra Reset option if already approved or rejected */}
+                          {(isPaymentApproved || paymentStatus === 'PAYMENT_REJECTED') && (
+                            <div className="flex justify-end pt-1">
+                              <button
+                                type="button"
+                                onClick={handleResetToReview}
+                                disabled={paymentActionBusy}
+                                className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                              >
+                                <RefreshCw className="h-3 w-3" />
+                                <span>Reset slip status back to Review Pending</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         /* Rejection Form */
@@ -632,7 +843,7 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
                             <button
                               type="button"
                               onClick={() => setShowRejectForm(false)}
-                              className="text-xs text-slate-500 hover:text-slate-800"
+                              className="text-xs text-slate-500 hover:text-slate-800 cursor-pointer"
                             >
                               Cancel
                             </button>
@@ -657,7 +868,7 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
                                     setRejectionReason(reason)
                                     setCustomRejectionNote('')
                                   }}
-                                  className="mt-0.5 text-rose-600 focus:ring-rose-500"
+                                  className="mt-0.5 text-rose-600 focus:ring-rose-500 cursor-pointer"
                                 />
                                 <span className="leading-tight">{reason}</span>
                               </label>
@@ -682,7 +893,7 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
                             <button
                               type="button"
                               onClick={() => setShowRejectForm(false)}
-                              className="flex-1 rounded-lg border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                              className="flex-1 rounded-lg border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
                             >
                               Cancel
                             </button>
@@ -706,19 +917,55 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
                   </div>
                 ) : (
                   /* No Screenshot State */
-                  <div className="rounded-xl border border-dashed border-slate-200 bg-white p-6 text-center space-y-3">
-                    <p className="text-xs text-slate-500">
-                      No payment slip or screenshot uploaded yet by this service partner.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => handlePaymentDecision('APPROVE')}
-                      disabled={paymentActionBusy || isPaymentApproved}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                      <span>{isPaymentApproved ? 'Payment Already Verified ✓' : 'Direct Approval (Direct Hub Cash Verification)'}</span>
-                    </button>
+                  <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-6 text-center space-y-4">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 ring-1 ring-amber-200">
+                        <Upload className="h-6 w-6" />
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-900">No Payment Slip Uploaded Yet</h4>
+                      <p className="text-xs text-slate-500 max-w-md mx-auto">
+                        This service partner has not uploaded their ₹999 payment screenshot yet. You can upload or attach a slip on their behalf, or approve direct hub cash.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-2">
+                      {/* Upload Slip on Partner Behalf */}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingSlip}
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-brand/90 transition cursor-pointer"
+                      >
+                        {uploadingSlip ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Upload className="h-4 w-4" />
+                        )}
+                        <span>{uploadingSlip ? 'Uploading Slip...' : 'Upload Slip on Partner Behalf'}</span>
+                      </button>
+
+                      {/* Attach Demo Slip (1-click testing) */}
+                      <button
+                        type="button"
+                        onClick={handleAttachSampleSlip}
+                        disabled={uploadingSlip}
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
+                      >
+                        <Sparkles className="h-4 w-4 text-indigo-600" />
+                        <span>Attach Demo Slip (Test Receipt)</span>
+                      </button>
+
+                      {/* Direct Cash Approval */}
+                      <button
+                        type="button"
+                        onClick={() => handlePaymentDecision('APPROVE')}
+                        disabled={paymentActionBusy || isPaymentApproved}
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>{isPaymentApproved ? 'Payment Already Verified ✓' : 'Direct Hub Cash Approval'}</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
