@@ -705,9 +705,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
           : 'Payment slip submitted! Admin verification in progress.'
       )
       await loadStatus()
-      if (paymentTab === 'ONLINE') {
-        setExpandedStep(5)
-      }
+      setExpandedStep(5) // Unlocks and moves to Step 5!
     } catch (err) {
       showToast('error', err?.message || 'Failed to submit payment')
     } finally {
@@ -806,6 +804,29 @@ export function PartnerOnboardingStepper({ onFinish }) {
   const step4 = data?.step4 || {}
   const step5 = data?.step5 || {}
 
+  // Helper payment & address submitted states
+  const kitPayment = step4.welcomeKitPayment || data?.welcomeKit || data?.user?.welcomeKit || user?.welcomeKit || {}
+  const kitPaymentStatus = kitPayment.status || data?.welcomeKit?.status || user?.welcomeKit?.status || 'PENDING_PAYMENT'
+  const kitPaymentReceiptUrl = kitPayment.receiptUrl || billReceiptUrl || user?.welcomeKit?.paymentReceiptUrl
+  const isPaymentSubmitted =
+    ['PAID', 'READY_FOR_DISPATCH', 'DISPATCHED', 'DELIVERED'].includes(kitPaymentStatus) ||
+    kitPaymentStatus === 'PAYMENT_SUBMITTED' ||
+    Boolean(kitPaymentReceiptUrl) ||
+    Boolean(step4.paymentComplete)
+
+  const isStep4Submitted = Boolean(step4.completed && isPaymentSubmitted)
+
+  const wk = data?.welcomeKit || data?.user?.welcomeKit || step4.welcomeKitPayment || step5.welcomeKit || {}
+  const kitStatus = wk.status || kitPaymentStatus || 'PENDING_PAYMENT'
+  const wkAddress = wk.address || {}
+  const addressStatus = wk.addressStatus || wkAddress.addressStatus || wkAddress.status || 'NOT_SUBMITTED'
+  const isAddressSubmitted = Boolean(
+    (wkAddress.recipientName || wkAddress.mobileNumber || wkAddress.recipientPhone || addressRecipientName) &&
+    addressStatus !== 'NOT_SUBMITTED'
+  )
+  const isKitDispatched = kitStatus === 'DISPATCHED' || Boolean(wk.dispatch?.courierName)
+  const isKitDelivered = kitStatus === 'DELIVERED' || Boolean(wk.deliveryConfirmation?.isConfirmed)
+
   const stepsMeta = [
     {
       num: 1,
@@ -832,15 +853,15 @@ export function PartnerOnboardingStepper({ onFinish }) {
       num: 4,
       badge: 'STEP 4 • TRIAL SLOT',
       title: 'Trial Slot & Joining Confirmation',
-      completed: Boolean(step4.completed && step4.paymentComplete),
+      completed: Boolean(isStep4Submitted || (step4.completed && step4.paymentComplete)),
       locked: !step3.isApproved,
     },
     {
       num: 5,
       badge: 'STEP 5 • WELCOME KIT',
       title: 'Welcome Kit & Booking Activation',
-      completed: Boolean(step5.completed),
-      locked: !(step4.completed && step4.paymentComplete),
+      completed: Boolean(step5.completed || isKitDelivered || isAddressSubmitted),
+      locked: !(step4.completed && isPaymentSubmitted),
     },
   ]
 
@@ -986,7 +1007,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                 <div className="flex items-center gap-2">
                   {step1.completed ? (
                     <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                      Completed
+                      Submitted ✓
                     </span>
                   ) : (
                     <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-800">
@@ -1373,7 +1394,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                 <div className="flex items-center gap-2">
                   {step2.completed ? (
                     <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                      Submitted
+                      Submitted ✓
                     </span>
                   ) : !step1.completed ? (
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
@@ -1617,14 +1638,14 @@ export function PartnerOnboardingStepper({ onFinish }) {
                 step3.isApproved
                   ? 'border-emerald-500 bg-emerald-500 text-white'
                   : step2.completed && step3.isPending
-                  ? 'border-orange-500 bg-orange-500 text-white ring-4 ring-orange-100'
+                  ? 'border-emerald-500 bg-emerald-50 text-emerald-600 ring-4 ring-emerald-100'
                   : 'border-slate-300 bg-white text-slate-400'
               }`}
             >
               {step3.isApproved ? (
                 <Check className="h-4 w-4 stroke-[3]" />
               ) : step2.completed && step3.isPending ? (
-                <Clock className="h-4 w-4 stroke-[2.5] animate-pulse" />
+                <Clock className="h-4 w-4 stroke-[2.5] text-emerald-600 animate-pulse" />
               ) : (
                 <span className="h-2 w-2 rounded-full bg-slate-300" />
               )}
@@ -1664,8 +1685,8 @@ export function PartnerOnboardingStepper({ onFinish }) {
                       Approved ✓
                     </span>
                   ) : step3.isPending ? (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
-                      Pending
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                      Submitted ✓
                     </span>
                   ) : step3.isFailed ? (
                     <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800">
@@ -1757,14 +1778,14 @@ export function PartnerOnboardingStepper({ onFinish }) {
             {/* Stepper Node Icon */}
             <div
               className={`flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full border-2 transition-all shadow-xs ${
-                step4.completed && step4.paymentComplete
+                isStep4Submitted || (step4.completed && step4.paymentComplete)
                   ? 'border-emerald-500 bg-emerald-500 text-white'
                   : step3.isApproved
                   ? 'border-orange-500 bg-orange-500 text-white ring-4 ring-orange-100'
                   : 'border-slate-300 bg-white text-slate-400'
               }`}
             >
-              {step4.completed && step4.paymentComplete ? (
+              {isStep4Submitted || (step4.completed && step4.paymentComplete) ? (
                 <Check className="h-4 w-4 stroke-[3]" />
               ) : step3.isApproved ? (
                 <Clock className="h-4 w-4 stroke-[2.5] animate-pulse" />
@@ -1802,9 +1823,9 @@ export function PartnerOnboardingStepper({ onFinish }) {
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
                       Locked
                     </span>
-                  ) : step4.completed && step4.paymentComplete ? (
+                  ) : isStep4Submitted || (step4.completed && step4.paymentComplete) ? (
                     <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                      Paid & Confirmed
+                      Submitted ✓
                     </span>
                   ) : step4.completed ? (
                     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
@@ -1812,7 +1833,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                     </span>
                   ) : step4.trialSlot?.status === 'SCHEDULED' ? (
                     <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold text-cyan-800">
-                      Slot Booked
+                      Submitted • Slot Booked ✓
                     </span>
                   ) : (
                     <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-800">
@@ -2585,16 +2606,16 @@ export function PartnerOnboardingStepper({ onFinish }) {
             {/* Stepper Node Icon */}
             <div
               className={`flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full border-2 transition-all shadow-xs ${
-                step5.completed
+                step5.completed || isKitDelivered || isAddressSubmitted || addressStatus === 'SUBMITTED'
                   ? 'border-emerald-500 bg-emerald-500 text-white'
-                  : step4.completed && step4.paymentComplete
+                  : step4.completed && isPaymentSubmitted
                   ? 'border-orange-500 bg-orange-500 text-white ring-4 ring-orange-100'
                   : 'border-slate-300 bg-white text-slate-400'
               }`}
             >
-              {step5.completed ? (
+              {step5.completed || isKitDelivered || isAddressSubmitted || addressStatus === 'SUBMITTED' ? (
                 <Check className="h-4 w-4 stroke-[3]" />
-              ) : step4.completed && step4.paymentComplete ? (
+              ) : step4.completed && isPaymentSubmitted ? (
                 <Clock className="h-4 w-4 stroke-[2.5] animate-pulse" />
               ) : (
                 <span className="h-2 w-2 rounded-full bg-slate-300" />
@@ -2605,16 +2626,16 @@ export function PartnerOnboardingStepper({ onFinish }) {
             <div className="min-w-0 flex-1">
               <button
                 type="button"
-                disabled={!(step4.completed && step4.paymentComplete)}
+                disabled={!(step4.completed && isPaymentSubmitted)}
                 onClick={() => {
-                  if (!(step4.completed && step4.paymentComplete)) {
-                    showToast('error', 'Step 5 is locked. Please complete trial evaluation and payment verification in Step 4 first.')
+                  if (!(step4.completed && isPaymentSubmitted)) {
+                    showToast('error', 'Step 5 is locked. Please complete trial evaluation and payment in Step 4 first.')
                     return
                   }
                   setExpandedStep(expandedStep === 5 ? null : 5)
                 }}
                 className={`flex w-full items-center justify-between text-left group ${
-                  !(step4.completed && step4.paymentComplete) ? 'opacity-50 cursor-not-allowed' : ''
+                  !(step4.completed && isPaymentSubmitted) ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
                 <div>
@@ -2627,21 +2648,14 @@ export function PartnerOnboardingStepper({ onFinish }) {
                 </div>
                 <div className="flex items-center gap-2">
                   {(() => {
-                    const wk = data?.welcomeKit || data?.user?.welcomeKit || {}
-                    const kitStatus = wk.status || 'PENDING_PAYMENT'
-                    const wkAddress = wk.address || {}
-                    const addressStatus = wkAddress.status || 'NOT_SUBMITTED'
-                    const isDispatched = kitStatus === 'DISPATCHED' || Boolean(wk.dispatch?.courierName)
-                    const isDelivered = kitStatus === 'DELIVERED' || Boolean(wk.deliveryConfirmation?.isConfirmed)
-
-                    if (step5.completed || isDelivered) {
+                    if (step5.completed || isKitDelivered) {
                       return (
                         <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
                           Active for Bookings 🚀
                         </span>
                       )
                     }
-                    if (isDispatched) {
+                    if (isKitDispatched) {
                       return (
                         <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-[10px] font-bold text-purple-800">
                           Dispatched 🚚
@@ -2655,10 +2669,10 @@ export function PartnerOnboardingStepper({ onFinish }) {
                         </span>
                       )
                     }
-                    if (addressStatus === 'SUBMITTED') {
+                    if (isAddressSubmitted || addressStatus === 'SUBMITTED') {
                       return (
-                        <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-bold text-blue-800">
-                          Address Submitted 📍
+                        <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                          Submitted ✓
                         </span>
                       )
                     }
@@ -2669,7 +2683,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                         </span>
                       )
                     }
-                    if (!(step4.completed && step4.paymentComplete)) {
+                    if (!(step4.completed && isPaymentSubmitted)) {
                       return (
                         <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-500">
                           Locked 🔒
@@ -2692,7 +2706,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
 
               {/* Collapsible Card */}
               <AnimatePresence>
-                {expandedStep === 5 && step4.completed && step4.paymentComplete && (
+                {expandedStep === 5 && step4.completed && isPaymentSubmitted && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
