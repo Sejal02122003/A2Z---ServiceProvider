@@ -45,6 +45,7 @@ import {
   Eye,
   HeartHandshake,
   Layers,
+  Plus,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth.js'
 import { setUser } from '../../store/slices/authSlice.js'
@@ -142,8 +143,9 @@ export function PartnerOnboardingStepper({ onFinish }) {
   // Step 2 Form State
   const [aadhaarInput, setAadhaarInput] = useState('')
   const [panInput, setPanInput] = useState('')
-  const [kycDocUrl, setKycDocUrl] = useState('')
+  const [kycDocUrls, setKycDocUrls] = useState([])
   const [uploadingKyc, setUploadingKyc] = useState(false)
+  const [uploadProgressText, setUploadProgressText] = useState('')
 
   // Step 4 Form State
   const [trialDateFilter, setTrialDateFilter] = useState('ALL')
@@ -342,6 +344,20 @@ export function PartnerOnboardingStepper({ onFinish }) {
           if (wkAddr.pincode) setAddressPincode(wkAddr.pincode)
         }
       }
+      if (res.step2) {
+        if (Array.isArray(res.step2.documentUrls) && res.step2.documentUrls.length > 0) {
+          setKycDocUrls((prev) => (prev.length === 0 ? res.step2.documentUrls.filter(Boolean) : prev))
+        } else if (res.step2.frontImageUrl) {
+          setKycDocUrls((prev) => (prev.length === 0 ? [res.step2.frontImageUrl] : prev))
+        }
+      } else if (res.user?.labourProfile) {
+        const lp = res.user.labourProfile
+        if (Array.isArray(lp.kycDocumentUrls) && lp.kycDocumentUrls.length > 0) {
+          setKycDocUrls((prev) => (prev.length === 0 ? lp.kycDocumentUrls.filter(Boolean) : prev))
+        } else if (lp.kycFrontImageUrl) {
+          setKycDocUrls((prev) => (prev.length === 0 ? [lp.kycFrontImageUrl] : prev))
+        }
+      }
       if (res.step4?.welcomeKitPayment?.receiptUrl) {
         setBillReceiptUrl(res.step4.welcomeKitPayment.receiptUrl)
       }
@@ -490,22 +506,24 @@ export function PartnerOnboardingStepper({ onFinish }) {
       return
     }
 
-    if (!kycDocUrl) {
-      showToast('error', 'Please upload your Aadhaar or PAN card document photo before submitting.')
+    if (!kycDocUrls || kycDocUrls.length === 0) {
+      showToast('error', 'Please upload at least one Aadhaar or PAN card document photo before submitting.')
       return
     }
 
     try {
       setSubmitting(true)
-      const docUrl = kycDocUrl
+      const primaryDoc = kycDocUrls[0] || ''
+      const secondaryDoc = kycDocUrls[1] || ''
 
       await submitLabourKycDocuments({
         aadhaar: rawAadhaar,
         pan: rawPan,
-        documentUrl: docUrl,
-        frontImageUrl: docUrl,
-        videoUrl: docUrl,
-        documentUrls: [docUrl],
+        documentUrl: primaryDoc,
+        frontImageUrl: primaryDoc,
+        backImageUrl: secondaryDoc,
+        videoUrl: primaryDoc,
+        documentUrls: kycDocUrls,
         videoMeta: {
           publicId: `kyc_${user?._id || 'partner'}`,
           uploadedAt: new Date(),
@@ -522,28 +540,50 @@ export function PartnerOnboardingStepper({ onFinish }) {
     }
   }
 
-  // Step 2 Document upload
+  // Step 2 Multi-Document / Photo upload
   const handleKycFileUpload = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const rawFiles = Array.from(e.target.files || [])
+    if (rawFiles.length === 0) return
     try {
       setUploadingKyc(true)
-      let res
-      try {
-        res = await uploadDocument(file, UPLOAD_FOLDERS.KYC_DOCUMENTS)
-      } catch (docErr) {
-        res = await uploadMedia(file, UPLOAD_FOLDERS.KYC_DOCUMENTS)
+      const newUrls = []
+      for (let i = 0; i < rawFiles.length; i++) {
+        const file = rawFiles[i]
+        setUploadProgressText(
+          rawFiles.length > 1
+            ? `Uploading ${i + 1} of ${rawFiles.length} photos…`
+            : 'Uploading document photo…'
+        )
+        let res
+        try {
+          res = await uploadDocument(file, UPLOAD_FOLDERS.KYC_DOCUMENTS)
+        } catch (docErr) {
+          res = await uploadMedia(file, UPLOAD_FOLDERS.KYC_DOCUMENTS)
+        }
+        const url =
+          res?.data?.asset?.secureUrl ||
+          res?.data?.asset?.url ||
+          res?.asset?.secureUrl ||
+          res?.asset?.url ||
+          res?.url ||
+          res?.data?.url
+        if (url) {
+          newUrls.push(url)
+        }
       }
-      const url =
-        res?.data?.asset?.secureUrl ||
-        res?.data?.asset?.url ||
-        res?.asset?.secureUrl ||
-        res?.asset?.url ||
-        res?.url ||
-        res?.data?.url
-      if (url) {
-        setKycDocUrl(url)
-        showToast('success', 'KYC document uploaded successfully!')
+
+      if (newUrls.length > 0) {
+        setKycDocUrls((prev) => {
+          const combined = [...prev]
+          newUrls.forEach((u) => {
+            if (!combined.includes(u)) combined.push(u)
+          })
+          return combined
+        })
+        showToast(
+          'success',
+          `${newUrls.length} KYC photo${newUrls.length > 1 ? 's' : ''} uploaded successfully!`
+        )
       } else {
         throw new Error('Upload succeeded but no file URL returned')
       }
@@ -552,7 +592,13 @@ export function PartnerOnboardingStepper({ onFinish }) {
       showToast('error', err?.message || 'Upload failed')
     } finally {
       setUploadingKyc(false)
+      setUploadProgressText('')
+      if (e.target) e.target.value = ''
     }
+  }
+
+  const handleRemoveKycDoc = (indexToRemove) => {
+    setKycDocUrls((prev) => prev.filter((_, idx) => idx !== indexToRemove))
   }
 
   // Step 4: Schedule Trial Slot
@@ -1377,81 +1423,151 @@ export function PartnerOnboardingStepper({ onFinish }) {
                         />
                       </div>
 
-                      {/* Document / Photo Upload */}
+                      {/* Document / Photos Upload */}
                       <div>
-                        <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center justify-between mb-1.5">
                           <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                            Aadhaar / PAN Card Photo or Document
+                            Aadhaar / PAN Card Photos or Documents
                           </label>
-                          {kycDocUrl ? (
+                          {kycDocUrls.length > 0 ? (
                             <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                              ✓ Document Ready
+                              ✓ {kycDocUrls.length} Photo{kycDocUrls.length > 1 ? 's' : ''} Ready
                             </span>
                           ) : (
                             <span className="text-[10px] font-medium text-slate-400">
-                              JPG, PNG, PDF or Video
+                              Upload Multiple (JPG, PNG, PDF)
                             </span>
                           )}
                         </div>
 
-                        {kycDocUrl ? (
-                          <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-3 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <img
-                                src={kycDocUrl}
-                                alt="KYC Document Preview"
-                                className="h-12 w-12 rounded-lg object-cover border border-emerald-200 shrink-0 bg-white"
-                                onError={(e) => {
-                                  e.target.style.display = 'none'
-                                }}
-                              />
-                              <div className="min-w-0">
-                                <p className="text-xs font-bold text-slate-800 truncate">KYC Document Uploaded</p>
-                                <a
-                                  href={kycDocUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-[11px] text-brand hover:underline font-medium inline-flex items-center gap-1"
-                                >
-                                  View Full File ↗
-                                </a>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <label className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs">
-                                Change
+                        {kycDocUrls.length > 0 ? (
+                          <div className="space-y-2.5">
+                            {/* Grid of uploaded photos */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                              {kycDocUrls.map((url, idx) => {
+                                const isPdf = /\.pdf($|\?)/i.test(url)
+                                const isVid = /\.(mp4|webm|ogg|mov|m4v)($|\?)/i.test(url)
+                                return (
+                                  <div
+                                    key={idx}
+                                    className="relative group rounded-xl border border-slate-200 bg-slate-50/70 p-2 shadow-2xs hover:border-brand/40 transition flex flex-col justify-between"
+                                  >
+                                    <div className="relative h-24 w-full rounded-lg overflow-hidden bg-white border border-slate-100 flex items-center justify-center">
+                                      {isPdf ? (
+                                        <div className="flex flex-col items-center justify-center text-slate-500 p-2">
+                                          <FileText className="h-8 w-8 text-rose-500 mb-1" />
+                                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                                            PDF Doc
+                                          </span>
+                                        </div>
+                                      ) : isVid ? (
+                                        <div className="flex flex-col items-center justify-center text-slate-500 p-2">
+                                          <Camera className="h-8 w-8 text-indigo-500 mb-1" />
+                                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                                            Video Proof
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <img
+                                          src={url}
+                                          alt={`KYC Photo ${idx + 1}`}
+                                          className="h-full w-full object-cover"
+                                          onError={(e) => {
+                                            e.target.onerror = null
+                                            e.target.style.display = 'none'
+                                          }}
+                                        />
+                                      )}
+
+                                      {/* Remove photo button */}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveKycDoc(idx)}
+                                        className="absolute top-1.5 right-1.5 rounded-full bg-slate-900/75 hover:bg-rose-600 text-white p-1 shadow-sm transition cursor-pointer"
+                                        title="Remove photo"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </div>
+
+                                    <div className="mt-1.5 flex items-center justify-between text-[11px]">
+                                      <span className="font-bold text-slate-700 truncate">
+                                        Photo #{idx + 1}
+                                      </span>
+                                      <a
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-brand hover:underline font-semibold text-[10px] inline-flex items-center gap-0.5"
+                                      >
+                                        View ↗
+                                      </a>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+
+                              {/* Add More card in the grid */}
+                              <label
+                                className={`flex flex-col items-center justify-center min-h-[110px] rounded-xl border-2 border-dashed border-brand/40 bg-brand/5 p-2 text-center hover:bg-brand/10 hover:border-brand transition cursor-pointer ${
+                                  uploadingKyc ? 'opacity-50 pointer-events-none' : ''
+                                }`}
+                              >
+                                {uploadingKyc ? (
+                                  <RefreshCw className="h-5 w-5 animate-spin text-brand mb-1" />
+                                ) : (
+                                  <Plus className="h-5 w-5 text-brand mb-1" />
+                                )}
+                                <span className="text-[11px] font-bold text-brand leading-tight">
+                                  {uploadingKyc ? 'Uploading…' : '+ Add Photo'}
+                                </span>
+                                <span className="text-[9px] text-slate-400 mt-0.5">
+                                  Aadhaar back / PAN
+                                </span>
                                 <input
                                   type="file"
+                                  multiple
                                   accept="image/*,.pdf,video/*"
                                   onChange={handleKycFileUpload}
+                                  disabled={uploadingKyc}
                                   className="hidden"
                                 />
                               </label>
-                              <button
-                                type="button"
-                                onClick={() => setKycDocUrl('')}
-                                className="rounded-lg p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                                title="Remove file"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
                             </div>
+
+                            <p className="text-[11px] text-slate-500">
+                              Tip: You can upload multiple photos (e.g. Aadhaar Front, Aadhaar Back, and PAN Card).
+                            </p>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
-                            <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 p-3 text-xs text-slate-600 hover:border-brand hover:bg-slate-50 transition">
+                            <label
+                              className={`flex flex-1 flex-col items-center justify-center gap-1.5 cursor-pointer rounded-2xl border-2 border-dashed border-slate-300 p-5 text-xs text-slate-600 hover:border-brand hover:bg-slate-50 transition ${
+                                uploadingKyc ? 'opacity-60 pointer-events-none' : ''
+                              }`}
+                            >
                               {uploadingKyc ? (
-                                <RefreshCw className="h-4 w-4 animate-spin text-brand" />
+                                <RefreshCw className="h-6 w-6 animate-spin text-brand" />
                               ) : (
-                                <UploadCloud className="h-4 w-4 text-brand" />
+                                <UploadCloud className="h-6 w-6 text-brand" />
                               )}
-                              <span className="font-semibold">
-                                {uploadingKyc ? 'Uploading document…' : 'Upload Aadhaar / PAN Document Photo'}
+                              <span className="font-bold text-slate-800 text-xs sm:text-sm">
+                                {uploadingKyc
+                                  ? uploadProgressText || 'Uploading photos…'
+                                  : 'Upload Aadhaar & PAN Document Photos'}
+                              </span>
+                              <span className="text-[11px] text-slate-500 text-center font-normal">
+                                Select multiple photos together (Front & Back of Aadhaar, PAN card) or upload one by one
+                              </span>
+                              <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                Supports JPG, PNG, PDF & Videos (Multiple photos allowed)
                               </span>
                               <input
                                 type="file"
+                                multiple
                                 accept="image/*,.pdf,video/*"
                                 onChange={handleKycFileUpload}
+                                disabled={uploadingKyc}
                                 className="hidden"
                               />
                             </label>
@@ -1461,7 +1577,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
 
                       <button
                         type="submit"
-                        disabled={submitting || aadhaarInput.length !== 12 || panInput.length !== 10}
+                        disabled={submitting || aadhaarInput.length !== 12 || panInput.length !== 10 || kycDocUrls.length === 0}
                         className="w-full flex items-center justify-center gap-2 rounded-xl bg-brand py-2.5 text-xs font-bold text-white shadow-md shadow-brand/20 transition hover:bg-brand-600 disabled:opacity-50"
                       >
                         {submitting ? (

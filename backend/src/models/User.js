@@ -41,6 +41,8 @@ const labourProfileSchema = new mongoose.Schema(
     /** Cloudinary HTTPS URLs (preferred) */
     kycFrontImageUrl: { type: String, maxlength: 2048 },
     kycBackImageUrl: { type: String, maxlength: 2048 },
+    /** Multi-document/photo uploads for KYC */
+    kycDocumentUrls: [{ type: String, maxlength: 2048 }],
     /** Legacy base64 data URLs — kept for older submissions */
     kycFrontImageDataUrl: { type: String },
     kycBackImageDataUrl: { type: String },
@@ -130,6 +132,8 @@ const contractorProfileSchema = new mongoose.Schema(
     },
     kycFrontImageUrl: { type: String, maxlength: 2048 },
     kycBackImageUrl: { type: String, maxlength: 2048 },
+    /** Multi-document/photo uploads for KYC */
+    kycDocumentUrls: [{ type: String, maxlength: 2048 }],
     kycFrontImageDataUrl: { type: String },
     kycBackImageDataUrl: { type: String },
     kycReviewNote: { type: String, trim: true, maxlength: 500 },

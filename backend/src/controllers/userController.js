@@ -42,7 +42,13 @@ function validateKycDataUrlImage(value, label) {
 }
 
 function labourHasKycVideo(lp) {
-  return Boolean(lp?.kycVideoUrl?.trim() || lp?.kycFrontImageUrl?.trim() || lp?.kycBackImageUrl?.trim() || lp?.kycFrontImageDataUrl?.trim())
+  return Boolean(
+    lp?.kycVideoUrl?.trim() ||
+    lp?.kycFrontImageUrl?.trim() ||
+    lp?.kycBackImageUrl?.trim() ||
+    lp?.kycFrontImageDataUrl?.trim() ||
+    (Array.isArray(lp?.kycDocumentUrls) && lp.kycDocumentUrls.length > 0)
+  )
 }
 
 function normalizePan(input) {
@@ -475,6 +481,9 @@ export const submitLabourKycDocuments = asyncHandler(async (req, res) => {
     [`${profileKey}.kycVideoMeta`]: sanitizeKycVideoMeta(req.body.videoMeta),
     [`${profileKey}.kycSubmittedAt`]: new Date(),
     identityStatus: IDENTITY_STATUS.PENDING_IDENTITY_VERIFICATION,
+  }
+  if (incomingDocUrls.length > 0) {
+    updateData[`${profileKey}.kycDocumentUrls`] = incomingDocUrls
   }
   if (primaryFrontImageUrl) updateData[`${profileKey}.kycFrontImageUrl`] = primaryFrontImageUrl
   if (rawBackUrl) updateData[`${profileKey}.kycBackImageUrl`] = rawBackUrl
@@ -1503,6 +1512,15 @@ export const getPartnerOnboardingStatus = asyncHandler(async (req, res) => {
         kycStatus,
         hasAadhaar,
         hasPan,
+        documentUrls:
+          Array.isArray(user.labourProfile?.kycDocumentUrls) && user.labourProfile.kycDocumentUrls.length > 0
+            ? user.labourProfile.kycDocumentUrls
+            : user.labourProfile?.kycFrontImageUrl
+            ? [user.labourProfile.kycFrontImageUrl]
+            : [],
+        frontImageUrl: user.labourProfile?.kycFrontImageUrl || '',
+        backImageUrl: user.labourProfile?.kycBackImageUrl || '',
+        videoUrl: user.labourProfile?.kycVideoUrl || '',
       },
       step3: {
         status: step2Complete ? kycStatus : 'locked',

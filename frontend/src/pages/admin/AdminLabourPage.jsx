@@ -256,6 +256,13 @@ function extractKycMedia(detailUser) {
   if (profile.kycBackImageUrl) addItem(profile.kycBackImageUrl, 'Aadhaar / ID Card (Back)', true)
   if (profile.kycBackImageDataUrl) addItem(profile.kycBackImageDataUrl, 'Aadhaar / ID Card (Back Photo)', true)
 
+  // 1b. Multi-document photo uploads from profile
+  if (Array.isArray(profile.kycDocumentUrls)) {
+    profile.kycDocumentUrls.forEach((u, i) => {
+      addItem(u, `Aadhaar / KYC Document #${i + 1}`)
+    })
+  }
+
   // 2. IdentityVerification documentUrls
   if (Array.isArray(idDoc.documentUrls)) {
     idDoc.documentUrls.forEach((u, i) => {
@@ -928,6 +935,7 @@ export function AdminLabourPage() {
                             profile?.kycVideoUrl ||
                             profile?.kycFrontImageUrl ||
                             profile?.kycBackImageUrl ||
+                            (Array.isArray(profile?.kycDocumentUrls) && profile.kycDocumentUrls.length > 0) ||
                             u.identityVerificationRef
                           )
                           const st = profile?.kycStatus || KYC_STATUS.PENDING
@@ -1107,6 +1115,7 @@ export function AdminLabourPage() {
                     profile?.kycVideoUrl ||
                     profile?.kycFrontImageUrl ||
                     profile?.kycBackImageUrl ||
+                    (Array.isArray(profile?.kycDocumentUrls) && profile.kycDocumentUrls.length > 0) ||
                     u.identityVerificationRef
                   )
                   if (!hasDocs && profile?.kycStatus === KYC_STATUS.PENDING) return null
