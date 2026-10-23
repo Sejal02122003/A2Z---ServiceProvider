@@ -448,6 +448,25 @@ userSchema.methods.toSafeObject = function toSafeObject(options = {}) {
     delete cp.kycBackImageDataUrl
     o.contractorProfile = cp
   }
+
+  // Ensure human-readable trial slot timing format
+  if (o.labourProfile?.trialSlot?.timeSlot && typeof o.labourProfile.trialSlot.timeSlot === 'string') {
+    if (o.labourProfile.trialSlot.timeSlot.includes('_')) {
+      o.labourProfile.trialSlot = {
+        ...o.labourProfile.trialSlot,
+        timeSlot: o.labourProfile.trialSlot.timeSlot.split('_')[0].trim(),
+      }
+    }
+  }
+  if (o.contractorProfile?.trialSlot?.timeSlot && typeof o.contractorProfile.trialSlot.timeSlot === 'string') {
+    if (o.contractorProfile.trialSlot.timeSlot.includes('_')) {
+      o.contractorProfile.trialSlot = {
+        ...o.contractorProfile.trialSlot,
+        timeSlot: o.contractorProfile.trialSlot.timeSlot.split('_')[0].trim(),
+      }
+    }
+  }
+
   return o
 }
 

@@ -82,6 +82,9 @@ function maskPan(str) {
   return str
 }
 
+import { formatTrialTimeSlot } from '../../lib/formatTrialTimeSlot.js'
+export { formatTrialTimeSlot }
+
 function getCategoryVisual(name) {
   const lower = String(name || '').toLowerCase()
   if (lower.includes('salon') || lower.includes('beauty') || lower.includes('hair') || lower.includes('spa')) {
@@ -150,6 +153,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
     return d.toISOString().split('T')[0]
   })
   const [trialTimeSlot, setTrialTimeSlot] = useState('')
+  const [selectedSlotId, setSelectedSlotId] = useState('')
   const [trialLocation, setTrialLocation] = useState(
     'A2Z Partner Training & Evaluation Center, Sector 18, Noida'
   )
@@ -210,7 +214,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
         setDynamicSlots(data.availableTrialSlots)
         setTrialTimeSlot((current) => {
           const matched = data.availableTrialSlots.find(
-            (s) => s.id === current || s.label === current
+            (s) => s.id === current || s.label === current || formatTrialTimeSlot(s.id) === formatTrialTimeSlot(current)
           ) || data.availableTrialSlots[0]
           if (matched?.centerAddress) {
             setTrialLocation(matched.centerAddress)
@@ -220,11 +224,15 @@ export function PartnerOnboardingStepper({ onFinish }) {
           if (matched?.date) {
             setTrialDate(matched.date)
           }
-          return matched ? matched.id : data.availableTrialSlots[0].id
+          if (matched?.id) {
+            setSelectedSlotId(matched.id)
+          }
+          return matched ? (matched.label || formatTrialTimeSlot(matched.id)) : (data.availableTrialSlots[0].label || formatTrialTimeSlot(data.availableTrialSlots[0].id))
         })
       } else {
         setDynamicSlots([])
         setTrialTimeSlot('')
+        setSelectedSlotId('')
         if (data?.defaultHubLocation) {
           setTrialLocation(data.defaultHubLocation)
         }
@@ -263,7 +271,8 @@ export function PartnerOnboardingStepper({ onFinish }) {
           setDynamicSlots(res.step4.availableTrialSlots)
           if (!res.step4.trialSlot?.timeSlot) {
             const firstSlot = res.step4.availableTrialSlots[0]
-            setTrialTimeSlot(firstSlot.id)
+            setSelectedSlotId(firstSlot.id)
+            setTrialTimeSlot(firstSlot.label || formatTrialTimeSlot(firstSlot.id))
             if (firstSlot.centerAddress && !res.step4.trialSlot?.location) {
               setTrialLocation(firstSlot.centerAddress)
             }
@@ -272,10 +281,12 @@ export function PartnerOnboardingStepper({ onFinish }) {
           setDynamicSlots([])
           if (!res.step4.trialSlot?.timeSlot) {
             setTrialTimeSlot('')
+            setSelectedSlotId('')
           }
         }
         if (res.step4.trialSlot?.timeSlot) {
-          setTrialTimeSlot(res.step4.trialSlot.timeSlot)
+          const cleanSlot = formatTrialTimeSlot(res.step4.trialSlot.timeSlot)
+          setTrialTimeSlot(cleanSlot)
         }
         if (res.step4.trialSlot?.date) {
           setTrialDate(res.step4.trialSlot.date)
@@ -560,7 +571,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
       setSubmitting(true)
       await schedulePartnerTrialSlot({
         date: trialDate,
-        timeSlot: trialTimeSlot,
+        timeSlot: formatTrialTimeSlot(trialTimeSlot),
         location: trialLocation,
         zoneId: trialZoneId,
         zoneName: trialZoneName,
@@ -1735,7 +1746,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                             <div className="flex items-center gap-2">
                               <Clock className="h-3.5 w-3.5 text-cyan-600 shrink-0" />
                               <span className="font-semibold text-slate-500">Timing:</span>
-                              <span className="font-bold text-slate-900">{step4.trialSlot.timeSlot}</span>
+                              <span className="font-bold text-slate-900">{formatTrialTimeSlot(step4.trialSlot.timeSlot)}</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <Building2 className="h-3.5 w-3.5 text-purple-600 shrink-0" />
@@ -1861,13 +1872,19 @@ export function PartnerOnboardingStepper({ onFinish }) {
                           <div className="space-y-1.5">
                             {dynamicSlots.length > 0 ? (
                               dynamicSlots.map((slot) => {
-                                const isSelected = trialTimeSlot === slot.id || trialTimeSlot === slot.label
+                                const cleanLabel = slot.label || formatTrialTimeSlot(slot.id)
+                                const isSelected =
+                                  selectedSlotId === slot.id ||
+                                  trialTimeSlot === slot.id ||
+                                  trialTimeSlot === cleanLabel ||
+                                  formatTrialTimeSlot(trialTimeSlot) === cleanLabel
                                 return (
                                   <button
                                     type="button"
                                     key={slot.id}
                                     onClick={() => {
-                                      setTrialTimeSlot(slot.id)
+                                      setSelectedSlotId(slot.id)
+                                      setTrialTimeSlot(cleanLabel)
                                       if (slot.centerAddress) {
                                         setTrialLocation(slot.centerAddress)
                                       }
@@ -1961,7 +1978,11 @@ export function PartnerOnboardingStepper({ onFinish }) {
                               <span className="font-semibold text-slate-500 text-[11px]">Appointment Date:</span>
                               {(() => {
                                 const selectedSlot = dynamicSlots.find(
-                                  (s) => s.id === trialTimeSlot || s.label === trialTimeSlot
+                                  (s) =>
+                                    s.id === selectedSlotId ||
+                                    s.id === trialTimeSlot ||
+                                    s.label === trialTimeSlot ||
+                                    formatTrialTimeSlot(s.id) === formatTrialTimeSlot(trialTimeSlot)
                                 )
                                 if (selectedSlot?.date) {
                                   return (

@@ -60,6 +60,16 @@ function maskPan(normalized) {
   return `${normalized.slice(0, 5)} XXXX ${normalized.slice(-1)}`
 }
 
+function cleanTimeSlot(rawSlot) {
+  if (!rawSlot || typeof rawSlot !== 'string') return ''
+  const trimmed = rawSlot.trim()
+  if (trimmed.includes('_')) {
+    const clean = trimmed.split('_')[0].trim()
+    if (clean) return clean
+  }
+  return trimmed
+}
+
 function sanitizeKycVideoMeta(meta) {
   if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return undefined
   return {
@@ -915,11 +925,29 @@ export const listUsers = asyncHandler(async (req, res) => {
   ])
 
   const itemsOut = items.map((u) => {
-    if (!u.labourProfile) return u
-    const lp = { ...u.labourProfile }
-    delete lp.kycFrontImageDataUrl
-    delete lp.kycBackImageDataUrl
-    return { ...u, labourProfile: lp }
+    let lp = u.labourProfile ? { ...u.labourProfile } : undefined
+    if (lp) {
+      delete lp.kycFrontImageDataUrl
+      delete lp.kycBackImageDataUrl
+      if (lp.trialSlot?.timeSlot) {
+        lp.trialSlot = {
+          ...lp.trialSlot,
+          timeSlot: cleanTimeSlot(lp.trialSlot.timeSlot),
+        }
+      }
+    }
+    let cp = u.contractorProfile ? { ...u.contractorProfile } : undefined
+    if (cp) {
+      delete cp.kycFrontImageDataUrl
+      delete cp.kycBackImageDataUrl
+      if (cp.trialSlot?.timeSlot) {
+        cp.trialSlot = {
+          ...cp.trialSlot,
+          timeSlot: cleanTimeSlot(cp.trialSlot.timeSlot),
+        }
+      }
+    }
+    return { ...u, ...(lp ? { labourProfile: lp } : {}), ...(cp ? { contractorProfile: cp } : {}) }
   })
 
   return sendSuccess(res, {
@@ -1378,7 +1406,13 @@ export const getPartnerOnboardingStatus = asyncHandler(async (req, res) => {
   const step3Pending = Boolean(step2Complete && !step3Approved && !step3Failed)
 
   // Step 4: Trial Slot & Joining Confirmation
-  const trialSlot = user.labourProfile?.trialSlot || { status: 'NOT_SCHEDULED' }
+  const rawTrialSlot = user.labourProfile?.trialSlot
+    ? (user.labourProfile.trialSlot.toObject ? user.labourProfile.trialSlot.toObject() : { ...user.labourProfile.trialSlot })
+    : { status: 'NOT_SCHEDULED' }
+  const trialSlot = {
+    ...rawTrialSlot,
+    timeSlot: cleanTimeSlot(rawTrialSlot.timeSlot),
+  }
   const trialStatus = user.vendorStatus || 'NOT_STARTED'
   const trialPassed =
     step3Approved &&
@@ -1635,10 +1669,12 @@ export const schedulePartnerTrialSlot = asyncHandler(async (req, res) => {
     }
   }
 
+  const cleanedTimeSlot = cleanTimeSlot(timeSlot)
+
   user.labourProfile = user.labourProfile || {}
   user.labourProfile.trialSlot = {
     date: String(date).trim(),
-    timeSlot: String(timeSlot).trim(),
+    timeSlot: cleanedTimeSlot,
     location: resolvedLocation,
     zoneId: zoneId ? String(zoneId).trim() : '',
     zoneName: zoneName ? String(zoneName).trim() : '',

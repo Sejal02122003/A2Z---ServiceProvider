@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { X, Loader2, User, Phone, Mail, Building2, MapPin, Briefcase, FileCheck, IndianRupee, Award } from 'lucide-react'
 import { fetchAdminUserById } from '../../../api/adminUsersApi.js'
 import { WelcomeKitCard } from '../../../components/admin/welcomeKit/WelcomeKitCard.jsx'
+import { formatTrialTimeSlot } from '../../../lib/formatTrialTimeSlot.js'
 
 export function AdminUserViewModal({ userId, onClose }) {
   const [user, setUser] = useState(null)
@@ -160,7 +161,7 @@ export function AdminUserViewModal({ userId, onClose }) {
                     </div>
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Timing</p>
-                      <p className="font-semibold text-slate-800">{user.labourProfile.trialSlot.timeSlot || '—'}</p>
+                      <p className="font-semibold text-slate-800">{formatTrialTimeSlot(user.labourProfile.trialSlot.timeSlot) || '—'}</p>
                     </div>
                     <div className="sm:col-span-2">
                       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Hub Location</p>

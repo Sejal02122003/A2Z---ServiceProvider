@@ -41,6 +41,7 @@ import { KYC_STATUS, USER_ROLES } from '../../constants/userRoles.js'
 import { formatLastLoginDisplay } from '../../lib/formatAdminLastLogin.js'
 import { KitStatusBadge, WorkflowStatusBadge } from '../../components/admin/welcomeKit/KitStatusBadge.jsx'
 import { WelcomeKitModal } from '../../components/admin/welcomeKit/WelcomeKitModal.jsx'
+import { formatTrialTimeSlot } from '../../lib/formatTrialTimeSlot.js'
 
 function readInitialKyc(sp) {
   const k = sp.get('kyc')?.toLowerCase()
@@ -114,7 +115,7 @@ function TrialSlotBadge({ trialSlot, onEvaluate }) {
         </span>
         {trialSlot.date && (
           <span className="text-[10px] text-slate-500 font-medium">
-            {trialSlot.date} {trialSlot.timeSlot ? `• ${trialSlot.timeSlot}` : ''}
+            {trialSlot.date} {trialSlot.timeSlot ? `• ${formatTrialTimeSlot(trialSlot.timeSlot)}` : ''}
           </span>
         )}
       </div>
@@ -130,7 +131,7 @@ function TrialSlotBadge({ trialSlot, onEvaluate }) {
         </span>
         <div className="text-[11px] font-bold text-slate-800 leading-tight">
           <p>{trialSlot.date}</p>
-          <p className="text-[10px] font-medium text-slate-500">{trialSlot.timeSlot}</p>
+          <p className="text-[10px] font-medium text-slate-500">{formatTrialTimeSlot(trialSlot.timeSlot)}</p>
           {trialSlot.zoneName && (
             <p className="text-[10px] text-cyan-700 font-semibold mt-0.5">
               📍 {trialSlot.zoneName}
@@ -1663,7 +1664,7 @@ export function AdminLabourPage() {
                   <div>
                     <span className="text-slate-400 font-semibold block uppercase text-[9px]">Timing & Hub</span>
                     <span className="font-bold text-slate-900">
-                      {(trialModalUser.contractorProfile || trialModalUser.labourProfile)?.trialSlot?.timeSlot || '—'}
+                      {formatTrialTimeSlot((trialModalUser.contractorProfile || trialModalUser.labourProfile)?.trialSlot?.timeSlot) || '—'}
                     </span>
                   </div>
                 </div>
