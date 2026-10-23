@@ -1451,6 +1451,49 @@ function DeleteServiceModal({ open, service, onClose, onDeleted, busy, setBusy }
   )
 }
 
+function BulkDeleteServiceModal({ open, count, onClose, onConfirmed, busy }) {
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
+        onClick={() => !busy && onClose()}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative w-full max-w-sm rounded-2xl bg-white shadow-2xl p-6 text-center"
+      >
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-100 mb-4">
+          <AlertTriangle className="h-6 w-6 text-rose-600" />
+        </div>
+        <h3 className="text-lg font-extrabold text-slate-900">Delete {count} {count === 1 ? 'Service' : 'Services'}?</h3>
+        <p className="mt-2 text-sm text-slate-600">
+          Are you sure you want to delete <span className="font-bold text-slate-900">{count} selected {count === 1 ? 'service' : 'services'}</span>? This action cannot be undone.
+        </p>
+        <div className="mt-6 flex justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => !busy && onClose()}
+            className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirmed}
+            disabled={busy}
+            className="flex-1 rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-rose-500 disabled:opacity-50"
+          >
+            {busy ? 'Deleting...' : 'Delete All'}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
 export function AdminServicesPage() {
   const reduce = useReducedMotion()
   const [loading, setLoading] = useState(true)
@@ -1458,6 +1501,11 @@ export function AdminServicesPage() {
   
   const [subcategories, setSubcategories] = useState([])
   const [services, setServices] = useState([])
+
+  // Selection state for multiple delete
+  const [selectedIds, setSelectedIds] = useState([])
+  const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false)
+  const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false)
   
   // Filters & Search
   const [search, setSearch] = useState('')
@@ -1567,6 +1615,41 @@ export function AdminServicesPage() {
   const totalPages = Math.ceil(filteredServices.length / limit) || 1
   const paginatedServices = filteredServices.slice((page - 1) * limit, page * limit)
   const activeCount = services.filter(s => s.isActive).length
+
+  const isAllCurrentSelected = paginatedServices.length > 0 && paginatedServices.every(s => selectedIds.includes(s._id))
+
+  const toggleSelectAll = () => {
+    if (isAllCurrentSelected) {
+      setSelectedIds(prev => prev.filter(id => !paginatedServices.some(s => s._id === id)))
+    } else {
+      setSelectedIds(prev => Array.from(new Set([...prev, ...paginatedServices.map(s => s._id)])))
+    }
+  }
+
+  const toggleSelectOne = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  async function handleBulkDelete() {
+    if (!selectedIds.length) return
+    setBulkDeleteBusy(true)
+    try {
+      const results = await Promise.allSettled(
+        selectedIds.map(id => deleteAdminLabourService(id))
+      )
+      const failed = results.filter(r => r.status === 'rejected')
+      if (failed.length > 0) {
+        alert(`Failed to delete ${failed.length} services. Some may be in use.`)
+      }
+      setSelectedIds([])
+      setBulkDeleteModalOpen(false)
+      load()
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : 'Bulk delete failed')
+    } finally {
+      setBulkDeleteBusy(false)
+    }
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 pb-10">
@@ -1682,6 +1765,52 @@ export function AdminServicesPage() {
         </div>
       </GlassPanel>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50/90 px-4 py-3 shadow-xs"
+        >
+          <div className="flex items-center gap-3">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-100 text-rose-700 font-bold text-xs">
+              {selectedIds.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-rose-950">
+                {selectedIds.length === 1 ? '1 service selected' : `${selectedIds.length} services selected`}
+              </span>
+              {selectedIds.length < filteredServices.length && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds(filteredServices.map(s => s._id))}
+                  className="text-xs font-semibold text-rose-700 underline hover:text-rose-900 transition ml-1"
+                >
+                  Select all {filteredServices.length} matching
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+            >
+              Clear Selection
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkDeleteModalOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-rose-500 transition active:scale-95"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete Selected ({selectedIds.length})
+            </button>
+          </div>
+        </motion.div>
+      )}
+
       {error ? (
         <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">{error}</p>
       ) : null}
@@ -1691,6 +1820,15 @@ export function AdminServicesPage() {
           <table className="w-full min-w-[800px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <th className="px-4 py-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={isAllCurrentSelected}
+                    onChange={toggleSelectAll}
+                    className="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand/35 cursor-pointer accent-brand"
+                    title="Select all on current page"
+                  />
+                </th>
                 <th className="px-4 py-3">Icon</th>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Sub-Category</th>
@@ -1703,15 +1841,28 @@ export function AdminServicesPage() {
             <tbody>
               {loading && services.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500">Loading...</td>
+                  <td colSpan={8} className="p-8 text-center text-slate-500">Loading...</td>
                 </tr>
               ) : paginatedServices.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500">No services found.</td>
+                  <td colSpan={8} className="p-8 text-center text-slate-500">No services found.</td>
                 </tr>
               ) : (
                 paginatedServices.map(s => (
-                  <tr key={s._id} className="border-b border-slate-100 hover:bg-slate-50/60">
+                  <tr
+                    key={s._id}
+                    className={`border-b border-slate-100 transition ${
+                      selectedIds.includes(s._id) ? 'bg-rose-50/40 hover:bg-rose-50/60' : 'hover:bg-slate-50/60'
+                    }`}
+                  >
+                    <td className="px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(s._id)}
+                        onChange={() => toggleSelectOne(s._id)}
+                        className="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand/35 cursor-pointer accent-brand"
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="h-10 w-10 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200 flex items-center justify-center">
                         {s.iconUrl ? (
@@ -1904,6 +2055,14 @@ export function AdminServicesPage() {
         }}
         busy={modalBusy}
         setBusy={setModalBusy}
+      />
+
+      <BulkDeleteServiceModal
+        open={bulkDeleteModalOpen}
+        count={selectedIds.length}
+        onClose={() => setBulkDeleteModalOpen(false)}
+        onConfirmed={handleBulkDelete}
+        busy={bulkDeleteBusy}
       />
     </div>
   )

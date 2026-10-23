@@ -528,6 +528,49 @@ function DeleteSubCategoryModal({ open, subcategory, onClose, onDeleted, busy, s
   )
 }
 
+function BulkDeleteSubCategoryModal({ open, count, onClose, onConfirmed, busy }) {
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
+        onClick={() => !busy && onClose()}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative w-full max-w-sm rounded-2xl bg-white shadow-2xl p-6 text-center"
+      >
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-100 mb-4">
+          <AlertTriangle className="h-6 w-6 text-rose-600" />
+        </div>
+        <h3 className="text-lg font-extrabold text-slate-900">Delete {count} {count === 1 ? 'Sub-Category' : 'Sub-Categories'}?</h3>
+        <p className="mt-2 text-sm text-slate-600">
+          Are you sure you want to delete <span className="font-bold text-slate-900">{count} selected {count === 1 ? 'sub-category' : 'sub-categories'}</span>? This action cannot be undone.
+        </p>
+        <div className="mt-6 flex justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => !busy && onClose()}
+            className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirmed}
+            disabled={busy}
+            className="flex-1 rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-rose-500 disabled:opacity-50"
+          >
+            {busy ? 'Deleting...' : 'Delete All'}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
 export function AdminSubCategoriesPage() {
   const reduce = useReducedMotion()
   const [loading, setLoading] = useState(true)
@@ -535,6 +578,11 @@ export function AdminSubCategoriesPage() {
   
   const [categories, setCategories] = useState([])
   const [subcategories, setSubcategories] = useState([])
+
+  // Selection state for multiple delete
+  const [selectedIds, setSelectedIds] = useState([])
+  const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false)
+  const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false)
   
   // Filters & Search
   const [search, setSearch] = useState('')
@@ -619,6 +667,41 @@ export function AdminSubCategoriesPage() {
   const paginatedSubCategories = filteredSubCategories.slice((page - 1) * limit, page * limit)
   const activeCount = subcategories.filter(sc => sc.isActive).length
 
+  const isAllCurrentSelected = paginatedSubCategories.length > 0 && paginatedSubCategories.every(sc => selectedIds.includes(sc._id))
+
+  const toggleSelectAll = () => {
+    if (isAllCurrentSelected) {
+      setSelectedIds(prev => prev.filter(id => !paginatedSubCategories.some(sc => sc._id === id)))
+    } else {
+      setSelectedIds(prev => Array.from(new Set([...prev, ...paginatedSubCategories.map(sc => sc._id)])))
+    }
+  }
+
+  const toggleSelectOne = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  async function handleBulkDelete() {
+    if (!selectedIds.length) return
+    setBulkDeleteBusy(true)
+    try {
+      const results = await Promise.allSettled(
+        selectedIds.map(id => deleteAdminLabourSubcategory(id))
+      )
+      const failed = results.filter(r => r.status === 'rejected')
+      if (failed.length > 0) {
+        alert(`Failed to delete ${failed.length} sub-categories. Note: sub-categories with linked services cannot be deleted until services are removed.`)
+      }
+      setSelectedIds([])
+      setBulkDeleteModalOpen(false)
+      load()
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : 'Bulk delete failed')
+    } finally {
+      setBulkDeleteBusy(false)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-6 pb-10">
       <motion.div
@@ -701,6 +784,52 @@ export function AdminSubCategoriesPage() {
         </div>
       </GlassPanel>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50/90 px-4 py-3 shadow-xs"
+        >
+          <div className="flex items-center gap-3">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-100 text-rose-700 font-bold text-xs">
+              {selectedIds.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-rose-950">
+                {selectedIds.length === 1 ? '1 sub-category selected' : `${selectedIds.length} sub-categories selected`}
+              </span>
+              {selectedIds.length < filteredSubCategories.length && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds(filteredSubCategories.map(sc => sc._id))}
+                  className="text-xs font-semibold text-rose-700 underline hover:text-rose-900 transition ml-1"
+                >
+                  Select all {filteredSubCategories.length} matching
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+            >
+              Clear Selection
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkDeleteModalOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-rose-500 transition active:scale-95"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete Selected ({selectedIds.length})
+            </button>
+          </div>
+        </motion.div>
+      )}
+
       {error ? (
         <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">{error}</p>
       ) : null}
@@ -710,6 +839,15 @@ export function AdminSubCategoriesPage() {
           <table className="w-full min-w-[800px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <th className="px-4 py-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={isAllCurrentSelected}
+                    onChange={toggleSelectAll}
+                    className="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand/35 cursor-pointer accent-brand"
+                    title="Select all on current page"
+                  />
+                </th>
                 <th className="px-4 py-3 w-12 text-center"></th>
                 <th className="px-4 py-3">Name & Desc</th>
                 <th className="px-4 py-3">Category</th>
@@ -721,15 +859,28 @@ export function AdminSubCategoriesPage() {
             <tbody>
               {loading && subcategories.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-500">Loading...</td>
+                  <td colSpan={6} className="p-8 text-center text-slate-500">Loading...</td>
                 </tr>
               ) : paginatedSubCategories.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-500">No sub-categories found.</td>
+                  <td colSpan={6} className="p-8 text-center text-slate-500">No sub-categories found.</td>
                 </tr>
               ) : (
                 paginatedSubCategories.map(s => (
-                  <tr key={s._id} className="border-b border-slate-100 hover:bg-slate-50/60">
+                  <tr
+                    key={s._id}
+                    className={`border-b border-slate-100 transition ${
+                      selectedIds.includes(s._id) ? 'bg-rose-50/40 hover:bg-rose-50/60' : 'hover:bg-slate-50/60'
+                    }`}
+                  >
+                    <td className="px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(s._id)}
+                        onChange={() => toggleSelectOne(s._id)}
+                        className="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand/35 cursor-pointer accent-brand"
+                      />
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 overflow-hidden">
                         {s.iconUrl ? (
@@ -860,6 +1011,14 @@ export function AdminSubCategoriesPage() {
         }}
         busy={modalBusy}
         setBusy={setModalBusy}
+      />
+
+      <BulkDeleteSubCategoryModal
+        open={bulkDeleteModalOpen}
+        count={selectedIds.length}
+        onClose={() => setBulkDeleteModalOpen(false)}
+        onConfirmed={handleBulkDelete}
+        busy={bulkDeleteBusy}
       />
     </div>
   )
