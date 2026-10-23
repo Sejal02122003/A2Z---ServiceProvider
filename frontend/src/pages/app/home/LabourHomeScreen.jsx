@@ -19,6 +19,7 @@ import {
   GraduationCap,
   HardHat,
   Headphones,
+  IdCard,
   IndianRupee,
   LifeBuoy,
   LogIn,
@@ -52,6 +53,7 @@ import {
 import { AppUserLocationModal } from '../../../components/app/AppUserLocationModal.jsx'
 import { LabourAssignmentDetailModal } from '../../../components/labour/LabourAssignmentDetailModal.jsx'
 import { VendorJoiningConfirmedModal } from '../../../components/labour/VendorJoiningConfirmedModal.jsx'
+import { ServiceProviderIdCardModal } from '../../../components/labour/ServiceProviderIdCardModal.jsx'
 import { useLabourPresence } from '../../../hooks/useLabourPresence.js'
 
 import { useLabourSocket } from '../../../hooks/useLabourSocket.js'
@@ -193,6 +195,7 @@ export function LabourHomeScreen({ user }) {
 
   const [trialData, setTrialData] = useState(null)
   const [showConfirmedModal, setShowConfirmedModal] = useState(false)
+  const [showIdCardModal, setShowIdCardModal] = useState(false)
 
   useEffect(() => {
     if (!user || user.id === 'guest' || user._id === 'guest') return
@@ -660,14 +663,24 @@ export function LabourHomeScreen({ user }) {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowConfirmedModal(true)}
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-white px-3.5 py-2 text-xs font-bold text-emerald-950 shadow-md transition hover:bg-emerald-50 active:scale-95"
-              >
-                <Package className="h-3.5 w-3.5 text-emerald-700" />
-                <span>Kit Details</span>
-              </button>
+              <div className="shrink-0 flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setShowIdCardModal(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-400 px-3 py-2 text-xs font-black text-slate-950 shadow-md transition hover:bg-amber-300 active:scale-95 cursor-pointer"
+                >
+                  <IdCard className="h-3.5 w-3.5 text-slate-950" />
+                  <span>ID Card</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmedModal(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-bold text-emerald-950 shadow-md transition hover:bg-emerald-50 active:scale-95 cursor-pointer"
+                >
+                  <Package className="h-3.5 w-3.5 text-emerald-700" />
+                  <span>Kit</span>
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
@@ -1265,6 +1278,12 @@ export function LabourHomeScreen({ user }) {
         user={user}
         trialData={trialData}
         onViewTrialDetails={() => navigate('/app/trial-status')}
+      />
+
+      <ServiceProviderIdCardModal
+        isOpen={showIdCardModal}
+        onClose={() => setShowIdCardModal(false)}
+        user={user}
       />
     </motion.div>
   )

@@ -31,6 +31,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { KitStatusBadge } from '../../components/admin/welcomeKit/KitStatusBadge.jsx'
+import { ServiceProviderIdCardModal } from '../../components/labour/ServiceProviderIdCardModal.jsx'
 import { BOOT_ROUTES } from '../../constants/bootFlow.js'
 import { useAuth } from '../../hooks/useAuth.js'
 import {
@@ -153,6 +154,7 @@ export function AppProfilePage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [deleteErr, setDeleteErr] = useState('')
+  const [showIdCardModal, setShowIdCardModal] = useState(false)
 
   useEffect(() => {
     if (!editProfileOpen) return
@@ -720,6 +722,45 @@ export function AppProfilePage() {
         </Link>
       ) : null}
 
+      {/* Official Service Provider Digital ID Card */}
+      {(user?.role === USER_ROLES.LABOUR || user?.role === USER_ROLES.CONTRACTOR) && (
+        <div className="rounded-3xl border border-brand/30 bg-gradient-to-br from-slate-900 via-slate-800 to-brand-950 p-4 text-white shadow-lg space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 shadow-md">
+                <IdCard className="h-5 w-5" />
+              </div>
+              <div>
+                <span className="block text-[10px] font-black uppercase tracking-wider text-amber-300">
+                  Digital Credential
+                </span>
+                <span className="block text-sm font-bold text-white leading-tight">
+                  Official Partner ID Card
+                </span>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-500/30">
+              <ShieldCheck className="h-3 w-3" />
+              Verified ✓
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between pt-2 border-t border-white/10 text-xs">
+            <span className="font-mono text-slate-300 font-bold text-[11px]">
+              ID: {user?.partnerIdCode || `A2Z-SP-${user?._id ? String(user._id).slice(-6).toUpperCase() : '847291'}`}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowIdCardModal(true)}
+              className="inline-flex items-center gap-1 rounded-xl bg-white px-3.5 py-1.5 text-xs font-black text-slate-950 hover:bg-emerald-50 transition cursor-pointer shadow-sm active:scale-95"
+            >
+              <span>View ID Card</span>
+              <ChevronRight className="h-3.5 w-3.5 text-brand" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <GlassPanel className="border-slate-200/90 p-4 ring-1 ring-slate-100/90">
         <div className="flex justify-between items-center mb-3">
           <AppSectionHeader title="Account details" className="mb-0" />
@@ -1085,6 +1126,13 @@ export function AppProfilePage() {
           </div>
         </div>
       </AppModal>
+
+      {/* Digital ID Card Modal */}
+      <ServiceProviderIdCardModal
+        isOpen={showIdCardModal}
+        onClose={() => setShowIdCardModal(false)}
+        user={user}
+      />
     </motion.div>
   )
 }

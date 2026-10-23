@@ -37,6 +37,7 @@ import {
 import { ApiError } from '../../api/http.js'
 import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
+import { ServiceProviderIdCardModal } from '../../components/labour/ServiceProviderIdCardModal.jsx'
 import { KYC_STATUS, USER_ROLES } from '../../constants/userRoles.js'
 import { formatLastLoginDisplay } from '../../lib/formatAdminLastLogin.js'
 import { KitStatusBadge, WorkflowStatusBadge } from '../../components/admin/welcomeKit/KitStatusBadge.jsx'
@@ -308,6 +309,7 @@ export function AdminLabourPage() {
   const [detailError, setDetailError] = useState('')
   const [reviewNote, setReviewNote] = useState('')
   const [reviewBusy, setReviewBusy] = useState(false)
+  const [viewIdCardUser, setViewIdCardUser] = useState(null)
 
   // Document Lightbox & Zoom Inspection State
   const [lightboxMedia, setLightboxMedia] = useState(null)
@@ -959,15 +961,26 @@ export function AdminLabourPage() {
 
                           if (st === KYC_STATUS.VERIFIED) {
                             return (
-                              <button
-                                type="button"
-                                onClick={() => setReviewUserId(u._id)}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition cursor-pointer"
-                                title="View verified documents"
-                              >
-                                <Eye className="h-3.5 w-3.5 text-emerald-600" />
-                                <span>View KYC</span>
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setReviewUserId(u._id)}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition cursor-pointer"
+                                  title="View verified documents"
+                                >
+                                  <Eye className="h-3 w-3 text-emerald-600" />
+                                  <span>KYC</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setViewIdCardUser(u)}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-amber-300/80 bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-900 shadow-2xs hover:bg-amber-100 transition cursor-pointer"
+                                  title="View Partner ID Card"
+                                >
+                                  <IdCard className="h-3 w-3 text-amber-600" />
+                                  <span>ID Card</span>
+                                </button>
+                              </div>
                             )
                           }
 
@@ -1451,9 +1464,19 @@ export function AdminLabourPage() {
                         {/* Rejection Note & Decision Section */}
                         <div className="pt-2 border-t border-slate-100 space-y-3">
                           {status === KYC_STATUS.VERIFIED && (
-                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-800 flex items-center gap-2">
-                              <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-                              <span>This partner's KYC has already been verified and approved.</span>
+                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-800 flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                                <span>This partner's KYC has already been verified and approved.</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setViewIdCardUser(detailUser)}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 transition cursor-pointer shrink-0"
+                              >
+                                <IdCard className="h-3.5 w-3.5" />
+                                <span>View ID Card</span>
+                              </button>
                             </div>
                           )}
 
@@ -1775,6 +1798,13 @@ export function AdminLabourPage() {
           </motion.div>
         </div>
       )}
+
+      {/* Partner ID Card Modal for Admin */}
+      <ServiceProviderIdCardModal
+        isOpen={Boolean(viewIdCardUser)}
+        onClose={() => setViewIdCardUser(null)}
+        user={viewIdCardUser}
+      />
     </div>
   )
 }

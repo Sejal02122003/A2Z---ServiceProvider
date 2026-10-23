@@ -64,6 +64,8 @@ import { fetchLabourCategoriesGrouped } from '../../api/labourCategoriesApi.js'
 import { uploadMedia, uploadDocument } from '../../api/uploadApi.js'
 import { UPLOAD_FOLDERS } from '../../constants/uploadFolders.js'
 import { KYC_STATUS, USER_ROLES } from '../../constants/userRoles.js'
+import { ServiceProviderIdCard } from './ServiceProviderIdCard.jsx'
+import { ServiceProviderIdCardModal } from './ServiceProviderIdCardModal.jsx'
 
 function maskAadhaar(str) {
   if (!str) return '•••• •••• ••••'
@@ -195,6 +197,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
   const [addressSubmitting, setAddressSubmitting] = useState(false)
   const [addressEditMode, setAddressEditMode] = useState(false)
   const [addressValidationError, setAddressValidationError] = useState('')
+  const [showIdCardModal, setShowIdCardModal] = useState(false)
 
   const showToast = (type, message) => {
     setToast({ type, message })
@@ -771,13 +774,14 @@ export function PartnerOnboardingStepper({ onFinish }) {
     }
   }
 
-  // Step 5: Confirm Welcome Kit Received
+  // Step 5: Confirm Welcome Kit Received & Generate ID Card
   const handleConfirmKitReceipt = async () => {
     try {
       setSubmitting(true)
       await confirmWelcomeKitReceipt()
-      showToast('success', '🎉 Welcome kit confirmed! You are now ready to accept bookings!')
+      showToast('success', '🎉 Welcome kit confirmed! Your official Partner ID Card is generated!')
       await loadStatus()
+      setShowIdCardModal(true)
     } catch (err) {
       showToast('error', err?.message || 'Failed to confirm kit receipt')
     } finally {
@@ -3077,27 +3081,46 @@ export function PartnerOnboardingStepper({ onFinish }) {
 
                           {/* Case E: Final Delivery Confirmation & Booking Activation */}
                           {isDelivered || step5.completed ? (
-                            <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-center">
-                              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-white shadow-md">
-                                <Sparkles className="h-5 w-5" />
+                            <div className="rounded-3xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50/90 via-teal-50/50 to-white p-5 text-center space-y-4 shadow-sm">
+                              <div className="flex flex-col items-center">
+                                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-600/30">
+                                  <Sparkles className="h-6 w-6 text-yellow-300" />
+                                </div>
+                                <h4 className="mt-2.5 text-base sm:text-lg font-black text-emerald-950">
+                                  Registration Complete & Official ID Card Generated! 🎉
+                                </h4>
+                                <p className="mt-1 text-xs text-emerald-800 max-w-md mx-auto leading-relaxed">
+                                  Congratulations! Your service partner registration has been completely approved and verified. Your official Digital Partner ID Card has been generated below:
+                                </p>
                               </div>
-                              <h4 className="mt-2 text-sm font-black text-emerald-950">
-                                Welcome Kit Delivered Successfully!
-                              </h4>
-                              <p className="mt-1 text-xs text-emerald-700">
-                                Your profile is 100% verified and active. Customer bookings matching your trade will now appear in your live feed.
-                              </p>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (onFinish) onFinish()
-                                  else navigate('/app/jobs')
-                                }}
-                                className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700 cursor-pointer"
-                              >
-                                <span>Go to Bookings Dashboard</span>
-                                <ArrowRight className="h-4 w-4" />
-                              </button>
+
+                              {/* Official Generated ID Card */}
+                              <div className="py-2 flex justify-center">
+                                <ServiceProviderIdCard user={data?.user || user} />
+                              </div>
+
+                              {/* Bottom CTAs */}
+                              <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-3 border-t border-emerald-200">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowIdCardModal(true)}
+                                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-4 py-2.5 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-50 transition cursor-pointer"
+                                >
+                                  <Eye className="h-4 w-4 text-emerald-600" />
+                                  <span>View Fullscreen ID Card</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (onFinish) onFinish()
+                                    else navigate('/app/jobs')
+                                  }}
+                                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/25 hover:brightness-105 transition cursor-pointer"
+                                >
+                                  <span>Go to Bookings Dashboard</span>
+                                  <ArrowRight className="h-4 w-4" />
+                                </button>
+                              </div>
                             </div>
                           ) : (
                             <div className="space-y-2 pt-1">
@@ -3125,6 +3148,14 @@ export function PartnerOnboardingStepper({ onFinish }) {
           </div>
         </div>
       </div>
+
+      {/* Generated ID Card Modal */}
+      <ServiceProviderIdCardModal
+        isOpen={showIdCardModal}
+        onClose={() => setShowIdCardModal(false)}
+        user={data?.user || user}
+        isNewlyGenerated={true}
+      />
     </div>
   )
 }

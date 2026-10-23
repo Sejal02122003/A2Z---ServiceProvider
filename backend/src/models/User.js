@@ -364,6 +364,16 @@ const userSchema = new mongoose.Schema(
       default: IDENTITY_STATUS.UNVERIFIED,
       index: true,
     },
+    /** Generated Official Partner ID Code (e.g. A2Z-SP-XXXX) */
+    partnerIdCode: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    idCardGeneratedAt: {
+      type: Date,
+      default: null,
+    },
     verifiedLegalName: {
       type: String,
       trim: true,
@@ -469,6 +479,11 @@ userSchema.methods.toSafeObject = function toSafeObject(options = {}) {
         timeSlot: o.contractorProfile.trialSlot.timeSlot.split('_')[0].trim(),
       }
     }
+  }
+
+  // Ensure unique partnerIdCode is available for verified/registered service providers
+  if (!o.partnerIdCode && o._id) {
+    o.partnerIdCode = `A2Z-SP-${String(o._id).slice(-6).toUpperCase()}`
   }
 
   return o

@@ -1563,12 +1563,18 @@ export const getPartnerOnboardingStatus = asyncHandler(async (req, res) => {
         completed: step5Complete,
         welcomeKit,
         isReadyForBookings: step5Complete,
+        idCardGenerated: Boolean(user.welcomeKit?.idCardIssued || user.idCardGeneratedAt || step5Complete),
+        partnerIdCode: user.partnerIdCode || `A2Z-SP-${String(user._id).slice(-6).toUpperCase()}`,
       },
       user: {
         _id: user._id,
         phone: user.phone,
         role: user.role,
         fullName: user.fullName,
+        avatar: user.avatar,
+        city: user.city,
+        partnerIdCode: user.partnerIdCode || `A2Z-SP-${String(user._id).slice(-6).toUpperCase()}`,
+        idCardGeneratedAt: user.idCardGeneratedAt || (step5Complete ? new Date() : null),
         welcomeKit,
         labourProfile: user.labourProfile,
         vendorStatus: user.vendorStatus,
@@ -2376,6 +2382,10 @@ export const confirmPartnerWelcomeKitDeliveryAdmin = asyncHandler(async (req, re
   user.welcomeKit.bagIssued = true
   user.welcomeKit.productsIssued = true
   user.welcomeKit.issuedAt = user.welcomeKit.issuedAt || now
+  user.idCardGeneratedAt = user.idCardGeneratedAt || now
+  if (!user.partnerIdCode) {
+    user.partnerIdCode = `A2Z-SP-${String(user._id).slice(-6).toUpperCase()}`
+  }
 
   user.welcomeKit.deliveryConfirmation = {
     isConfirmed: true,
@@ -2427,6 +2437,10 @@ export const confirmPartnerWelcomeKitReceipt = asyncHandler(async (req, res) => 
   user.welcomeKit.productsIssued = true
   user.welcomeKit.receivedAt = new Date()
   user.welcomeKit.issuedAt = user.welcomeKit.issuedAt || new Date()
+  user.idCardGeneratedAt = user.idCardGeneratedAt || new Date()
+  if (!user.partnerIdCode) {
+    user.partnerIdCode = `A2Z-SP-${String(user._id).slice(-6).toUpperCase()}`
+  }
 
   await user.save()
 
