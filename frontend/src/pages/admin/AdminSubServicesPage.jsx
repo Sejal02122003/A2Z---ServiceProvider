@@ -34,12 +34,19 @@ import { assetUrlFromUpload, uploadMedia } from '../../api/uploadApi.js'
 
 function AddSubServiceModal({
   open,
-  services,
+  categories = [],
+  subcategories = [],
+  services = [],
+  defaultCategoryId = '',
+  defaultSubcategoryId = '',
+  defaultServiceId = '',
   onClose,
   onSaved,
   busy,
   setBusy,
 }) {
+  const [selectedCategoryId, setSelectedCategoryId] = useState('')
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState('')
   const [parentServiceId, setParentServiceId] = useState('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -53,7 +60,35 @@ function AddSubServiceModal({
 
   useEffect(() => {
     if (open) {
-      setParentServiceId(services[0]?._id ?? '')
+      let initServiceId = defaultServiceId || ''
+      let initCatId = defaultCategoryId || ''
+      let initSubcatId = defaultSubcategoryId || ''
+
+      if (initServiceId) {
+        const foundSrv = services.find((s) => s._id === initServiceId)
+        if (foundSrv) {
+          initCatId = initCatId || foundSrv.categoryId || ''
+          initSubcatId = initSubcatId || foundSrv.subcategoryId || ''
+        }
+      } else if (!initCatId && !initSubcatId) {
+        const first = services[0]
+        if (first) {
+          initServiceId = first._id
+          initCatId = first.categoryId || ''
+          initSubcatId = first.subcategoryId || ''
+        }
+      } else {
+        const matchingSrv = services.find((s) => {
+          if (initCatId && String(s.categoryId) !== String(initCatId)) return false
+          if (initSubcatId && String(s.subcategoryId) !== String(initSubcatId)) return false
+          return true
+        })
+        initServiceId = matchingSrv?._id || ''
+      }
+
+      setSelectedCategoryId(initCatId)
+      setSelectedSubcategoryId(initSubcatId)
+      setParentServiceId(initServiceId)
       setName('')
       setDescription('')
       setPrice(0)
@@ -63,7 +98,94 @@ function AddSubServiceModal({
       setIsActive(true)
       setError('')
     }
-  }, [open, services])
+  }, [open, services, defaultCategoryId, defaultSubcategoryId, defaultServiceId])
+
+  // Subcategories filtered by category
+  const availableSubcategories = useMemo(() => {
+    if (!selectedCategoryId) return subcategories
+    return subcategories.filter((sc) => String(sc.categoryId) === String(selectedCategoryId))
+  }, [subcategories, selectedCategoryId])
+
+  // Services filtered by category and/or subcategory
+  const availableServices = useMemo(() => {
+    return services.filter((s) => {
+      if (selectedCategoryId && String(s.categoryId) !== String(selectedCategoryId)) return false
+      if (selectedSubcategoryId && String(s.subcategoryId) !== String(selectedSubcategoryId)) return false
+      return true
+    })
+  }, [services, selectedCategoryId, selectedSubcategoryId])
+
+  const handleCategoryChange = (catId) => {
+    setSelectedCategoryId(catId)
+    let newSubcatId = selectedSubcategoryId
+    if (selectedSubcategoryId && catId) {
+      const sub = subcategories.find((sc) => sc._id === selectedSubcategoryId)
+      if (sub && String(sub.categoryId) !== String(catId)) {
+        newSubcatId = ''
+        setSelectedSubcategoryId('')
+      }
+    }
+
+    const isValid = services.some(
+      (s) =>
+        s._id === parentServiceId &&
+        (!catId || String(s.categoryId) === String(catId)) &&
+        (!newSubcatId || String(s.subcategoryId) === String(newSubcatId))
+    )
+    if (!isValid) {
+      const firstValid = services.find(
+        (s) =>
+          (!catId || String(s.categoryId) === String(catId)) &&
+          (!newSubcatId || String(s.subcategoryId) === String(newSubcatId))
+      )
+      setParentServiceId(firstValid?._id || '')
+    }
+  }
+
+  const handleSubcategoryChange = (subcatId) => {
+    setSelectedSubcategoryId(subcatId)
+    let newCatId = selectedCategoryId
+    if (subcatId) {
+      const sub = subcategories.find((sc) => sc._id === subcatId)
+      if (sub && sub.categoryId) {
+        newCatId = sub.categoryId
+        setSelectedCategoryId(sub.categoryId)
+      }
+    }
+
+    const isValid = services.some(
+      (s) =>
+        s._id === parentServiceId &&
+        (!newCatId || String(s.categoryId) === String(newCatId)) &&
+        (!subcatId || String(s.subcategoryId) === String(subcatId))
+    )
+    if (!isValid) {
+      const firstValid = services.find(
+        (s) =>
+          (!newCatId || String(s.categoryId) === String(newCatId)) &&
+          (!subcatId || String(s.subcategoryId) === String(subcatId))
+      )
+      setParentServiceId(firstValid?._id || '')
+    }
+  }
+
+  const handleServiceChange = (srvId) => {
+    setParentServiceId(srvId)
+    if (srvId) {
+      const srv = services.find((s) => s._id === srvId)
+      if (srv) {
+        if (srv.categoryId) setSelectedCategoryId(srv.categoryId)
+        if (srv.subcategoryId) setSelectedSubcategoryId(srv.subcategoryId)
+      }
+    }
+  }
+
+  const serviceOptions = useMemo(() => {
+    return availableServices.map((s) => ({
+      value: s._id,
+      label: `${s.name} (${s.subcategoryName} • ${s.categoryName})`,
+    }))
+  }, [availableServices])
 
   if (!open) return null
 
@@ -176,19 +298,69 @@ function AddSubServiceModal({
             </div>
           )}
 
+          {/* Category & Sub-Category Selection */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <Layers className="h-3.5 w-3.5 text-slate-400" />
+                <span>Category</span>
+              </label>
+              <SearchableSelect
+                value={selectedCategoryId}
+                onChange={handleCategoryChange}
+                options={[
+                  { value: '', label: '📁 All Categories' },
+                  ...categories.map((c) => ({ value: c._id, label: c.name })),
+                ]}
+                placeholder="Choose category"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <Tag className="h-3.5 w-3.5 text-slate-400" />
+                <span>Sub-Category</span>
+              </label>
+              <SearchableSelect
+                value={selectedSubcategoryId}
+                onChange={handleSubcategoryChange}
+                options={[
+                  { value: '', label: '🏷️ All Sub-Categories' },
+                  ...availableSubcategories.map((sc) => ({
+                    value: sc._id,
+                    label: selectedCategoryId ? sc.name : `${sc.name} (${sc.categoryName})`,
+                  })),
+                ]}
+                placeholder="Choose sub-category"
+              />
+            </div>
+          </div>
+
           <div>
-            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Parent Service <span className="text-rose-500">*</span>
+            <label className="mb-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <Wrench className="h-3.5 w-3.5 text-slate-400" />
+              <span>Parent Service</span>
+              <span className="text-rose-500">*</span>
             </label>
             <SearchableSelect
               value={parentServiceId}
-              onChange={setParentServiceId}
-              options={services.map((s) => ({
-                value: s._id,
-                label: `${s.name} (${s.subcategoryName} • ${s.categoryName})`,
-              }))}
-              placeholder="Search & choose parent service"
+              onChange={handleServiceChange}
+              options={serviceOptions}
+              placeholder={
+                serviceOptions.length === 0
+                  ? 'No services available in this category'
+                  : 'Search & choose parent service'
+              }
             />
+            {serviceOptions.length === 0 ? (
+              <p className="mt-1 text-xs text-amber-600 font-medium">
+                No services found under this selection. Change category or create a service first.
+              </p>
+            ) : (
+              <p className="mt-1 text-[11px] text-slate-400">
+                {availableServices.length} {availableServices.length === 1 ? 'service' : 'services'} available
+              </p>
+            )}
           </div>
 
           <div>
@@ -354,12 +526,16 @@ function AddSubServiceModal({
 function EditSubServiceModal({
   open,
   subService,
-  services,
+  categories = [],
+  subcategories = [],
+  services = [],
   onClose,
   onSaved,
   busy,
   setBusy,
 }) {
+  const [selectedCategoryId, setSelectedCategoryId] = useState('')
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState('')
   const [parentServiceId, setParentServiceId] = useState('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -373,6 +549,9 @@ function EditSubServiceModal({
 
   useEffect(() => {
     if (open && subService) {
+      const parent = services.find((s) => s._id === subService.serviceId)
+      setSelectedCategoryId(subService.categoryId || parent?.categoryId || '')
+      setSelectedSubcategoryId(subService.subcategoryId || parent?.subcategoryId || '')
       setParentServiceId(subService.serviceId || '')
       setName(subService.name || '')
       setDescription(subService.description || '')
@@ -383,7 +562,94 @@ function EditSubServiceModal({
       setIsActive(subService.isActive !== false)
       setError('')
     }
-  }, [open, subService])
+  }, [open, subService, services])
+
+  // Subcategories filtered by category
+  const availableSubcategories = useMemo(() => {
+    if (!selectedCategoryId) return subcategories
+    return subcategories.filter((sc) => String(sc.categoryId) === String(selectedCategoryId))
+  }, [subcategories, selectedCategoryId])
+
+  // Services filtered by category and/or subcategory
+  const availableServices = useMemo(() => {
+    return services.filter((s) => {
+      if (selectedCategoryId && String(s.categoryId) !== String(selectedCategoryId)) return false
+      if (selectedSubcategoryId && String(s.subcategoryId) !== String(selectedSubcategoryId)) return false
+      return true
+    })
+  }, [services, selectedCategoryId, selectedSubcategoryId])
+
+  const handleCategoryChange = (catId) => {
+    setSelectedCategoryId(catId)
+    let newSubcatId = selectedSubcategoryId
+    if (selectedSubcategoryId && catId) {
+      const sub = subcategories.find((sc) => sc._id === selectedSubcategoryId)
+      if (sub && String(sub.categoryId) !== String(catId)) {
+        newSubcatId = ''
+        setSelectedSubcategoryId('')
+      }
+    }
+
+    const isValid = services.some(
+      (s) =>
+        s._id === parentServiceId &&
+        (!catId || String(s.categoryId) === String(catId)) &&
+        (!newSubcatId || String(s.subcategoryId) === String(newSubcatId))
+    )
+    if (!isValid) {
+      const firstValid = services.find(
+        (s) =>
+          (!catId || String(s.categoryId) === String(catId)) &&
+          (!newSubcatId || String(s.subcategoryId) === String(newSubcatId))
+      )
+      setParentServiceId(firstValid?._id || '')
+    }
+  }
+
+  const handleSubcategoryChange = (subcatId) => {
+    setSelectedSubcategoryId(subcatId)
+    let newCatId = selectedCategoryId
+    if (subcatId) {
+      const sub = subcategories.find((sc) => sc._id === subcatId)
+      if (sub && sub.categoryId) {
+        newCatId = sub.categoryId
+        setSelectedCategoryId(sub.categoryId)
+      }
+    }
+
+    const isValid = services.some(
+      (s) =>
+        s._id === parentServiceId &&
+        (!newCatId || String(s.categoryId) === String(newCatId)) &&
+        (!subcatId || String(s.subcategoryId) === String(subcatId))
+    )
+    if (!isValid) {
+      const firstValid = services.find(
+        (s) =>
+          (!newCatId || String(s.categoryId) === String(newCatId)) &&
+          (!subcatId || String(s.subcategoryId) === String(subcatId))
+      )
+      setParentServiceId(firstValid?._id || '')
+    }
+  }
+
+  const handleServiceChange = (srvId) => {
+    setParentServiceId(srvId)
+    if (srvId) {
+      const srv = services.find((s) => s._id === srvId)
+      if (srv) {
+        if (srv.categoryId) setSelectedCategoryId(srv.categoryId)
+        if (srv.subcategoryId) setSelectedSubcategoryId(srv.subcategoryId)
+      }
+    }
+  }
+
+  const serviceOptions = useMemo(() => {
+    return availableServices.map((s) => ({
+      value: s._id,
+      label: `${s.name} (${s.subcategoryName} • ${s.categoryName})`,
+    }))
+  }, [availableServices])
 
   if (!open || !subService) return null
 
@@ -505,19 +771,69 @@ function EditSubServiceModal({
             </div>
           )}
 
+          {/* Category & Sub-Category Selection */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <Layers className="h-3.5 w-3.5 text-slate-400" />
+                <span>Category</span>
+              </label>
+              <SearchableSelect
+                value={selectedCategoryId}
+                onChange={handleCategoryChange}
+                options={[
+                  { value: '', label: '📁 All Categories' },
+                  ...categories.map((c) => ({ value: c._id, label: c.name })),
+                ]}
+                placeholder="Choose category"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <Tag className="h-3.5 w-3.5 text-slate-400" />
+                <span>Sub-Category</span>
+              </label>
+              <SearchableSelect
+                value={selectedSubcategoryId}
+                onChange={handleSubcategoryChange}
+                options={[
+                  { value: '', label: '🏷️ All Sub-Categories' },
+                  ...availableSubcategories.map((sc) => ({
+                    value: sc._id,
+                    label: selectedCategoryId ? sc.name : `${sc.name} (${sc.categoryName})`,
+                  })),
+                ]}
+                placeholder="Choose sub-category"
+              />
+            </div>
+          </div>
+
           <div>
-            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Parent Service <span className="text-rose-500">*</span>
+            <label className="mb-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <Wrench className="h-3.5 w-3.5 text-slate-400" />
+              <span>Parent Service</span>
+              <span className="text-rose-500">*</span>
             </label>
             <SearchableSelect
               value={parentServiceId}
-              onChange={setParentServiceId}
-              options={services.map((s) => ({
-                value: s._id,
-                label: `${s.name} (${s.subcategoryName} • ${s.categoryName})`,
-              }))}
-              placeholder="Select parent service"
+              onChange={handleServiceChange}
+              options={serviceOptions}
+              placeholder={
+                serviceOptions.length === 0
+                  ? 'No services available in this category'
+                  : 'Select parent service'
+              }
             />
+            {serviceOptions.length === 0 ? (
+              <p className="mt-1 text-xs text-amber-600 font-medium">
+                No services found under this selection. Change category or create a service first.
+              </p>
+            ) : (
+              <p className="mt-1 text-[11px] text-slate-400">
+                {availableServices.length} {availableServices.length === 1 ? 'service' : 'services'} available
+              </p>
+            )}
           </div>
 
           <div>
@@ -1426,7 +1742,12 @@ export function AdminSubServicesPage() {
       {/* Modals */}
       <AddSubServiceModal
         open={addModalOpen}
+        categories={categories}
+        subcategories={subcategories}
         services={services}
+        defaultCategoryId={categoryFilter !== 'all' ? categoryFilter : ''}
+        defaultSubcategoryId={subcategoryFilter !== 'all' ? subcategoryFilter : ''}
+        defaultServiceId={serviceFilter !== 'all' ? serviceFilter : ''}
         onClose={() => setAddModalOpen(false)}
         onSaved={async () => {
           setAddModalOpen(false)
@@ -1439,6 +1760,8 @@ export function AdminSubServicesPage() {
       <EditSubServiceModal
         open={Boolean(editSubService)}
         subService={editSubService}
+        categories={categories}
+        subcategories={subcategories}
         services={services}
         onClose={() => setEditSubService(null)}
         onSaved={async () => {
