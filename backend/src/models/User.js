@@ -440,16 +440,12 @@ userSchema.methods.toSafeObject = function toSafeObject(options = {}) {
     const lp = { ...o.labourProfile }
     delete lp.kycFrontImageDataUrl
     delete lp.kycBackImageDataUrl
-    delete lp.kycFrontImageUrl
-    delete lp.kycBackImageUrl
     o.labourProfile = lp
   }
   if (!options.includeLabourKycImages && o.contractorProfile) {
     const cp = { ...o.contractorProfile }
     delete cp.kycFrontImageDataUrl
     delete cp.kycBackImageDataUrl
-    delete cp.kycFrontImageUrl
-    delete cp.kycBackImageUrl
     o.contractorProfile = cp
   }
   return o

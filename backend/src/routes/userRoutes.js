@@ -87,11 +87,11 @@ router.post(
   [
     body('aadhaar').optional({ values: 'falsy' }).isString().trim(),
     body('pan').optional({ values: 'falsy' }).isString().trim(),
-    body('videoUrl')
-      .isString()
-      .trim()
-      .isURL({ protocols: ['https'], require_protocol: true })
-      .withMessage('KYC video URL is required'),
+    body('videoUrl').optional({ values: 'falsy' }).isString().trim(),
+    body('documentUrl').optional({ values: 'falsy' }).isString().trim(),
+    body('frontImageUrl').optional({ values: 'falsy' }).isString().trim(),
+    body('backImageUrl').optional({ values: 'falsy' }).isString().trim(),
+    body('documentUrls').optional().isArray(),
     body('videoMeta').optional().isObject().withMessage('videoMeta must be an object'),
   ],
   validateRequest,

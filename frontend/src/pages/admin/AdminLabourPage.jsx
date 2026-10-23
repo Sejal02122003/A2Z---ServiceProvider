@@ -9,15 +9,24 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Download,
+  ExternalLink,
+  Eye,
+  FileCheck,
+  FileText,
   IdCard,
   Layers,
   Loader2,
   Package,
   RefreshCw,
+  RotateCw,
   Search,
+  ShieldAlert,
   ShieldCheck,
   Users,
   X,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react'
 import {
   evaluateLabourTrialAdmin,
@@ -198,6 +207,70 @@ function formatServiceLine(user) {
   return s.length > 48 ? `${s.slice(0, 45)}…` : s
 }
 
+function isVideoUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  if (/\.(webm|mp4|mov|mkv|avi|m4v)($|\?)/i.test(url)) return true
+  if (url.includes('/video/upload/')) return true
+  return false
+}
+
+function isPdfUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  return /\.pdf($|\?)/i.test(url)
+}
+
+function extractKycMedia(detailUser) {
+  if (!detailUser) return { documents: [], videos: [] }
+  const profile = detailUser.contractorProfile || detailUser.labourProfile || {}
+  const idDoc = detailUser.identityVerification || detailUser.identityVerificationRef || {}
+
+  const documents = []
+  const videos = []
+  const seenUrls = new Set()
+
+  const addItem = (url, label, isBack = false) => {
+    if (!url || typeof url !== 'string' || !url.trim()) return
+    const clean = url.trim()
+    if (seenUrls.has(clean)) return
+    seenUrls.add(clean)
+
+    const isVid = isVideoUrl(clean)
+    const isPdf = isPdfUrl(clean)
+
+    if (isVid) {
+      videos.push({ url: clean, label: label || 'Recorded KYC Video' })
+    } else {
+      documents.push({
+        url: clean,
+        label: label || (isPdf ? 'KYC Document (PDF)' : 'KYC Document Photo'),
+        isPdf,
+        isBack,
+      })
+    }
+  }
+
+  // 1. Explicit front & back images
+  if (profile.kycFrontImageUrl) addItem(profile.kycFrontImageUrl, 'Aadhaar / ID Card (Front)')
+  if (profile.kycFrontImageDataUrl) addItem(profile.kycFrontImageDataUrl, 'Aadhaar / ID Card (Front Photo)')
+  if (profile.kycBackImageUrl) addItem(profile.kycBackImageUrl, 'Aadhaar / ID Card (Back)', true)
+  if (profile.kycBackImageDataUrl) addItem(profile.kycBackImageDataUrl, 'Aadhaar / ID Card (Back Photo)', true)
+
+  // 2. IdentityVerification documentUrls
+  if (Array.isArray(idDoc.documentUrls)) {
+    idDoc.documentUrls.forEach((u, i) => {
+      addItem(u, `Uploaded Document #${i + 1}`)
+    })
+  }
+
+  // 3. kycVideoUrl (detect if it's an image or a video or PDF)
+  if (profile.kycVideoUrl) {
+    const isVid = isVideoUrl(profile.kycVideoUrl)
+    addItem(profile.kycVideoUrl, isVid ? 'Recorded KYC Video' : 'Aadhaar / Document Proof')
+  }
+
+  return { documents, videos }
+}
+
 export function AdminLabourPage() {
   const reduce = useReducedMotion()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -227,6 +300,23 @@ export function AdminLabourPage() {
   const [detailError, setDetailError] = useState('')
   const [reviewNote, setReviewNote] = useState('')
   const [reviewBusy, setReviewBusy] = useState(false)
+
+  // Document Lightbox & Zoom Inspection State
+  const [lightboxMedia, setLightboxMedia] = useState(null)
+  const [zoomScale, setZoomScale] = useState(1)
+  const [rotation, setRotation] = useState(0)
+
+  const openLightbox = (media) => {
+    setLightboxMedia(media)
+    setZoomScale(1)
+    setRotation(0)
+  }
+
+  const closeLightbox = () => {
+    setLightboxMedia(null)
+    setZoomScale(1)
+    setRotation(0)
+  }
 
   // Practical Trial Evaluation Modal State
   const [trialModalUser, setTrialModalUser] = useState(null)
@@ -830,21 +920,64 @@ export function AdminLabourPage() {
                         {u.city || u.currentLocation || '—'}
                       </td>
                       <td className="px-4 py-3">
-                        {(u.contractorProfile || u.labourProfile)?.kycStatus === KYC_STATUS.PENDING ? (
-                          (u.contractorProfile || u.labourProfile)?.kycSubmittedAt ? (
-                            <button
-                              type="button"
-                              onClick={() => setReviewUserId(u._id)}
-                              className="rounded-lg border border-brand/30 bg-brand/10 px-2.5 py-1.5 text-[11px] font-bold text-brand transition hover:bg-brand/15"
-                            >
-                              Review video KYC
-                            </button>
-                          ) : (
-                            <span className="text-xs text-slate-400">Not submitted</span>
+                        {(() => {
+                          const profile = u.contractorProfile || u.labourProfile
+                          const hasDocs = Boolean(
+                            profile?.kycSubmittedAt ||
+                            profile?.kycVideoUrl ||
+                            profile?.kycFrontImageUrl ||
+                            profile?.kycBackImageUrl ||
+                            u.identityVerificationRef
                           )
-                        ) : (
-                          <span className="text-xs text-slate-400">—</span>
-                        )}
+                          const st = profile?.kycStatus || KYC_STATUS.PENDING
+
+                          if (st === KYC_STATUS.PENDING) {
+                            if (hasDocs) {
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => setReviewUserId(u._id)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[11px] font-bold text-amber-900 shadow-2xs hover:bg-amber-100 transition cursor-pointer"
+                                  title="Review submitted documents"
+                                >
+                                  <FileCheck className="h-3.5 w-3.5 text-amber-700" />
+                                  <span>Review KYC</span>
+                                </button>
+                              )
+                            }
+                            return <span className="text-xs text-slate-400">Not submitted</span>
+                          }
+
+                          if (st === KYC_STATUS.VERIFIED) {
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setReviewUserId(u._id)}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 transition cursor-pointer"
+                                title="View verified documents"
+                              >
+                                <Eye className="h-3.5 w-3.5 text-emerald-600" />
+                                <span>View KYC</span>
+                              </button>
+                            )
+                          }
+
+                          if (st === KYC_STATUS.FAILED) {
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setReviewUserId(u._id)}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-800 shadow-2xs hover:bg-rose-100 transition cursor-pointer"
+                                title="Review rejected documents"
+                              >
+                                <Eye className="h-3.5 w-3.5 text-rose-600" />
+                                <span>View KYC</span>
+                              </button>
+                            )
+                          }
+
+                          return <span className="text-xs text-slate-400">—</span>
+                        })()}
                       </td>
                       <td className="px-4 py-3">
                         <StatusPill active={u.isActive !== false} />
@@ -966,15 +1099,33 @@ export function AdminLabourPage() {
                     {u.welcomeKit?.status === 'PAYMENT_SUBMITTED' ? 'Review Slip' : u.welcomeKit?.paymentReceiptUrl ? 'View Slip' : 'Manage Kit'}
                   </button>
                 </div>
-                {(u.contractorProfile || u.labourProfile)?.kycStatus === KYC_STATUS.PENDING && (u.contractorProfile || u.labourProfile)?.kycSubmittedAt ? (
-                  <button
-                    type="button"
-                    onClick={() => setReviewUserId(u._id)}
-                    className="mt-2 w-full rounded-xl border border-brand/30 bg-brand/10 py-2 text-xs font-bold text-brand transition hover:bg-brand/15"
-                  >
-                    Review video KYC
-                  </button>
-                ) : null}
+                {(() => {
+                  const profile = u.contractorProfile || u.labourProfile
+                  const hasDocs = Boolean(
+                    profile?.kycSubmittedAt ||
+                    profile?.kycVideoUrl ||
+                    profile?.kycFrontImageUrl ||
+                    profile?.kycBackImageUrl ||
+                    u.identityVerificationRef
+                  )
+                  if (!hasDocs && profile?.kycStatus === KYC_STATUS.PENDING) return null
+
+                  const isPending = profile?.kycStatus === KYC_STATUS.PENDING
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => setReviewUserId(u._id)}
+                      className={`mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-bold transition cursor-pointer ${
+                        isPending
+                          ? 'border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 shadow-xs'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <FileCheck className="h-4 w-4" />
+                      <span>{isPending ? 'Review KYC & Documents' : 'View KYC & Documents'}</span>
+                    </button>
+                  )
+                })()}
                 {activeTab !== 'contractor' && (
                   <div className="mt-3 rounded bg-slate-50 p-2">
                     <p className="text-xs font-medium text-slate-800">{formatSkillLine(u)}</p>
@@ -1023,114 +1174,417 @@ export function AdminLabourPage() {
       ) : null}
 
       {reviewUserId ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-0 sm:p-4" role="dialog" aria-modal="true">
           <button
             type="button"
-            className="absolute inset-0 bg-slate-950/50 backdrop-blur-[2px]"
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-[2px]"
             aria-label="Close"
             disabled={reviewBusy}
             onClick={() => !reviewBusy && setReviewUserId(null)}
           />
           <motion.div
-        initial={reduce ? false : { opacity: 0, y: 16 }}
+            initial={reduce ? false : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            className="relative z-10 max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-slate-200/90 bg-white shadow-2xl sm:rounded-3xl"
+            className="relative z-10 max-h-[92vh] w-full max-w-2xl sm:max-w-3xl overflow-y-auto rounded-t-3xl border border-slate-200/90 bg-white shadow-2xl sm:rounded-3xl"
           >
-            <div className="sticky top-0 flex items-center justify-between border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur-sm">
-              <p className="text-sm font-extrabold text-slate-900">Video KYC review</p>
+            {/* Modal Header */}
+            <div className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur-md">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand/10 text-brand ring-1 ring-brand/20 shrink-0">
+                  <IdCard className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-base font-extrabold text-slate-900 leading-tight">
+                    KYC & Document Verification
+                  </h3>
+                  <p className="text-xs text-slate-500 truncate">
+                    Review uploaded Aadhaar, PAN card, and identity media
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
                 disabled={reviewBusy}
                 onClick={() => setReviewUserId(null)}
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/90 text-slate-600 transition hover:bg-slate-50"
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/90 text-slate-500 hover:text-slate-800 transition hover:bg-slate-50 shrink-0 cursor-pointer"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="space-y-4 p-4">
+
+            <div className="space-y-5 p-5">
               {detailLoading ? (
-                <div className="flex flex-col items-center gap-3 py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-brand" aria-hidden />
-                  <p className="text-sm font-medium text-slate-600">Loading worker…</p>
+                <div className="flex flex-col items-center gap-3 py-16">
+                  <Loader2 className="h-9 w-9 animate-spin text-brand" aria-hidden />
+                  <p className="text-sm font-semibold text-slate-600">Loading partner documents…</p>
                 </div>
               ) : detailError ? (
-                <p className="rounded-xl border border-rose-200/80 bg-rose-50 px-3 py-2 text-sm text-rose-900">{detailError}</p>
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-900">
+                  {detailError}
+                </div>
               ) : detailUser ? (
                 <>
-                  <div>
-                    <p className="text-xs font-bold uppercase text-slate-400">Worker</p>
-                    <p className="text-base font-extrabold text-slate-900">{detailUser.fullName || '—'}</p>
-                    <p className="font-mono text-xs text-slate-600">+91 {detailUser.phone}</p>
-                    {(detailUser.contractorProfile || detailUser.labourProfile)?.aadhaarMasked ? (
-                      <p className="mt-1 font-mono text-sm text-slate-800">Aadhaar: {(detailUser.contractorProfile || detailUser.labourProfile).aadhaarMasked}</p>
-                    ) : null}
-                    {(detailUser.contractorProfile || detailUser.labourProfile)?.panMasked ? (
-                      <p className="mt-1 font-mono text-sm text-slate-800">PAN: {(detailUser.contractorProfile || detailUser.labourProfile).panMasked}</p>
-                    ) : null}
-                    {(detailUser.contractorProfile || detailUser.labourProfile)?.kycSubmittedAt ? (
-                      <p className="mt-1 text-xs text-slate-500">
-                        Submitted{' '}
-                        {new Date((detailUser.contractorProfile || detailUser.labourProfile).kycSubmittedAt).toLocaleString(undefined, {
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                        })}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div>
-                    <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Recorded KYC video</p>
-                    {(detailUser.contractorProfile || detailUser.labourProfile)?.kycVideoUrl ? (
-                      <video
-                        src={(detailUser.contractorProfile || detailUser.labourProfile).kycVideoUrl}
-                        controls
-                        playsInline
-                        className="aspect-video w-full rounded-xl border border-slate-200/90 bg-slate-950 object-contain"
-                      />
-                    ) : (
-                      <p className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-                        No KYC video found for this worker.
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500" htmlFor="reject-note">
-                      Note if rejecting (optional)
-                    </label>
-                    <textarea
-                      id="reject-note"
-                      rows={2}
-                      value={reviewNote}
-                      onChange={(e) => setReviewNote(e.target.value)}
-                      placeholder="e.g. Video is unclear — please record again"
-                      className="w-full rounded-xl border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-brand/35"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <button
-                      type="button"
-                      disabled={reviewBusy}
-                      onClick={() => runKycReview('rejected')}
-                      className="flex-1 rounded-2xl border border-rose-200/90 bg-rose-50 py-3 text-sm font-bold text-rose-900 transition hover:bg-rose-100 disabled:opacity-50"
-                    >
-                      Reject
-                    </button>
-                    <AppPrimaryButton
-                      type="button"
-                      className="flex-1 py-3 text-sm"
-                      disabled={reviewBusy}
-                      onClick={() => runKycReview('approved')}
-                    >
-                      {reviewBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                      Approve KYC
-                    </AppPrimaryButton>
-                  </div>
+                  {(() => {
+                    const profile = detailUser.contractorProfile || detailUser.labourProfile || {}
+                    const kycMedia = extractKycMedia(detailUser)
+                    const status = profile?.kycStatus || KYC_STATUS.PENDING
+
+                    return (
+                      <>
+                        {/* Worker Identity Summary Card */}
+                        <div className="rounded-2xl border border-slate-200/80 bg-slate-50/75 p-4 space-y-3">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                  {detailUser.role === USER_ROLES.CONTRACTOR ? 'Contractor Partner' : 'Service Partner'}
+                                </span>
+                                <KycPill status={status} submittedAt={profile?.kycSubmittedAt} />
+                              </div>
+                              <h4 className="text-lg font-black text-slate-900 mt-0.5">
+                                {detailUser.fullName || '—'}
+                              </h4>
+                              <p className="font-mono text-xs text-slate-600">+91 {detailUser.phone}</p>
+                            </div>
+
+                            {profile?.kycSubmittedAt ? (
+                              <div className="text-right">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                  Submitted On
+                                </span>
+                                <span className="text-xs font-semibold text-slate-700">
+                                  {new Date(profile.kycSubmittedAt).toLocaleString(undefined, {
+                                    dateStyle: 'medium',
+                                    timeStyle: 'short',
+                                  })}
+                                </span>
+                              </div>
+                            ) : null}
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-slate-200/60">
+                            <div className="rounded-xl border border-slate-200 bg-white p-2.5 flex items-center justify-between">
+                              <div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                  Aadhaar Number
+                                </span>
+                                <span className="font-mono text-xs font-bold text-slate-800">
+                                  {profile?.aadhaarMasked || 'Not provided'}
+                                </span>
+                              </div>
+                              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                                UIDAI
+                              </span>
+                            </div>
+
+                            <div className="rounded-xl border border-slate-200 bg-white p-2.5 flex items-center justify-between">
+                              <div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                  PAN Card Number
+                                </span>
+                                <span className="font-mono text-xs font-bold text-slate-800">
+                                  {profile?.panMasked || 'Not provided'}
+                                </span>
+                              </div>
+                              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                                ITD
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Uploaded Documents Gallery (NEW) */}
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                                Uploaded Documents & ID Photos ({kycMedia.documents.length})
+                              </h4>
+                              {kycMedia.documents.length > 0 && (
+                                <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-extrabold text-brand">
+                                  Click image to zoom
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {kycMedia.documents.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                              {kycMedia.documents.map((doc, idx) => (
+                                <div
+                                  key={idx}
+                                  className="group rounded-2xl border border-slate-200 bg-white p-3 shadow-xs hover:border-brand/40 hover:shadow-md transition-all flex flex-col"
+                                >
+                                  {/* Card Top Label & Open Full Link */}
+                                  <div className="flex items-center justify-between gap-2 mb-2">
+                                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-800 truncate">
+                                      {doc.label}
+                                    </span>
+                                    <a
+                                      href={doc.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-[11px] font-bold text-brand hover:underline shrink-0"
+                                      title="Open in new window"
+                                    >
+                                      <span>Full</span>
+                                      <ExternalLink className="h-3 w-3" />
+                                    </a>
+                                  </div>
+
+                                  {/* Preview Area */}
+                                  {doc.isPdf ? (
+                                    <a
+                                      href={doc.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex h-44 w-full flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center hover:bg-slate-100 transition"
+                                    >
+                                      <FileText className="h-10 w-10 text-rose-500 mb-2" />
+                                      <span className="text-xs font-bold text-slate-800">PDF Document</span>
+                                      <span className="text-[10px] text-brand mt-1 font-semibold flex items-center gap-1">
+                                        Click to view PDF <ExternalLink className="h-3 w-3" />
+                                      </span>
+                                    </a>
+                                  ) : (
+                                    <div
+                                      onClick={() => openLightbox(doc)}
+                                      className="relative h-44 w-full cursor-pointer overflow-hidden rounded-xl border border-slate-200/90 bg-slate-900/5 group/thumb"
+                                      title="Click to zoom / inspect high-resolution"
+                                    >
+                                      <img
+                                        src={doc.url}
+                                        alt={doc.label}
+                                        className="h-full w-full object-contain transition duration-200 group-hover/thumb:scale-105"
+                                        loading="lazy"
+                                      />
+                                      <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center text-white text-xs font-bold transition gap-1.5 backdrop-blur-[1px]">
+                                        <ZoomIn className="h-4 w-4" />
+                                        <span>Click to Zoom</span>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Bottom Inspection Actions */}
+                                  <div className="mt-2.5 flex items-center justify-between pt-2 border-t border-slate-100">
+                                    <button
+                                      type="button"
+                                      onClick={() => openLightbox(doc)}
+                                      className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-brand transition cursor-pointer"
+                                    >
+                                      <ZoomIn className="h-3.5 w-3.5" />
+                                      <span>Zoom & Inspect</span>
+                                    </button>
+                                    <a
+                                      href={doc.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      download
+                                      className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
+                                    >
+                                      <Download className="h-3.5 w-3.5" />
+                                      <span>Save</span>
+                                    </a>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/75 p-5 text-center">
+                              <FileText className="mx-auto h-8 w-8 text-slate-300 mb-1" />
+                              <p className="text-xs font-semibold text-slate-600">No document photos uploaded yet</p>
+                              <p className="text-[11px] text-slate-400 mt-0.5">
+                                Worker may have submitted video KYC instead.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Recorded Video KYC Section */}
+                        {kycMedia.videos.length > 0 ? (
+                          <div className="space-y-2 pt-2 border-t border-slate-100">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                              Recorded KYC Video ({kycMedia.videos.length})
+                            </h4>
+                            {kycMedia.videos.map((vid, idx) => (
+                              <div key={idx} className="rounded-2xl border border-slate-200 bg-slate-950 p-2 overflow-hidden shadow-sm">
+                                <video
+                                  src={vid.url}
+                                  controls
+                                  playsInline
+                                  className="aspect-video w-full rounded-xl bg-slate-950 object-contain"
+                                />
+                                <div className="p-2 flex items-center justify-between text-white/80 text-xs">
+                                  <span className="font-semibold">{vid.label}</span>
+                                  <a
+                                    href={vid.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-brand hover:underline text-[11px] font-bold flex items-center gap-1"
+                                  >
+                                    Open Video ↗
+                                  </a>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : kycMedia.documents.length > 0 ? (
+                          <div className="rounded-xl border border-sky-100 bg-sky-50/60 p-3 text-xs text-sky-900 flex items-center gap-2.5">
+                            <CheckCircle2 className="h-4 w-4 text-sky-600 shrink-0" />
+                            <span>
+                              Worker submitted document photo proof for KYC verification (no separate video file).
+                            </span>
+                          </div>
+                        ) : null}
+
+                        {/* Rejection Note & Decision Section */}
+                        <div className="pt-2 border-t border-slate-100 space-y-3">
+                          {status === KYC_STATUS.VERIFIED && (
+                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-800 flex items-center gap-2">
+                              <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                              <span>This partner's KYC has already been verified and approved.</span>
+                            </div>
+                          )}
+
+                          {status === KYC_STATUS.FAILED && profile?.kycReviewNote && (
+                            <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
+                              <span className="font-bold">Previous Rejection Reason: </span>
+                              <span>{profile.kycReviewNote}</span>
+                            </div>
+                          )}
+
+                          <div>
+                            <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500" htmlFor="reject-note">
+                              Review / Rejection Note (optional if approved)
+                            </label>
+                            <textarea
+                              id="reject-note"
+                              rows={2}
+                              value={reviewNote}
+                              onChange={(e) => setReviewNote(e.target.value)}
+                              placeholder="e.g. Aadhaar details clear and verified, or Note for worker if rejecting"
+                              className="w-full rounded-xl border border-slate-200/90 bg-white px-3 py-2 text-xs font-medium text-slate-900 outline-none focus:ring-2 focus:ring-brand/35 focus:border-brand"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-2.5 sm:flex-row pt-1">
+                            <button
+                              type="button"
+                              disabled={reviewBusy}
+                              onClick={() => runKycReview('rejected')}
+                              className="flex-1 rounded-2xl border border-rose-200/90 bg-rose-50 py-3 text-xs font-bold text-rose-900 transition hover:bg-rose-100 disabled:opacity-50 cursor-pointer shadow-2xs"
+                            >
+                              {reviewBusy ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : 'Reject KYC'}
+                            </button>
+                            <AppPrimaryButton
+                              type="button"
+                              className="flex-1 py-3 text-xs font-bold cursor-pointer"
+                              disabled={reviewBusy}
+                              onClick={() => runKycReview('approved')}
+                            >
+                              {reviewBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                              {status === KYC_STATUS.VERIFIED ? 'Re-Approve KYC' : 'Approve KYC & Start Trial'}
+                            </AppPrimaryButton>
+                          </div>
+                        </div>
+                      </>
+                    )
+                  })()}
                 </>
               ) : null}
             </div>
           </motion.div>
         </div>
       ) : null}
+
+      {/* High-Resolution Document Lightbox & Zoom Modal */}
+      {lightboxMedia && (
+        <div
+          className="fixed inset-0 z-[100] flex flex-col bg-slate-950/95 backdrop-blur-md p-3 sm:p-5"
+          role="dialog"
+          aria-modal="true"
+        >
+          {/* Lightbox Toolbar */}
+          <div className="flex items-center justify-between border-b border-white/10 pb-3 text-white">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="rounded-md bg-white/10 px-2.5 py-1 text-xs font-bold truncate">
+                {lightboxMedia.label || 'Document Photo'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setZoomScale((s) => Math.max(0.5, s - 0.25))}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition cursor-pointer text-white"
+                title="Zoom Out"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setZoomScale(1)
+                  setRotation(0)
+                }}
+                className="h-9 px-3 rounded-xl bg-white/10 hover:bg-white/20 transition cursor-pointer text-xs font-mono font-bold text-white"
+                title="Reset Zoom"
+              >
+                {Math.round(zoomScale * 100)}%
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoomScale((s) => Math.min(3, s + 0.25))}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition cursor-pointer text-white"
+                title="Zoom In"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setRotation((r) => (r + 90) % 360)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition cursor-pointer text-white"
+                title="Rotate 90 degrees"
+              >
+                <RotateCw className="h-4 w-4" />
+              </button>
+              <a
+                href={lightboxMedia.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 transition cursor-pointer text-white"
+                title="Open in new window"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </a>
+              <button
+                type="button"
+                onClick={closeLightbox}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-600/80 hover:bg-rose-600 transition cursor-pointer text-white ml-2"
+                title="Close Lightbox"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Lightbox Image Preview Area */}
+          <div className="flex-1 overflow-auto flex items-center justify-center p-4">
+            <img
+              src={lightboxMedia.url}
+              alt={lightboxMedia.label}
+              style={{
+                transform: `rotate(${rotation}deg) scale(${zoomScale})`,
+                transition: 'transform 0.15s ease-out',
+                maxHeight: '82vh',
+                maxWidth: '92vw',
+              }}
+              className="object-contain rounded-lg shadow-2xl select-none"
+            />
+          </div>
+        </div>
+      )}
 
       {kitModalUser && (
         <WelcomeKitModal

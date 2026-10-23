@@ -42,7 +42,7 @@ function validateKycDataUrlImage(value, label) {
 }
 
 function labourHasKycVideo(lp) {
-  return Boolean(lp?.kycVideoUrl?.trim())
+  return Boolean(lp?.kycVideoUrl?.trim() || lp?.kycFrontImageUrl?.trim() || lp?.kycBackImageUrl?.trim() || lp?.kycFrontImageDataUrl?.trim())
 }
 
 function normalizePan(input) {
@@ -420,42 +420,75 @@ export const submitLabourKycDocuments = asyncHandler(async (req, res) => {
     }
   }
 
-  const videoUrl = normalizeStoredMediaUrl(req.body.videoUrl)
-  if (!videoUrl) {
-    return sendError(res, {
-      message: 'Record and upload a KYC video before submitting',
-      statusCode: HTTP_STATUS.BAD_REQUEST,
-      code: 'INVALID_KYC_VIDEO',
+  const rawVideoUrl = normalizeStoredMediaUrl(req.body.videoUrl || req.body.kycVideoUrl)
+  const rawFrontUrl = normalizeStoredMediaUrl(req.body.frontImageUrl || req.body.kycFrontImageUrl || req.body.documentUrl)
+  const rawBackUrl = normalizeStoredMediaUrl(req.body.backImageUrl || req.body.kycBackImageUrl)
+
+  const isImageFile = (u) =>
+    Boolean(
+      u &&
+        (typeof u === 'string' &&
+          (/\.(jpg|jpeg|png|webp|svg|gif|bmp)($|\?)/i.test(u) ||
+            u.includes('/image/upload/') ||
+            u.startsWith('data:image/'))),
+    )
+
+  const incomingDocUrls = []
+  if (Array.isArray(req.body.documentUrls)) {
+    req.body.documentUrls.forEach((u) => {
+      const norm = normalizeStoredMediaUrl(u)
+      if (norm && !incomingDocUrls.includes(norm)) incomingDocUrls.push(norm)
     })
+  }
+  if (rawFrontUrl && !incomingDocUrls.includes(rawFrontUrl)) incomingDocUrls.push(rawFrontUrl)
+  if (rawBackUrl && !incomingDocUrls.includes(rawBackUrl)) incomingDocUrls.push(rawBackUrl)
+  if (rawVideoUrl && !incomingDocUrls.includes(rawVideoUrl)) incomingDocUrls.push(rawVideoUrl)
+
+  if (!rawVideoUrl && !rawFrontUrl && !rawBackUrl && incomingDocUrls.length === 0) {
+    return sendError(res, {
+      message: 'Upload your Aadhaar/PAN document photo or record a KYC video before submitting',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_KYC_DOCUMENT',
+    })
+  }
+
+  // Determine primary video vs image
+  let primaryVideoUrl = rawVideoUrl
+  let primaryFrontImageUrl = rawFrontUrl
+  if (rawVideoUrl && isImageFile(rawVideoUrl) && !primaryFrontImageUrl) {
+    primaryFrontImageUrl = rawVideoUrl
   }
 
   const updateData = {
     [`${profileKey}.kycStatus`]: KYC_STATUS.PENDING,
-    [`${profileKey}.kycVideoUrl`]: videoUrl,
+    [`${profileKey}.kycVideoUrl`]: primaryVideoUrl || primaryFrontImageUrl || '',
     [`${profileKey}.kycVideoMeta`]: sanitizeKycVideoMeta(req.body.videoMeta),
     [`${profileKey}.kycSubmittedAt`]: new Date(),
     identityStatus: IDENTITY_STATUS.PENDING_IDENTITY_VERIFICATION,
   }
+  if (primaryFrontImageUrl) updateData[`${profileKey}.kycFrontImageUrl`] = primaryFrontImageUrl
+  if (rawBackUrl) updateData[`${profileKey}.kycBackImageUrl`] = rawBackUrl
   if (hasAadhaarInput) updateData[`${profileKey}.aadhaarMasked`] = maskAadhaarLast4(normalizedAadhaar)
   if (hasPanInput) updateData[`${profileKey}.panMasked`] = maskPan(normalizedPan)
 
   // Create or update IdentityVerification record
   let identityDoc = await IdentityVerification.findOne({ userId: req.user._id })
+  const docUrlsToSave = incomingDocUrls.length > 0 ? incomingDocUrls : (primaryVideoUrl ? [primaryVideoUrl] : [])
   if (!identityDoc) {
     identityDoc = await IdentityVerification.create({
       userId: req.user._id,
       role: req.user.role,
       submittedName: req.user.fullName || 'Service Partner',
       status: IDENTITY_STATUS.PENDING_IDENTITY_VERIFICATION,
-      documentType: 'aadhaar',
+      documentType: hasPanInput && !hasAadhaarInput ? 'pan' : 'aadhaar',
       documentNumberMasked: updateData[`${profileKey}.aadhaarMasked`] || updateData[`${profileKey}.panMasked`],
-      documentUrls: [videoUrl],
+      documentUrls: docUrlsToSave,
       submittedAt: new Date(),
     })
   } else {
     identityDoc.status = IDENTITY_STATUS.PENDING_IDENTITY_VERIFICATION
     identityDoc.documentNumberMasked = updateData[`${profileKey}.aadhaarMasked`] || updateData[`${profileKey}.panMasked`]
-    identityDoc.documentUrls = [videoUrl]
+    identityDoc.documentUrls = docUrlsToSave
     identityDoc.submittedAt = new Date()
     await identityDoc.save()
   }
@@ -475,7 +508,7 @@ export const submitLabourKycDocuments = asyncHandler(async (req, res) => {
     newStatus: IDENTITY_STATUS.PENDING_IDENTITY_VERIFICATION,
     performedBy: req.user._id,
     actorRole: 'USER',
-    reason: 'Vendor submitted video KYC and masked government ID details for identity verification',
+    reason: 'Vendor submitted KYC documents and masked government ID details for identity verification',
   })
 
   if (req.user.role === USER_ROLES.LABOUR) {
@@ -483,7 +516,7 @@ export const submitLabourKycDocuments = asyncHandler(async (req, res) => {
   }
 
   return sendSuccess(res, {
-    message: 'KYC video submitted — an admin will review your Aadhaar and PAN shortly.',
+    message: 'KYC documents submitted — an admin will review your Aadhaar and PAN shortly.',
     data: { user: req.user.toSafeObject() },
   })
 })
@@ -510,7 +543,7 @@ export const reviewLabourKyc = asyncHandler(async (req, res) => {
   if (decision === 'approved') {
     if (!profile.kycSubmittedAt || !labourHasKycVideo(profile)) {
       return sendError(res, {
-        message: 'This user has not submitted a KYC video yet',
+        message: 'This user has not submitted KYC documents or video yet',
         statusCode: HTTP_STATUS.BAD_REQUEST,
         code: 'NO_KYC_SUBMISSION',
       })
@@ -901,14 +934,18 @@ export const listUsers = asyncHandler(async (req, res) => {
   })
 })
 
-/** Admin: get one user (includes KYC document data URLs for review) */
+/** Admin: get one user (includes KYC document data URLs and identity verification for review) */
 export const getUserById = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.params.id)
+  const user = await User.findById(req.params.id).populate('identityVerificationRef')
   if (!user) {
     return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND, code: 'NOT_FOUND' })
   }
   await populateLabourCategories(user)
-  return sendSuccess(res, { data: { user: user.toSafeObject({ includeLabourKycImages: true }) } })
+  const safeUser = user.toSafeObject({ includeLabourKycImages: true })
+  if (user.identityVerificationRef) {
+    safeUser.identityVerification = user.identityVerificationRef
+  }
+  return sendSuccess(res, { data: { user: safeUser } })
 })
 
 function displayNameFromFullName(fullName) {

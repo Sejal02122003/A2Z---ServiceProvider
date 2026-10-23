@@ -479,14 +479,22 @@ export function PartnerOnboardingStepper({ onFinish }) {
       return
     }
 
+    if (!kycDocUrl) {
+      showToast('error', 'Please upload your Aadhaar or PAN card document photo before submitting.')
+      return
+    }
+
     try {
       setSubmitting(true)
-      const docUrl = kycDocUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80'
+      const docUrl = kycDocUrl
 
       await submitLabourKycDocuments({
         aadhaar: rawAadhaar,
         pan: rawPan,
+        documentUrl: docUrl,
+        frontImageUrl: docUrl,
         videoUrl: docUrl,
+        documentUrls: [docUrl],
         videoMeta: {
           publicId: `kyc_${user?._id || 'partner'}`,
           uploadedAt: new Date(),
@@ -1360,25 +1368,84 @@ export function PartnerOnboardingStepper({ onFinish }) {
 
                       {/* Document / Photo Upload */}
                       <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                          Document Proof / Card Photo
-                        </label>
-                        <div className="flex items-center gap-2">
-                          <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 p-2.5 text-xs text-slate-600 hover:border-brand hover:bg-slate-50">
-                            {uploadingKyc ? (
-                              <RefreshCw className="h-4 w-4 animate-spin text-brand" />
-                            ) : (
-                              <UploadCloud className="h-4 w-4 text-brand" />
-                            )}
-                            <span>{kycDocUrl ? 'Document Attached ✓' : 'Upload Card Photo'}</span>
-                            <input
-                              type="file"
-                              accept="image/*,video/*"
-                              onChange={handleKycFileUpload}
-                              className="hidden"
-                            />
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                            Aadhaar / PAN Card Photo or Document
                           </label>
+                          {kycDocUrl ? (
+                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                              ✓ Document Ready
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-medium text-slate-400">
+                              JPG, PNG, PDF or Video
+                            </span>
+                          )}
                         </div>
+
+                        {kycDocUrl ? (
+                          <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-3 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <img
+                                src={kycDocUrl}
+                                alt="KYC Document Preview"
+                                className="h-12 w-12 rounded-lg object-cover border border-emerald-200 shrink-0 bg-white"
+                                onError={(e) => {
+                                  e.target.style.display = 'none'
+                                }}
+                              />
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-slate-800 truncate">KYC Document Uploaded</p>
+                                <a
+                                  href={kycDocUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[11px] text-brand hover:underline font-medium inline-flex items-center gap-1"
+                                >
+                                  View Full File ↗
+                                </a>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <label className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs">
+                                Change
+                                <input
+                                  type="file"
+                                  accept="image/*,.pdf,video/*"
+                                  onChange={handleKycFileUpload}
+                                  className="hidden"
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => setKycDocUrl('')}
+                                className="rounded-lg p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                                title="Remove file"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 p-3 text-xs text-slate-600 hover:border-brand hover:bg-slate-50 transition">
+                              {uploadingKyc ? (
+                                <RefreshCw className="h-4 w-4 animate-spin text-brand" />
+                              ) : (
+                                <UploadCloud className="h-4 w-4 text-brand" />
+                              )}
+                              <span className="font-semibold">
+                                {uploadingKyc ? 'Uploading document…' : 'Upload Aadhaar / PAN Document Photo'}
+                              </span>
+                              <input
+                                type="file"
+                                accept="image/*,.pdf,video/*"
+                                onChange={handleKycFileUpload}
+                                className="hidden"
+                              />
+                            </label>
+                          </div>
+                        )}
                       </div>
 
                       <button
