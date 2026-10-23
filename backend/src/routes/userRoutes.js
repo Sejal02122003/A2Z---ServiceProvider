@@ -143,13 +143,13 @@ router.post(
 
 router.post(
   '/me/welcome-kit/address',
-  restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),
+  restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR, USER_ROLES.ADMIN),
   user.submitPartnerWelcomeKitAddress,
 )
 
 router.put(
   '/me/welcome-kit/address',
-  restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),
+  restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR, USER_ROLES.ADMIN),
   user.submitPartnerWelcomeKitAddress,
 )
 
@@ -191,6 +191,56 @@ router.patch(
   ],
   validateRequest,
   user.verifyPartnerWelcomeKitPayment,
+)
+
+// Admin Welcome Kit Address Routes under /users/:id
+router.post(
+  ['/:id/welcome-kit/address', '/:id/welcome-kit/delivery-address'],
+  restrictTo(USER_ROLES.ADMIN),
+  validateUserIdParam,
+  user.adminSubmitPartnerWelcomeKitAddress,
+)
+router.put(
+  ['/:id/welcome-kit/address', '/:id/welcome-kit/delivery-address'],
+  restrictTo(USER_ROLES.ADMIN),
+  validateUserIdParam,
+  user.adminSubmitPartnerWelcomeKitAddress,
+)
+router.patch(
+  ['/:id/welcome-kit/address', '/:id/welcome-kit/delivery-address'],
+  restrictTo(USER_ROLES.ADMIN),
+  validateUserIdParam,
+  user.adminSubmitPartnerWelcomeKitAddress,
+)
+
+router.post(
+  ['/:id/welcome-kit/confirm-address', '/:id/welcome-kit/address/confirm'],
+  restrictTo(USER_ROLES.ADMIN),
+  validateUserIdParam,
+  user.confirmPartnerWelcomeKitAddress,
+)
+router.patch(
+  ['/:id/welcome-kit/confirm-address', '/:id/welcome-kit/address/confirm'],
+  restrictTo(USER_ROLES.ADMIN),
+  validateUserIdParam,
+  user.confirmPartnerWelcomeKitAddress,
+)
+
+router.post(
+  ['/:id/welcome-kit/request-address-correction', '/:id/welcome-kit/address/request-correction'],
+  restrictTo(USER_ROLES.ADMIN),
+  validateUserIdParam,
+  [body('reason').trim().notEmpty().withMessage('reason is required to request address correction')],
+  validateRequest,
+  user.requestPartnerAddressCorrection,
+)
+router.patch(
+  ['/:id/welcome-kit/request-address-correction', '/:id/welcome-kit/address/request-correction'],
+  restrictTo(USER_ROLES.ADMIN),
+  validateUserIdParam,
+  [body('reason').trim().notEmpty().withMessage('reason is required to request address correction')],
+  validateRequest,
+  user.requestPartnerAddressCorrection,
 )
 
 router.patch(

@@ -47,11 +47,45 @@ router.patch(
 )
 
 /**
- * POST /api/service-partners/:partnerId/welcome-kit/request-address-correction
- * Admin requests address correction from service provider
+ * POST /api/service-partners/:partnerId/welcome-kit/address
+ * PUT /api/service-partners/:partnerId/welcome-kit/address
+ * PATCH /api/service-partners/:partnerId/welcome-kit/address
+ * Admin enters or updates welcome kit delivery address on behalf of partner
  */
 router.post(
-  '/:partnerId/welcome-kit/request-address-correction',
+  ['/:partnerId/welcome-kit/address', '/:partnerId/welcome-kit/delivery-address'],
+  [param('partnerId').isMongoId().withMessage('partnerId must be a valid MongoDB ObjectId')],
+  validateRequest,
+  user.adminSubmitPartnerWelcomeKitAddress,
+)
+router.put(
+  ['/:partnerId/welcome-kit/address', '/:partnerId/welcome-kit/delivery-address'],
+  [param('partnerId').isMongoId().withMessage('partnerId must be a valid MongoDB ObjectId')],
+  validateRequest,
+  user.adminSubmitPartnerWelcomeKitAddress,
+)
+router.patch(
+  ['/:partnerId/welcome-kit/address', '/:partnerId/welcome-kit/delivery-address'],
+  [param('partnerId').isMongoId().withMessage('partnerId must be a valid MongoDB ObjectId')],
+  validateRequest,
+  user.adminSubmitPartnerWelcomeKitAddress,
+)
+
+/**
+ * POST & PATCH /api/service-partners/:partnerId/welcome-kit/request-address-correction
+ * Admin requests address correction from service provider (supports /address/request-correction alias)
+ */
+router.post(
+  ['/:partnerId/welcome-kit/request-address-correction', '/:partnerId/welcome-kit/address/request-correction'],
+  [
+    param('partnerId').isMongoId().withMessage('partnerId must be a valid MongoDB ObjectId'),
+    body('reason').trim().notEmpty().withMessage('reason is required to request address correction'),
+  ],
+  validateRequest,
+  user.requestPartnerAddressCorrection,
+)
+router.patch(
+  ['/:partnerId/welcome-kit/request-address-correction', '/:partnerId/welcome-kit/address/request-correction'],
   [
     param('partnerId').isMongoId().withMessage('partnerId must be a valid MongoDB ObjectId'),
     body('reason').trim().notEmpty().withMessage('reason is required to request address correction'),
@@ -61,11 +95,19 @@ router.post(
 )
 
 /**
- * POST /api/service-partners/:partnerId/welcome-kit/confirm-address
- * Admin confirms shipping address & marks kit ready for dispatch
+ * POST & PATCH /api/service-partners/:partnerId/welcome-kit/confirm-address
+ * Admin confirms shipping address & marks kit ready for dispatch (supports /address/confirm alias)
  */
 router.post(
-  '/:partnerId/welcome-kit/confirm-address',
+  ['/:partnerId/welcome-kit/confirm-address', '/:partnerId/welcome-kit/address/confirm'],
+  [
+    param('partnerId').isMongoId().withMessage('partnerId must be a valid MongoDB ObjectId'),
+  ],
+  validateRequest,
+  user.confirmPartnerWelcomeKitAddress,
+)
+router.patch(
+  ['/:partnerId/welcome-kit/confirm-address', '/:partnerId/welcome-kit/address/confirm'],
   [
     param('partnerId').isMongoId().withMessage('partnerId must be a valid MongoDB ObjectId'),
   ],
@@ -81,7 +123,13 @@ router.post(
   '/:partnerId/welcome-kit/dispatch',
   [
     param('partnerId').isMongoId().withMessage('partnerId must be a valid MongoDB ObjectId'),
-    body('courierCompany').trim().notEmpty().withMessage('courierCompany is required'),
+    body().custom((val, { req }) => {
+      const courier = req.body.courierCompany || req.body.courierName
+      if (!courier || typeof courier !== 'string' || courier.trim().length === 0) {
+        throw new Error('Courier company name is required')
+      }
+      return true
+    }),
     body('trackingNumber').optional().trim(),
     body('trackingUrl').optional().trim(),
     body('dispatchDate').optional().isISO8601().toDate(),

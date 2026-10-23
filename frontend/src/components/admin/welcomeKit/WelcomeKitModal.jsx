@@ -33,6 +33,7 @@ import {
   verifyPartnerWelcomeKitPayment,
   requestPartnerAddressCorrection,
   confirmPartnerWelcomeKitAddress,
+  adminSubmitPartnerAddress,
   dispatchPartnerWelcomeKit,
   confirmPartnerWelcomeKitDeliveryAdmin,
 } from '../../../api/servicePartnerApi.js'
@@ -81,10 +82,19 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
   const [customRejectionNote, setCustomRejectionNote] = useState('')
   const [showFullReceipt, setShowFullReceipt] = useState(false)
 
-  // Address Review & Correction State
+  // Address Review, Entry & Correction State
   const [showCorrectionForm, setShowCorrectionForm] = useState(false)
   const [correctionReason, setCorrectionReason] = useState('')
   const [customCorrectionReason, setCustomCorrectionReason] = useState('')
+  const [showAddressForm, setShowAddressForm] = useState(false)
+  const [formRecipientName, setFormRecipientName] = useState('')
+  const [formMobileNumber, setFormMobileNumber] = useState('')
+  const [formHouseBuilding, setFormHouseBuilding] = useState('')
+  const [formStreetArea, setFormStreetArea] = useState('')
+  const [formLandmark, setFormLandmark] = useState('')
+  const [formCity, setFormCity] = useState('')
+  const [formState, setFormState] = useState('')
+  const [formPincode, setFormPincode] = useState('')
   const [addressActionBusy, setAddressActionBusy] = useState(false)
 
   // Dispatch Form State
@@ -375,6 +385,94 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
       if (onSuccess) onSuccess(updated)
     } catch (err) {
       setError(err?.message || 'Failed to request address correction')
+    } finally {
+      setAddressActionBusy(false)
+    }
+  }
+
+  // Open address edit/entry form prefilled with current address or user defaults
+  function openAddressForm() {
+    const addr = currentKit?.address || {}
+    setFormRecipientName(addr.recipientName || user?.fullName || '')
+    setFormMobileNumber(addr.mobileNumber || addr.recipientPhone || user?.phone || '')
+    setFormHouseBuilding(addr.houseBuilding || addr.houseNumber || '')
+    setFormStreetArea(addr.streetArea || '')
+    setFormLandmark(addr.landmark || '')
+    setFormCity(addr.city || user?.city || '')
+    setFormState(addr.state || '')
+    setFormPincode(addr.pincode || '')
+    setShowAddressForm(true)
+    setShowCorrectionForm(false)
+  }
+
+  // Handle Admin Saving Delivery Address on behalf of partner
+  async function handleSaveDeliveryAddress(e) {
+    if (e) e.preventDefault()
+    setError(null)
+    setSuccessMsg(null)
+
+    if (!formRecipientName.trim()) {
+      setError('Recipient Full Name is required.')
+      return
+    }
+    let cleanMobile = formMobileNumber.replace(/\D/g, '')
+    if (cleanMobile.length === 12 && cleanMobile.startsWith('91')) {
+      cleanMobile = cleanMobile.slice(2)
+    } else if (cleanMobile.length === 11 && cleanMobile.startsWith('0')) {
+      cleanMobile = cleanMobile.slice(1)
+    }
+    if (cleanMobile.length !== 10) {
+      setError('Please enter a valid 10-digit mobile number.')
+      return
+    }
+    if (!formHouseBuilding.trim()) {
+      setError('House / Flat / Building number is required.')
+      return
+    }
+    if (!formStreetArea.trim()) {
+      setError('Street and area name are required.')
+      return
+    }
+    if (!formCity.trim()) {
+      setError('City name is required.')
+      return
+    }
+    if (!formState.trim()) {
+      setError('State name is required.')
+      return
+    }
+    const cleanPin = formPincode.replace(/\D/g, '')
+    if (cleanPin.length !== 6 || !/^[1-9][0-9]{5}$/.test(cleanPin)) {
+      setError('Please enter a valid 6-digit Indian PIN code.')
+      return
+    }
+
+    setAddressActionBusy(true)
+    try {
+      const payload = {
+        recipientName: formRecipientName.trim(),
+        recipientPhone: cleanMobile,
+        mobileNumber: cleanMobile,
+        houseNumber: formHouseBuilding.trim(),
+        houseBuilding: formHouseBuilding.trim(),
+        streetArea: formStreetArea.trim(),
+        landmark: formLandmark.trim(),
+        city: formCity.trim(),
+        state: formState.trim(),
+        pincode: cleanPin,
+      }
+      const res = await adminSubmitPartnerAddress(user._id, payload)
+      const updated = res?.welcomeKit || {
+        ...currentKit,
+        address: res?.address || payload,
+        addressStatus: 'SUBMITTED',
+      }
+      setCurrentKit(updated)
+      setShowAddressForm(false)
+      setSuccessMsg('Delivery address saved successfully!')
+      if (onSuccess) onSuccess(updated)
+    } catch (err) {
+      setError(err?.message || 'Failed to save delivery address')
     } finally {
       setAddressActionBusy(false)
     }
@@ -1015,7 +1113,163 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
                   </div>
                 )}
 
-                {isAddressSubmitted ? (
+                {showAddressForm ? (
+                  /* Admin 8-Field Address Entry/Edit Form */
+                  <form onSubmit={handleSaveDeliveryAddress} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-3.5 shadow-2xs">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-brand" />
+                        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                          {isAddressSubmitted ? 'Edit Delivery Address' : 'Enter Delivery Address for Partner'}
+                        </h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddressForm(false)}
+                        className="text-xs text-slate-500 hover:text-slate-800"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                          Recipient Full Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={formRecipientName}
+                          onChange={(e) => setFormRecipientName(e.target.value)}
+                          placeholder="e.g. Ramesh Kumar"
+                          required
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-brand"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                          Contact Mobile Number (10 Digits) *
+                        </label>
+                        <input
+                          type="tel"
+                          maxLength={10}
+                          value={formMobileNumber}
+                          onChange={(e) => setFormMobileNumber(e.target.value.replace(/\D/g, ''))}
+                          placeholder="e.g. 9876543210"
+                          required
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-brand font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                          House / Flat / Building No. *
+                        </label>
+                        <input
+                          type="text"
+                          value={formHouseBuilding}
+                          onChange={(e) => setFormHouseBuilding(e.target.value)}
+                          placeholder="e.g. Flat 402, Shivam Apartments"
+                          required
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-brand"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                          Street & Area / Sector *
+                        </label>
+                        <input
+                          type="text"
+                          value={formStreetArea}
+                          onChange={(e) => setFormStreetArea(e.target.value)}
+                          placeholder="e.g. Main Market Road, Sector 62"
+                          required
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-brand"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                          Landmark (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={formLandmark}
+                          onChange={(e) => setFormLandmark(e.target.value)}
+                          placeholder="e.g. Near City Hospital"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-brand"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                          City *
+                        </label>
+                        <input
+                          type="text"
+                          value={formCity}
+                          onChange={(e) => setFormCity(e.target.value)}
+                          placeholder="e.g. Noida, Delhi"
+                          required
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-brand"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                          State *
+                        </label>
+                        <input
+                          type="text"
+                          value={formState}
+                          onChange={(e) => setFormState(e.target.value)}
+                          placeholder="e.g. Uttar Pradesh"
+                          required
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-brand"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                          6-Digit Indian PIN Code *
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={formPincode}
+                          onChange={(e) => setFormPincode(e.target.value.replace(/\D/g, ''))}
+                          placeholder="e.g. 201301"
+                          required
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:border-brand font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddressForm(false)}
+                        className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={addressActionBusy}
+                        className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-brand py-2.5 text-xs font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-50 cursor-pointer"
+                      >
+                        {addressActionBusy ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4" />
+                        )}
+                        <span>Save Delivery Address</span>
+                      </button>
+                    </div>
+                  </form>
+                ) : isAddressSubmitted ? (
                   <div className="space-y-3">
                     {/* 8-Field Address Details Card */}
                     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
@@ -1024,10 +1278,21 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
                           <UserIcon className="h-3.5 w-3.5 text-brand" />
                           <span>Recipient: {address.recipientName}</span>
                         </div>
-                        <span className="font-semibold text-slate-500 flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          +91 {address.mobileNumber || address.recipientPhone}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-500 flex items-center gap-1">
+                            <Phone className="h-3 w-3" />
+                            +91 {address.mobileNumber || address.recipientPhone}
+                          </span>
+                          {!isDispatched && (
+                            <button
+                              type="button"
+                              onClick={openAddressForm}
+                              className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                            >
+                              Edit Address
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -1199,14 +1464,26 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
                     </div>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center space-y-2">
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center space-y-3">
                     <MapPin className="h-8 w-8 text-slate-300 mx-auto" />
-                    <p className="text-xs font-semibold text-slate-600">
-                      No delivery address submitted yet by the service partner.
-                    </p>
-                    <p className="text-[11px] text-slate-400">
-                      Once payment is approved, the service provider dashboard prompts them to provide their 8-field shipping address.
-                    </p>
+                    <div>
+                      <p className="text-xs font-semibold text-slate-700">
+                        No delivery address submitted yet by the service partner.
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        You can enter the 8-field delivery address manually on behalf of the partner below.
+                      </p>
+                    </div>
+                    {!isDispatched && (
+                      <button
+                        type="button"
+                        onClick={openAddressForm}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:brightness-105 active:scale-[0.98] transition cursor-pointer"
+                      >
+                        <MapPin className="h-3.5 w-3.5" />
+                        <span>Enter Delivery Address on Behalf of Partner</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

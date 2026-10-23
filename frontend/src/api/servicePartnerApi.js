@@ -40,8 +40,8 @@ export async function verifyPartnerWelcomeKitPayment(partnerId, body) {
  * @param {{ reason: string }} body
  */
 export async function requestPartnerAddressCorrection(partnerId, body) {
-  const json = await apiRequest(`/service-partners/${partnerId}/welcome-kit/address/request-correction`, {
-    method: 'PATCH',
+  const json = await apiRequest(`/service-partners/${partnerId}/welcome-kit/request-address-correction`, {
+    method: 'POST',
     body,
   })
   return json.data
@@ -52,8 +52,21 @@ export async function requestPartnerAddressCorrection(partnerId, body) {
  * @param {string} partnerId
  */
 export async function confirmPartnerWelcomeKitAddress(partnerId) {
-  const json = await apiRequest(`/service-partners/${partnerId}/welcome-kit/address/confirm`, {
-    method: 'PATCH',
+  const json = await apiRequest(`/service-partners/${partnerId}/welcome-kit/confirm-address`, {
+    method: 'POST',
+  })
+  return json.data
+}
+
+/**
+ * Admin: Enter or update service partner's welcome kit delivery address on their behalf
+ * @param {string} partnerId
+ * @param {object} body
+ */
+export async function adminSubmitPartnerAddress(partnerId, body) {
+  const json = await apiRequest(`/service-partners/${partnerId}/welcome-kit/address`, {
+    method: 'POST',
+    body,
   })
   return json.data
 }
@@ -62,7 +75,8 @@ export async function confirmPartnerWelcomeKitAddress(partnerId) {
  * Admin: Record manual dispatch details for a welcome kit
  * @param {string} partnerId
  * @param {{
- *   courierName: string,
+ *   courierName?: string,
+ *   courierCompany?: string,
  *   trackingNumber?: string,
  *   trackingUrl?: string,
  *   dispatchDate?: string,
@@ -71,9 +85,14 @@ export async function confirmPartnerWelcomeKitAddress(partnerId) {
  * }} body
  */
 export async function dispatchPartnerWelcomeKit(partnerId, body) {
+  const payload = {
+    ...body,
+    courierCompany: body.courierCompany || body.courierName,
+    courierName: body.courierName || body.courierCompany,
+  }
   const json = await apiRequest(`/service-partners/${partnerId}/welcome-kit/dispatch`, {
     method: 'POST',
-    body,
+    body: payload,
   })
   return json.data
 }

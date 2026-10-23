@@ -2154,7 +2154,7 @@ export const submitPartnerWelcomeKitAddress = asyncHandler(async (req, res) => {
  * Admin requests address correction from service partner
  */
 export const requestPartnerAddressCorrection = asyncHandler(async (req, res) => {
-  const { partnerId } = req.params
+  const partnerId = req.params.partnerId || req.params.id
   const { reason } = req.body
 
   if (!mongoose.Types.ObjectId.isValid(partnerId)) {
@@ -2213,11 +2213,165 @@ export const requestPartnerAddressCorrection = asyncHandler(async (req, res) => 
 })
 
 /**
+ * POST/PUT/PATCH /api/service-partners/:partnerId/welcome-kit/address
+ * Admin sets or updates welcome kit delivery address on behalf of partner
+ */
+export const adminSubmitPartnerWelcomeKitAddress = asyncHandler(async (req, res) => {
+  const partnerId = req.params.partnerId || req.params.id
+
+  if (!mongoose.Types.ObjectId.isValid(partnerId)) {
+    return sendError(res, { message: 'Invalid partner ID', statusCode: HTTP_STATUS.BAD_REQUEST })
+  }
+
+  const user = await User.findById(partnerId)
+  if (!user) {
+    return sendError(res, { message: 'Service partner not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  user.welcomeKit = user.welcomeKit || {}
+  const status = user.welcomeKit.status
+
+  if (status === 'DISPATCHED' || status === 'DELIVERED') {
+    return sendError(res, {
+      message: 'Welcome kit has already been dispatched. Address cannot be modified after dispatch.',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'ALREADY_DISPATCHED',
+    })
+  }
+
+  const rawRecipientName = req.body.recipientName || req.body.fullName || ''
+  const rawRecipientPhone =
+    req.body.recipientPhone ||
+    req.body.mobileNumber ||
+    req.body.phone ||
+    req.body.contactMobileNumber ||
+    ''
+  const rawHouseNumber =
+    req.body.houseNumber ||
+    req.body.houseBuilding ||
+    req.body.houseFlatBuilding ||
+    ''
+  const rawStreetArea = req.body.streetArea || req.body.street || ''
+  const rawCity = req.body.city || ''
+  const rawState = req.body.state || ''
+  const rawPincode = req.body.pincode || req.body.pinCode || req.body.postalCode || ''
+  const rawLandmark = req.body.landmark || ''
+
+  if (!rawRecipientName || typeof rawRecipientName !== 'string' || rawRecipientName.trim().length < 2) {
+    return sendError(res, {
+      message: 'Recipient full name is required (minimum 2 characters)',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_RECIPIENT_NAME',
+    })
+  }
+
+  let phoneDigits = String(rawRecipientPhone || '').replace(/\D/g, '')
+  if (phoneDigits.length === 12 && phoneDigits.startsWith('91')) {
+    phoneDigits = phoneDigits.slice(2)
+  } else if (phoneDigits.length === 11 && phoneDigits.startsWith('0')) {
+    phoneDigits = phoneDigits.slice(1)
+  }
+
+  if (phoneDigits.length !== 10) {
+    return sendError(res, {
+      message: 'Recipient mobile number must be a valid 10-digit Indian phone number',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_RECIPIENT_PHONE',
+    })
+  }
+
+  if (!rawHouseNumber || typeof rawHouseNumber !== 'string' || rawHouseNumber.trim().length === 0) {
+    return sendError(res, {
+      message: 'House / Flat / Building number is required',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_HOUSE_NUMBER',
+    })
+  }
+
+  if (!rawStreetArea || typeof rawStreetArea !== 'string' || rawStreetArea.trim().length < 2) {
+    return sendError(res, {
+      message: 'Street and area name are required',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_STREET_AREA',
+    })
+  }
+
+  if (!rawCity || typeof rawCity !== 'string' || rawCity.trim().length < 2) {
+    return sendError(res, {
+      message: 'City name is required',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_CITY',
+    })
+  }
+
+  if (!rawState || typeof rawState !== 'string' || rawState.trim().length < 2) {
+    return sendError(res, {
+      message: 'State name is required',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_STATE',
+    })
+  }
+
+  const cleanPin = String(rawPincode || '').trim()
+  if (!/^[1-9][0-9]{5}$/.test(cleanPin)) {
+    return sendError(res, {
+      message: 'PIN code must be a valid 6-digit Indian postal code',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_PINCODE',
+    })
+  }
+
+  const addressData = {
+    recipientName: rawRecipientName.trim(),
+    recipientPhone: phoneDigits,
+    mobileNumber: phoneDigits,
+    houseNumber: rawHouseNumber.trim(),
+    houseBuilding: rawHouseNumber.trim(),
+    streetArea: rawStreetArea.trim(),
+    landmark: String(rawLandmark || '').trim(),
+    city: rawCity.trim(),
+    state: rawState.trim(),
+    pincode: cleanPin,
+  }
+
+  user.welcomeKit.address = addressData
+  user.welcomeKit.addressStatus = 'SUBMITTED'
+  user.welcomeKit.addressSubmittedAt = new Date()
+  user.welcomeKit.addressCorrectionReason = ''
+
+  // Sync legacy fields
+  user.welcomeKit.deliveryAddress = `${addressData.houseNumber}, ${addressData.streetArea}${addressData.landmark ? `, Near ${addressData.landmark}` : ''}, ${addressData.city}, ${addressData.state} - ${addressData.pincode}`
+  user.welcomeKit.deliveryCity = addressData.city
+  user.welcomeKit.deliveryPincode = addressData.pincode
+
+  user.welcomeKit.auditTrail = user.welcomeKit.auditTrail || []
+  user.welcomeKit.auditTrail.push({
+    action: 'ADDRESS_SUBMITTED_BY_ADMIN',
+    performedBy: req.user._id,
+    performedByName: req.user.fullName || req.user.phone || 'Admin',
+    performedByRole: req.user.role,
+    timestamp: new Date(),
+    details: `Delivery address saved by admin for ${addressData.recipientName} (${addressData.city}, PIN: ${addressData.pincode}).`,
+  })
+
+  await user.save()
+
+  return sendSuccess(res, {
+    message: 'Welcome kit delivery address saved successfully!',
+    data: {
+      address: user.welcomeKit.address,
+      addressStatus: user.welcomeKit.addressStatus,
+      welcomeKit: user.welcomeKit,
+    },
+  })
+})
+
+/**
  * POST /api/service-partners/:partnerId/welcome-kit/confirm-address
  * Admin confirms shipping address & marks kit ready for dispatch
  */
 export const confirmPartnerWelcomeKitAddress = asyncHandler(async (req, res) => {
-  const { partnerId } = req.params
+  const partnerId = req.params.partnerId || req.params.id
 
   if (!mongoose.Types.ObjectId.isValid(partnerId)) {
     return sendError(res, { message: 'Invalid partner ID', statusCode: HTTP_STATUS.BAD_REQUEST })
@@ -2284,14 +2438,15 @@ export const confirmPartnerWelcomeKitAddress = asyncHandler(async (req, res) => 
  * Admin records manual dispatch details (Informational only — No courier live tracking)
  */
 export const dispatchPartnerWelcomeKit = asyncHandler(async (req, res) => {
-  const { partnerId } = req.params
-  const { courierCompany, trackingNumber, trackingUrl, dispatchDate, estimatedDeliveryDate, notes } = req.body
+  const partnerId = req.params.partnerId || req.params.id
+  const { courierCompany, courierName, trackingNumber, trackingUrl, dispatchDate, estimatedDeliveryDate, notes } = req.body
 
   if (!mongoose.Types.ObjectId.isValid(partnerId)) {
     return sendError(res, { message: 'Invalid partner ID', statusCode: HTTP_STATUS.BAD_REQUEST })
   }
 
-  if (!courierCompany || typeof courierCompany !== 'string' || courierCompany.trim().length === 0) {
+  const rawCourier = courierCompany || courierName || ''
+  if (!rawCourier || typeof rawCourier !== 'string' || rawCourier.trim().length === 0) {
     return sendError(res, {
       message: 'Courier company name is required',
       statusCode: HTTP_STATUS.BAD_REQUEST,
@@ -2326,7 +2481,8 @@ export const dispatchPartnerWelcomeKit = asyncHandler(async (req, res) => {
   }
 
   const dispatchObj = {
-    courierCompany: courierCompany.trim(),
+    courierCompany: rawCourier.trim(),
+    courierName: rawCourier.trim(),
     trackingNumber: String(trackingNumber || '').trim(),
     trackingUrl: cleanUrl,
     dispatchDate: dispatchDate ? new Date(dispatchDate) : new Date(),
@@ -2367,7 +2523,7 @@ export const dispatchPartnerWelcomeKit = asyncHandler(async (req, res) => {
  * Explicit, authorized admin action to manually confirm welcome kit delivery
  */
 export const confirmPartnerWelcomeKitDeliveryAdmin = asyncHandler(async (req, res) => {
-  const { partnerId } = req.params
+  const partnerId = req.params.partnerId || req.params.id
   const { notes } = req.body
 
   if (!mongoose.Types.ObjectId.isValid(partnerId)) {
