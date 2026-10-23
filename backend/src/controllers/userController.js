@@ -2016,19 +2016,26 @@ export const submitPartnerWelcomeKitAddress = asyncHandler(async (req, res) => {
     })
   }
 
-  // 3. Field collection & validation
-  const {
-    recipientName,
-    recipientPhone,
-    houseNumber,
-    streetArea,
-    landmark,
-    city,
-    state,
-    pincode,
-  } = req.body
+  // 3. Field collection & validation (supports recipientPhone / mobileNumber and houseNumber / houseBuilding)
+  const rawRecipientName = req.body.recipientName || req.body.fullName || ''
+  const rawRecipientPhone =
+    req.body.recipientPhone ||
+    req.body.mobileNumber ||
+    req.body.phone ||
+    req.body.contactMobileNumber ||
+    ''
+  const rawHouseNumber =
+    req.body.houseNumber ||
+    req.body.houseBuilding ||
+    req.body.houseFlatBuilding ||
+    ''
+  const rawStreetArea = req.body.streetArea || req.body.street || ''
+  const rawCity = req.body.city || ''
+  const rawState = req.body.state || ''
+  const rawPincode = req.body.pincode || req.body.pinCode || req.body.postalCode || ''
+  const rawLandmark = req.body.landmark || ''
 
-  if (!recipientName || typeof recipientName !== 'string' || recipientName.trim().length < 2) {
+  if (!rawRecipientName || typeof rawRecipientName !== 'string' || rawRecipientName.trim().length < 2) {
     return sendError(res, {
       message: 'Recipient full name is required (minimum 2 characters)',
       statusCode: HTTP_STATUS.BAD_REQUEST,
@@ -2036,7 +2043,13 @@ export const submitPartnerWelcomeKitAddress = asyncHandler(async (req, res) => {
     })
   }
 
-  const phoneDigits = String(recipientPhone || '').replace(/\D/g, '')
+  let phoneDigits = String(rawRecipientPhone || '').replace(/\D/g, '')
+  if (phoneDigits.length === 12 && phoneDigits.startsWith('91')) {
+    phoneDigits = phoneDigits.slice(2)
+  } else if (phoneDigits.length === 11 && phoneDigits.startsWith('0')) {
+    phoneDigits = phoneDigits.slice(1)
+  }
+
   if (phoneDigits.length !== 10) {
     return sendError(res, {
       message: 'Recipient mobile number must be a valid 10-digit Indian phone number',
@@ -2045,7 +2058,7 @@ export const submitPartnerWelcomeKitAddress = asyncHandler(async (req, res) => {
     })
   }
 
-  if (!houseNumber || typeof houseNumber !== 'string' || houseNumber.trim().length === 0) {
+  if (!rawHouseNumber || typeof rawHouseNumber !== 'string' || rawHouseNumber.trim().length === 0) {
     return sendError(res, {
       message: 'House / Flat / Building number is required',
       statusCode: HTTP_STATUS.BAD_REQUEST,
@@ -2053,7 +2066,7 @@ export const submitPartnerWelcomeKitAddress = asyncHandler(async (req, res) => {
     })
   }
 
-  if (!streetArea || typeof streetArea !== 'string' || streetArea.trim().length < 2) {
+  if (!rawStreetArea || typeof rawStreetArea !== 'string' || rawStreetArea.trim().length < 2) {
     return sendError(res, {
       message: 'Street and area name are required',
       statusCode: HTTP_STATUS.BAD_REQUEST,
@@ -2061,7 +2074,7 @@ export const submitPartnerWelcomeKitAddress = asyncHandler(async (req, res) => {
     })
   }
 
-  if (!city || typeof city !== 'string' || city.trim().length < 2) {
+  if (!rawCity || typeof rawCity !== 'string' || rawCity.trim().length < 2) {
     return sendError(res, {
       message: 'City name is required',
       statusCode: HTTP_STATUS.BAD_REQUEST,
@@ -2069,7 +2082,7 @@ export const submitPartnerWelcomeKitAddress = asyncHandler(async (req, res) => {
     })
   }
 
-  if (!state || typeof state !== 'string' || state.trim().length < 2) {
+  if (!rawState || typeof rawState !== 'string' || rawState.trim().length < 2) {
     return sendError(res, {
       message: 'State name is required',
       statusCode: HTTP_STATUS.BAD_REQUEST,
@@ -2077,7 +2090,7 @@ export const submitPartnerWelcomeKitAddress = asyncHandler(async (req, res) => {
     })
   }
 
-  const cleanPin = String(pincode || '').trim()
+  const cleanPin = String(rawPincode || '').trim()
   if (!/^[1-9][0-9]{5}$/.test(cleanPin)) {
     return sendError(res, {
       message: 'PIN code must be a valid 6-digit Indian postal code',
@@ -2087,13 +2100,15 @@ export const submitPartnerWelcomeKitAddress = asyncHandler(async (req, res) => {
   }
 
   const addressData = {
-    recipientName: recipientName.trim(),
+    recipientName: rawRecipientName.trim(),
     recipientPhone: phoneDigits,
-    houseNumber: houseNumber.trim(),
-    streetArea: streetArea.trim(),
-    landmark: String(landmark || '').trim(),
-    city: city.trim(),
-    state: state.trim(),
+    mobileNumber: phoneDigits,
+    houseNumber: rawHouseNumber.trim(),
+    houseBuilding: rawHouseNumber.trim(),
+    streetArea: rawStreetArea.trim(),
+    landmark: String(rawLandmark || '').trim(),
+    city: rawCity.trim(),
+    state: rawState.trim(),
     pincode: cleanPin,
   }
 
@@ -2230,8 +2245,10 @@ export const confirmPartnerWelcomeKitAddress = asyncHandler(async (req, res) => 
   user.welcomeKit.addressConfirmedBy = req.user._id
   user.welcomeKit.confirmedAddressSnapshot = {
     recipientName: addr.recipientName,
-    recipientPhone: addr.recipientPhone,
-    houseNumber: addr.houseNumber,
+    recipientPhone: addr.recipientPhone || addr.mobileNumber || '',
+    mobileNumber: addr.mobileNumber || addr.recipientPhone || '',
+    houseNumber: addr.houseNumber || addr.houseBuilding || '',
+    houseBuilding: addr.houseBuilding || addr.houseNumber || '',
     streetArea: addr.streetArea,
     landmark: addr.landmark || '',
     city: addr.city,

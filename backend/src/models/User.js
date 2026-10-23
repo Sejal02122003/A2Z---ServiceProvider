@@ -145,7 +145,9 @@ const welcomeKitAddressSchema = new mongoose.Schema(
   {
     recipientName: { type: String, trim: true, default: '' },
     recipientPhone: { type: String, trim: true, default: '' },
+    mobileNumber: { type: String, trim: true, default: '' },
     houseNumber: { type: String, trim: true, default: '' },
+    houseBuilding: { type: String, trim: true, default: '' },
     streetArea: { type: String, trim: true, default: '' },
     landmark: { type: String, trim: true, default: '' },
     city: { type: String, trim: true, default: '' },

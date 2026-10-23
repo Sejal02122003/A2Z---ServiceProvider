@@ -335,11 +335,13 @@ export function PartnerOnboardingStepper({ onFinish }) {
           setBillReceiptUrl(res.user.welcomeKit.paymentReceiptUrl)
         }
 
-        const wkAddr = res.welcomeKit?.address || res.user?.welcomeKit?.address
-        if (wkAddr && wkAddr.recipientName) {
-          setAddressRecipientName(wkAddr.recipientName)
-          if (wkAddr.mobileNumber) setAddressMobileNumber(wkAddr.mobileNumber)
-          if (wkAddr.houseBuilding) setAddressHouseBuilding(wkAddr.houseBuilding)
+        const wkAddr = res.welcomeKit?.address || res.user?.welcomeKit?.address || res.step4?.welcomeKitPayment?.address || res.step5?.welcomeKit?.address
+        if (wkAddr && (wkAddr.recipientName || wkAddr.recipientPhone || wkAddr.mobileNumber)) {
+          if (wkAddr.recipientName) setAddressRecipientName(wkAddr.recipientName)
+          const mob = wkAddr.mobileNumber || wkAddr.recipientPhone || ''
+          if (mob) setAddressMobileNumber(mob)
+          const hb = wkAddr.houseBuilding || wkAddr.houseNumber || ''
+          if (hb) setAddressHouseBuilding(hb)
           if (wkAddr.streetArea) setAddressStreetArea(wkAddr.streetArea)
           if (wkAddr.landmark) setAddressLandmark(wkAddr.landmark)
           if (wkAddr.city) setAddressCity(wkAddr.city)
@@ -722,7 +724,12 @@ export function PartnerOnboardingStepper({ onFinish }) {
       setAddressValidationError('Recipient Full Name is required.')
       return
     }
-    const cleanMobile = addressMobileNumber.replace(/\D/g, '')
+    let cleanMobile = addressMobileNumber.replace(/\D/g, '')
+    if (cleanMobile.length === 12 && cleanMobile.startsWith('91')) {
+      cleanMobile = cleanMobile.slice(2)
+    } else if (cleanMobile.length === 11 && cleanMobile.startsWith('0')) {
+      cleanMobile = cleanMobile.slice(1)
+    }
     if (cleanMobile.length !== 10) {
       setAddressValidationError('Please enter a valid 10-digit mobile number.')
       return
@@ -753,7 +760,9 @@ export function PartnerOnboardingStepper({ onFinish }) {
       setAddressSubmitting(true)
       await submitWelcomeKitAddress({
         recipientName: addressRecipientName.trim(),
+        recipientPhone: cleanMobile,
         mobileNumber: cleanMobile,
+        houseNumber: addressHouseBuilding.trim(),
         houseBuilding: addressHouseBuilding.trim(),
         streetArea: addressStreetArea.trim(),
         landmark: addressLandmark.trim(),
@@ -2748,11 +2757,11 @@ export function PartnerOnboardingStepper({ onFinish }) {
 
                     {/* Welcome Kit 8-Field Delivery Address & Dispatch Section */}
                     {(() => {
-                      const wk = data?.welcomeKit || data?.user?.welcomeKit || {}
+                      const wk = data?.welcomeKit || data?.user?.welcomeKit || data?.step4?.welcomeKitPayment || data?.step5?.welcomeKit || {}
                       const kitStatus = wk.status || 'PENDING_PAYMENT'
                       const wkAddress = wk.address || {}
-                      const addressStatus = wkAddress.status || 'NOT_SUBMITTED'
-                      const isAddressSubmitted = Boolean(wkAddress.recipientName && addressStatus !== 'NOT_SUBMITTED')
+                      const addressStatus = wk.addressStatus || wkAddress.addressStatus || wkAddress.status || 'NOT_SUBMITTED'
+                      const isAddressSubmitted = Boolean((wkAddress.recipientName || wkAddress.mobileNumber || wkAddress.recipientPhone) && addressStatus !== 'NOT_SUBMITTED')
                       const isDispatched = kitStatus === 'DISPATCHED' || Boolean(wk.dispatch?.courierName)
                       const isDelivered = kitStatus === 'DELIVERED' || Boolean(wk.deliveryConfirmation?.isConfirmed)
 
@@ -2768,7 +2777,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                               <div className="rounded-xl bg-white border border-rose-200 p-3 text-xs text-rose-900 space-y-1">
                                 <span className="font-bold text-[11px] text-rose-700">Admin Note:</span>
                                 <p className="font-semibold text-slate-800">
-                                  "{wkAddress.correctionReason || 'Please review and correct your shipping details.'}"
+                                  "{wk.addressCorrectionReason || wkAddress.correctionReason || 'Please review and correct your shipping details.'}"
                                 </p>
                               </div>
                               <p className="text-[11px] text-slate-600">
@@ -3003,12 +3012,12 @@ export function PartnerOnboardingStepper({ onFinish }) {
                                 </div>
                                 <div>
                                   <span className="text-[10px] uppercase font-bold text-slate-400 block">Contact Phone</span>
-                                  <span className="font-semibold text-slate-900 font-mono">+91 {wkAddress.mobileNumber}</span>
+                                  <span className="font-semibold text-slate-900 font-mono">+91 {wkAddress.mobileNumber || wkAddress.recipientPhone}</span>
                                 </div>
                                 <div className="sm:col-span-2">
                                   <span className="text-[10px] uppercase font-bold text-slate-400 block">Shipping Location</span>
                                   <span className="font-medium text-slate-800">
-                                    {wkAddress.houseBuilding}, {wkAddress.streetArea}
+                                    {wkAddress.houseBuilding || wkAddress.houseNumber}, {wkAddress.streetArea}
                                     {wkAddress.landmark ? `, Landmark: ${wkAddress.landmark}` : ''}
                                   </span>
                                   <div className="font-bold text-slate-900 mt-0.5">

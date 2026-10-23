@@ -161,9 +161,9 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
   const isPaymentApproved = ['PAID', 'READY_FOR_DISPATCH', 'DISPATCHED', 'DELIVERED'].includes(paymentStatus)
   const receiptUrl = currentKit?.paymentReceiptUrl
 
-  const address = currentKit?.address
-  const addressStatus = address?.status || 'NOT_SUBMITTED'
-  const isAddressSubmitted = Boolean(address?.recipientName && addressStatus !== 'NOT_SUBMITTED')
+  const address = currentKit?.address || {}
+  const addressStatus = currentKit?.addressStatus || address?.status || 'NOT_SUBMITTED'
+  const isAddressSubmitted = Boolean((address?.recipientName || address?.mobileNumber || address?.recipientPhone) && addressStatus !== 'NOT_SUBMITTED')
   const isAddressConfirmed = addressStatus === 'CONFIRMED' || paymentStatus === 'READY_FOR_DISPATCH'
 
   const isDispatched = paymentStatus === 'DISPATCHED' || Boolean(currentKit?.dispatch?.courierName)
@@ -1026,14 +1026,14 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
                         </div>
                         <span className="font-semibold text-slate-500 flex items-center gap-1">
                           <Phone className="h-3 w-3" />
-                          +91 {address.mobileNumber}
+                          +91 {address.mobileNumber || address.recipientPhone}
                         </span>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                         <div>
                           <span className="text-[10px] uppercase font-bold text-slate-400 block">House / Flat / Building</span>
-                          <span className="font-semibold text-slate-800">{address.houseBuilding || '—'}</span>
+                          <span className="font-semibold text-slate-800">{address.houseBuilding || address.houseNumber || '—'}</span>
                         </div>
 
                         <div>
@@ -1065,13 +1065,13 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
                       </div>
 
                       {/* Display active correction note if any */}
-                      {addressStatus === 'CORRECTION_REQUESTED' && address.correctionReason && (
+                      {addressStatus === 'CORRECTION_REQUESTED' && (currentKit?.addressCorrectionReason || address.correctionReason) && (
                         <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900 space-y-1">
                           <div className="flex items-center gap-1.5 font-bold text-amber-800">
                             <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
                             <span>Current Correction Request Note:</span>
                           </div>
-                          <p className="pl-5 italic font-medium">"{address.correctionReason}"</p>
+                          <p className="pl-5 italic font-medium">"{currentKit?.addressCorrectionReason || address.correctionReason}"</p>
                         </div>
                       )}
                     </div>
