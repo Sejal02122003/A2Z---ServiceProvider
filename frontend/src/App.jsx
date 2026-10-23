@@ -12,6 +12,7 @@ import { bootRoutes } from './routes/bootRoutes.jsx'
 import { AdminCategoriesPage } from './pages/admin/AdminCategoriesPage.jsx'
 import { AdminSubCategoriesPage } from './pages/admin/AdminSubCategoriesPage.jsx'
 import { AdminServicesPage } from './pages/admin/AdminServicesPage.jsx'
+import { AdminSubServicesPage } from './pages/admin/AdminSubServicesPage.jsx'
 import { AdminPackagesPage } from './pages/admin/AdminPackagesPage.jsx'
 import { AdminLoginPage } from './pages/admin/AdminLoginPage.jsx'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage.jsx'
@@ -128,6 +129,7 @@ function App() {
             <Route path="categories" element={<AdminCategoriesPage />} />
             <Route path="sub-categories" element={<AdminSubCategoriesPage />} />
             <Route path="services" element={<AdminServicesPage />} />
+            <Route path="sub-services" element={<AdminSubServicesPage />} />
             <Route path="packages" element={<AdminPackagesPage />} />
             <Route path="users" element={<AdminUsersPage />} />
             <Route path="identity-verifications" element={<AdminIdentityVerificationsPage />} />
