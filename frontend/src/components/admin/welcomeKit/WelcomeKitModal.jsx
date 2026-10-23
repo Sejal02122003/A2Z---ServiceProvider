@@ -1791,8 +1791,8 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
                         className="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand/30 cursor-pointer"
                       />
                       <div>
-                        <span className="text-sm font-bold text-slate-900">Tool / Service Bag</span>
-                        <p className="text-xs text-slate-500">Official branded equipment bag</p>
+                        <span className="text-sm font-bold text-slate-900">Tool / Product / Service Bag</span>
+                        <p className="text-xs text-slate-500">Official branded equipment, product & service bag</p>
                       </div>
                     </div>
                     <span className={`text-xs font-semibold ${bagIssued ? 'text-brand' : 'text-slate-400'}`}>

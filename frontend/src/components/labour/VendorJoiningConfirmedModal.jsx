@@ -178,8 +178,8 @@ export function VendorJoiningConfirmedModal({
                       <Briefcase className="h-3.5 w-3.5" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-slate-800 leading-none">Tool & Equipment Bag</p>
-                      <p className="text-[9px] text-slate-400 mt-0.5">Professional gear kit bag</p>
+                      <p className="text-xs font-bold text-slate-800 leading-none">Tool / Product / Service Bag</p>
+                      <p className="text-[9px] text-slate-400 mt-0.5">Professional equipment & service kit bag</p>
                     </div>
                   </div>
                   {isBagIssued ? (

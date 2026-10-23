@@ -2734,14 +2734,14 @@ export function PartnerOnboardingStepper({ onFinish }) {
                           </div>
                         </div>
 
-                        {/* Tool Bag */}
+                        {/* Tool / Product / Service Bag */}
                         <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 p-2.5">
                           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
                             <Briefcase className="h-4 w-4" />
                           </div>
                           <div className="min-w-0">
-                            <p className="text-xs font-bold text-slate-900 leading-tight">Gear Kit Bag</p>
-                            <p className="text-[9px] text-slate-400">Heavy-duty Tool Bag</p>
+                            <p className="text-xs font-bold text-slate-900 leading-tight">Tool / Product / Service Bag</p>
+                            <p className="text-[9px] text-slate-400">Official branded equipment, product & service kit bag</p>
                           </div>
                         </div>
 
