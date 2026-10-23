@@ -13,13 +13,13 @@ export function AppIndividualSearchPage() {
   useEffect(() => {
     let cancelled = false
     const loc = readAppUserLocation()
-    fetchLabourCategoriesGrouped(loc?.lat, loc?.lng)
+    fetchLabourCategoriesGrouped(loc?.lat, loc?.lng, loc?.city, loc?.address)
       .then((res) => {
         if (cancelled) return
         const groups = res.data?.groups ?? []
         const meta = res.data?.meta ?? {}
         const tradeKind = meta.tradeKind ?? 'trade'
-        setTradeGroups(groups.filter((g) => g.kind === tradeKind && (g.categories?.length ?? 0) > 0))
+        setTradeGroups(groups.filter((g) => g.kind === tradeKind))
       })
       .catch(() => {
         if (!cancelled) setTradeGroups([])

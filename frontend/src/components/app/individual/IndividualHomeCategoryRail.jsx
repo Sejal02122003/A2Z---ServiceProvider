@@ -45,7 +45,7 @@ export function IndividualHomeCategoryRail({ groups, loading, selectedGroupId, o
       ) : null}
 
       <div
-        className={`-mx-1 flex snap-x snap-mandatory gap-8 overflow-x-auto pb-2 scrollbar-none [&::-webkit-scrollbar]:hidden ${
+        className={`-mx-1 flex snap-x snap-mandatory gap-5 sm:gap-6 overflow-x-auto pb-2 scrollbar-none [&::-webkit-scrollbar]:hidden ${
           onBrand ? 'px-1 pt-3' : 'px-1 pt-4'
         }`}
       >

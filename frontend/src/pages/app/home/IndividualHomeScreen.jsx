@@ -187,7 +187,7 @@ export function IndividualHomeScreen({ user }) {
           const groups = res.data?.groups ?? []
           const meta = res.data?.meta ?? {}
           const tradeKind = meta.tradeKind ?? 'trade'
-          setTradeGroups(groups.filter((g) => g.kind === tradeKind && (g.categories?.length ?? 0) > 0))
+          setTradeGroups(groups.filter((g) => g.kind === tradeKind))
         })
         .catch(() => {
           if (!cancelled) setTradeGroups([])
