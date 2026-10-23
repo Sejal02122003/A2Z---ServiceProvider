@@ -55,9 +55,9 @@ export const listGrouped = asyncHandler(async (req, res) => {
     const effectivePrice = Number(s.hourlyPrice || s.basePrice || s.pricePerUnit || 0)
     if (userZoneId && s.zones && s.zones.length > 0) {
       const zonePricing = s.zones.find(z => String(z.zone) === userZoneId)
-      if (zonePricing && typeof zonePricing.price === 'number') {
-        s.hourlyPrice = zonePricing.price
-        s.basePrice = zonePricing.price
+      if (zonePricing && typeof zonePricing.price === 'number' && Number(zonePricing.price) > 0) {
+        s.hourlyPrice = Number(zonePricing.price)
+        s.basePrice = Number(zonePricing.price)
       } else {
         if (!s.hourlyPrice && effectivePrice) s.hourlyPrice = effectivePrice
         if (!s.basePrice && effectivePrice) s.basePrice = effectivePrice
@@ -66,6 +66,9 @@ export const listGrouped = asyncHandler(async (req, res) => {
       if (!s.hourlyPrice && effectivePrice) s.hourlyPrice = effectivePrice
       if (!s.basePrice && effectivePrice) s.basePrice = effectivePrice
     }
+
+    if ((!s.hourlyPrice || s.hourlyPrice <= 0) && effectivePrice > 0) s.hourlyPrice = effectivePrice
+    if ((!s.basePrice || s.basePrice <= 0) && effectivePrice > 0) s.basePrice = effectivePrice
 
     const k = String(s.subcategoryId)
     if (!servicesBySubcat.has(k)) servicesBySubcat.set(k, [])

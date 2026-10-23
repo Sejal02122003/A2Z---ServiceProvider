@@ -186,17 +186,21 @@ export const calculateBill = asyncHandler(async (req, res) => {
     let name = ''
     let categoryId = null
     if (service) {
+      const serviceFallbackPrice = Number(service.hourlyPrice || service.basePrice || service.pricePerUnit || 0)
       if (ssId && Array.isArray(service.subServices)) {
         const foundSub = service.subServices.find(ss => String(ss._id) === String(ssId))
-        if (foundSub) {
-          originalHourlyRate = foundSub.price
+        if (foundSub && Number(foundSub.price) > 0) {
+          originalHourlyRate = Number(foundSub.price)
+          name = `${service.name} (${foundSub.name})`
+        } else if (foundSub) {
+          originalHourlyRate = serviceFallbackPrice
           name = `${service.name} (${foundSub.name})`
         } else {
-          originalHourlyRate = service.hourlyPrice || service.basePrice || 0
+          originalHourlyRate = serviceFallbackPrice
           name = service.name
         }
       } else {
-        originalHourlyRate = service.hourlyPrice || service.basePrice || 0
+        originalHourlyRate = serviceFallbackPrice
         name = service.name
       }
       discountType = service.discountType || 'PERCENTAGE'
@@ -206,9 +210,12 @@ export const calculateBill = asyncHandler(async (req, res) => {
       if (sub) categoryId = sub.categoryId
       if (matchedZone && service.zones && service.zones.length > 0 && !ssId) {
         const zonePricing = service.zones.find(z => String(z.zone) === String(matchedZone._id))
-        if (zonePricing && typeof zonePricing.price === 'number') {
-          originalHourlyRate = zonePricing.price
+        if (zonePricing && typeof zonePricing.price === 'number' && Number(zonePricing.price) > 0) {
+          originalHourlyRate = Number(zonePricing.price)
         }
+      }
+      if (!originalHourlyRate || originalHourlyRate <= 0) {
+        originalHourlyRate = serviceFallbackPrice
       }
       if (discountValue > 0) {
         if (discountType === 'PERCENTAGE') {
@@ -217,6 +224,9 @@ export const calculateBill = asyncHandler(async (req, res) => {
           hourlyRate = Math.max(0, originalHourlyRate - discountValue)
         }
       } else {
+        hourlyRate = originalHourlyRate
+      }
+      if (!hourlyRate || hourlyRate <= 0) {
         hourlyRate = originalHourlyRate
       }
     } else {
@@ -540,17 +550,23 @@ export const createBooking = asyncHandler(async (req, res) => {
       let hrRate = 0
       const srv = await LabourService.findById(sId)
       if (srv) {
-        let baseRate = srv.hourlyPrice || srv.basePrice || 0
+        const srvFallback = Number(srv.hourlyPrice || srv.basePrice || srv.pricePerUnit || 0)
+        let baseRate = srvFallback
         if (ssId && Array.isArray(srv.subServices)) {
           const foundSub = srv.subServices.find(ss => String(ss._id) === String(ssId))
-          if (foundSub) {
-            baseRate = foundSub.price
+          if (foundSub && Number(foundSub.price) > 0) {
+            baseRate = Number(foundSub.price)
+          } else {
+            baseRate = srvFallback
           }
         } else if (matchingZone && srv.zones && srv.zones.length > 0) {
           const zonePricing = srv.zones.find(z => String(z.zone) === String(matchingZone._id))
-          if (zonePricing && typeof zonePricing.price === 'number') {
-            baseRate = zonePricing.price
+          if (zonePricing && typeof zonePricing.price === 'number' && Number(zonePricing.price) > 0) {
+            baseRate = Number(zonePricing.price)
           }
+        }
+        if (!baseRate || baseRate <= 0) {
+          baseRate = srvFallback
         }
         if (srv.discountValue > 0) {
           if (srv.discountType === 'PERCENTAGE') {
@@ -559,6 +575,9 @@ export const createBooking = asyncHandler(async (req, res) => {
             hrRate = Math.max(0, baseRate - srv.discountValue)
           }
         } else {
+          hrRate = baseRate
+        }
+        if (!hrRate || hrRate <= 0) {
           hrRate = baseRate
         }
       }
@@ -823,6 +842,25 @@ export const getMyBookings = asyncHandler(async (req, res) => {
           delete a.startOtp;
           delete a.completionOtp;
         })
+      }
+    }
+
+    // Recover display amount if booking was stored with 0 totalAmount
+    if ((!b.totalAmount || Number(b.totalAmount) <= 0) && b.serviceId) {
+      const srv = b.serviceId
+      const base = Number(srv.hourlyPrice || srv.basePrice || srv.pricePerUnit || 0)
+      if (base > 0) {
+        const discVal = Number(srv.discountValue || 0)
+        let discounted = base
+        if (discVal > 0) {
+          if (srv.discountType === 'PERCENTAGE') {
+            discounted = Math.max(0, Math.round(base * (1 - discVal / 100)))
+          } else {
+            discounted = Math.max(0, base - discVal)
+          }
+        }
+        b.basePrice = discounted * (b.hours || 1) * (b.quantity || 1)
+        b.totalAmount = b.basePrice + Number(b.platformFee || 0) + Number(b.taxes || 0)
       }
     }
   })

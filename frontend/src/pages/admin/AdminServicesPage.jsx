@@ -121,17 +121,27 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
         discountType,
         discountValue: Number(discountValue),
         isAllZones: zones.length === activeZones.length,
-        zones,
+        zones: zones
+          .filter(z => (typeof z.zone === 'object' ? z.zone?._id : z.zone))
+          .map(z => ({
+            zone: typeof z.zone === 'object' ? z.zone._id : z.zone,
+            price: Number(z.price) > 0 ? Number(z.price) : Number(resolvedBasePrice || resolvedHourlyPrice || 0)
+          })),
         subServices: subServices
           .filter((ss) => ss.name && ss.name.trim())
-          .map((ss) => ({
-            name: ss.name.trim(),
-            description: String(ss.description || '').trim(),
-            price: Number(ss.price || 0),
-            originalPrice: Number(ss.originalPrice || ss.price || 0),
-            estimatedDurationMins: Number(ss.estimatedDurationMins || 30),
-            isActive: ss.isActive !== false,
-          })),
+          .map((ss) => {
+            const fallbackP = Number(resolvedBasePrice || resolvedHourlyPrice || 0)
+            const p = Number(ss.price) > 0 ? Number(ss.price) : fallbackP
+            const op = Number(ss.originalPrice) > 0 ? Number(ss.originalPrice) : p
+            return {
+              name: ss.name.trim(),
+              description: String(ss.description || '').trim(),
+              price: p,
+              originalPrice: op,
+              estimatedDurationMins: Number(ss.estimatedDurationMins || 30),
+              isActive: ss.isActive !== false,
+            }
+          }),
         iconUrl: iconUrl.trim() || undefined,
         isActive
       }
@@ -480,7 +490,7 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
                 </div>
                 <button
                   type="button"
-                  onClick={() => setSubServices([...subServices, { name: '', price: 0, estimatedDurationMins: 30, description: '', isActive: true }])}
+                  onClick={() => setSubServices([...subServices, { name: '', price: Number(hourlyPrice || basePrice || pricePerUnit || 0), estimatedDurationMins: 30, description: '', isActive: true }])}
                   className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition"
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -722,18 +732,28 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
         discountType,
         discountValue: Number(discountValue),
         isAllZones: zones.length === activeZones.length,
-        zones,
+        zones: zones
+          .filter(z => (typeof z.zone === 'object' ? z.zone?._id : z.zone))
+          .map(z => ({
+            zone: typeof z.zone === 'object' ? z.zone._id : z.zone,
+            price: Number(z.price) > 0 ? Number(z.price) : Number(resolvedBasePrice || resolvedHourlyPrice || 0)
+          })),
         subServices: subServices
           .filter((ss) => ss.name && ss.name.trim())
-          .map((ss) => ({
-            ...(ss._id ? { _id: ss._id } : {}),
-            name: ss.name.trim(),
-            description: String(ss.description || '').trim(),
-            price: Number(ss.price || 0),
-            originalPrice: Number(ss.originalPrice || ss.price || 0),
-            estimatedDurationMins: Number(ss.estimatedDurationMins || 30),
-            isActive: ss.isActive !== false,
-          })),
+          .map((ss) => {
+            const fallbackP = Number(resolvedBasePrice || resolvedHourlyPrice || 0)
+            const p = Number(ss.price) > 0 ? Number(ss.price) : fallbackP
+            const op = Number(ss.originalPrice) > 0 ? Number(ss.originalPrice) : p
+            return {
+              ...(ss._id ? { _id: ss._id } : {}),
+              name: ss.name.trim(),
+              description: String(ss.description || '').trim(),
+              price: p,
+              originalPrice: op,
+              estimatedDurationMins: Number(ss.estimatedDurationMins || 30),
+              isActive: ss.isActive !== false,
+            }
+          }),
         iconUrl: iconUrl.trim() || undefined,
         isActive
       }
@@ -1082,7 +1102,7 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
                 </div>
                 <button
                   type="button"
-                  onClick={() => setSubServices([...subServices, { name: '', price: 0, estimatedDurationMins: 30, description: '', isActive: true }])}
+                  onClick={() => setSubServices([...subServices, { name: '', price: Number(hourlyPrice || basePrice || pricePerUnit || 0), estimatedDurationMins: 30, description: '', isActive: true }])}
                   className="inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition"
                 >
                   <Plus className="h-3.5 w-3.5" />

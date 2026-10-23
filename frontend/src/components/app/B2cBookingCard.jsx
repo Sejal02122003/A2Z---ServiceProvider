@@ -132,7 +132,13 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
               <span className="text-lg font-black text-brand">
                 ₹{isLabour
                   ? Math.round(getLabourBookingShare(booking, authUser?._id)).toLocaleString('en-IN')
-                  : (Number(booking.totalAmount) || 0).toLocaleString('en-IN')}
+                  : (
+                      Number(booking.totalAmount) ||
+                      Number(booking.basePrice) ||
+                      Number(booking.serviceId?.basePrice) ||
+                      Number(booking.serviceId?.hourlyPrice) ||
+                      0
+                    ).toLocaleString('en-IN')}
               </span>
             </div>
           </div>
