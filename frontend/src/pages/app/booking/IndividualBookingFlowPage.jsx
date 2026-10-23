@@ -512,40 +512,48 @@ export function IndividualBookingFlowPage() {
   }, [step, syncDraft])
 
   useEffect(() => {
-    if (step === 'summary' && !calculatedBill) {
-      if (!draft.categoryId && !draft.serviceId) {
-        goStep('type')
-        return
-      }
-      let cancelled = false
-      setIsCalculating(true)
-      const days = durationKindToDays(draft.durationKind, draft.durationDays)
-      const kind = draft.durationKind || 'few_hours'
-      const hours = draft.bookingType === 'instant' ? (draft.hours || draft.minHours || 1) : (days > 0 ? days * 8 : (kind === 'few_hours' ? (draft.hours || draft.minHours || 1) : (kind === 'half_day' ? 4 : 8)))
-      bookingsApi.calculateBill({
-        serviceId: draft.serviceId || draft.categoryId,
-        subServiceId: draft.subServiceId || undefined,
-        packageId: draft.packageId || packageIdParam || undefined,
-        hours,
-        quantity: draft.quantity || 1,
-        address: draft.address,
-        ...(realUser?.role === 'contractor' ? { contractorServices: draft.contractorServices } : {})
-      }).then(res => {
-        if (!cancelled) {
-          setCalculatedBill(res.data)
-          syncDraft({ billAmount: res.data.totalAmount })
-        }
-      }).catch(err => {
-        if (!cancelled) {
-          setFormError(err.message || 'Failed to calculate bill.')
-          goStep('details')
-        }
-      }).finally(() => {
-        if (!cancelled) setIsCalculating(false)
-      })
-      return () => { cancelled = true }
+    if (step !== 'summary') {
+      if (calculatedBill) setCalculatedBill(null)
+      return
     }
-  }, [step, calculatedBill, draft.categoryId, draft.serviceId, draft.durationKind, draft.durationDays, goStep])
+
+    if (calculatedBill && (calculatedBill.totalAmount > 0 || calculatedBill.subTotal > 0)) {
+      return
+    }
+
+    if (!draft.categoryId && !draft.serviceId) {
+      goStep('type')
+      return
+    }
+
+    let cancelled = false
+    setIsCalculating(true)
+    const days = durationKindToDays(draft.durationKind, draft.durationDays)
+    const kind = draft.durationKind || 'few_hours'
+    const hours = draft.bookingType === 'instant' ? (draft.hours || draft.minHours || 1) : (days > 0 ? days * 8 : (kind === 'few_hours' ? (draft.hours || draft.minHours || 1) : (kind === 'half_day' ? 4 : 8)))
+    bookingsApi.calculateBill({
+      serviceId: draft.serviceId || draft.categoryId,
+      subServiceId: draft.subServiceId || undefined,
+      packageId: draft.packageId || packageIdParam || undefined,
+      hours,
+      quantity: draft.quantity || 1,
+      address: draft.address,
+      ...(realUser?.role === 'contractor' ? { contractorServices: draft.contractorServices } : {})
+    }).then(res => {
+      if (!cancelled && res.data) {
+        setCalculatedBill(res.data)
+        syncDraft({ billAmount: res.data.totalAmount })
+      }
+    }).catch(err => {
+      if (!cancelled) {
+        setFormError(err.message || 'Failed to calculate bill.')
+        goStep('details')
+      }
+    }).finally(() => {
+      if (!cancelled) setIsCalculating(false)
+    })
+    return () => { cancelled = true }
+  }, [step, calculatedBill, draft.categoryId, draft.serviceId, draft.subServiceId, draft.packageId, draft.bookingType, draft.durationKind, draft.durationDays, draft.hours, draft.quantity, draft.address, goStep, syncDraft])
 
   useEffect(() => {
     if (mapInstance.current && markerInstance.current && draft.lat && draft.lng) {
@@ -2072,11 +2080,13 @@ export function IndividualBookingFlowPage() {
                                      (parseFloat(draft.hours) || parseFloat(draft.minHours) || 1);
                             const q = draft.quantity || 1;
                             const hLabel = h === 0.5 ? '30 min' : `${h} hrs`
-                            return `Hourly rate (${formatInr((calculatedBill.subTotal || calculatedBill.basePrice) / (h * q))}/hr) × ${hLabel}${q > 1 ? ` × ${q} workers` : ''}`;
+                            const effectiveSubTotal = Number(calculatedBill.subTotal || calculatedBill.basePrice || draft.servicePrice || 0);
+                            const unitHourlyRate = (h * q) > 0 ? (effectiveSubTotal / (h * q)) : effectiveSubTotal;
+                            return `Hourly rate (${formatInr(unitHourlyRate)}/hr) × ${hLabel}${q > 1 ? ` × ${q} workers` : ''}`;
                           })()}
                         </span>
                       </span>
-                      <span>{formatInr(calculatedBill.subTotal || calculatedBill.basePrice)}</span>
+                      <span>{formatInr(calculatedBill.subTotal || calculatedBill.basePrice || Number(draft.servicePrice || 0))}</span>
                     </div>
                   )}
                   {calculatedBill.serviceDiscount > 0 ? (
@@ -2140,8 +2150,8 @@ export function IndividualBookingFlowPage() {
                     <span>
                       {formatInr(
                         useWallet && calculatedBill.walletInfo?.actualWalletDiscount > 0
-                          ? Math.max(0, calculatedBill.totalAmount - calculatedBill.walletInfo.actualWalletDiscount)
-                          : calculatedBill.totalAmount
+                          ? Math.max(0, (calculatedBill.totalAmount || calculatedBill.subTotal || calculatedBill.basePrice || Number(draft.servicePrice || 0)) - calculatedBill.walletInfo.actualWalletDiscount)
+                          : (calculatedBill.totalAmount || calculatedBill.subTotal || calculatedBill.basePrice || Number(draft.servicePrice || 0))
                       )}
                     </span>
                   </div>
@@ -2186,7 +2196,7 @@ export function IndividualBookingFlowPage() {
               </div>
 
               <div className="flex gap-2">
-                <button type="button" className="lc-booking-btn-secondary flex-1" onClick={() => goStep('details')}>
+                <button type="button" className="lc-booking-btn-secondary flex-1" onClick={() => { setCalculatedBill(null); goStep('details'); }}>
                   Edit details
                 </button>
                 <BookingPrimaryButton type="button" className="flex-1" onClick={confirmBooking} disabled={isCreating}>

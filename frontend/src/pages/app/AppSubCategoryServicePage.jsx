@@ -76,6 +76,7 @@ export function AppSubCategoryServicePage() {
         categoryName: cat.name || '',
         serviceId: String(bookingService._id),
         serviceName: sName,
+        servicePrice: subSvc ? Number(subSvc.price) : Number(bookingService.hourlyPrice || bookingService.basePrice || 0),
         subServiceId: subSvc ? String(subSvc._id) : undefined,
         subServiceName: subSvc ? subSvc.name : undefined,
         subServicePrice: subSvc ? subSvc.price : undefined,
