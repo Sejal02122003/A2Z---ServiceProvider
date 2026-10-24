@@ -10,6 +10,7 @@ import { readAppUserLocation } from '../../lib/appUserLocationStorage.js'
 import { getServiceOfferDetails } from '../../lib/serviceOfferUtils.js'
 import { ServiceOfferBadge } from '../../components/app/services/ServiceOfferBadge.jsx'
 import { useBookingCart } from '../../context/BookingCartContext.jsx'
+import { FloatingCartBar } from '../../components/app/booking/FloatingCartBar.jsx'
 
 export function AppSubCategoryServicePage() {
   const { id } = useParams()
@@ -177,7 +178,7 @@ export function AppSubCategoryServicePage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-3 sm:px-4 py-4 space-y-5 w-full min-w-0 box-border">
+      <div className={`flex-1 px-3 sm:px-4 py-4 space-y-5 w-full min-w-0 box-border ${cartCount > 0 ? 'pb-28' : 'pb-8'}`}>
         <section>
           {cat.subtitle ? (
             <p className="text-sm text-slate-600 leading-relaxed bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
@@ -563,36 +564,8 @@ export function AppSubCategoryServicePage() {
         onSelect={handleQuickBookType}
       />
 
-      {/* Floating Bottom Cart Bar */}
-      {cartCount > 0 && (
-        <div className="fixed bottom-4 inset-x-4 z-40 max-w-md mx-auto">
-          <div className="flex items-center justify-between rounded-2xl bg-slate-900/95 text-white p-3.5 shadow-2xl backdrop-blur-md border border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-white shadow-sm">
-                <ShoppingBag className="h-5 w-5" />
-                <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white ring-2 ring-slate-900">
-                  {cartCount}
-                </span>
-              </div>
-              <div>
-                <p className="text-xs font-bold leading-tight">
-                  {cartCount} {cartCount === 1 ? 'Service in Cart' : 'Services in Cart'}
-                </p>
-                <p className="text-[11px] font-semibold text-slate-400">
-                  Subtotal: <span className="font-mono text-emerald-400 font-bold">₹{cartSubtotal.toLocaleString('en-IN')}</span>
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => navigate('/app/cart')}
-              className="rounded-xl bg-brand px-4 py-2 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-brand/30 hover:bg-brand/90 active:scale-95 transition"
-            >
-              View Cart &rarr;
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Floating Bottom Cart Bar (Styled like Urban Company / Modern Service Cart) */}
+      <FloatingCartBar />
     </div>
   )
 }

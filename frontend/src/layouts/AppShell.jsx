@@ -498,7 +498,10 @@ export function AppShell() {
       {!pathname.startsWith('/app/partner-onboarding') &&
       !pathname.startsWith('/app/onboarding') &&
       !pathname.startsWith('/app/booking/flow') &&
-      !pathname.startsWith('/app/active-job') ? (
+      !pathname.startsWith('/app/active-job') &&
+      !pathname.startsWith('/app/sub-category') &&
+      !pathname.startsWith('/app/cart') &&
+      !pathname.startsWith('/app/booking/cart') ? (
         <AppBottomNav items={bottomNav} />
       ) : null}
 
