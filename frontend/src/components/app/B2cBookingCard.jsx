@@ -9,11 +9,15 @@ import { CancelBookingModal } from './booking/CancelBookingModal.jsx'
 
 const STATUS_STYLES = {
   CREATED: 'bg-amber-100 text-amber-800 border-amber-200',
+  BROADCASTING: 'bg-amber-100 text-amber-800 border-amber-200',
   ACCEPTED: 'bg-blue-100 text-blue-800 border-blue-200',
+  PARTIALLY_ACCEPTED: 'bg-teal-100 text-teal-800 border-teal-200',
   EN_ROUTE: 'bg-purple-100 text-purple-800 border-purple-200',
   STARTED: 'bg-blue-100 text-blue-800 border-blue-200',
+  PARTIALLY_COMPLETED: 'bg-indigo-100 text-indigo-800 border-indigo-200',
   PAYMENT_PENDING: 'bg-amber-100 text-amber-800 border-amber-200',
   COMPLETED: 'bg-slate-100 text-slate-800 border-slate-200',
+  PARTIALLY_CANCELLED: 'bg-rose-100 text-rose-800 border-rose-200',
   CANCELLED: 'bg-rose-100 text-rose-800 border-rose-200',
 }
 
@@ -95,6 +99,11 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
               <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-sm ${STATUS_STYLES[displayStatus] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
                 {displayStatus.replace('_', ' ')}
               </span>
+              {booking.multiServiceBooking?.isMultiService && (
+                <span className="rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[9px] font-bold text-blue-700 uppercase">
+                  ✨ Multi-Service ({booking.multiServiceBooking.items?.length || 1})
+                </span>
+              )}
               {booking.packageBooking?.isPackage && (
                 <span className="rounded-full bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[9px] font-bold text-indigo-700 uppercase">
                   📦 {booking.packageBooking.snapshot?.badge || 'Package'}
@@ -108,13 +117,35 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
               )}
             </div>
             <p className="truncate text-base font-extrabold text-slate-900 leading-tight">
-              {booking.packageBooking?.isPackage
+              {booking.multiServiceBooking?.isMultiService && booking.multiServiceBooking.items?.length > 0
+                ? booking.multiServiceBooking.items.map(it => it.subServiceName ? `${it.serviceName} (${it.subServiceName})` : it.serviceName).join(', ')
+                : booking.packageBooking?.isPackage
                 ? booking.packageBooking.packageName
                 : booking.contractorInfo?.services?.length > 0
                 ? booking.contractorInfo.services.map(s => s.serviceId?.name || s.name || 'Service').join(', ')
                 : (booking.serviceId?.name || subcategory?.name || 'Service Booking')}
             </p>
-            {booking.packageBooking?.isPackage && booking.packageBooking.inclusions?.length > 0 ? (
+            {booking.multiServiceBooking?.isMultiService && booking.multiServiceBooking.items?.length > 0 ? (
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {booking.multiServiceBooking.items.map((it, idx) => (
+                  <span
+                    key={idx}
+                    className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                      it.status === 'COMPLETED'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : it.status === 'CANCELLED'
+                        ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                        : it.status === 'ACCEPTED' || it.status === 'STARTED'
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    <span>{it.subServiceName || it.serviceName}</span>
+                    <span className="text-[9px] opacity-75">({it.status})</span>
+                  </span>
+                ))}
+              </div>
+            ) : booking.packageBooking?.isPackage && booking.packageBooking.inclusions?.length > 0 ? (
               <p className="truncate text-xs text-indigo-700 font-medium mt-1">
                 Includes: {booking.packageBooking.inclusions.map(i => `${i.name}${i.quantity > 1 ? ` (x${i.quantity})` : ''}`).join(', ')}
               </p>

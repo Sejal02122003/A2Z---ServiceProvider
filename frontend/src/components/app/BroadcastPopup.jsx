@@ -141,7 +141,10 @@ export function BroadcastPopup() {
     setResponding(true)
     setError('')
     try {
-      const payload = selectedServiceId ? { serviceId: selectedServiceId } : {}
+      const chosen = services.find(s => (s.itemId || s.serviceId) === selectedServiceId)
+      const payload = chosen
+        ? { serviceId: chosen.serviceId, itemId: chosen.itemId }
+        : (selectedServiceId ? { serviceId: selectedServiceId } : {})
       await broadcastsApi.acceptBroadcast(incoming.bookingId, payload)
       if (timerRef.current) clearInterval(timerRef.current)
       const bookingId = incoming.bookingId
@@ -151,7 +154,7 @@ export function BroadcastPopup() {
       setError(err instanceof ApiError ? err.message : 'Failed to accept')
       setResponding(false)
     }
-  }, [incoming, navigate, selectedServiceId])
+  }, [incoming, navigate, selectedServiceId, services])
 
   const handleReject = useCallback(async () => {
     if (!incoming) return
@@ -171,7 +174,7 @@ export function BroadcastPopup() {
 
   const services = incoming?.services || []
   const requiresSelection = incoming?.requiresServiceSelection && services.length > 1
-  const selectedService = services.find(s => s.serviceId === selectedServiceId)
+  const selectedService = services.find(s => (s.itemId || s.serviceId) === selectedServiceId)
 
   return (
     <AnimatePresence>
@@ -254,12 +257,13 @@ export function BroadcastPopup() {
                   </p>
                   <div className="space-y-2">
                     {services.map((svc) => {
-                      const isSelected = selectedServiceId === svc.serviceId
+                      const svcKey = svc.itemId || svc.serviceId
+                      const isSelected = selectedServiceId === svcKey
                       return (
                         <button
-                          key={svc.serviceId}
+                          key={svcKey}
                           type="button"
-                          onClick={() => setSelectedServiceId(svc.serviceId)}
+                          onClick={() => setSelectedServiceId(svcKey)}
                           className={`w-full flex items-center justify-between rounded-2xl border-2 px-4 py-3 text-left transition ${
                             isSelected
                               ? 'border-brand bg-brand/5 shadow-sm'

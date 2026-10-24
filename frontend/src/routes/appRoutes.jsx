@@ -10,6 +10,7 @@ import { AppEarningsPage } from '../pages/app/AppEarningsPage.jsx'
 import { AppKycPage } from '../pages/app/AppKycPage.jsx'
 import { LabourNotificationsPage } from '../pages/app/labour/LabourNotificationsPage.jsx'
 import { IndividualBookingFlowPage } from '../pages/app/booking/IndividualBookingFlowPage.jsx'
+import { MultiServiceCartPage } from '../pages/app/booking/MultiServiceCartPage.jsx'
 
 import { AppIndividualSearchPage } from '../pages/app/AppIndividualSearchPage.jsx'
 import { ServiceCatalog } from '../pages/app/ServiceCatalog.jsx'
@@ -67,6 +68,22 @@ export const appShellChildRoutes = (
       element={
         <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR]} allowGuest>
           <IndividualBookingFlowPage />
+        </RoleRoute>
+      }
+    />
+    <Route
+      path="cart"
+      element={
+        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR]} allowGuest>
+          <MultiServiceCartPage />
+        </RoleRoute>
+      }
+    />
+    <Route
+      path="booking/cart"
+      element={
+        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR]} allowGuest>
+          <MultiServiceCartPage />
         </RoleRoute>
       }
     />

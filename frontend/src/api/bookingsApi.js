@@ -64,4 +64,11 @@ export const bookingsApi = {
       method: 'GET',
     })
   },
+
+  cancelBookingItem: (id, itemId, payload) => {
+    return apiRequest(`/bookings/${id}/items/${itemId}/cancel`, {
+      method: 'POST',
+      body: payload,
+    })
+  },
 }

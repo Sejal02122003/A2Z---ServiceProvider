@@ -15,9 +15,11 @@ router.post(
   [
     body('serviceId').optional().isMongoId().withMessage('Valid service ID required'),
     body('packageId').optional().isMongoId().withMessage('Valid package ID required'),
+    body('items').optional().isArray().withMessage('Items must be an array'),
     body().custom((val) => {
-      if (!val.serviceId && !val.packageId) {
-        throw new Error('Either serviceId or packageId must be provided')
+      const hasItems = Array.isArray(val.items) && val.items.length > 0
+      if (!val.serviceId && !val.packageId && !hasItems) {
+        throw new Error('Either serviceId, packageId, or items must be provided')
       }
       return true
     }),
@@ -31,9 +33,11 @@ router.post(
   [
     body('serviceId').optional().isMongoId().withMessage('Valid service ID required'),
     body('packageId').optional().isMongoId().withMessage('Valid package ID required'),
+    body('items').optional().isArray().withMessage('Items must be an array'),
     body().custom((val) => {
-      if (!val.serviceId && !val.packageId) {
-        throw new Error('Either serviceId or packageId must be provided')
+      const hasItems = Array.isArray(val.items) && val.items.length > 0
+      if (!val.serviceId && !val.packageId && !hasItems) {
+        throw new Error('Either serviceId, packageId, or items must be provided')
       }
       return true
     }),
@@ -69,6 +73,17 @@ router.post(
   ],
   validateRequest,
   booking.cancelCustomerBooking
+)
+
+router.post(
+  '/:id/items/:itemId/cancel',
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  [
+    body('reason').trim().notEmpty().withMessage('Cancellation reason is required'),
+    body('reasonNote').optional().trim(),
+  ],
+  validateRequest,
+  booking.cancelBookingItem
 )
 router.patch(
   '/:id/status',

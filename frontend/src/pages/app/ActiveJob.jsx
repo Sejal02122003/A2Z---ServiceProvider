@@ -77,6 +77,16 @@ const STEP_ORDER = ['ACCEPTED', 'EN_ROUTE', 'STARTED', 'COMPLETED']
 function isBookingCancelledForLabour(b, user) {
   if (!b) return false
   if (b.status === 'CANCELLED') return true
+  if (b.multiServiceBooking?.isMultiService && Array.isArray(b.multiServiceBooking.items)) {
+    if (user && user._id) {
+      const myItem = b.multiServiceBooking.items.find((it) => {
+        const lId = typeof it.assignedLabourId === 'object' ? it.assignedLabourId?._id : it.assignedLabourId
+        return String(lId) === String(user._id)
+      })
+      if (myItem && myItem.status === 'CANCELLED') return true
+    }
+    if (b.multiServiceBooking.items.every((it) => it.status === 'CANCELLED')) return true
+  }
   if (Array.isArray(b.assignments) && b.assignments.length > 0) {
     if (user && user._id) {
       const myAssignment = b.assignments.find((a) => {
@@ -583,7 +593,15 @@ export function ActiveJob() {
       <GlassPanel className="p-4 text-sm">
         {booking && (() => {
           let share = booking.laborShare || booking.basePrice || 0;
-          if (booking.assignments && booking.assignments.length > 0) {
+          if (booking.multiServiceBooking?.isMultiService) {
+            const myMultiItem = (booking.multiServiceBooking.items || []).find(it => {
+              const lId = typeof it.assignedLabourId === 'object' ? it.assignedLabourId?._id : it.assignedLabourId
+              return String(lId) === String(user?._id)
+            })
+            if (myMultiItem) {
+              share = Math.round((myMultiItem.itemTotal || 0) * 0.90)
+            }
+          } else if (booking.assignments && booking.assignments.length > 0) {
             if (booking.contractorInfo?.services?.length > 0) {
               let subTotal = 0;
               booking.contractorInfo.services.forEach(s => {
@@ -633,6 +651,23 @@ export function ActiveJob() {
               <span className="font-bold text-slate-900">₹{share.toFixed(2)}</span>
             </div>
           ) : null;
+        })()}
+        {booking.multiServiceBooking?.isMultiService && (() => {
+          const myItem = (booking.multiServiceBooking.items || []).find(it => {
+            const lId = typeof it.assignedLabourId === 'object' ? it.assignedLabourId?._id : it.assignedLabourId
+            return String(lId) === String(user?._id)
+          })
+          if (!myItem) return null
+          return (
+            <div className="mb-2 pb-2 border-b border-slate-100">
+              <span className="text-xs font-bold uppercase tracking-wider text-brand">Your Assigned Service</span>
+              <p className="text-sm font-black text-slate-900 mt-0.5">{myItem.serviceName}</p>
+              {myItem.subServiceName && (
+                <p className="text-xs text-brand font-semibold">{myItem.subServiceName}</p>
+              )}
+              <p className="text-xs text-slate-500 mt-0.5">Quantity: {myItem.quantity || 1}</p>
+            </div>
+          )
         })()}
         {booking.paymentMethod && (
           <div className="mt-2 flex justify-between">

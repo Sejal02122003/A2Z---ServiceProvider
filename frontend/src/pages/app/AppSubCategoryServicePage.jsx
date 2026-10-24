@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useLocation, useNavigate, useParams, Navigate } from 'react-router-dom'
-import { ArrowLeft, Wrench, ChevronDown, ChevronUp, Loader2, Sparkles, Tag, Flame, Clock, CheckCircle2, XCircle, Check, X } from 'lucide-react'
+import { ArrowLeft, Wrench, ChevronDown, ChevronUp, Loader2, Sparkles, Tag, Flame, Clock, CheckCircle2, XCircle, Check, X, ShoppingBag, Plus, Minus } from 'lucide-react'
 import { getCategoryImageUrl } from '../../lib/labourCategoryDisplay.js'
 import { BookingTypeSheet } from '../../components/app/booking/BookingTypeSheet.jsx'
 import { readBookingDraft, writeBookingDraft } from '../../lib/individualBookingDraft.js'
@@ -9,6 +9,7 @@ import { fetchLabourCategoriesGrouped } from '../../api/labourCategoriesApi.js'
 import { readAppUserLocation } from '../../lib/appUserLocationStorage.js'
 import { getServiceOfferDetails } from '../../lib/serviceOfferUtils.js'
 import { ServiceOfferBadge } from '../../components/app/services/ServiceOfferBadge.jsx'
+import { useBookingCart } from '../../context/BookingCartContext.jsx'
 
 export function AppSubCategoryServicePage() {
   const { id } = useParams()
@@ -22,6 +23,16 @@ export function AppSubCategoryServicePage() {
   const [cat, setCat] = useState(() => location.state?.cat || null)
   const [loading, setLoading] = useState(() => !(location.state?.cat?.services?.length > 0))
   const [fetchDone, setFetchDone] = useState(() => !!(location.state?.cat?.services?.length > 0))
+
+  const {
+    cartCount,
+    cartSubtotal,
+    addToCart,
+    removeFromCart,
+    updateQuantity,
+    isInCart,
+    getItemQuantity,
+  } = useBookingCart()
 
   useEffect(() => {
     let cancelled = false
@@ -137,16 +148,31 @@ export function AppSubCategoryServicePage() {
       {/* Header */}
       <div className="sticky top-0 z-30 px-4 pt-[max(0.75rem,env(safe-area-inset-top,0.75rem))] pb-2 bg-slate-50/90 backdrop-blur-md">
         <div className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <div className="flex items-center gap-3.5">
-            <button 
-              onClick={() => navigate(-1)}
-              className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[14px] border border-slate-200 text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-            <div className="flex flex-col justify-center min-w-0">
-              <h1 className="text-[20px] font-bold tracking-tight text-slate-900 leading-none truncate">{cat.name || 'Services'}</h1>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3.5">
+              <button 
+                onClick={() => navigate(-1)}
+                className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[14px] border border-slate-200 text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <div className="flex flex-col justify-center min-w-0">
+                <h1 className="text-[20px] font-bold tracking-tight text-slate-900 leading-none truncate">{cat.name || 'Services'}</h1>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => navigate('/app/cart')}
+              className="relative flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[14px] border border-slate-200 text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+              title="View Booking Cart"
+            >
+              <ShoppingBag className="h-5 w-5" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[10px] font-black text-white shadow-xs">
+                  {cartCount}
+                </span>
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -411,10 +437,55 @@ export function AppSubCategoryServicePage() {
                                       <span>{subItem.estimatedDurationMins || 30} mins</span>
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-2 shrink-0">
-                                    <span className="font-mono text-sm font-black text-blue-600 block text-right">
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className="font-mono text-sm font-black text-blue-600 block text-right mr-1">
                                       ₹{subItem.price}
                                     </span>
+                                    {isInCart(service._id, subItem._id) ? (
+                                      <div className="flex items-center border border-emerald-300 rounded-xl bg-emerald-50 shadow-2xs overflow-hidden">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            const curr = getItemQuantity(service._id, subItem._id)
+                                            updateQuantity(`${service._id}_${subItem._id}`, curr - 1)
+                                          }}
+                                          className="p-1 text-emerald-700 hover:bg-emerald-100 transition"
+                                        >
+                                          <Minus className="h-3 w-3" />
+                                        </button>
+                                        <span className="px-1.5 text-xs font-bold text-emerald-900 font-mono">
+                                          {getItemQuantity(service._id, subItem._id)}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            const curr = getItemQuantity(service._id, subItem._id)
+                                            updateQuantity(`${service._id}_${subItem._id}`, curr + 1)
+                                          }}
+                                          className="p-1 text-emerald-700 hover:bg-emerald-100 transition"
+                                        >
+                                          <Plus className="h-3 w-3" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          addToCart(service, subItem, {
+                                            categoryId: cat?._id,
+                                            categoryName: cat?.name,
+                                            subcategoryId: cat?._id,
+                                            subcategoryName: cat?.name,
+                                          })
+                                        }}
+                                        className="inline-flex items-center justify-center rounded-xl border border-brand/40 bg-brand/5 px-2.5 py-1.5 text-xs font-bold text-brand shadow-2xs hover:bg-brand hover:text-white transition active:scale-95"
+                                      >
+                                        + Add
+                                      </button>
+                                    )}
                                     <button
                                       type="button"
                                       onClick={(e) => {
@@ -436,7 +507,31 @@ export function AppSubCategoryServicePage() {
                           </div>
                         )}
 
-                        <div className="flex justify-end pt-2">
+                        <div className="flex items-center justify-end gap-2.5 pt-2">
+                          {isInCart(service._id) ? (
+                            <div className="flex items-center border border-emerald-300 rounded-xl bg-emerald-50 px-3 py-2 shadow-2xs">
+                              <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                                <Check className="h-3.5 w-3.5 text-emerald-600 stroke-[3]" />
+                                In Cart ({getItemQuantity(service._id)})
+                              </span>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                addToCart(service, null, {
+                                  categoryId: cat?._id,
+                                  categoryName: cat?.name,
+                                  subcategoryId: cat?._id,
+                                  subcategoryName: cat?.name,
+                                })
+                              }}
+                              className="rounded-xl border border-brand bg-brand/5 px-4 py-2 text-xs font-bold text-brand transition active:scale-95 hover:bg-brand hover:text-white shadow-2xs"
+                            >
+                              + Add to Booking
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={(e) => {
@@ -444,7 +539,7 @@ export function AppSubCategoryServicePage() {
                               setBookingService(service)
                               setBookingTypeOpen(true)
                             }}
-                            className="rounded-xl bg-brand px-6 py-2.5 text-sm font-bold text-white shadow-sm transition active:scale-95 hover:bg-brand/90"
+                            className="rounded-xl bg-brand px-6 py-2 text-xs font-black uppercase tracking-wider text-white shadow-sm transition active:scale-95 hover:bg-brand/90"
                           >
                             Book Now
                           </button>
@@ -468,6 +563,37 @@ export function AppSubCategoryServicePage() {
         categoryLabel={bookingService?.name || cat?.name}
         onSelect={handleQuickBookType}
       />
+
+      {/* Floating Bottom Cart Bar */}
+      {cartCount > 0 && (
+        <div className="fixed bottom-4 inset-x-4 z-40 max-w-md mx-auto">
+          <div className="flex items-center justify-between rounded-2xl bg-slate-900/95 text-white p-3.5 shadow-2xl backdrop-blur-md border border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-white shadow-sm">
+                <ShoppingBag className="h-5 w-5" />
+                <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white ring-2 ring-slate-900">
+                  {cartCount}
+                </span>
+              </div>
+              <div>
+                <p className="text-xs font-bold leading-tight">
+                  {cartCount} {cartCount === 1 ? 'Service in Cart' : 'Services in Cart'}
+                </p>
+                <p className="text-[11px] font-semibold text-slate-400">
+                  Subtotal: <span className="font-mono text-emerald-400 font-bold">₹{cartSubtotal.toLocaleString('en-IN')}</span>
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/app/cart')}
+              className="rounded-xl bg-brand px-4 py-2 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-brand/30 hover:bg-brand/90 active:scale-95 transition"
+            >
+              View Cart &rarr;
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

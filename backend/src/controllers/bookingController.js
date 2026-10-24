@@ -249,7 +249,17 @@ export const calculateBill = asyncHandler(async (req, res) => {
         }
       }
     }
-    return { hourlyRate, originalHourlyRate, discountType, discountValue, offerBadge, name, categoryId }
+    return {
+      hourlyRate,
+      originalHourlyRate,
+      discountType,
+      discountValue,
+      offerBadge,
+      name,
+      categoryId,
+      subcategoryId: service?.subcategoryId,
+      iconUrl: service?.iconUrl,
+    }
   }
 
   let subTotal = 0
@@ -257,45 +267,72 @@ export const calculateBill = asyncHandler(async (req, res) => {
   let serviceDiscount = 0
   let breakdown = []
 
-  const servicesToCalculate = contractorServices && contractorServices.length > 0 
-    ? contractorServices 
-    : [{ serviceId, quantity }]
+  const isMultiService = Array.isArray(req.body.items) && req.body.items.length > 0
+  const servicesToCalculate = isMultiService
+    ? req.body.items
+    : (contractorServices && contractorServices.length > 0 
+      ? contractorServices 
+      : [{ serviceId, subServiceId, quantity, hours }])
 
   let primaryCategoryId = null
+  let itemTaxesTotal = 0
+
   for (const item of servicesToCalculate) {
     if (!item.serviceId) continue
-    const { hourlyRate, originalHourlyRate, discountType, discountValue, offerBadge, name, categoryId, error } = await resolveHourlyRate(item.serviceId)
+    const itemHours = Number(item.hours) || hours || 1
+    const itemQty = Number(item.quantity) || 1
+    const { hourlyRate, originalHourlyRate, discountType, discountValue, offerBadge, name, categoryId, subcategoryId, iconUrl, error } = await resolveHourlyRate(item.serviceId, item.subServiceId)
     if (error) return sendError(res, { message: error, statusCode: HTTP_STATUS.NOT_FOUND })
     
     if (!primaryCategoryId && categoryId) primaryCategoryId = categoryId
 
-    const itemOriginalTotal = (originalHourlyRate || hourlyRate) * hours * (item.quantity || 1)
-    const itemTotal = hourlyRate * hours * (item.quantity || 1)
+    const itemOriginalTotal = (originalHourlyRate || hourlyRate) * itemHours * itemQty
+    const itemTotal = hourlyRate * itemHours * itemQty
     const itemDiscount = Math.max(0, itemOriginalTotal - itemTotal)
 
     originalSubTotal += itemOriginalTotal
     subTotal += itemTotal
     serviceDiscount += itemDiscount
 
+    // Calculate category GST for this item
+    let itemGst = 0
+    if (categoryId) {
+      const { LabourCategory } = await import('../models/LabourCategory.js')
+      const catDoc = await LabourCategory.findById(categoryId)
+      if (catDoc && catDoc.isGstActive) {
+        itemGst = catDoc.gstPercentage || 0
+      }
+    }
+    if (!itemGst && settings.gstPercentage > 0) {
+      itemGst = settings.gstPercentage
+    }
+    const itemTax = itemGst > 0 ? (itemTotal * itemGst) / 100 : 0
+    itemTaxesTotal += itemTax
+
     breakdown.push({
       serviceId: item.serviceId,
+      subServiceId: item.subServiceId || undefined,
       name,
+      iconUrl,
       originalHourlyRate: originalHourlyRate || hourlyRate,
       hourlyRate,
       discountType,
       discountValue,
       offerBadge,
-      hours,
-      quantity: item.quantity || 1,
+      hours: itemHours,
+      quantity: itemQty,
       subTotal: itemTotal,
       savings: itemDiscount,
+      taxes: itemTax,
+      categoryId,
+      subcategoryId,
     })
   }
 
   // Calculate Subtotal (Hourly Rate * Hours * Quantity)
   let maxHourDiscount = 0
 
-  if (hours >= 8 && settings.maxHourDiscountPercentage > 0) {
+  if (hours >= 8 && settings.maxHourDiscountPercentage > 0 && !isMultiService) {
     maxHourDiscount = (subTotal * settings.maxHourDiscountPercentage) / 100
   }
 
@@ -310,22 +347,24 @@ export const calculateBill = asyncHandler(async (req, res) => {
     }
   }
 
-  let taxes = 0
+  let taxes = isMultiService ? itemTaxesTotal : 0
 
-  let gstPercentage = 0
-  if (primaryCategoryId) {
-    const { LabourCategory } = await import('../models/LabourCategory.js')
-    const category = await LabourCategory.findById(primaryCategoryId)
-    if (category && category.isGstActive) {
-      gstPercentage = category.gstPercentage || 0
+  if (!isMultiService) {
+    let gstPercentage = 0
+    if (primaryCategoryId) {
+      const { LabourCategory } = await import('../models/LabourCategory.js')
+      const category = await LabourCategory.findById(primaryCategoryId)
+      if (category && category.isGstActive) {
+        gstPercentage = category.gstPercentage || 0
+      }
+    } else if (settings.gstPercentage > 0) {
+      // Fallback to global if for some reason category is not resolved
+      gstPercentage = settings.gstPercentage
     }
-  } else if (settings.gstPercentage > 0) {
-    // Fallback to global if for some reason category is not resolved
-    gstPercentage = settings.gstPercentage
-  }
 
-  if (gstPercentage > 0) {
-    taxes = (basePrice * gstPercentage) / 100
+    if (gstPercentage > 0) {
+      taxes = (basePrice * gstPercentage) / 100
+    }
   }
 
   // Customer does not pay platform fee; customer pays basePrice + taxes
@@ -370,6 +409,8 @@ export const calculateBill = asyncHandler(async (req, res) => {
       laborShare: Math.max(0, basePrice - commissionAmount - platformFee),
       paymentModes: settings.paymentModes || { cashEnabled: true, onlineEnabled: true },
       breakdown,
+      isMultiService,
+      itemsCount: breakdown.length,
       walletInfo,
       restriction: await checkCustomerBookingRestriction(req.user?._id),
     }
@@ -444,13 +485,134 @@ export const createBooking = asyncHandler(async (req, res) => {
   let subTotal = 0
   let maxHourDiscount = 0
   let packageBookingData = null
+  let multiServiceBookingData = null
+  let multiServiceTaxes = 0
   let totalQuantity = quantity
   let bookingHours = hours
 
-  // ----------------------------------------------------
-  // CASE 1: Predefined Service Package Booking
-  // ----------------------------------------------------
-  if (packageId) {
+  const isMultiService = Array.isArray(req.body.items) && req.body.items.length > 0
+
+  if (isMultiService) {
+    // ----------------------------------------------------
+    // CASE 0: Multi-Service Unified Booking
+    // ----------------------------------------------------
+    const rawItems = req.body.items
+    const processedItems = []
+    let computedSubTotal = 0
+    const { LabourCategory } = await import('../models/LabourCategory.js')
+
+    for (const itm of rawItems) {
+      if (!itm.serviceId) continue
+      const srv = await LabourService.findById(itm.serviceId)
+      if (!srv || !srv.isActive) {
+        return sendError(res, {
+          message: `Service "${itm.serviceName || itm.serviceId}" is unavailable or inactive`,
+          statusCode: HTTP_STATUS.BAD_REQUEST,
+        })
+      }
+
+      let subServiceDoc = null
+      let subServiceName = undefined
+      let subServicePrice = null
+      if (itm.subServiceId && Array.isArray(srv.subServices)) {
+        subServiceDoc = srv.subServices.find(ss => String(ss._id) === String(itm.subServiceId))
+        if (subServiceDoc) {
+          subServiceName = subServiceDoc.name
+          if (Number(subServiceDoc.price) > 0) {
+            subServicePrice = Number(subServiceDoc.price)
+          }
+        }
+      }
+
+      const srvFallback = Number(srv.hourlyPrice || srv.basePrice || srv.pricePerUnit || 0)
+      let baseRate = subServicePrice !== null ? subServicePrice : srvFallback
+
+      if (matchingZone && srv.zones && srv.zones.length > 0 && !itm.subServiceId) {
+        const zonePricing = srv.zones.find(z => String(z.zone) === String(matchingZone._id))
+        if (zonePricing && typeof zonePricing.price === 'number' && Number(zonePricing.price) > 0) {
+          baseRate = Number(zonePricing.price)
+        }
+      }
+      if (!baseRate || baseRate <= 0) baseRate = srvFallback
+
+      let unitPrice = baseRate
+      if (srv.discountValue > 0) {
+        if (srv.discountType === 'PERCENTAGE') {
+          unitPrice = Math.max(0, Math.round(baseRate * (1 - srv.discountValue / 100)))
+        } else {
+          unitPrice = Math.max(0, baseRate - srv.discountValue)
+        }
+      }
+      if (!unitPrice || unitPrice <= 0) unitPrice = baseRate
+
+      const itemQty = Number(itm.quantity) || 1
+      const itemHours = Number(itm.hours) || hours || 1
+      const itemTotal = unitPrice * itemHours * itemQty
+      computedSubTotal += itemTotal
+
+      let catDoc = null
+      let subDoc = null
+      if (srv.subcategoryId) {
+        subDoc = await LabourSubcategory.findById(srv.subcategoryId).lean()
+        if (subDoc?.categoryId) {
+          catDoc = await LabourCategory.findById(subDoc.categoryId).lean()
+        }
+      }
+
+      let itmGst = 0
+      if (catDoc && catDoc.isGstActive) {
+        itmGst = catDoc.gstPercentage || 0
+      } else if (settings?.gstPercentage > 0) {
+        itmGst = settings.gstPercentage
+      }
+      if (itmGst > 0) {
+        multiServiceTaxes += (itemTotal * itmGst) / 100
+      }
+
+      const itemStartOtp = Math.floor(1000 + Math.random() * 9000).toString()
+      const itemCompletionOtp = Math.floor(1000 + Math.random() * 9000).toString()
+
+      processedItems.push({
+        serviceId: srv._id,
+        subServiceId: itm.subServiceId || undefined,
+        serviceName: srv.name,
+        subServiceName: subServiceName || itm.subServiceName || undefined,
+        categoryId: catDoc?._id || undefined,
+        subcategoryId: subDoc?._id || srv.subcategoryId || undefined,
+        categoryName: catDoc?.name || undefined,
+        subcategoryName: subDoc?.name || undefined,
+        iconUrl: srv.iconUrl || undefined,
+        unitPrice,
+        originalPrice: baseRate,
+        quantity: itemQty,
+        hours: itemHours,
+        itemTotal,
+        status: 'PENDING',
+        startOtp: itemStartOtp,
+        completionOtp: itemCompletionOtp,
+      })
+    }
+
+    if (processedItems.length === 0) {
+      return sendError(res, {
+        message: 'No valid services provided for multi-service booking',
+        statusCode: HTTP_STATUS.BAD_REQUEST,
+      })
+    }
+
+    bookingServiceId = processedItems[0].serviceId
+    bookingSubcategoryId = processedItems[0].subcategoryId
+    subTotal = computedSubTotal
+    totalQuantity = processedItems.reduce((acc, it) => acc + it.quantity, 0)
+    maxHourDiscount = 0
+    multiServiceBookingData = {
+      isMultiService: true,
+      items: processedItems,
+    }
+  } else if (packageId) {
+    // ----------------------------------------------------
+    // CASE 1: Predefined Service Package Booking
+    // ----------------------------------------------------
     const pkg = await ServicePackage.findById(packageId)
     if (!pkg || pkg.status !== 'ACTIVE') {
       return sendError(res, { message: 'Selected package is invalid or no longer active', statusCode: HTTP_STATUS.BAD_REQUEST })
@@ -610,25 +772,27 @@ export const createBooking = asyncHandler(async (req, res) => {
       : (basePrice * settings.platformFee.value) / 100
   }
 
-  let taxes = 0
+  let taxes = isMultiService ? multiServiceTaxes : 0
 
-  let gstPercentage = 0
-  if (bookingSubcategoryId) {
-    const subcategory = await LabourSubcategory.findById(bookingSubcategoryId)
-    if (subcategory) {
-      const { LabourCategory } = await import('../models/LabourCategory.js')
-      const category = await LabourCategory.findById(subcategory.categoryId)
-      if (category && category.isGstActive) {
-        gstPercentage = category.gstPercentage || 0
+  if (!isMultiService) {
+    let gstPercentage = 0
+    if (bookingSubcategoryId) {
+      const subcategory = await LabourSubcategory.findById(bookingSubcategoryId)
+      if (subcategory) {
+        const { LabourCategory } = await import('../models/LabourCategory.js')
+        const category = await LabourCategory.findById(subcategory.categoryId)
+        if (category && category.isGstActive) {
+          gstPercentage = category.gstPercentage || 0
+        }
       }
     }
-  }
-  if (!gstPercentage && settings?.gstPercentage > 0) {
-    gstPercentage = settings.gstPercentage
-  }
+    if (!gstPercentage && settings?.gstPercentage > 0) {
+      gstPercentage = settings.gstPercentage
+    }
 
-  if (gstPercentage > 0) {
-    taxes = (basePrice * gstPercentage) / 100
+    if (gstPercentage > 0) {
+      taxes = (basePrice * gstPercentage) / 100
+    }
   }
 
   // Customer does not pay platform fee; customer pays basePrice + taxes
@@ -685,6 +849,7 @@ export const createBooking = asyncHandler(async (req, res) => {
     contractorInfo,
     maxHourDiscount,
     packageBooking: packageBookingData,
+    multiServiceBooking: multiServiceBookingData,
     address: { 
       locationText,
       coordinates: {
@@ -772,6 +937,8 @@ export const getBookingStatus = asyncHandler(async (req, res) => {
     .populate('serviceId').populate('contractorInfo.services.serviceId')
     .populate('packageBooking.packageId')
     .populate('packageBooking.inclusions.serviceId')
+    .populate('multiServiceBooking.items.serviceId')
+    .populate('multiServiceBooking.items.assignedLabourId', 'fullName phone profileImageUrl')
     .populate('laborId', 'fullName phone profileImageUrl')
     .populate('userId', 'fullName phone')
     .populate('assignments.labourId', 'fullName phone profileImageUrl serviceIds labourProfile')
@@ -783,9 +950,6 @@ export const getBookingStatus = asyncHandler(async (req, res) => {
 
   // Hide OTPs from labourer
   if (['labour', 'contractor'].includes(req.user.role)) {
-    // Only hide if the requesting user is the labourer. If it's the contractor, they SHOULD see the OTPs to share with labourer or verify?
-    // Wait, the contractor IS the customer in this scenario. The contractor role acts as the buyer. 
-    // If the req.user._id matches booking.userId, they are the customer, they should see OTPs.
     if (String(req.user._id) !== String(booking.userId?._id || booking.userId)) {
       delete booking.startOtp
       delete booking.completionOtp
@@ -793,6 +957,14 @@ export const getBookingStatus = asyncHandler(async (req, res) => {
         booking.assignments.forEach(a => {
           delete a.startOtp;
           delete a.completionOtp;
+        })
+      }
+      if (booking.multiServiceBooking?.items) {
+        booking.multiServiceBooking.items.forEach(item => {
+          if (String(item.assignedLabourId?._id || item.assignedLabourId) !== String(req.user._id)) {
+            delete item.startOtp
+            delete item.completionOtp
+          }
         })
       }
     }
@@ -808,13 +980,12 @@ export const getMyBookings = asyncHandler(async (req, res) => {
   if (role === 'customer' || role === 'contractor') {
     query = { userId: _id }
   } else if (role === 'labour' || role === 'contractor') {
-    // A contractor could also be a labourer for some jobs if configured that way, but mainly they are customers.
-    // We'll use an OR query to support both if they act as both.
     query = { 
       $or: [
         { userId: _id },
         { laborId: _id, status: { $in: ['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED', 'COMPLETED', 'CANCELLED'] } },
-        { acceptedLabourIds: _id }
+        { acceptedLabourIds: _id },
+        { 'multiServiceBooking.items.assignedLabourId': _id }
       ] 
     }
   } else {
@@ -826,6 +997,8 @@ export const getMyBookings = asyncHandler(async (req, res) => {
     .populate('serviceId').populate('contractorInfo.services.serviceId')
     .populate('packageBooking.packageId')
     .populate('packageBooking.inclusions.serviceId')
+    .populate('multiServiceBooking.items.serviceId')
+    .populate('multiServiceBooking.items.assignedLabourId', 'fullName phone profileImageUrl')
     .populate('userId', 'fullName phone')
     .populate('laborId', 'fullName phone profileImageUrl')
     .populate('assignments.labourId', 'fullName phone profileImageUrl serviceIds labourProfile')
@@ -841,6 +1014,14 @@ export const getMyBookings = asyncHandler(async (req, res) => {
         b.assignments.forEach(a => {
           delete a.startOtp;
           delete a.completionOtp;
+        })
+      }
+      if (b.multiServiceBooking?.items) {
+        b.multiServiceBooking.items.forEach(item => {
+          if (String(item.assignedLabourId?._id || item.assignedLabourId) !== String(_id)) {
+            delete item.startOtp
+            delete item.completionOtp
+          }
         })
       }
     }
@@ -966,8 +1147,35 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
     booking.status = status;
   }
 
-  // Calculate top-level booking status based on assignments if it's a bulk booking
-  if (booking.assignments && booking.assignments.length > 0) {
+  // Sync multiServiceBooking item status if applicable
+  if (booking.multiServiceBooking?.isMultiService && Array.isArray(booking.multiServiceBooking.items)) {
+    const multiItem = booking.multiServiceBooking.items.find(it => 
+      String(it.assignedLabourId) === labourIdStr || 
+      (assignment && String(it.serviceId) === String(assignment.serviceId))
+    )
+    if (multiItem) {
+      multiItem.status = status
+      if (status === 'STARTED') multiItem.startedAt = new Date()
+      if (status === 'COMPLETED') multiItem.completedAt = new Date()
+    }
+
+    const activeItems = booking.multiServiceBooking.items.filter(it => it.status !== 'CANCELLED')
+    const itemStatuses = activeItems.map(it => it.status)
+    if (itemStatuses.length > 0 && itemStatuses.every(s => s === 'COMPLETED')) {
+      booking.status = 'COMPLETED'
+    } else if (itemStatuses.some(s => s === 'COMPLETED')) {
+      booking.status = 'PARTIALLY_COMPLETED'
+    } else if (itemStatuses.some(s => s === 'STARTED')) {
+      booking.status = 'STARTED'
+    } else if (itemStatuses.some(s => s === 'EN_ROUTE')) {
+      booking.status = 'EN_ROUTE'
+    } else if (itemStatuses.length > 0 && itemStatuses.every(s => s === 'ACCEPTED')) {
+      booking.status = 'ACCEPTED'
+    } else if (itemStatuses.some(s => s === 'ACCEPTED')) {
+      booking.status = 'PARTIALLY_ACCEPTED'
+    }
+  } else if (booking.assignments && booking.assignments.length > 0) {
+    // Calculate top-level booking status based on assignments if it's a bulk booking
     const allStatuses = booking.assignments.map(a => a.status);
     const expectedQuantity = booking.quantity || 1;
     if (allStatuses.length > 0 && allStatuses.every(s => s === 'COMPLETED')) {
@@ -1533,4 +1741,148 @@ export const cancelCustomerBooking = asyncHandler(async (req, res) => {
     data: result,
   })
 })
+
+export const cancelBookingItem = asyncHandler(async (req, res) => {
+  const { id, itemId } = req.params
+  const { reason, reasonNote } = req.body
+
+  const booking = await Booking.findById(id)
+  if (!booking) {
+    return sendError(res, { message: 'Booking not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  // Authorization check: must be the booking owner
+  if (String(booking.userId) !== String(req.user._id)) {
+    return sendError(res, { message: 'Unauthorized to cancel items on this booking', statusCode: HTTP_STATUS.FORBIDDEN })
+  }
+
+  if (!booking.multiServiceBooking?.isMultiService || !Array.isArray(booking.multiServiceBooking.items)) {
+    return sendError(res, { message: 'This booking is not a multi-service booking', statusCode: HTTP_STATUS.BAD_REQUEST })
+  }
+
+  const item = booking.multiServiceBooking.items.find(it => String(it._id) === String(itemId))
+  if (!item) {
+    return sendError(res, { message: 'Service item not found in booking', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  if (item.status === 'CANCELLED') {
+    return sendError(res, { message: 'This service item is already cancelled', statusCode: HTTP_STATUS.BAD_REQUEST })
+  }
+
+  if (item.status === 'COMPLETED') {
+    return sendError(res, { message: 'Completed services cannot be cancelled', statusCode: HTTP_STATUS.BAD_REQUEST })
+  }
+
+  // Mark item as cancelled
+  item.status = 'CANCELLED'
+  item.cancellationReason = [reason, reasonNote].filter(Boolean).join(': ')
+  item.cancelledAt = new Date()
+
+  // Update corresponding assignment if assigned
+  let notifiedLabourId = null
+  if (item.assignedLabourId) {
+    notifiedLabourId = item.assignedLabourId
+    if (Array.isArray(booking.assignments)) {
+      const assignment = booking.assignments.find(a => 
+        String(a.labourId) === String(item.assignedLabourId) && 
+        String(a.serviceId) === String(item.serviceId)
+      )
+      if (assignment) {
+        assignment.status = 'CANCELLED'
+        assignment.cancellationReason = item.cancellationReason
+      }
+    }
+  }
+
+  // Recalculate parent booking status
+  const activeItems = booking.multiServiceBooking.items.filter(it => it.status !== 'CANCELLED')
+  if (activeItems.length === 0) {
+    booking.status = 'CANCELLED'
+    booking.cancelledBy = 'CUSTOMER'
+    booking.cancelledAt = new Date()
+    booking.cancellationReason = item.cancellationReason
+  } else {
+    const activeStatuses = activeItems.map(it => it.status)
+    if (activeStatuses.every(s => s === 'COMPLETED')) {
+      booking.status = 'COMPLETED'
+    } else if (activeStatuses.some(s => s === 'COMPLETED')) {
+      booking.status = 'PARTIALLY_COMPLETED'
+    } else if (activeStatuses.some(s => s === 'STARTED')) {
+      booking.status = 'STARTED'
+    } else if (activeStatuses.some(s => s === 'EN_ROUTE')) {
+      booking.status = 'EN_ROUTE'
+    } else if (activeStatuses.every(s => s === 'ACCEPTED')) {
+      booking.status = 'ACCEPTED'
+    } else if (activeStatuses.some(s => s === 'ACCEPTED')) {
+      booking.status = 'PARTIALLY_ACCEPTED'
+    } else {
+      booking.status = 'PARTIALLY_CANCELLED'
+    }
+  }
+
+  // Calculate refund if paid
+  let refundAmount = 0
+  if (booking.paymentStatus === 'PAID') {
+    refundAmount = Number(item.itemTotal) || 0
+    if (refundAmount > 0) {
+      try {
+        let wallet = await Wallet.findOne({ userId: booking.userId })
+        if (!wallet) wallet = new Wallet({ userId: booking.userId })
+        const balanceBefore = Number(wallet.balance || wallet.selfBalance || 0)
+        const balanceAfter = balanceBefore + refundAmount
+        wallet.balance = (wallet.balance || 0) + refundAmount
+        wallet.selfBalance = (wallet.selfBalance || 0) + refundAmount
+        await wallet.save()
+
+        const { WalletTransaction } = await import('../models/WalletTransaction.js')
+        const shortCode = String(booking._id).slice(-6).toUpperCase()
+        await WalletTransaction.create({
+          walletId: wallet._id,
+          userId: booking.userId,
+          type: 'CREDIT',
+          amount: refundAmount,
+          balanceBefore,
+          balanceAfter,
+          description: `Refund for cancelled service "${item.serviceName}" on booking #${shortCode}`,
+          context: 'REFUND',
+          referenceType: 'BOOKING',
+          referenceId: booking._id,
+          status: 'COMPLETED',
+        })
+      } catch (err) {
+        console.error('[ITEM_REFUND_ERROR] Failed to credit wallet for item cancellation:', err)
+      }
+    }
+  }
+
+  await booking.save()
+
+  // Notify assigned labourer if applicable
+  if (notifiedLabourId) {
+    import('../utils/pushNotificationHelper.js').then(({ sendNotificationToUser }) => {
+      sendNotificationToUser(notifiedLabourId, {
+        title: 'Service Item Cancelled',
+        body: `Customer has cancelled service "${item.serviceName}" on booking #${String(booking._id).slice(-6).toUpperCase()}`,
+        data: { bookingId: String(booking._id), itemId: String(itemId) }
+      }).catch(err => console.error('Push notification error on item cancel:', err))
+    })
+  }
+
+  // Socket notification
+  import('../socket.js').then(({ emitToUser }) => {
+    emitToUser(booking.userId, 'BOOKING_ITEM_CANCELLED', {
+      bookingId: booking._id,
+      itemId,
+      status: item.status,
+      parentStatus: booking.status,
+      refundAmount,
+    })
+  }).catch(err => console.error('Socket error on item cancel:', err))
+
+  return sendSuccess(res, {
+    message: `Service "${item.serviceName}" cancelled successfully`,
+    data: { booking, item, refundAmount }
+  })
+})
+
 

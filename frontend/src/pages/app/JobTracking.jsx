@@ -43,6 +43,32 @@ export function JobTracking() {
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [labourLocation, setLabourLocation] = useState(null)
 
+  const [cancellingItemId, setCancellingItemId] = useState(null)
+  const [itemCancelReason, setItemCancelReason] = useState('')
+  const [isCancellingItem, setIsCancellingItem] = useState(false)
+  const [cancelItemError, setCancelItemError] = useState('')
+
+  const handleCancelItem = async () => {
+    if (!cancellingItemId || !booking?._id) return
+    setIsCancellingItem(true)
+    setCancelItemError('')
+    try {
+      await bookingsApi.cancelBookingItem(booking._id, cancellingItemId, {
+        reason: itemCancelReason || 'Customer requested item cancellation',
+      })
+      const res = await bookingsApi.getBookingStatus(booking._id)
+      if (res.data?.booking) {
+        setBooking(res.data.booking)
+      }
+      setCancellingItemId(null)
+      setItemCancelReason('')
+    } catch (err) {
+      setCancelItemError(err instanceof ApiError ? err.message : 'Failed to cancel item')
+    } finally {
+      setIsCancellingItem(false)
+    }
+  }
+
   // Fetch booking on mount
   useEffect(() => {
     if (!bookingId) return
@@ -371,6 +397,103 @@ export function JobTracking() {
         </GlassPanel>
       )}
 
+      {/* Multi-Service Items List */}
+      {booking.multiServiceBooking?.isMultiService && booking.multiServiceBooking?.items?.length > 0 && (
+        <GlassPanel className="p-4 text-sm border-brand/20 bg-white">
+          <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 mb-3">
+            <span className="font-extrabold text-slate-900 flex items-center gap-1.5 text-sm">
+              <span className="text-base">✨</span> Booked Services ({booking.multiServiceBooking.items.length})
+            </span>
+            <span className="text-[10px] font-bold text-brand uppercase tracking-wider bg-brand/10 px-2 py-0.5 rounded-full">
+              Multi-Service
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {booking.multiServiceBooking.items.map((item, idx) => {
+              const isItemCancellable = ['PENDING', 'ACCEPTED'].includes(item.status) && !['COMPLETED', 'CANCELLED', 'STARTED'].includes(item.status)
+              return (
+                <div key={item._id || idx} className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      {item.iconUrl ? (
+                        <img src={item.iconUrl} alt="" className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-brand/10 text-brand flex items-center justify-center font-bold text-xs shrink-0">
+                          #{idx + 1}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-900 truncate">{item.serviceName}</p>
+                        {item.subServiceName && (
+                          <p className="text-xs text-brand font-semibold">{item.subServiceName}</p>
+                        )}
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Qty: {item.quantity || 1} · ₹{item.unitPrice || 0}/item
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-black text-slate-900">₹{item.itemTotal || 0}</p>
+                      <span className={`inline-block mt-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${
+                        item.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800'
+                        : item.status === 'STARTED' ? 'bg-purple-100 text-purple-700'
+                        : item.status === 'ACCEPTED' ? 'bg-teal-100 text-teal-700'
+                        : item.status === 'CANCELLED' ? 'bg-rose-100 text-rose-700'
+                        : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {item.status || 'PENDING'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Assigned Provider info for this item */}
+                  {item.assignedLabourId && (
+                    <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-200/60 text-slate-600">
+                      <span className="font-medium">Provider: {item.assignedLabourId.fullName || 'Assigned'}</span>
+                      {item.assignedLabourId.phone && (
+                        <a href={`tel:${item.assignedLabourId.phone}`} className="text-brand font-bold text-[11px] flex items-center gap-1">
+                          <Phone className="h-3 w-3" /> Call
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Item OTPs */}
+                  {(item.startOtp || item.completionOtp) && (
+                    <div className="flex items-center gap-3 text-xs pt-1 border-t border-slate-200/60 text-slate-600">
+                      {item.startOtp && <span>Start OTP: <strong className="font-mono text-slate-900">{item.startOtp}</strong></span>}
+                      {item.completionOtp && <span>End OTP: <strong className="font-mono text-slate-900">{item.completionOtp}</strong></span>}
+                    </div>
+                  )}
+
+                  {/* Individual Cancellation Button */}
+                  {isItemCancellable && (
+                    <div className="pt-1 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCancellingItemId(item._id)
+                          setItemCancelReason('')
+                          setCancelItemError('')
+                        }}
+                        className="text-[11px] font-bold text-rose-600 hover:text-rose-700 underline"
+                      >
+                        Cancel this service
+                      </button>
+                    </div>
+                  )}
+
+                  {item.cancellationReason && (
+                    <p className="text-[10px] text-rose-600 italic">Cancelled: {item.cancellationReason}</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </GlassPanel>
+      )}
+
       {/* Booking Info */}
       <GlassPanel className="p-4 text-sm">
         <div className="flex justify-between">
@@ -459,6 +582,53 @@ export function JobTracking() {
           navigate('/app', { replace: true })
         }}
       />
+
+      {/* Cancel Item Confirmation Modal */}
+      {cancellingItemId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl ring-1 ring-slate-900/5">
+            <h3 className="text-base font-extrabold text-slate-900">Cancel Selected Service?</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              Only this service item will be cancelled. Your remaining booked services will proceed as scheduled.
+            </p>
+
+            <div className="mt-3">
+              <label className="text-xs font-bold text-slate-700 block mb-1">Reason for cancellation</label>
+              <textarea
+                value={itemCancelReason}
+                onChange={(e) => setItemCancelReason(e.target.value)}
+                placeholder="e.g. Changed mind, booked wrong variant"
+                rows={2}
+                className="w-full text-xs rounded-xl border border-slate-200 p-2.5 focus:border-brand focus:ring-1 focus:ring-brand outline-none"
+              />
+            </div>
+
+            {cancelItemError && (
+              <p className="mt-2 text-xs font-semibold text-rose-600">{cancelItemError}</p>
+            )}
+
+            <div className="mt-4 flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setCancellingItemId(null)}
+                disabled={isCancellingItem}
+                className="rounded-lg px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition disabled:opacity-50"
+              >
+                Keep Service
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelItem}
+                disabled={isCancellingItem}
+                className="rounded-lg bg-rose-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-rose-700 transition flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isCancellingItem ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                {isCancellingItem ? 'Cancelling...' : 'Confirm Cancellation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Review Modal */}
       <BookingReviewModal

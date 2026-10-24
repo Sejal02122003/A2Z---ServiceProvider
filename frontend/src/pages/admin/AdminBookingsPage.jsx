@@ -33,10 +33,13 @@ const BOOKING_STATUS_FILTERS = [
   { value: 'ALL', label: 'All' },
   { value: 'PENDING', label: 'Pending' },
   { value: 'CREATED', label: 'Created' },
+  { value: 'PARTIALLY_ACCEPTED', label: 'Partially Accepted' },
   { value: 'ACCEPTED', label: 'Accepted' },
   { value: 'ASSIGNED', label: 'Assigned' },
   { value: 'STARTED', label: 'Started' },
+  { value: 'PARTIALLY_COMPLETED', label: 'Partially Completed' },
   { value: 'COMPLETED', label: 'Completed' },
+  { value: 'PARTIALLY_CANCELLED', label: 'Partially Cancelled' },
   { value: 'CANCELLED', label: 'Cancelled' },
   { value: 'FAILED', label: 'Failed' },
   { value: 'REFUNDED', label: 'Refunded' },
@@ -46,11 +49,14 @@ const getStatusBadgeStyle = (status) => {
   switch (status?.toUpperCase()) {
     case 'CREATED': return 'bg-slate-100 text-slate-700'
     case 'BROADCASTING': return 'bg-amber-100 text-amber-700'
+    case 'PARTIALLY_ACCEPTED': return 'bg-cyan-100 text-cyan-800'
     case 'ACCEPTED': return 'bg-teal-100 text-teal-700'
     case 'ASSIGNED': return 'bg-indigo-100 text-indigo-700'
     case 'EN_ROUTE': return 'bg-blue-100 text-blue-700'
     case 'STARTED': return 'bg-purple-100 text-purple-700'
+    case 'PARTIALLY_COMPLETED': return 'bg-lime-100 text-lime-800'
     case 'COMPLETED': return 'bg-emerald-100 text-emerald-800'
+    case 'PARTIALLY_CANCELLED': return 'bg-orange-100 text-orange-800'
     case 'CANCELLED': return 'bg-rose-50 text-rose-600'
     case 'FAILED': return 'bg-red-100 text-red-700'
     case 'REFUNDED': return 'bg-zinc-100 text-zinc-700'
@@ -516,7 +522,18 @@ function BookingDetailsModal({ booking, onClose }) {
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="col-span-2 sm:col-span-1">
               <p className="text-slate-500 text-xs">Service</p>
-              {booking.contractorInfo?.services?.length > 0 ? (
+              {booking.multiServiceBooking?.isMultiService && booking.multiServiceBooking?.items?.length > 0 ? (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  <span className="font-extrabold text-[11px] bg-brand/10 text-brand px-2 py-0.5 rounded-md">
+                    ✨ Multi-Service ({booking.multiServiceBooking.items.length})
+                  </span>
+                  {booking.multiServiceBooking.items.map((s, idx) => (
+                    <span key={idx} className="font-semibold text-[11px] bg-slate-100 px-2 py-0.5 rounded-md">
+                      {s.serviceName}{s.subServiceName ? ` (${s.subServiceName})` : ''} (x{s.quantity || 1})
+                    </span>
+                  ))}
+                </div>
+              ) : booking.contractorInfo?.services?.length > 0 ? (
                 <div className="flex flex-wrap gap-1 mt-1">
                   {booking.contractorInfo.services.map((s, idx) => (
                     <span key={idx} className="font-semibold text-[11px] bg-slate-100 px-2 py-0.5 rounded-md">
@@ -714,6 +731,57 @@ function BookingDetailsModal({ booking, onClose }) {
             </>
           )}
 
+          {booking.multiServiceBooking?.isMultiService && booking.multiServiceBooking?.items?.length > 0 && (
+            <div className="border-t border-slate-100 pt-4">
+              <p className="text-xs font-extrabold uppercase tracking-wider text-brand mb-3 flex items-center gap-1.5">
+                <span>✨</span> Booked Service Items ({booking.multiServiceBooking.items.length})
+              </p>
+              <div className="space-y-2.5">
+                {booking.multiServiceBooking.items.map((item, idx) => (
+                  <div key={item._id || idx} className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      {item.iconUrl ? (
+                        <img src={item.iconUrl} alt="" className="w-10 h-10 rounded-lg object-cover border border-slate-200" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-brand/10 text-brand flex items-center justify-center font-bold text-xs">
+                          #{idx + 1}
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">{item.serviceName}</p>
+                        {item.subServiceName && (
+                          <p className="text-xs text-brand font-semibold">{item.subServiceName}</p>
+                        )}
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Qty: <span className="font-semibold text-slate-700">{item.quantity || 1}</span> · Price: <span className="font-semibold text-slate-700">₹{item.unitPrice || 0}</span> · Total: <span className="font-bold text-slate-900">₹{item.itemTotal || 0}</span>
+                        </p>
+                        {item.assignedLabourId && (
+                          <p className="text-xs text-indigo-700 font-semibold mt-1">
+                            Partner: {item.assignedLabourId.fullName || item.assignedLabourId.phone || 'Assigned'}
+                          </p>
+                        )}
+                        {item.cancellationReason && (
+                          <p className="text-xs text-rose-600 font-semibold mt-1">
+                            Cancelled: {item.cancellationReason}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col sm:items-end gap-1.5">
+                      <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${getStatusBadgeStyle(item.status)}`}>
+                        {item.status || 'PENDING'}
+                      </span>
+                      <div className="flex gap-2 text-[11px] text-slate-500">
+                        {item.startOtp && <span>Start OTP: <strong className="font-mono text-slate-800">{item.startOtp}</strong></span>}
+                        {item.completionOtp && <span>End OTP: <strong className="font-mono text-slate-800">{item.completionOtp}</strong></span>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="border-t border-slate-100 pt-4 bg-slate-50 p-3 rounded-lg">
             <p className="font-extrabold text-sm mb-2">Financial Breakdown</p>
             {completedBill.isContractorBooking && completedBill.deductedBasePrice > 0 ? (
@@ -730,6 +798,12 @@ function BookingDetailsModal({ booking, onClose }) {
                 )}
               </span>
             </div>
+            {booking.walletDiscountApplied > 0 && (
+              <div className="flex justify-between text-xs text-emerald-600 py-1 font-medium">
+                <span>Wallet Discount Applied:</span>
+                <span>-₹{booking.walletDiscountApplied}</span>
+              </div>
+            )}
             {completedBill.isContractorBooking && completedBill.deductedBasePrice > 0 && (
               <div className="flex justify-between text-xs text-emerald-600 py-1 font-medium">
                 <span>Deductions (Unfulfilled / Pending):</span>
@@ -841,7 +915,19 @@ function BookingsListTab({ type }) {
             <GlassPanel className="p-5">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div className="flex-1 min-w-0 space-y-1">
-                  {b.contractorInfo?.services?.length > 0 ? (
+                  {b.multiServiceBooking?.isMultiService && b.multiServiceBooking?.items?.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] font-black text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-md flex items-center gap-1">
+                        ✨ Multi-Service ({b.multiServiceBooking.items.length})
+                      </span>
+                      {b.multiServiceBooking.items.map((s, idx) => (
+                        <span key={idx} className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                          {s.serviceName}{s.subServiceName ? ` (${s.subServiceName})` : ''} x{s.quantity || 1}
+                        </span>
+                      ))}
+                      <span className="text-sm font-black text-slate-900 ml-1">({b.type})</span>
+                    </div>
+                  ) : b.contractorInfo?.services?.length > 0 ? (
                     <div className="flex flex-wrap items-center gap-1">
                       {b.contractorInfo.services.map((s, idx) => (
                         <span key={idx} className="text-[11px] font-bold text-brand bg-brand/5 px-2 py-0.5 rounded-md">

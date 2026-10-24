@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './context/AuthProvider.jsx'
 import { BrandingProvider } from './context/BrandingContext.jsx'
+import { BookingCartProvider } from './context/BookingCartContext.jsx'
 import { ProtectedRoute } from './components/auth/ProtectedRoute.jsx'
 import { AppShell } from './layouts/AppShell.jsx'
 import { AdminLayout } from './layouts/AdminLayout.jsx'
@@ -76,7 +77,8 @@ function App() {
     <BrowserRouter>
       <BrandingProvider>
         <AuthProvider>
-        <Routes>
+          <BookingCartProvider>
+          <Routes>
           <Route path="/" element={<LandingPage />} />
           {bootRoutes}
           <Route path="/auth" element={<Navigate to="/users/auth" replace />} />
@@ -178,6 +180,7 @@ function App() {
         <BroadcastPopup />
         <SimulatedOpportunityPopup />
         <BookingConfirmedToast />
+          </BookingCartProvider>
         </AuthProvider>
       </BrandingProvider>
     </BrowserRouter>

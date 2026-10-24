@@ -88,8 +88,8 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     })
   }
 
-  // Fetch booking first
-  let booking = await Booking.findOne({ _id: bookingId, status: 'BROADCASTING' })
+  // Fetch booking first (can be BROADCASTING or PARTIALLY_ACCEPTED for multi-service)
+  let booking = await Booking.findOne({ _id: bookingId, status: { $in: ['BROADCASTING', 'PARTIALLY_ACCEPTED'] } })
   
   if (!booking) {
     const currentBooking = await Booking.findById(bookingId)
@@ -148,9 +148,49 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
   let assignedServiceName = ''
   let assignedLabourShare = 0
 
+  const isMultiServiceBooking = Boolean(booking.multiServiceBooking?.isMultiService && booking.multiServiceBooking.items?.length > 0)
   const isContractorBooking = booking.contractorInfo?.services?.length > 0
 
-  if (isContractorBooking) {
+  let chosenMultiItem = null
+
+  if (isMultiServiceBooking) {
+    const openItems = booking.multiServiceBooking.items.filter(it => it.status === 'PENDING')
+    if (openItems.length === 0) {
+      return sendError(res, { message: 'All service slots for this booking are already filled', statusCode: HTTP_STATUS.CONFLICT })
+    }
+
+    const fullLabour = await (await import('../models/User.js')).User.findById(labour._id).lean()
+    const labourServiceIds = (fullLabour?.labourProfile?.serviceIds || []).map(id => String(id))
+    const labourSubcatIds = (fullLabour?.labourProfile?.subcategoryIds || []).map(id => String(id))
+
+    // Match open items against provider skills
+    const matchingOpen = openItems.filter(it => 
+      labourServiceIds.includes(String(it.serviceId)) ||
+      (it.subcategoryId && labourSubcatIds.includes(String(it.subcategoryId)))
+    )
+
+    const chosenItemId = req.body?.itemId ? String(req.body.itemId) : null
+    const chosenServiceId = req.body?.serviceId ? String(req.body.serviceId) : null
+
+    if (chosenItemId) {
+      chosenMultiItem = openItems.find(it => String(it._id) === chosenItemId)
+    } else if (chosenServiceId) {
+      chosenMultiItem = openItems.find(it => String(it.serviceId) === chosenServiceId)
+    } else if (matchingOpen.length > 0) {
+      chosenMultiItem = matchingOpen[0]
+    } else {
+      chosenMultiItem = openItems[0]
+    }
+
+    if (!chosenMultiItem) {
+      return sendError(res, { message: 'Selected service item is no longer available', statusCode: HTTP_STATUS.BAD_REQUEST })
+    }
+
+    assignedServiceId = chosenMultiItem.serviceId
+    assignedPricePerHour = chosenMultiItem.unitPrice || 0
+    assignedServiceName = chosenMultiItem.subServiceName ? `${chosenMultiItem.serviceName} (${chosenMultiItem.subServiceName})` : chosenMultiItem.serviceName
+    assignedLabourShare = Math.round(chosenMultiItem.itemTotal * 0.90)
+  } else if (isContractorBooking) {
     const currentAssignments = booking.assignments || []
     const { LabourService } = await import('../models/LabourService.js')
 
@@ -215,9 +255,11 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
   }
 
   // Determine total expected assignments to decide if fully ACCEPTED
-  const totalRequested = isContractorBooking
-    ? booking.contractorInfo.services.reduce((acc, s) => acc + (s.quantity || 1), 0)
-    : (booking.quantity || 1)
+  const totalRequested = isMultiServiceBooking
+    ? booking.multiServiceBooking.items.filter(it => it.status !== 'CANCELLED').length
+    : (isContractorBooking
+      ? booking.contractorInfo.services.reduce((acc, s) => acc + (s.quantity || 1), 0)
+      : (booking.quantity || 1))
 
   const startOtp = Math.floor(1000 + Math.random() * 9000).toString()
   const completionOtp = Math.floor(1000 + Math.random() * 9000).toString()
@@ -233,28 +275,43 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     completionOtp,
   }
 
-  const willBeFullyAccepted = (booking.assignments?.length || 0) + 1 >= totalRequested
+  const willBeFullyAccepted = isMultiServiceBooking
+    ? (booking.multiServiceBooking.items.filter(it => it.status === 'PENDING').length <= 1)
+    : ((booking.assignments?.length || 0) + 1 >= totalRequested)
+
   const setFields = {
     acceptedLabourId: labour._id,
     laborId: labour._id,
   }
   if (willBeFullyAccepted) {
     setFields.status = 'ACCEPTED'
+  } else if (isMultiServiceBooking) {
+    setFields.status = 'PARTIALLY_ACCEPTED'
+  }
+
+  const query = {
+    _id: bookingId,
+    status: { $in: ['BROADCASTING', 'PARTIALLY_ACCEPTED'] },
+    acceptedLabourIds: { $ne: labour._id },
+    $expr: {
+      $lt: [
+        { $size: { $ifNull: ['$acceptedLabourIds', []] } },
+        totalRequested,
+      ],
+    },
+  }
+
+  if (isMultiServiceBooking && chosenMultiItem) {
+    query['multiServiceBooking.items'] = {
+      $elemMatch: { _id: chosenMultiItem._id, status: 'PENDING' }
+    }
+    setFields['multiServiceBooking.items.$.assignedLabourId'] = labour._id
+    setFields['multiServiceBooking.items.$.status'] = 'ACCEPTED'
   }
 
   // Atomic conditional update to prevent double-assignment concurrent races
   const updatedBooking = await Booking.findOneAndUpdate(
-    {
-      _id: bookingId,
-      status: 'BROADCASTING',
-      acceptedLabourIds: { $ne: labour._id },
-      $expr: {
-        $lt: [
-          { $size: { $ifNull: ['$acceptedLabourIds', []] } },
-          totalRequested,
-        ],
-      },
-    },
+    query,
     {
       $push: {
         acceptedLabourIds: labour._id,

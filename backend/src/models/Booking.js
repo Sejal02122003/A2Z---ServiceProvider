@@ -16,12 +16,16 @@ const bookingSchema = new mongoose.Schema(
     subcategoryId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'LabourSubcategory',
-      required: true,
+      required: function() {
+        return !this.packageBooking?.isPackage && !this.multiServiceBooking?.isMultiService
+      },
     },
     serviceId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'LabourService',
-      required: true,
+      required: function() {
+        return !this.packageBooking?.isPackage && !this.multiServiceBooking?.isMultiService
+      },
     },
     subServiceId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -122,6 +126,39 @@ const bookingSchema = new mongoose.Schema(
       ],
       snapshot: { type: mongoose.Schema.Types.Mixed },
     },
+    multiServiceBooking: {
+      isMultiService: { type: Boolean, default: false, index: true },
+      items: [
+        {
+          serviceId: { type: mongoose.Schema.Types.ObjectId, ref: 'LabourService', required: true },
+          subServiceId: { type: mongoose.Schema.Types.ObjectId },
+          serviceName: { type: String, required: true },
+          subServiceName: { type: String },
+          categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'LabourCategory' },
+          subcategoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'LabourSubcategory' },
+          categoryName: { type: String },
+          subcategoryName: { type: String },
+          iconUrl: { type: String },
+          unitPrice: { type: Number, required: true },
+          originalPrice: { type: Number, default: 0 },
+          quantity: { type: Number, default: 1 },
+          hours: { type: Number, default: 1 },
+          itemTotal: { type: Number, required: true },
+          assignedLabourId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+          status: {
+            type: String,
+            enum: ['PENDING', 'ACCEPTED', 'EN_ROUTE', 'STARTED', 'COMPLETED', 'CANCELLED', 'REJECTED'],
+            default: 'PENDING',
+          },
+          startOtp: { type: String },
+          completionOtp: { type: String },
+          startedAt: { type: Date },
+          completedAt: { type: Date },
+          cancellationReason: { type: String },
+          cancelledAt: { type: Date },
+        },
+      ],
+    },
     totalAmount: { type: Number, required: true },
     commissionAmount: { type: Number, required: true, default: 0 },
     laborShare: { type: Number, required: true },
@@ -147,10 +184,13 @@ const bookingSchema = new mongoose.Schema(
         'CREATED',
         'BROADCASTING',
         'ACCEPTED',
+        'PARTIALLY_ACCEPTED',
         'ASSIGNED',
         'EN_ROUTE',
         'STARTED',
+        'PARTIALLY_COMPLETED',
         'COMPLETED',
+        'PARTIALLY_CANCELLED',
         'CANCELLED',
         'CANCELLATION_REQUESTED',
         'REFUNDED',

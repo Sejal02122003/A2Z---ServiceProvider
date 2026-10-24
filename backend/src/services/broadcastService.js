@@ -84,7 +84,16 @@ export async function startBroadcastCycle(bookingId) {
   }
 
   const matchOr = []
-  if (booking.contractorInfo && booking.contractorInfo.services && booking.contractorInfo.services.length > 0) {
+  if (booking.multiServiceBooking?.isMultiService && Array.isArray(booking.multiServiceBooking.items) && booking.multiServiceBooking.items.length > 0) {
+    const pendingItems = booking.multiServiceBooking.items.filter(it => it.status === 'PENDING')
+    const multiServiceIds = pendingItems.map(it => it.serviceId).filter(Boolean)
+    const multiSubcategoryIds = pendingItems.map(it => it.subcategoryId).filter(Boolean)
+    const multiCategoryIds = pendingItems.map(it => it.categoryId).filter(Boolean)
+
+    if (multiServiceIds.length > 0) matchOr.push({ 'labourProfile.serviceIds': { $in: multiServiceIds } })
+    if (multiSubcategoryIds.length > 0) matchOr.push({ 'labourProfile.subcategoryIds': { $in: multiSubcategoryIds } })
+    if (multiCategoryIds.length > 0) matchOr.push({ 'labourProfile.categoryIds': { $in: multiCategoryIds } })
+  } else if (booking.contractorInfo && booking.contractorInfo.services && booking.contractorInfo.services.length > 0) {
     const requestedServiceIds = booking.contractorInfo.services.map(s => s.serviceId)
     matchOr.push({ 'labourProfile.serviceIds': { $in: requestedServiceIds } })
   } else {
@@ -389,7 +398,61 @@ export async function startBroadcastCycle(bookingId) {
         const laborServiceIds = labor.labourProfile?.serviceIds?.map(id => String(id)) || []
         const bookingHours = booking.duration || booking.hours || 1
 
-        if (booking.contractorInfo?.services?.length > 0) {
+        const isMultiService = Boolean(booking.multiServiceBooking?.isMultiService && booking.multiServiceBooking?.items?.length > 0)
+
+        if (isMultiService) {
+          const openMultiItems = (booking.multiServiceBooking?.items || []).filter(it => it.status === 'PENDING')
+          const matchingMulti = openMultiItems.filter(it =>
+            laborServiceIds.includes(String(it.serviceId)) ||
+            (it.subcategoryId && (labor.labourProfile?.subcategoryIds || []).map(id => String(id)).includes(String(it.subcategoryId)))
+          ).map(it => ({
+            itemId: String(it._id),
+            serviceId: String(it.serviceId),
+            name: it.subServiceName ? `${it.serviceName} - ${it.subServiceName}` : it.serviceName,
+            pricePerHour: it.unitPrice || 0,
+            estimatedEarnings: Math.round(it.itemTotal * 0.90),
+            openSlots: 1
+          }))
+
+          const servicesPayload = matchingMulti.length > 0
+            ? matchingMulti
+            : openMultiItems.map(it => ({
+                itemId: String(it._id),
+                serviceId: String(it.serviceId),
+                name: it.subServiceName ? `${it.serviceName} - ${it.subServiceName}` : it.serviceName,
+                pricePerHour: it.unitPrice || 0,
+                estimatedEarnings: Math.round(it.itemTotal * 0.90),
+                openSlots: 1
+              }))
+
+          const bestEarning = servicesPayload.reduce((max, s) => Math.max(max, s.estimatedEarnings), 0)
+
+          import('../socket.js').then(({ emitToUser }) => {
+            console.log(`[BROADCAST] Emitting BOOKING_RECEIVED to labour ${labor.fullName || labor.phone} (${labor._id}) for multi-service booking ${booking._id}, earnings=₹${bestEarning}`)
+            emitToUser(labor._id, 'BOOKING_RECEIVED', {
+              bookingId: booking._id,
+              type: booking.type || 'SCHEDULED',
+              customerName: booking.userId?.fullName || 'Customer',
+              serviceName: servicesPayload.length === 1 ? servicesPayload[0].name : 'Multi-Service Booking',
+              services: servicesPayload,
+              isMultiServiceBooking: true,
+              requiresServiceSelection: servicesPayload.length > 1,
+              date: booking.scheduledAt || booking.createdAt,
+              time: booking.timeSlot || 'Earliest available',
+              duration: bookingHours,
+              customerLocation: booking.address?.locationText || 'Service Location',
+              approximateDistance: labor.approximateDistance,
+              estimatedEarnings: bestEarning,
+              timeoutMs: BROADCAST_TIMEOUT_MS
+            })
+          })
+
+          sendNotificationToUser(labor._id, {
+            title: booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer!',
+            body: `New multi-service job available near you. Estimated earnings: ₹${bestEarning}`,
+            data: { type: 'booking_received', bookingId: String(booking._id) }
+          })
+        } else if (booking.contractorInfo?.services?.length > 0) {
           // Find open services that match this labourer's skills
           const matchingOpenServices = booking.contractorInfo.services
             .filter(s => {
