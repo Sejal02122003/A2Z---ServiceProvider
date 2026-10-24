@@ -340,8 +340,13 @@ export function PackageDetailsPage() {
         </p>
       </div>
 
-      {/* Fixed Sticky Bottom Checkout Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200/80 bg-white/95 p-3.5 backdrop-blur-md shadow-lg max-w-lg mx-auto">
+      {/* Fixed Sticky Bottom Checkout Bar with Curved Edges and Bottom Padding */}
+      <div
+        style={{
+          bottom: 'calc(0.85rem + env(safe-area-inset-bottom, 0px))',
+        }}
+        className="fixed inset-x-3 sm:inset-x-4 z-40 border border-slate-200/90 rounded-3xl bg-white/95 p-3.5 sm:p-4 backdrop-blur-md shadow-[0_12px_40px_rgba(0,0,0,0.14),0_4px_16px_rgba(0,0,0,0.06)] max-w-lg mx-auto"
+      >
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">

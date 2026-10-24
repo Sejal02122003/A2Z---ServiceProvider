@@ -781,12 +781,17 @@ export function MultiServiceCartPage() {
         </div>
       </main>
 
-      {/* Sticky Bottom Bar */}
-      <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 border-t border-slate-200 px-4 py-3 backdrop-blur-md shadow-lg">
-        <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
+      {/* Floating Curved Bottom Bar with Bottom Padding */}
+      <div
+        style={{
+          bottom: 'calc(0.85rem + env(safe-area-inset-bottom, 0px))',
+        }}
+        className="fixed inset-x-3 sm:inset-x-4 z-40 max-w-2xl mx-auto rounded-3xl bg-white/95 border border-slate-200/90 px-4 py-3 sm:px-5 sm:py-3.5 backdrop-blur-md shadow-[0_12px_40px_rgba(0,0,0,0.14),0_4px_16px_rgba(0,0,0,0.06)]"
+      >
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[10px] font-bold uppercase text-slate-400">Total Payable</p>
-            <p className="text-xl font-black text-blue-600 font-mono leading-none">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Payable</p>
+            <p className="text-xl font-black text-blue-600 font-mono leading-none mt-0.5">
               ₹{Math.round(totalAmount).toLocaleString('en-IN')}
             </p>
           </div>
@@ -795,7 +800,7 @@ export function MultiServiceCartPage() {
             type="button"
             disabled={isSubmitting || calcLoading}
             onClick={handleCheckout}
-            className="flex-1 max-w-xs rounded-2xl bg-brand py-3.5 px-4 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-brand/25 transition active:scale-98 hover:bg-brand/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 max-w-xs rounded-full bg-brand py-3.5 px-4 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-brand/25 transition active:scale-98 hover:bg-brand/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
           >
             {isSubmitting ? (
               <>
@@ -805,7 +810,7 @@ export function MultiServiceCartPage() {
             ) : (
               <>
                 <span>Confirm Booking ({cartCount})</span>
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-4 w-4 stroke-[2.5]" />
               </>
             )}
           </button>
