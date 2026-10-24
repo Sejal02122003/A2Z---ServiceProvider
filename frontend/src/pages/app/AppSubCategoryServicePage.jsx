@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useLocation, useNavigate, useParams, Navigate } from 'react-router-dom'
-import { ArrowLeft, Wrench, ChevronDown, ChevronUp, Loader2, Sparkles, Tag, Flame, Clock } from 'lucide-react'
+import { ArrowLeft, Wrench, ChevronDown, ChevronUp, Loader2, Sparkles, Tag, Flame, Clock, CheckCircle2, XCircle, Check, X } from 'lucide-react'
 import { getCategoryImageUrl } from '../../lib/labourCategoryDisplay.js'
 import { BookingTypeSheet } from '../../components/app/booking/BookingTypeSheet.jsx'
 import { readBookingDraft, writeBookingDraft } from '../../lib/individualBookingDraft.js'
@@ -217,7 +217,7 @@ export function AppSubCategoryServicePage() {
                       {/* Name & Offer Details */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <h3 className="font-bold text-slate-900 truncate text-sm">{service.name}</h3>
+                          <h3 className="font-bold text-slate-900 text-sm leading-snug line-clamp-2">{service.name}</h3>
                           {offer.hasOffer && (
                             <ServiceOfferBadge label={offer.offerBadge} variant="compact" />
                           )}
@@ -313,6 +313,63 @@ export function AppSubCategoryServicePage() {
                             </span>
                           </div>
                         </div>
+
+                        {/* What's Included & Excluded (Inclusions / Exclusions) */}
+                        {((Array.isArray(service.inclusions) && service.inclusions.length > 0) || (Array.isArray(service.exclusions) && service.exclusions.length > 0)) && (
+                          <div className="space-y-3 pt-3 border-t border-slate-200/80">
+                            {Array.isArray(service.inclusions) && service.inclusions.length > 0 && (
+                              <div className="rounded-2xl border border-emerald-200/60 bg-emerald-50/40 p-3.5 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white">
+                                      <Check className="h-3 w-3 stroke-[3]" />
+                                    </div>
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-emerald-950">
+                                      What's Included
+                                    </h4>
+                                  </div>
+                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                                    {service.inclusions.length} items
+                                  </span>
+                                </div>
+                                <div className="grid gap-1.5 sm:grid-cols-2 pt-1">
+                                  {service.inclusions.map((item, idx) => (
+                                    <div key={idx} className="flex items-start gap-2 rounded-xl bg-white border border-emerald-100/80 px-2.5 py-1.5 text-xs font-semibold text-slate-800 shadow-2xs">
+                                      <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5 stroke-[2.5]" />
+                                      <span className="leading-tight">{item}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {Array.isArray(service.exclusions) && service.exclusions.length > 0 && (
+                              <div className="rounded-2xl border border-rose-200/60 bg-rose-50/40 p-3.5 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white">
+                                      <X className="h-3 w-3 stroke-[3]" />
+                                    </div>
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-rose-950">
+                                      Not Included / Excluded
+                                    </h4>
+                                  </div>
+                                  <span className="text-[10px] font-bold text-rose-700 bg-rose-100/80 px-2 py-0.5 rounded-full">
+                                    {service.exclusions.length} excluded
+                                  </span>
+                                </div>
+                                <div className="grid gap-1.5 sm:grid-cols-2 pt-1">
+                                  {service.exclusions.map((item, idx) => (
+                                    <div key={idx} className="flex items-start gap-2 rounded-xl bg-white border border-rose-100/80 px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs">
+                                      <X className="h-3.5 w-3.5 text-rose-500 shrink-0 mt-0.5 stroke-[2.5]" />
+                                      <span className="leading-tight">{item}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {/* Sub-Services / Variants List */}
                         {Array.isArray(service.subServices) && service.subServices.filter(ss => ss.isActive !== false).length > 0 && (

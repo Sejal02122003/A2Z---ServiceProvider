@@ -139,6 +139,18 @@ const labourServiceSchema = new mongoose.Schema(
         },
       },
     ],
+    inclusions: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    exclusions: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
   },
   { timestamps: true }
 )

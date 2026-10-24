@@ -37,6 +37,8 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
   const [iconUrl, setIconUrl] = useState('')
   const [subServices, setSubServices] = useState([])
   const [isActive, setIsActive] = useState(true)
+  const [inclusionsText, setInclusionsText] = useState('')
+  const [exclusionsText, setExclusionsText] = useState('')
   const [uploadBusy, setUploadBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -45,6 +47,8 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
       setName('')
       setSubcategoryId(subcategories[0]?._id ?? '')
       setDescription('')
+      setInclusionsText('')
+      setExclusionsText('')
       setChargeType('PER_HOUR')
       setUnitName('')
       setPricePerUnit(0)
@@ -142,6 +146,8 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
               isActive: ss.isActive !== false,
             }
           }),
+        inclusions: inclusionsText.split('\n').map(s => s.trim()).filter(Boolean),
+        exclusions: exclusionsText.split('\n').map(s => s.trim()).filter(Boolean),
         iconUrl: iconUrl.trim() || undefined,
         isActive
       }
@@ -205,6 +211,36 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
                 placeholder="Optional description"
               />
+            </div>
+
+            <div className="col-span-2 space-y-3 rounded-2xl bg-slate-50/70 border border-slate-200/80 p-3.5">
+              <div>
+                <label className="mb-1 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                  <span>What's Included (1 item per line)</span>
+                  <span className="text-[10px] text-emerald-600 font-semibold">Shows with checkmarks</span>
+                </label>
+                <textarea
+                  value={inclusionsText}
+                  onChange={(e) => setInclusionsText(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-brand/35"
+                  placeholder={"Full Legs Waxing\nFull Arms Waxing\nUnderarms Waxing"}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                  <span>What's Not Included / Exclusions (1 item per line)</span>
+                  <span className="text-[10px] text-rose-500 font-semibold">Shows with cross badge</span>
+                </label>
+                <textarea
+                  value={exclusionsText}
+                  onChange={(e) => setExclusionsText(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-brand/35"
+                  placeholder={"Face Waxing\nBikini Waxing"}
+                />
+              </div>
             </div>
 
             {/* Charges Option: 3 options */}
@@ -668,6 +704,8 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
       
       setIconUrl(service.iconUrl || '')
       setSubServices(Array.isArray(service.subServices) ? service.subServices.map(ss => ({ ...ss })) : [])
+      setInclusionsText(Array.isArray(service.inclusions) ? service.inclusions.join('\n') : '')
+      setExclusionsText(Array.isArray(service.exclusions) ? service.exclusions.join('\n') : '')
       setIsActive(service.isActive ?? true)
       setError('')
     }
@@ -754,6 +792,8 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
               isActive: ss.isActive !== false,
             }
           }),
+        inclusions: inclusionsText.split('\n').map(s => s.trim()).filter(Boolean),
+        exclusions: exclusionsText.split('\n').map(s => s.trim()).filter(Boolean),
         iconUrl: iconUrl.trim() || undefined,
         isActive
       }
@@ -817,6 +857,36 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
                 placeholder="Optional description"
               />
+            </div>
+
+            <div className="col-span-2 space-y-3 rounded-2xl bg-slate-50/70 border border-slate-200/80 p-3.5">
+              <div>
+                <label className="mb-1 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                  <span>What's Included (1 item per line)</span>
+                  <span className="text-[10px] text-emerald-600 font-semibold">Shows with checkmarks</span>
+                </label>
+                <textarea
+                  value={inclusionsText}
+                  onChange={(e) => setInclusionsText(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-brand/35"
+                  placeholder={"Full Legs Waxing\nFull Arms Waxing\nUnderarms Waxing"}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                  <span>What's Not Included / Exclusions (1 item per line)</span>
+                  <span className="text-[10px] text-rose-500 font-semibold">Shows with cross badge</span>
+                </label>
+                <textarea
+                  value={exclusionsText}
+                  onChange={(e) => setExclusionsText(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-brand/35"
+                  placeholder={"Face Waxing\nBikini Waxing"}
+                />
+              </div>
             </div>
 
             {/* Charges Option: 3 options */}

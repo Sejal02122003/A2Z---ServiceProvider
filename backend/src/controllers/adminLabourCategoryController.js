@@ -299,6 +299,8 @@ export const createService = asyncHandler(async (req, res) => {
     unitName = '',
     pricePerUnit = 0,
     subServices = [],
+    inclusions = [],
+    exclusions = [],
   } = req.body
   const subcat = await LabourSubcategory.findById(subcategoryId)
   if (!subcat) {
@@ -335,6 +337,18 @@ export const createService = asyncHandler(async (req, res) => {
         }))
     : []
 
+  const normalizedInclusions = Array.isArray(inclusions)
+    ? inclusions.map(i => String(i).trim()).filter(Boolean)
+    : typeof inclusions === 'string'
+      ? inclusions.split(/[\n,]/).map(i => i.trim()).filter(Boolean)
+      : []
+
+  const normalizedExclusions = Array.isArray(exclusions)
+    ? exclusions.map(e => String(e).trim()).filter(Boolean)
+    : typeof exclusions === 'string'
+      ? exclusions.split(/[\n,]/).map(e => e.trim()).filter(Boolean)
+      : []
+
   const s = await LabourService.create({
     subcategoryId: subcat._id,
     name: name.trim(),
@@ -355,6 +369,8 @@ export const createService = asyncHandler(async (req, res) => {
     isAllZones: Boolean(isAllZones),
     zones: Array.isArray(zones) ? zones : [],
     subServices: normalizedSubServices,
+    inclusions: normalizedInclusions,
+    exclusions: normalizedExclusions,
     isActive: isActive !== undefined ? Boolean(isActive) : true,
   })
   return sendSuccess(res, { message: 'Service created', statusCode: HTTP_STATUS.CREATED, data: { service: s } })
@@ -427,6 +443,20 @@ export const patchService = asyncHandler(async (req, res) => {
       })
     }
     s.iconUrl = normalized
+  }
+  if (req.body.inclusions !== undefined) {
+    s.inclusions = Array.isArray(req.body.inclusions)
+      ? req.body.inclusions.map(i => String(i).trim()).filter(Boolean)
+      : typeof req.body.inclusions === 'string'
+        ? req.body.inclusions.split(/[\n,]/).map(i => i.trim()).filter(Boolean)
+        : []
+  }
+  if (req.body.exclusions !== undefined) {
+    s.exclusions = Array.isArray(req.body.exclusions)
+      ? req.body.exclusions.map(e => String(e).trim()).filter(Boolean)
+      : typeof req.body.exclusions === 'string'
+        ? req.body.exclusions.split(/[\n,]/).map(e => e.trim()).filter(Boolean)
+        : []
   }
   await s.save()
   return sendSuccess(res, { message: 'Service updated', data: { service: s } })
