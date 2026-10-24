@@ -8,6 +8,12 @@ const router = Router()
 router.use(protect)
 
 // Only Labourers/Contractors can interact with broadcasts directly
+router.get(
+  '/active',
+  restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),
+  broadcast.getActiveBroadcast,
+)
+
 router.post(
   '/:bookingId/accept',
   restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),

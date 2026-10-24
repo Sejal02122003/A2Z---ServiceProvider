@@ -63,38 +63,40 @@ export function BroadcastPopup() {
     }
   }, [])
 
-  // Only render for labour / worker users
-  const isLabour = user?.role === USER_ROLES.LABOUR || user?.role === 'labour'
+  // Only render for labour / contractor / service provider users
+  const roleLower = String(user?.role || '').toLowerCase()
+  const isLabour = roleLower === 'labour' || roleLower === 'contractor'
 
-  // Listen for broadcast events
+  const handleBroadcast = useCallback((data) => {
+    if (!data) return
+    console.log('--- BOOKING_RECEIVED EVENT ---', data)
+    const timeout = Math.max(5, Math.floor((data.timeoutMs || 30000) / 1000))
+    setIncoming(data)
+    setTimeLeft(timeout)
+    setError('')
+    setResponding(false)
+    setSelectedServiceId(null)
+    playAlertChime()
+
+    // Browser notification fallback if granted
+    if (window.Notification && Notification.permission === 'granted') {
+      try {
+        const title = data.type === 'SCHEDULED' ? 'Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡'
+        new Notification(title, {
+          body: `${data.serviceName || 'Service'} · ₹${data.estimatedEarnings || 0}`,
+          icon: '/favicon.ico'
+        })
+      } catch { /* ignore */ }
+    }
+  }, [playAlertChime])
+
+  // Listen for real-time WebSocket broadcast events
   useEffect(() => {
     if (!isLabour) {
       setIncoming(null)
       return
     }
     if (!socket) return
-
-    const handleBroadcast = (data) => {
-      console.log('--- BOOKING_RECEIVED EVENT ---', data);
-      const timeout = Math.floor((data.timeoutMs || 30000) / 1000)
-      setIncoming(data)
-      setTimeLeft(timeout)
-      setError('')
-      setResponding(false)
-      setSelectedServiceId(null)
-      playAlertChime()
-
-      // Browser notification fallback if granted
-      if (window.Notification && Notification.permission === 'granted') {
-        try {
-          const title = data.type === 'SCHEDULED' ? 'Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡'
-          new Notification(title, {
-            body: `${data.serviceName || 'Service'} · ₹${data.estimatedEarnings || 0}`,
-            icon: '/favicon.ico'
-          })
-        } catch { /* ignore */ }
-      }
-    }
 
     socket.on('BOOKING_RECEIVED', handleBroadcast)
     const handleExpired = (data) => {
@@ -106,7 +108,32 @@ export function BroadcastPopup() {
       socket.off('BOOKING_RECEIVED', handleBroadcast)
       socket.off('BOOKING_EXPIRED', handleExpired)
     }
-  }, [socket, isLabour, playAlertChime])
+  }, [socket, isLabour, handleBroadcast])
+
+  // Periodic fallback: Poll for active broadcasts in case of socket reconnection or page refresh
+  useEffect(() => {
+    if (!isLabour) return
+
+    let cancelled = false
+    const fetchActive = async () => {
+      if (incoming) return // already displaying an offer
+      try {
+        const res = await broadcastsApi.getActiveBroadcast()
+        if (!cancelled && res?.data?.broadcast && !incoming) {
+          handleBroadcast(res.data.broadcast)
+        }
+      } catch {
+        // ignore background poll errors
+      }
+    }
+
+    fetchActive()
+    const interval = setInterval(fetchActive, 4000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [isLabour, incoming, handleBroadcast])
 
   // Countdown timer
   useEffect(() => {
@@ -185,7 +212,7 @@ export function BroadcastPopup() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm"
           />
 
           {/* Popup */}
@@ -194,7 +221,7 @@ export function BroadcastPopup() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={reduce ? undefined : { opacity: 0, y: 40, scale: 0.9 }}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="fixed inset-x-4 bottom-6 z-[301] mx-auto max-w-md rounded-3xl bg-white shadow-2xl overflow-hidden"
+            className="fixed inset-x-4 bottom-6 z-[9999] mx-auto max-w-md rounded-3xl bg-white shadow-2xl overflow-hidden"
           >
             {/* Timer Bar */}
             <div className="relative h-1.5 overflow-hidden rounded-t-3xl bg-slate-100">

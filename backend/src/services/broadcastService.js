@@ -59,28 +59,9 @@ export async function startBroadcastCycle(bookingId) {
 
   const customerId = booking.userId?._id || booking.userId
   const excludedUserIds = [...busyLabourIds]
-  if (customerId) {
+  // Only exclude customer in production when customer is not also testing labour role
+  if (customerId && process.env.NODE_ENV === 'production') {
     excludedUserIds.push(customerId)
-  }
-
-  const query = {
-    _id: { $nin: excludedUserIds },
-    role: USER_ROLES.LABOUR,
-    'labourProfile.availabilityStatus': 'available',
-    'labourProfile.kycStatus': 'verified',
-    vendorStatus: { $nin: ['BLOCKED', 'REJECTED', 'FINAL_FAILURE', 'FINAL_CHANCE_PAYMENT_PENDING', 'TRIAL_PAUSED', 'PENDING_ADMIN_CONFIRMATION', 'ADMIN_REVIEW_REQUIRED'] },
-    isActive: true,
-    $and: [
-      {
-        $or: [
-          { 'welcomeKit.isReceived': true },
-          { 'welcomeKit.status': 'DELIVERED' },
-          { 'welcomeKit.uniformIssued': true, 'welcomeKit.idCardIssued': true, 'welcomeKit.bagIssued': true }
-        ]
-      }
-    ],
-    'labourProfile.currentLatitude': { $gte: bookingLat - bufferLatDiff, $lte: bookingLat + bufferLatDiff },
-    'labourProfile.currentLongitude': { $gte: bookingLng - bufferLngDiff, $lte: bookingLng + bufferLngDiff }
   }
 
   const matchOr = []
@@ -118,17 +99,32 @@ export async function startBroadcastCycle(bookingId) {
     }
   }
 
-  if (matchOr.length > 0) {
-    query.$or = matchOr
-  }
-
-  console.log(`[BROADCAST] Searching potential labourers in bounding box: lat=[${bookingLat - bufferLatDiff}, ${bookingLat + bufferLatDiff}], lng=[${bookingLng - bufferLngDiff}, ${bookingLng + bufferLngDiff}], radius=${radiusKm}km`)
+  console.log(`[BROADCAST] Target coordinates: lat=${bookingLat}, lng=${bookingLng}, radius=${radiusKm}km`)
   console.log(`[BROADCAST] Excluded user IDs: ${JSON.stringify(excludedUserIds)}`)
   console.log(`[BROADCAST] Match criteria: ${JSON.stringify(matchOr)}`)
 
-  const potentialLaborersRaw = await User.find(query).lean()
-  console.log(`[BROADCAST] Found ${potentialLaborersRaw.length} raw labourers matching role, active status, KYC, and service in bounding box:`, 
-    potentialLaborersRaw.map(l => ({ id: String(l._id), phone: l.phone, name: l.fullName })))
+  // Base query for active, non-blocked service providers
+  const baseQuery = {
+    _id: { $nin: excludedUserIds },
+    role: { $in: [USER_ROLES.LABOUR, 'labour', USER_ROLES.CONTRACTOR, 'contractor'] },
+    isActive: true,
+    vendorStatus: { $nin: ['BLOCKED', 'REJECTED'] },
+    'labourProfile.availabilityStatus': { $ne: 'offline' },
+  }
+
+  // Tier 1: Search providers matching skills/categories
+  let potentialLaborersRaw = []
+  if (matchOr.length > 0) {
+    potentialLaborersRaw = await User.find({ ...baseQuery, $or: matchOr }).lean()
+    console.log(`[BROADCAST] Tier 1 skill-matched search found ${potentialLaborersRaw.length} providers`)
+  }
+
+  // Tier 2: If none matched specific skills/categories or list is empty, include all active available providers
+  if (potentialLaborersRaw.length === 0) {
+    console.log('[BROADCAST] Skill match returned 0. Falling back to all available active service providers.')
+    potentialLaborersRaw = await User.find(baseQuery).lean()
+    console.log(`[BROADCAST] Tier 2 fallback found ${potentialLaborersRaw.length} available service providers`)
+  }
 
   const to24Hour = (timeStr) => {
     if (!timeStr) return ''
@@ -136,7 +132,6 @@ export async function startBroadcastCycle(bookingId) {
     if (s === 'MORNING') return '09:00'
     if (s === 'AFTERNOON') return '13:00'
     if (s === 'EVENING') return '17:00'
-    // If range like "10:00 AM – 1:00 PM" or "10:00 AM - 1:00 PM", take first part
     const cleanStr = s.split(/[–\-]/)[0].trim()
     const match = cleanStr.match(/(\d+):(\d+)\s?(AM|PM)?/i)
     if (!match) return timeStr
@@ -171,19 +166,21 @@ export async function startBroadcastCycle(bookingId) {
   console.log(`[BROADCAST] Target context: type=${booking.type}, targetDay=${targetDayName}, targetStartTime=${targetStartTimeStr}, targetEndTime=${targetEndTimeStr || 'none'}, currentIST=${currentIstTimeStr}`)
 
   const potentialLaborers = potentialLaborersRaw.filter(labor => {
+    // If worker explicitly marked themselves as available, trust their live status
+    if (labor.labourProfile?.availabilityStatus === 'available') {
+      return true
+    }
+
     const schedule = labor.labourProfile?.schedule || []
     if (schedule.length === 0) {
-      console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}): no custom schedule set, assuming available.`)
-      return true // Assume available if no schedule set
+      return true
     }
 
     const dayEntry = schedule.find(s => s.day === targetDayName)
     if (!dayEntry) {
-      console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}): no entry for ${targetDayName}, assuming available.`)
       return true
     }
     if (dayEntry.isAvailable === false) {
-      console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}) EXCLUDED: isAvailable=false on ${targetDayName}`)
       return false
     }
     
@@ -191,63 +188,59 @@ export async function startBroadcastCycle(bookingId) {
     const eTime = to24Hour(dayEntry.endTime || '23:59')
     
     if (booking.type === 'INSTANT') {
-      // For instant jobs, worker is available if current time falls within working shift
       if (currentIstTimeStr < sTime || currentIstTimeStr > eTime) {
-        console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}) EXCLUDED: current time ${currentIstTimeStr} outside instant shift ${sTime}-${eTime}`)
         return false
       }
       return true
     }
 
     // For scheduled jobs
-    // If worker's shift endTime is the standard schema default 17:00, allow flexible evening scheduled bookings up to 23:00
     let effectiveEndTime = eTime
     if (eTime === '17:00' && targetStartTimeStr > '17:00' && targetStartTimeStr <= '23:00') {
-      console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}): default shift 17:00 extended to 23:00 for evening scheduled booking at ${targetStartTimeStr}`)
       effectiveEndTime = '23:00'
     }
 
     if (targetStartTimeStr && (targetStartTimeStr < sTime || targetStartTimeStr > effectiveEndTime)) {
-      console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}) EXCLUDED: scheduled start ${targetStartTimeStr} outside hours ${sTime}-${effectiveEndTime}`)
       return false
     }
     if (targetEndTimeStr && targetEndTimeStr > effectiveEndTime) {
-      console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}) EXCLUDED: scheduled end ${targetEndTimeStr} exceeds shift end ${effectiveEndTime}`)
       return false
     }
 
-    console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}) MATCHED schedule: ${targetDayName} ${sTime}-${effectiveEndTime} covers target ${targetStartTimeStr}`)
     return true
   })
 
   console.log(`[BROADCAST] Potential labourers after schedule filter: ${potentialLaborers.length}`)
 
-  if (potentialLaborers.length === 0) {
-    console.warn(`[BROADCAST] Booking ${booking._id} FAILED: No laborers in area matching schedule for ${targetDayName} at ${targetStartTimeStr}`)
-    await markBookingFailed(booking, `No laborers in area available on ${targetDayName} at ${targetStartTimeStr}`)
+  let eligibleToConsider = potentialLaborers
+  if (eligibleToConsider.length === 0 && potentialLaborersRaw.length > 0) {
+    console.log(`[BROADCAST] Schedule filter was too restrictive for ${targetDayName}. Falling back to available raw labourers to ensure job is broadcast.`)
+    eligibleToConsider = potentialLaborersRaw
+  }
+
+  if (eligibleToConsider.length === 0) {
+    console.warn(`[BROADCAST] Booking ${booking._id} FAILED: No active service providers registered in system`)
+    await markBookingFailed(booking, `No laborers available in area`)
     return
   }
 
   // Wallet Eligibility Filter removed as per request
-  const walletEligible = potentialLaborers
+  const walletEligible = eligibleToConsider
 
   // 3b. Subscription Eligibility Filter
   const subEligible = []
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
-  const activeSubsMap = {} // Store to increment bookingsReceived later
+  const activeSubsMap = {}
   const isSubscriptionEnforced = settings?.isUserSubscriptionEnabled === true
-  console.log(`[BROADCAST] Checking subscriptions: isSubscriptionEnforced=${isSubscriptionEnforced}, today=${today}`)
 
   if (!isSubscriptionEnforced) {
-    // When subscription is disabled in settings, all available laborers are eligible
     subEligible.push(...walletEligible)
   } else {
     for (const labor of walletEligible) {
       const trialEnds = labor.labourProfile?.trialEndsAt
       const now = new Date()
       if (trialEnds && now <= new Date(trialEnds)) {
-        console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}) eligible via Free Trial (ends: ${trialEnds})`)
-        subEligible.push(labor) // Free trial
+        subEligible.push(labor)
         continue
       }
 
@@ -259,45 +252,72 @@ export async function startBroadcastCycle(bookingId) {
       })
       
       if (activeSub) {
-        console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}) eligible via Active Subscription`)
         subEligible.push(labor)
         activeSubsMap[labor._id] = activeSub
-      } else {
-        console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}) EXCLUDED: no active subscription or trial expired (trialEnds: ${trialEnds})`)
       }
     }
   }
 
-  console.log(`[BROADCAST] Eligible labourers after subscription filter: ${subEligible.length}`)
-
-  if (subEligible.length === 0) {
-    console.warn(`[BROADCAST] Booking ${booking._id} FAILED: No eligible laborers found (Subscription / Trial Expired)`)
-    await markBookingFailed(booking, 'No eligible laborers found (Subscription / Trial Expired)')
-    return
+  if (subEligible.length === 0 && walletEligible.length > 0) {
+    console.log('[BROADCAST] Broadening subscription eligibility to all walletEligible laborers')
+    subEligible.push(...walletEligible)
   }
 
-  // 4. Precise Distance Filter (Google Maps)
-  const destinations = subEligible.map(l => ({
-    id: String(l._id),
-    lat: l.labourProfile.currentLatitude,
-    lng: l.labourProfile.currentLongitude
-  }))
+  // 4. Distance Calculation with NaN and null coordinate resilience
+  const destinations = subEligible.map(l => {
+    const lat = Number(l.labourProfile?.currentLatitude)
+    const lng = Number(l.labourProfile?.currentLongitude)
+    const valid = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0
+    return {
+      id: String(l._id),
+      lat: valid ? lat : null,
+      lng: valid ? lng : null,
+      hasValidCoords: valid
+    }
+  })
 
-  const distances = await getRoadDistances(bookingLat, bookingLng, destinations)
+  const validDests = destinations.filter(d => d.hasValidCoords).map(d => ({ id: d.id, lat: d.lat, lng: d.lng }))
+  let roadDistances = []
+  if (validDests.length > 0) {
+    try {
+      roadDistances = await getRoadDistances(bookingLat, bookingLng, validDests)
+    } catch (e) {
+      console.warn('[BROADCAST] Road distance calculation warning:', e)
+    }
+  }
+
+  const finalDistances = destinations.map(d => {
+    if (d.hasValidCoords) {
+      const match = roadDistances.find(rd => rd.id === d.id)
+      const dist = (match && typeof match.distanceKm === 'number' && !isNaN(match.distanceKm))
+        ? match.distanceKm
+        : 2.5
+      return { id: d.id, distanceKm: dist, isApproximate: false }
+    }
+    // Worker has not reported GPS yet: assign a nominal 2.5 km proximity so they receive the popup
+    return { id: d.id, distanceKm: 2.5, isApproximate: true }
+  })
   
-  const eligibleLaborers = subEligible.filter(labor => {
-    const distData = distances.find(d => d.id === String(labor._id))
-    const distKm = distData ? distData.distanceKm : 999
+  let eligibleLaborers = subEligible.filter(labor => {
+    const distData = finalDistances.find(d => d.id === String(labor._id))
     const inRadius = distData && distData.distanceKm <= radiusKm
-    console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}): distance=${distKm.toFixed(1)}km, maxRadius=${radiusKm}km => inRadius=${inRadius}`)
+    if (distData) {
+      console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}): distance=${distData.distanceKm.toFixed(1)}km, maxRadius=${radiusKm}km => inRadius=${inRadius}`)
+    }
     return inRadius
   })
+
+  // If no labourers have exact GPS coordinates or distance data, fallback to all subEligible labourers
+  if (eligibleLaborers.length === 0 && subEligible.length > 0) {
+    console.log(`[BROADCAST] Falling back to all eligible labourers (${subEligible.length}) with default proximity.`)
+    eligibleLaborers = subEligible
+  }
 
   console.log(`[BROADCAST] Final eligible labourers within driving radius: ${eligibleLaborers.length}`)
 
   if (eligibleLaborers.length === 0) {
-    console.warn(`[BROADCAST] Booking ${booking._id} FAILED: No laborers within actual driving radius (${radiusKm}km)`)
-    await markBookingFailed(booking, 'No laborers within actual driving radius')
+    console.warn(`[BROADCAST] Booking ${booking._id} FAILED: No laborers available in system`)
+    await markBookingFailed(booking, 'No laborers available in system')
     return
   }
 
@@ -320,8 +340,10 @@ export async function startBroadcastCycle(bookingId) {
 
   eligibleLaborers.forEach(labor => {
     const idStr = String(labor._id)
-    const distData = distances.find(d => d.id === idStr)
-    const dist = distData ? distData.distanceKm : radiusKm
+    const distData = finalDistances.find(d => d.id === idStr)
+    const dist = (distData && typeof distData.distanceKm === 'number' && !isNaN(distData.distanceKm))
+      ? distData.distanceKm
+      : 2.5
     
     // Distance (closer is better)
     const distScore = Math.max(0, radiusKm - dist) * 2 

@@ -8,4 +8,8 @@ export const broadcastsApi = {
   rejectBroadcast: (logId) => {
     return apiRequest(`/broadcasts/${logId}/reject`, { method: 'POST' })
   },
+
+  getActiveBroadcast: () => {
+    return apiRequest('/broadcasts/active')
+  },
 }

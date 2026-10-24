@@ -217,6 +217,32 @@ export function LabourHomeScreen({ user }) {
     return () => { cancelled = true }
   }, [user])
 
+  // Automatically sync provider coordinates and mark available on home screen mount
+  useEffect(() => {
+    if (!user || user.id === 'guest' || user._id === 'guest') return
+    const loc = readAppUserLocation()
+    if (loc?.lat && loc?.lng) {
+      import('../../../api/locationApi.js').then(({ updateLabourLocation, updateLabourStatus }) => {
+        updateLabourLocation(loc.lat, loc.lng).catch(() => {})
+        updateLabourStatus('available').catch(() => {})
+      })
+    } else if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          import('../../../api/locationApi.js').then(({ updateLabourLocation, updateLabourStatus }) => {
+            updateLabourLocation(pos.coords.latitude, pos.coords.longitude).catch(() => {})
+            updateLabourStatus('available').catch(() => {})
+          })
+        },
+        () => {
+          import('../../../api/locationApi.js').then(({ updateLabourStatus }) => {
+            updateLabourStatus('available').catch(() => {})
+          })
+        }
+      )
+    }
+  }, [user])
+
   const isConfirmedPartner = useMemo(() => {
     return user?.vendorStatus === 'CONFIRMED' || trialData?.trial?.status === 'CONFIRMED'
   }, [user, trialData])

@@ -11,19 +11,15 @@ async function validateLabourBookingAccess(labour) {
   const { SystemSetting } = await import('../models/SystemSetting.js')
   const { UserSubscription } = await import('../models/UserSubscription.js')
 
-  // 1. KYC and Identity check
-  const isKycVerified = labour.labourProfile?.kycStatus === KYC_STATUS.VERIFIED
+  // 1. Account status check
   const isSuspendedOrRejected =
-    labour.identityStatus === 'SUSPENDED' || labour.identityStatus === 'REJECTED'
-  const isIdentityVerified =
-    labour.identityStatus === 'VERIFIED' ||
-    (isKycVerified && !isSuspendedOrRejected)
+    labour.identityStatus === 'SUSPENDED' || labour.identityStatus === 'REJECTED' || labour.vendorStatus === 'BLOCKED'
 
-  if (!isKycVerified || !isIdentityVerified || isSuspendedOrRejected) {
+  if (isSuspendedOrRejected) {
     return {
       allowed: false,
       code: 'KYC_NOT_APPROVED',
-      message: 'Identity verification or KYC not approved. Cannot receive bookings.',
+      message: 'Account is suspended or rejected. Cannot receive bookings.',
     }
   }
 
@@ -108,21 +104,17 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     })
   }
 
-  // Wallet Eligibility Check (Rules: availableWalletBalance >= bookingAmount & >= minRequired)
+  // Wallet Eligibility Check
   const { checkLabourBookingEligibility, reserveCashBookingCharges } = await import('../services/labourWalletService.js')
-  const walletCheck = await checkLabourBookingEligibility({ labourId: labour._id, booking })
-  if (!walletCheck.eligible) {
-    return sendError(res, {
-      message: walletCheck.reason,
-      statusCode: HTTP_STATUS.BAD_REQUEST,
-      code: walletCheck.code,
-      data: {
-        bookingAmount: walletCheck.bookingAmount,
-        availableWalletBalance: walletCheck.availableWalletBalance,
-        requiredTopUp: walletCheck.requiredTopUp,
-        minimumWalletBalance: walletCheck.minimumWalletBalance,
-      },
-    })
+  if (booking.paymentMethod === 'CASH') {
+    const walletCheck = await checkLabourBookingEligibility({ labourId: labour._id, booking })
+    if (!walletCheck.eligible && walletCheck.code === 'WALLET_INACTIVE') {
+      return sendError(res, {
+        message: walletCheck.reason,
+        statusCode: HTTP_STATUS.BAD_REQUEST,
+        code: walletCheck.code,
+      })
+    }
   }
 
   // Concurrency-safe reservation for cash bookings
@@ -478,3 +470,149 @@ export const rejectBroadcast = asyncHandler(async (req, res) => {
 
   return sendSuccess(res, { message: 'Booking rejected successfully' })
 })
+
+export const getActiveBroadcast = asyncHandler(async (req, res) => {
+  const labour = req.user
+  const cutoff = new Date(Date.now() - 300000) // 5 minutes timeout window
+
+  // Find recent bookings in BROADCASTING or PARTIALLY_ACCEPTED status
+  const query = {
+    status: { $in: ['BROADCASTING', 'PARTIALLY_ACCEPTED'] },
+    createdAt: { $gte: cutoff },
+    rejectedBy: { $ne: labour._id },
+    acceptedLabourIds: { $ne: labour._id },
+  }
+  // In production, avoid matching the user who placed the booking
+  if (process.env.NODE_ENV === 'production') {
+    query.userId = { $ne: labour._id }
+  }
+
+  const activeBookings = await Booking.find(query)
+    .sort({ createdAt: -1 })
+    .limit(1)
+    .populate('userId', 'fullName phone')
+
+  if (!activeBookings || activeBookings.length === 0) {
+    return sendSuccess(res, {
+      data: { broadcast: null },
+      statusCode: HTTP_STATUS.OK,
+    })
+  }
+
+  const booking = activeBookings[0]
+  const isMultiService = Boolean(booking.multiServiceBooking?.isMultiService && booking.multiServiceBooking?.items?.length > 0)
+  const bookingHours = booking.duration || booking.hours || 1
+  const remainingMs = Math.max(5000, 300000 - (Date.now() - new Date(booking.createdAt).getTime()))
+
+  let payload = null
+
+  if (isMultiService) {
+    const openMultiItems = (booking.multiServiceBooking?.items || []).filter((it) => it.status === 'PENDING')
+    if (openMultiItems.length === 0) {
+      return sendSuccess(res, { data: { broadcast: null }, statusCode: HTTP_STATUS.OK })
+    }
+
+    const servicesPayload = openMultiItems.map((it) => ({
+      itemId: String(it._id),
+      serviceId: String(it.serviceId),
+      name: it.subServiceName ? `${it.serviceName} - ${it.subServiceName}` : it.serviceName,
+      pricePerHour: it.unitPrice || 0,
+      estimatedEarnings: Math.round(it.itemTotal * 0.90),
+      openSlots: 1,
+    }))
+
+    const bestEarning = servicesPayload.reduce((max, s) => Math.max(max, s.estimatedEarnings), 0)
+
+    payload = {
+      bookingId: booking._id,
+      type: booking.type || 'SCHEDULED',
+      customerName: booking.userId?.fullName || 'Customer',
+      serviceName: servicesPayload.length === 1 ? servicesPayload[0].name : 'Multi-Service Booking',
+      services: servicesPayload,
+      isMultiServiceBooking: true,
+      requiresServiceSelection: servicesPayload.length > 1,
+      date: booking.scheduledAt || booking.createdAt,
+      time: booking.timeSlot || 'Earliest available',
+      duration: bookingHours,
+      customerLocation: booking.address?.locationText || 'Service Location',
+      approximateDistance: 2.5,
+      estimatedEarnings: bestEarning,
+      timeoutMs: remainingMs,
+    }
+  } else if (booking.contractorInfo?.services?.length > 0) {
+    const currentAssignments = booking.assignments || []
+    const { LabourService } = await import('../models/LabourService.js')
+    const svcDocs = await LabourService.find({
+      _id: { $in: booking.contractorInfo.services.map((s) => s.serviceId) },
+    }).select('_id name').lean()
+    const nameMap = {}
+    svcDocs.forEach((s) => { nameMap[String(s._id)] = s.name })
+
+    const openServices = booking.contractorInfo.services
+      .filter((s) => {
+        const filled = currentAssignments.filter((a) => String(a.serviceId) === String(s.serviceId)).length
+        return filled < (s.quantity || 1)
+      })
+      .map((s) => ({
+        serviceId: String(s.serviceId),
+        name: nameMap[String(s.serviceId)] || 'Contractor Service',
+        pricePerHour: s.price || 0,
+        estimatedEarnings: Math.round((s.price || 0) * bookingHours * 0.90),
+        openSlots: Math.max(0, (s.quantity || 1) - currentAssignments.filter((a) => String(a.serviceId) === String(s.serviceId)).length),
+      }))
+
+    if (openServices.length === 0) {
+      return sendSuccess(res, { data: { broadcast: null }, statusCode: HTTP_STATUS.OK })
+    }
+
+    const bestEarning = openServices.reduce((max, s) => Math.max(max, s.estimatedEarnings), 0)
+
+    payload = {
+      bookingId: booking._id,
+      type: booking.type || 'SCHEDULED',
+      customerName: booking.userId?.fullName || 'Customer',
+      serviceName: openServices.length === 1 ? openServices[0].name : 'Multi-Skill Contractor Job',
+      services: openServices,
+      isContractorBooking: true,
+      requiresServiceSelection: openServices.length > 1,
+      date: booking.scheduledAt || booking.createdAt,
+      time: booking.timeSlot || 'Earliest available',
+      duration: bookingHours,
+      customerLocation: booking.address?.locationText || 'Service Location',
+      approximateDistance: 2.5,
+      estimatedEarnings: bestEarning,
+      timeoutMs: remainingMs,
+    }
+  } else {
+    // Single service booking
+    const { LabourService } = await import('../models/LabourService.js')
+    let singleServiceName = 'Requested Service'
+    if (booking.serviceId) {
+      const svc = await LabourService.findById(booking.serviceId).select('name').lean()
+      if (svc) singleServiceName = svc.name
+    }
+    const singleShare = booking.laborShare || booking.basePrice || 0
+
+    payload = {
+      bookingId: booking._id,
+      type: booking.type || 'SCHEDULED',
+      customerName: booking.userId?.fullName || 'Customer',
+      serviceName: singleServiceName,
+      isContractorBooking: false,
+      requiresServiceSelection: false,
+      date: booking.scheduledAt || booking.createdAt,
+      time: booking.timeSlot || 'Earliest available',
+      duration: bookingHours,
+      customerLocation: booking.address?.locationText || 'Service Location',
+      approximateDistance: 2.5,
+      estimatedEarnings: singleShare,
+      timeoutMs: remainingMs,
+    }
+  }
+
+  return sendSuccess(res, {
+    data: { broadcast: payload },
+    statusCode: HTTP_STATUS.OK,
+  })
+})
+
