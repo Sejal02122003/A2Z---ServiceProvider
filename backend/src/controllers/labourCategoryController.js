@@ -42,10 +42,6 @@ export const listGrouped = asyncHandler(async (req, res) => {
       { isAllZones: true },
       { "zones.zone": userZoneId }
     ]
-  } else if (lat && lng) {
-    // If lat/lng provided but no zone found, they are outside serviceable areas
-    // Only show globally available services
-    serviceFilter.isAllZones = true
   }
   
   const services = await import('../models/LabourService.js').then(m => m.LabourService.find(serviceFilter).sort({ name: 1 }).lean())
