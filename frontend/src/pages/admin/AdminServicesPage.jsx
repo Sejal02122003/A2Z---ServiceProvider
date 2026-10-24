@@ -22,6 +22,7 @@ import { assetUrlFromUpload, uploadMedia } from '../../api/uploadApi.js'
 
 function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSaved, busy, setBusy }) {
   const [name, setName] = useState('')
+  const [sortOrder, setSortOrder] = useState(0)
   const [subcategoryId, setSubcategoryId] = useState('')
   const [description, setDescription] = useState('')
   const [chargeType, setChargeType] = useState('PER_HOUR')
@@ -45,6 +46,7 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
   useEffect(() => {
     if (open) {
       setName('')
+      setSortOrder(0)
       setSubcategoryId(subcategories[0]?._id ?? '')
       setDescription('')
       setInclusionsText('')
@@ -113,6 +115,7 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
 
       const payload = {
         name: name.trim(),
+        sortOrder: Number(sortOrder) || 0,
         subcategoryId,
         description: description.trim(),
         chargeType,
@@ -133,7 +136,7 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
           })),
         subServices: subServices
           .filter((ss) => ss.name && ss.name.trim())
-          .map((ss) => {
+          .map((ss, idx) => {
             const fallbackP = Number(resolvedBasePrice || resolvedHourlyPrice || 0)
             const p = Number(ss.price) > 0 ? Number(ss.price) : fallbackP
             const op = Number(ss.originalPrice) > 0 ? Number(ss.originalPrice) : p
@@ -143,6 +146,7 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
               price: p,
               originalPrice: op,
               estimatedDurationMins: Number(ss.estimatedDurationMins || 30),
+              sortOrder: Number(ss.sortOrder) || idx,
               isActive: ss.isActive !== false,
             }
           }),
@@ -192,13 +196,24 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
               />
             </div>
             
-            <div className="col-span-2">
+            <div className="col-span-2 sm:col-span-1">
               <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Name</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
                 required
+              />
+            </div>
+
+            <div className="col-span-2 sm:col-span-1">
+              <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Sort Order (Numbering)</label>
+              <input
+                type="number"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+                placeholder="0"
               />
             </div>
 
@@ -571,7 +586,7 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                         <div className="sm:col-span-2">
                           <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Sub-Service Name</label>
                           <input
@@ -601,6 +616,20 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
                             }}
                             className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/30"
                             required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Sort Order</label>
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={subItem.sortOrder ?? idx}
+                            onChange={(e) => {
+                              const next = [...subServices];
+                              next[idx].sortOrder = Number(e.target.value);
+                              setSubServices(next);
+                            }}
+                            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/30"
                           />
                         </div>
                       </div>
@@ -663,6 +692,7 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
 
 function EditServiceModal({ open, service, subcategories, activeZones = [], onClose, onSaved, busy, setBusy }) {
   const [name, setName] = useState('')
+  const [sortOrder, setSortOrder] = useState(0)
   const [subcategoryId, setSubcategoryId] = useState('')
   const [description, setDescription] = useState('')
   const [chargeType, setChargeType] = useState('PER_HOUR')
@@ -678,12 +708,15 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
   const [iconUrl, setIconUrl] = useState('')
   const [subServices, setSubServices] = useState([])
   const [isActive, setIsActive] = useState(true)
+  const [inclusionsText, setInclusionsText] = useState('')
+  const [exclusionsText, setExclusionsText] = useState('')
   const [uploadBusy, setUploadBusy] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (open && service) {
       setName(service.name || '')
+      setSortOrder(service.sortOrder ?? 0)
       setSubcategoryId(service.subcategoryId || (subcategories[0]?._id ?? ''))
       setDescription(service.description || '')
       setChargeType(service.chargeType || 'PER_HOUR')
@@ -758,6 +791,7 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
 
       const payload = {
         name: name.trim(),
+        sortOrder: Number(sortOrder) || 0,
         subcategoryId,
         description: description.trim(),
         chargeType,
@@ -778,7 +812,7 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
           })),
         subServices: subServices
           .filter((ss) => ss.name && ss.name.trim())
-          .map((ss) => {
+          .map((ss, idx) => {
             const fallbackP = Number(resolvedBasePrice || resolvedHourlyPrice || 0)
             const p = Number(ss.price) > 0 ? Number(ss.price) : fallbackP
             const op = Number(ss.originalPrice) > 0 ? Number(ss.originalPrice) : p
@@ -789,6 +823,7 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
               price: p,
               originalPrice: op,
               estimatedDurationMins: Number(ss.estimatedDurationMins || 30),
+              sortOrder: Number(ss.sortOrder) || idx,
               isActive: ss.isActive !== false,
             }
           }),
@@ -838,13 +873,24 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
               />
             </div>
             
-            <div className="col-span-2">
+            <div className="col-span-2 sm:col-span-1">
               <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Name</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
                 required
+              />
+            </div>
+
+            <div className="col-span-2 sm:col-span-1">
+              <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Sort Order (Numbering)</label>
+              <input
+                type="number"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+                placeholder="0"
               />
             </div>
 
@@ -1217,7 +1263,7 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                         <div className="sm:col-span-2">
                           <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Sub-Service Name</label>
                           <input
@@ -1247,6 +1293,20 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
                             }}
                             className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/30"
                             required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Sort Order</label>
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={subItem.sortOrder ?? idx}
+                            onChange={(e) => {
+                              const next = [...subServices];
+                              next[idx].sortOrder = Number(e.target.value);
+                              setSubServices(next);
+                            }}
+                            className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500/30"
                           />
                         </div>
                       </div>
@@ -1407,13 +1467,19 @@ function ViewServiceModal({ open, service, onClose }) {
                     </>
                   )}
                 </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase text-slate-400">Status</p>
-                  <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ${
-                    displayData.isActive ? 'bg-blue-50 text-blue-700 ring-blue-200' : 'bg-slate-100 text-slate-500 ring-slate-200'
-                  }`}>
-                    {displayData.isActive ? 'Active' : 'Hidden'}
-                  </span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Sort Order</p>
+                    <p className="text-sm font-bold text-slate-800">{displayData.sortOrder ?? 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Status</p>
+                    <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ${
+                      displayData.isActive ? 'bg-blue-50 text-blue-700 ring-blue-200' : 'bg-slate-100 text-slate-500 ring-slate-200'
+                    }`}>
+                      {displayData.isActive ? 'Active' : 'Hidden'}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Sub-Services / Variants */}
@@ -1434,7 +1500,10 @@ function ViewServiceModal({ open, service, onClose }) {
                       {displayData.subServices.map((ss, idx) => (
                         <div key={idx} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2.5 shadow-xs">
                           <div className="min-w-0 pr-2">
-                            <p className="text-xs font-bold text-slate-800 truncate">{ss.name}</p>
+                            <div className="flex items-center gap-1.5">
+                              <span className="rounded bg-slate-100 px-1 py-0.2 text-[9px] font-bold text-slate-600">#{ss.sortOrder ?? idx}</span>
+                              <p className="text-xs font-bold text-slate-800 truncate">{ss.name}</p>
+                            </div>
                             {ss.description && <p className="text-[10px] text-slate-500 truncate mt-0.5">{ss.description}</p>}
                             <span className="inline-block text-[10px] text-slate-400 font-medium mt-0.5">⏱️ {ss.estimatedDurationMins || 30} mins</span>
                           </div>
@@ -1679,7 +1748,7 @@ export function AdminServicesPage() {
       });
     }
 
-    return result
+    return [...result].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
   }, [services, debouncedSearch, statusFilter, subcategoryFilter, zoneFilter])
 
   const totalPages = Math.ceil(filteredServices.length / limit) || 1
@@ -1903,6 +1972,7 @@ export function AdminServicesPage() {
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Sub-Category</th>
                 <th className="px-4 py-3">Category</th>
+                <th className="px-4 py-3 text-center">Sort Order</th>
                 <th className="px-4 py-3 text-right">Charges / Rate</th>
                 <th className="px-4 py-3 text-center">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
@@ -1911,11 +1981,11 @@ export function AdminServicesPage() {
             <tbody>
               {loading && services.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-slate-500">Loading...</td>
+                  <td colSpan={9} className="p-8 text-center text-slate-500">Loading...</td>
                 </tr>
               ) : paginatedServices.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-slate-500">No services found.</td>
+                  <td colSpan={9} className="p-8 text-center text-slate-500">No services found.</td>
                 </tr>
               ) : (
                 paginatedServices.map(s => (
@@ -1963,6 +2033,11 @@ export function AdminServicesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-[11px] font-semibold text-slate-700">{s.categoryName}</p>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="font-bold text-slate-800 rounded-lg bg-slate-100 px-2.5 py-1 text-xs">
+                        {s.sortOrder ?? 0}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-sm text-slate-700">
                       {(() => {

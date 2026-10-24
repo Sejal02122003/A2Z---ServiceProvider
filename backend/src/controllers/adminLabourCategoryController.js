@@ -17,11 +17,14 @@ function normalizeImageUrl(value) {
 
 export const listAllCategories = asyncHandler(async (_req, res) => {
   const cats = await LabourCategory.find().sort({ sortOrder: 1, name: 1 }).lean()
-  const subcats = await LabourSubcategory.find().sort({ name: 1 }).lean()
-  const services = await LabourService.find().sort({ name: 1 }).lean()
+  const subcats = await LabourSubcategory.find().sort({ sortOrder: 1, name: 1 }).lean()
+  const services = await LabourService.find().sort({ sortOrder: 1, name: 1 }).lean()
 
   const servicesBySubcat = new Map()
   for (const s of services) {
+    if (Array.isArray(s.subServices)) {
+      s.subServices.sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0))
+    }
     const k = String(s.subcategoryId)
     if (!servicesBySubcat.has(k)) servicesBySubcat.set(k, [])
     servicesBySubcat.get(k).push(s)
@@ -204,7 +207,7 @@ export const putCategory = asyncHandler(async (req, res) => {
 })
 
 export const createSubcategory = asyncHandler(async (req, res) => {
-  const { categoryId, name, description = '', iconUrl } = req.body
+  const { categoryId, name, description = '', sortOrder = 0, iconUrl } = req.body
   const cat = await LabourCategory.findById(categoryId)
   if (!cat) {
     return sendError(res, { message: 'Category not found', statusCode: HTTP_STATUS.NOT_FOUND, code: 'NOT_FOUND' })
@@ -229,7 +232,7 @@ export const createSubcategory = asyncHandler(async (req, res) => {
     categoryId: cat._id,
     name: name.trim(),
     description,
-
+    sortOrder: Number(sortOrder) || 0,
     iconUrl: image,
     isActive: true,
   })
@@ -257,10 +260,10 @@ export const patchSubcategory = asyncHandler(async (req, res) => {
   if (!sc) {
     return sendError(res, { message: 'Subcategory not found', statusCode: HTTP_STATUS.NOT_FOUND, code: 'NOT_FOUND' })
   }
-  const { name, description, isActive, iconUrl } = req.body
+  const { name, description, sortOrder, isActive, iconUrl } = req.body
   if (name != null) sc.name = String(name).trim()
   if (description != null) sc.description = String(description)
-
+  if (sortOrder != null) sc.sortOrder = Number(sortOrder) || 0
   if (isActive != null) sc.isActive = Boolean(isActive)
   if (iconUrl !== undefined) {
     const normalized = normalizeImageUrl(iconUrl)
@@ -295,6 +298,7 @@ export const createService = asyncHandler(async (req, res) => {
     isAllZones = true,
     zones = [],
     isActive,
+    sortOrder = 0,
     chargeType = 'PER_HOUR',
     unitName = '',
     pricePerUnit = 0,
@@ -334,7 +338,9 @@ export const createService = asyncHandler(async (req, res) => {
           estimatedDurationMins: Number(ss.estimatedDurationMins || 30),
           iconUrl: String(ss.iconUrl || '').trim(),
           isActive: ss.isActive !== false,
+          sortOrder: Number(ss.sortOrder || 0),
         }))
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
     : []
 
   const normalizedInclusions = Array.isArray(inclusions)
@@ -371,6 +377,7 @@ export const createService = asyncHandler(async (req, res) => {
     subServices: normalizedSubServices,
     inclusions: normalizedInclusions,
     exclusions: normalizedExclusions,
+    sortOrder: Number(sortOrder) || 0,
     isActive: isActive !== undefined ? Boolean(isActive) : true,
   })
   return sendSuccess(res, { message: 'Service created', statusCode: HTTP_STATUS.CREATED, data: { service: s } })
@@ -397,10 +404,11 @@ export const patchService = asyncHandler(async (req, res) => {
   if (!s) {
     return sendError(res, { message: 'Service not found', statusCode: HTTP_STATUS.NOT_FOUND, code: 'NOT_FOUND' })
   }
-  const { name, description, basePrice, estimatedDurationMins, isActive, iconUrl, hourlyPrice, minHours, maxHours, discountType, discountValue, offerBadge, offerDescription, isAllZones, zones, chargeType, unitName, pricePerUnit, subServices } = req.body
+  const { name, description, basePrice, estimatedDurationMins, isActive, sortOrder, iconUrl, hourlyPrice, minHours, maxHours, discountType, discountValue, offerBadge, offerDescription, isAllZones, zones, chargeType, unitName, pricePerUnit, subServices } = req.body
   if (name != null) s.name = String(name).trim()
   if (description != null) s.description = String(description)
   if (estimatedDurationMins != null) s.estimatedDurationMins = Number(estimatedDurationMins)
+  if (sortOrder != null) s.sortOrder = Number(sortOrder) || 0
   if (isActive != null) s.isActive = Boolean(isActive)
   if (chargeType != null && ['PER_HOUR', 'UNIT_WISE', 'NONE'].includes(chargeType)) s.chargeType = chargeType
   if (unitName !== undefined) s.unitName = String(unitName || '').trim()
@@ -430,7 +438,9 @@ export const patchService = asyncHandler(async (req, res) => {
             estimatedDurationMins: Number(ss.estimatedDurationMins || 30),
             iconUrl: String(ss.iconUrl || '').trim(),
             isActive: ss.isActive !== false,
+            sortOrder: Number(ss.sortOrder || 0),
           }))
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
       : []
   }
   if (iconUrl !== undefined) {

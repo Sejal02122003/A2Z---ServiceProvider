@@ -20,6 +20,7 @@ function AddSubCategoryModal({ open, categories, onClose, onSaved, busy, setBusy
   const [name, setName] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [description, setDescription] = useState('')
+  const [sortOrder, setSortOrder] = useState(0)
   const [iconUrl, setIconUrl] = useState('')
   const [uploadBusy, setUploadBusy] = useState(false)
   const [isActive, setIsActive] = useState(true)
@@ -30,6 +31,7 @@ function AddSubCategoryModal({ open, categories, onClose, onSaved, busy, setBusy
       setName('')
       setCategoryId(categories[0]?._id ?? '')
       setDescription('')
+      setSortOrder(0)
       setIconUrl('')
       setIsActive(true)
       setError('')
@@ -71,6 +73,7 @@ function AddSubCategoryModal({ open, categories, onClose, onSaved, busy, setBusy
         name: name.trim(),
         categoryId,
         description: description.trim(),
+        sortOrder: Number(sortOrder) || 0,
         iconUrl,
         isActive
       }
@@ -114,13 +117,24 @@ function AddSubCategoryModal({ open, categories, onClose, onSaved, busy, setBusy
               />
             </div>
             
-            <div className="col-span-2">
+            <div className="col-span-2 sm:col-span-1">
               <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Name</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
                 required
+              />
+            </div>
+
+            <div className="col-span-2 sm:col-span-1">
+              <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Sort Order (Numbering)</label>
+              <input
+                type="number"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+                placeholder="0"
               />
             </div>
 
@@ -204,6 +218,7 @@ function EditSubCategoryModal({ open, subcategory, categories, onClose, onSaved,
   const [name, setName] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [description, setDescription] = useState('')
+  const [sortOrder, setSortOrder] = useState(0)
 
   const [iconUrl, setIconUrl] = useState('')
   const [uploadBusy, setUploadBusy] = useState(false)
@@ -215,6 +230,7 @@ function EditSubCategoryModal({ open, subcategory, categories, onClose, onSaved,
       setName(subcategory.name || '')
       setCategoryId(subcategory.categoryId || (categories[0]?._id ?? ''))
       setDescription(subcategory.description || '')
+      setSortOrder(subcategory.sortOrder ?? 0)
       setIconUrl(subcategory.iconUrl || '')
       setIsActive(subcategory.isActive ?? true)
       setError('')
@@ -256,6 +272,7 @@ function EditSubCategoryModal({ open, subcategory, categories, onClose, onSaved,
         name: name.trim(),
         categoryId,
         description: description.trim(),
+        sortOrder: Number(sortOrder) || 0,
         iconUrl,
         isActive
       }
@@ -299,13 +316,24 @@ function EditSubCategoryModal({ open, subcategory, categories, onClose, onSaved,
               />
             </div>
             
-            <div className="col-span-2">
+            <div className="col-span-2 sm:col-span-1">
               <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Name</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
                 required
+              />
+            </div>
+
+            <div className="col-span-2 sm:col-span-1">
+              <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">Sort Order (Numbering)</label>
+              <input
+                type="number"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+                placeholder="0"
               />
             </div>
 
@@ -449,13 +477,19 @@ function ViewSubCategoryModal({ open, subcategory, onClose }) {
                   <p className="text-sm font-medium text-slate-700">{displayData.description || '—'}</p>
                 </div>
 
-                <div>
-                  <p className="text-[10px] font-bold uppercase text-slate-400">Status</p>
-                  <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ${
-                    displayData.isActive ? 'bg-blue-50 text-blue-700 ring-blue-200' : 'bg-slate-100 text-slate-500 ring-slate-200'
-                  }`}>
-                    {displayData.isActive ? 'Active' : 'Hidden'}
-                  </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Sort Order</p>
+                    <p className="text-sm font-bold text-slate-800">{displayData.sortOrder ?? 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Status</p>
+                    <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ${
+                      displayData.isActive ? 'bg-blue-50 text-blue-700 ring-blue-200' : 'bg-slate-100 text-slate-500 ring-slate-200'
+                    }`}>
+                      {displayData.isActive ? 'Active' : 'Hidden'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </>
@@ -660,7 +694,7 @@ export function AdminSubCategoriesPage() {
       result = result.filter(sc => sc.categoryId === categoryFilter)
     }
 
-    return result
+    return [...result].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
   }, [subcategories, debouncedSearch, statusFilter, categoryFilter])
 
   const totalPages = Math.ceil(filteredSubCategories.length / limit) || 1
@@ -851,7 +885,7 @@ export function AdminSubCategoriesPage() {
                 <th className="px-4 py-3 w-12 text-center"></th>
                 <th className="px-4 py-3">Name & Desc</th>
                 <th className="px-4 py-3">Category</th>
-
+                <th className="px-4 py-3 text-center">Sort Order</th>
                 <th className="px-4 py-3 text-center">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -859,11 +893,11 @@ export function AdminSubCategoriesPage() {
             <tbody>
               {loading && subcategories.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500">Loading...</td>
+                  <td colSpan={7} className="p-8 text-center text-slate-500">Loading...</td>
                 </tr>
               ) : paginatedSubCategories.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500">No sub-categories found.</td>
+                  <td colSpan={7} className="p-8 text-center text-slate-500">No sub-categories found.</td>
                 </tr>
               ) : (
                 paginatedSubCategories.map(s => (
@@ -897,6 +931,11 @@ export function AdminSubCategoriesPage() {
                     <td className="px-4 py-3">
                       <span className="rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
                         {s.categoryName}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="font-bold text-slate-800 rounded-lg bg-slate-100 px-2.5 py-1 text-xs">
+                        {s.sortOrder ?? 0}
                       </span>
                     </td>
 

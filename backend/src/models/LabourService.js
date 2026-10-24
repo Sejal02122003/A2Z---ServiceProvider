@@ -31,6 +31,11 @@ const labourServiceSchema = new mongoose.Schema(
       default: true,
       index: true,
     },
+    sortOrder: {
+      type: Number,
+      default: 0,
+      index: true,
+    },
     iconUrl: {
       type: String,
       trim: true,
@@ -137,6 +142,10 @@ const labourServiceSchema = new mongoose.Schema(
           type: Boolean,
           default: true,
         },
+        sortOrder: {
+          type: Number,
+          default: 0,
+        },
       },
     ],
     inclusions: [
@@ -157,5 +166,6 @@ const labourServiceSchema = new mongoose.Schema(
 
 // Ensure service names are unique within a subcategory
 labourServiceSchema.index({ subcategoryId: 1, name: 1 }, { unique: true })
+labourServiceSchema.index({ subcategoryId: 1, sortOrder: 1, name: 1 })
 
 export const LabourService = mongoose.model('LabourService', labourServiceSchema)

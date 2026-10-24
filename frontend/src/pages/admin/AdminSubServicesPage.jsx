@@ -49,6 +49,7 @@ function AddSubServiceModal({
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState('')
   const [parentServiceId, setParentServiceId] = useState('')
   const [name, setName] = useState('')
+  const [sortOrder, setSortOrder] = useState(0)
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState(0)
   const [originalPrice, setOriginalPrice] = useState(0)
@@ -90,6 +91,7 @@ function AddSubServiceModal({
       setSelectedSubcategoryId(initSubcatId)
       setParentServiceId(initServiceId)
       setName('')
+      setSortOrder(0)
       setDescription('')
       setPrice(0)
       setOriginalPrice(0)
@@ -236,6 +238,7 @@ function AddSubServiceModal({
       const currentList = Array.isArray(parent.subServices) ? parent.subServices : []
       const newSubService = {
         name: name.trim(),
+        sortOrder: Number(sortOrder) || 0,
         description: description.trim(),
         price: Number(price) || 0,
         originalPrice: Number(originalPrice) || Number(price) || 0,
@@ -363,18 +366,32 @@ function AddSubServiceModal({
             )}
           </div>
 
-          <div>
-            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Sub-Service Name <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. Split AC Jet Cleaning / Gold Bleach 30 Min"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35 transition"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Sub-Service Name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Split AC Jet Cleaning / Gold Bleach 30 Min"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35 transition"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Sort Order
+              </label>
+              <input
+                type="number"
+                placeholder="0"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35 transition"
+              />
+            </div>
           </div>
 
           <div>
@@ -538,6 +555,7 @@ function EditSubServiceModal({
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState('')
   const [parentServiceId, setParentServiceId] = useState('')
   const [name, setName] = useState('')
+  const [sortOrder, setSortOrder] = useState(0)
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState(0)
   const [originalPrice, setOriginalPrice] = useState(0)
@@ -554,6 +572,7 @@ function EditSubServiceModal({
       setSelectedSubcategoryId(subService.subcategoryId || parent?.subcategoryId || '')
       setParentServiceId(subService.serviceId || '')
       setName(subService.name || '')
+      setSortOrder(subService.sortOrder ?? 0)
       setDescription(subService.description || '')
       setPrice(subService.price || 0)
       setOriginalPrice(subService.originalPrice || subService.price || 0)
@@ -693,6 +712,7 @@ function EditSubServiceModal({
       const updatedPayload = {
         _id: subService._id,
         name: name.trim(),
+        sortOrder: Number(sortOrder) || 0,
         description: description.trim(),
         price: Number(price) || 0,
         originalPrice: Number(originalPrice) || Number(price) || 0,
@@ -836,17 +856,31 @@ function EditSubServiceModal({
             )}
           </div>
 
-          <div>
-            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Sub-Service Name <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35 transition"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Sub-Service Name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35 transition"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Sort Order
+              </label>
+              <input
+                type="number"
+                placeholder="0"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35 transition"
+              />
+            </div>
           </div>
 
           <div>
@@ -1075,17 +1109,25 @@ function ViewSubServiceModal({ subService, onClose }) {
             </div>
           </div>
 
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Status</span>
-            <span
-              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${
-                subService.isActive !== false
-                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                  : 'bg-slate-100 text-slate-600 border border-slate-200'
-              }`}
-            >
-              {subService.isActive !== false ? 'Active' : 'Inactive'}
-            </span>
+          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Sort Order</span>
+              <p className="text-sm font-bold text-slate-800 mt-0.5">{subService.sortOrder ?? 0}</p>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Status</span>
+              <div>
+                <span
+                  className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ${
+                    subService.isActive !== false
+                      ? 'bg-emerald-50 text-emerald-800 ring-emerald-200'
+                      : 'bg-slate-100 text-slate-500 ring-slate-200'
+                  }`}
+                >
+                  {subService.isActive !== false ? 'Active' : 'Hidden'}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1329,7 +1371,7 @@ export function AdminSubServicesPage() {
       result = result.filter((ss) => ss.isActive === false)
     }
 
-    return result
+    return [...result].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
   }, [subServices, search, categoryFilter, subcategoryFilter, serviceFilter, statusFilter])
 
   // Pagination
@@ -1726,6 +1768,7 @@ export function AdminSubServicesPage() {
                   </th>
                   <th className="py-3.5 px-3">Sub-Service Variant</th>
                   <th className="px-3 py-3.5">Parent Service & Category</th>
+                  <th className="px-3 py-3.5 text-center">Sort Order</th>
                   <th className="px-3 py-3.5">Price & MRP</th>
                   <th className="px-3 py-3.5">Duration</th>
                   <th className="px-3 py-3.5 text-center">Status</th>
@@ -1794,6 +1837,13 @@ export function AdminSubServicesPage() {
                             <span>{ss.subcategoryName}</span>
                           </p>
                         </div>
+                      </td>
+
+                      {/* Sort Order */}
+                      <td className="px-3 py-3.5 text-center">
+                        <span className="font-bold text-slate-800 rounded-lg bg-slate-100 px-2.5 py-1 text-xs">
+                          {ss.sortOrder ?? 0}
+                        </span>
                       </td>
 
                       {/* Pricing */}

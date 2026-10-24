@@ -124,7 +124,13 @@ export function AppSubCategoryServicePage() {
     return null
   }
 
-  const services = cat.services || []
+  const services = useMemo(
+    () =>
+      [...(cat.services || [])].sort(
+        (a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0) || a.name.localeCompare(b.name)
+      ),
+    [cat.services]
+  )
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 w-full overflow-x-hidden">
@@ -383,7 +389,14 @@ export function AppSubCategoryServicePage() {
                               </span>
                             </div>
                             <div className="grid grid-cols-1 gap-2.5 w-full min-w-0">
-                              {service.subServices.filter(ss => ss.isActive !== false).map((subItem) => (
+                              {[...service.subServices]
+                                .filter((ss) => ss.isActive !== false)
+                                .sort(
+                                  (a, b) =>
+                                    (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0) ||
+                                    a.name.localeCompare(b.name)
+                                )
+                                .map((subItem) => (
                                 <div
                                   key={subItem._id}
                                   className="flex items-center justify-between gap-2.5 rounded-2xl border border-slate-200/90 bg-white p-3 shadow-xs transition hover:border-brand/50 hover:shadow-sm w-full min-w-0 box-border"

@@ -477,7 +477,7 @@ export function AdminCategoriesPage() {
     if (statusFilter === 'active') result = result.filter(c => c.isActive)
     else if (statusFilter === 'hidden') result = result.filter(c => !c.isActive)
 
-    return result
+    return [...result].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
   }, [categories, debouncedSearch, statusFilter])
 
   const totalPages = Math.ceil(filteredCategories.length / limit) || 1

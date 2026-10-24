@@ -34,7 +34,7 @@ export const listGrouped = asyncHandler(async (req, res) => {
     .sort({ sortOrder: 1, name: 1 })
     .lean()
 
-  const subcats = await import('../models/LabourSubcategory.js').then(m => m.LabourSubcategory.find({ isActive: true }).sort({ name: 1 }).lean())
+  const subcats = await import('../models/LabourSubcategory.js').then(m => m.LabourSubcategory.find({ isActive: true }).sort({ sortOrder: 1, name: 1 }).lean())
   
   const serviceFilter = { isActive: true }
   if (userZoneId) {
@@ -44,10 +44,13 @@ export const listGrouped = asyncHandler(async (req, res) => {
     ]
   }
   
-  const services = await import('../models/LabourService.js').then(m => m.LabourService.find(serviceFilter).sort({ name: 1 }).lean())
+  const services = await import('../models/LabourService.js').then(m => m.LabourService.find(serviceFilter).sort({ sortOrder: 1, name: 1 }).lean())
 
   const servicesBySubcat = new Map()
   for (const s of services) {
+    if (Array.isArray(s.subServices)) {
+      s.subServices.sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0))
+    }
     const effectivePrice = Number(s.hourlyPrice || s.basePrice || s.pricePerUnit || 0)
     if (userZoneId && s.zones && s.zones.length > 0) {
       const zonePricing = s.zones.find(z => String(z.zone) === userZoneId)

@@ -24,6 +24,11 @@ const labourSubcategorySchema = new mongoose.Schema(
       default: true,
       index: true,
     },
+    sortOrder: {
+      type: Number,
+      default: 0,
+      index: true,
+    },
     iconUrl: {
       type: String,
       trim: true,
@@ -34,5 +39,6 @@ const labourSubcategorySchema = new mongoose.Schema(
 
 // Ensure subcategory names are unique within a category
 labourSubcategorySchema.index({ categoryId: 1, name: 1 }, { unique: true })
+labourSubcategorySchema.index({ categoryId: 1, sortOrder: 1, name: 1 })
 
 export const LabourSubcategory = mongoose.model('LabourSubcategory', labourSubcategorySchema)
