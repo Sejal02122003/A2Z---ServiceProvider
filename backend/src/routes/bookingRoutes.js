@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { body } from 'express-validator'
-import { protect, restrictTo } from '../middleware/auth.js'
+import { protect, optionalAuth, restrictTo } from '../middleware/auth.js'
 import { requireLabourSubscription } from '../middleware/requireLabourSubscription.js'
 import { validateRequest } from '../middleware/validateRequest.js'
 import { USER_ROLES } from '../constants/roles.js'
@@ -8,10 +8,9 @@ import * as booking from '../controllers/bookingController.js'
 
 const router = Router()
 
-router.use(protect)
-
 router.post(
   '/calculate',
+  optionalAuth,
   [
     body('serviceId').optional().isMongoId().withMessage('Valid service ID required'),
     body('packageId').optional().isMongoId().withMessage('Valid package ID required'),
@@ -27,6 +26,8 @@ router.post(
   validateRequest,
   booking.calculateBill,
 )
+
+router.use(protect)
 
 router.post(
   '/',

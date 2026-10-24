@@ -40,6 +40,31 @@ export const protect = asyncHandler(async (req, res, next) => {
   next()
 })
 
+export const optionalAuth = asyncHandler(async (req, res, next) => {
+  const header = req.headers.authorization
+  if (!header?.startsWith('Bearer ')) {
+    return next()
+  }
+  const token = header.slice(7)
+  let payload
+  try {
+    payload = verifyAccessToken(token)
+  } catch {
+    return next()
+  }
+
+  try {
+    const user = await User.findById(payload.sub)
+    if (user && user.isActive) {
+      req.user = user
+      req.tokenPayload = payload
+    }
+  } catch {
+    // Silently continue if user lookup fails
+  }
+  next()
+})
+
 export function restrictTo(...roles) {
   const lowerRoles = roles.map(r => String(r).toLowerCase())
   return (req, res, next) => {
