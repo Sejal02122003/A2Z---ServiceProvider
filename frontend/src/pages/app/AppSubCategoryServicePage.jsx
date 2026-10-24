@@ -10,7 +10,6 @@ import { readAppUserLocation } from '../../lib/appUserLocationStorage.js'
 import { getServiceOfferDetails } from '../../lib/serviceOfferUtils.js'
 import { ServiceOfferBadge } from '../../components/app/services/ServiceOfferBadge.jsx'
 import { useBookingCart } from '../../context/BookingCartContext.jsx'
-import { FloatingCartBar } from '../../components/app/booking/FloatingCartBar.jsx'
 
 export function AppSubCategoryServicePage() {
   const { id } = useParams()
@@ -612,9 +611,6 @@ export function AppSubCategoryServicePage() {
         categoryLabel={bookingService?.name || cat?.name}
         onSelect={handleQuickBookType}
       />
-
-      {/* Floating Bottom Cart Bar (Styled like Urban Company / Modern Service Cart) */}
-      <FloatingCartBar />
     </div>
   )
 }

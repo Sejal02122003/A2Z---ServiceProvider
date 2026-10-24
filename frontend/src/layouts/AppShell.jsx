@@ -21,6 +21,7 @@ import { BOOT_ROUTES } from '../constants/bootFlow.js'
 import { APP_HOME_LOCATION, APP_HOME_PATH, hasBookingFlowQuery } from '../lib/bookingFlowNavigation.js'
 import { notificationApi } from '../api/notificationApi.js'
 import { useSocket } from '../context/SocketContext.jsx'
+import { FloatingCartBar } from '../components/app/booking/FloatingCartBar.jsx'
 
 export function AppShell() {
   const { pathname, search } = useLocation()
@@ -504,6 +505,9 @@ export function AppShell() {
       !pathname.startsWith('/app/booking/cart') ? (
         <AppBottomNav items={bottomNav} />
       ) : null}
+
+      {/* Floating cart bar shown across all user app pages when items exist in cart */}
+      <FloatingCartBar />
 
       {isIndividualAppHome ? (
         <AppUserLocationModal
