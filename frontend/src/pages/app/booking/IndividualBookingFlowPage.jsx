@@ -7,7 +7,6 @@ import {
   Calendar,
   Check,
   CheckCircle2,
-  ImagePlus,
   IndianRupee,
   MapPin,
   MapPinned,
@@ -1753,26 +1752,6 @@ export function IndividualBookingFlowPage() {
               />
             </motion.div>
 
-            <motion.div>
-              <FieldLabel optional>Photos</FieldLabel>
-              <label htmlFor="job-photos" className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 py-4 text-xs font-bold text-black">
-                <ImagePlus className="h-4 w-4 text-brand" aria-hidden />
-                Upload images
-                <input
-                  id="job-photos"
-                  name="jobPhotos"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="sr-only"
-                  onChange={(e) => setImageFiles([...(e.target.files || [])])}
-                />
-              </label>
-              {imageFiles.length ? (
-                <p className="mt-1 text-[11px] text-slate-500">{imageFiles.length} file(s) selected</p>
-              ) : null}
-            </motion.div>
-
               {realUser?.role === 'contractor' ? (
                 <>
                   <motion.div className="mb-4">
@@ -1872,42 +1851,8 @@ export function IndividualBookingFlowPage() {
                   </motion.div>
                 </>
               ) : null}
-              <motion.div>
-                <FieldLabel>Required Duration</FieldLabel>
-                <div className="relative">
-                  <AppSearchableSelect
-                    value={parseFloat(draft.hours) || parseFloat(draft.minHours) || 1}
-                    onChange={(val) => syncDraft({ hours: parseFloat(val) || parseFloat(draft.minHours) || 1 })}
-                    hideSearch
-                    options={(() => {
-                      const min = parseFloat(draft.minHours) || 1
-                      const max = draft.maxHours || 24
-                      const opts = []
-                      // 30-min option only when the service explicitly allows it
-                      if (min <= 0.5) {
-                        opts.push({ value: 0.5, label: '30 Minutes' })
-                      }
-                      const startHour = min <= 0.5 ? 1 : Math.ceil(min)
-                      for (let h = startHour; h <= max; h++) {
-                        opts.push({ value: h, label: `${h} ${h === 1 ? 'Hour' : 'Hours'}` })
-                      }
-                      return opts
-                    })()}
-                  />
-                </div>
-              </motion.div>
 
-            {draft.bookingType === 'instant' ? (
-              <div className="space-y-4">
-                <div className="lc-booking-highlight flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-brand" aria-hidden />
-                  <div>
-                    <p className="text-sm font-bold text-black">ASAP</p>
-                    <p className="text-xs font-medium text-black/70">Earliest available slot</p>
-                  </div>
-                </div>
-              </div>
-            ) : (
+            {draft.bookingType !== 'instant' ? (
               <div className="space-y-3">
                 <motion.div>
                   <FieldLabel htmlFor="service-date">Date</FieldLabel>
@@ -1936,7 +1881,7 @@ export function IndividualBookingFlowPage() {
                   </motion.div>
                 </div>
               </div>
-            )}
+            ) : null}
 
             {formError ? (
               <p className="flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-950">
