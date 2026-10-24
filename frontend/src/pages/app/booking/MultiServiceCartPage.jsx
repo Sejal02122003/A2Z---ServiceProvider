@@ -175,6 +175,8 @@ export function MultiServiceCartPage() {
           quantity: it.quantity || 1,
           hours: it.hours || 1,
         })),
+        serviceId: cartItems[0]?.serviceId,
+        subcategoryId: cartItems[0]?.subcategoryId,
         type: bookingType,
         scheduledAt: bookingType === 'SCHEDULED' ? scheduledDate : undefined,
         timeSlot: bookingType === 'SCHEDULED' ? timeSlot : 'INSTANT',

@@ -454,7 +454,9 @@ export const createBooking = asyncHandler(async (req, res) => {
   } = req.body
   const hours = parseFloat(rawHours) || 1 // supports 0.5 = 30 min
 
-  if ((!serviceId && !packageId) || !type || !locationText || !paymentMethod) {
+  const isMultiService = (Array.isArray(req.body.items) && req.body.items.length > 0)
+
+  if ((!serviceId && !packageId && !isMultiService) || !type || !locationText || !paymentMethod) {
     return sendError(res, { message: 'Missing required fields', statusCode: HTTP_STATUS.BAD_REQUEST })
   }
 
@@ -471,10 +473,19 @@ export const createBooking = asyncHandler(async (req, res) => {
 
   // Enforce Zone matching
   const activeZones = await Zone.find({ isActive: true })
-  const normalizedLocation = locationText.toLowerCase()
-  const matchingZone = activeZones.find(z => normalizedLocation.includes(z.city.toLowerCase()))
+  let matchingZone = null
+  if (activeZones.length > 0) {
+    const normalizedLocation = locationText.toLowerCase()
+    matchingZone = activeZones.find(z => 
+      normalizedLocation.includes(z.city.toLowerCase()) || 
+      (z.name && normalizedLocation.includes(z.name.toLowerCase()))
+    )
+    if (!matchingZone && activeZones.length === 1) {
+      matchingZone = activeZones[0]
+    }
+  }
 
-  if (!matchingZone) {
+  if (activeZones.length > 0 && !matchingZone) {
     return sendError(res, { message: 'We currently do not provide service in this area (Zone not found).', statusCode: HTTP_STATUS.BAD_REQUEST })
   }
 
@@ -489,8 +500,6 @@ export const createBooking = asyncHandler(async (req, res) => {
   let multiServiceTaxes = 0
   let totalQuantity = quantity
   let bookingHours = hours
-
-  const isMultiService = Array.isArray(req.body.items) && req.body.items.length > 0
 
   if (isMultiService) {
     // ----------------------------------------------------
