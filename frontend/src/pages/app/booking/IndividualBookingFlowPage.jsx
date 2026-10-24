@@ -1391,12 +1391,8 @@ export function IndividualBookingFlowPage() {
                     </div>
                   )}
 
-                  <div className="mt-1 flex justify-between lc-booking-flow-muted">
-                    <span>Platform fee</span>
-                    <span>₹{completedBill.completedPlatformFee.toLocaleString('en-IN')}</span>
-                  </div>
                   <div className="flex justify-between lc-booking-flow-muted">
-                    <span>Taxes</span>
+                    <span>Taxes (GST)</span>
                     <span>₹{completedBill.completedTaxes.toLocaleString('en-IN')}</span>
                   </div>
                   <div className="mt-2 flex justify-between text-base font-extrabold text-black border-t border-slate-100 pt-2">
@@ -1459,10 +1455,6 @@ export function IndividualBookingFlowPage() {
                   <span>-₹{completedBill.deductedBasePrice.toLocaleString('en-IN')}</span>
                 </div>
               )}
-              <div className="mt-1 flex justify-between lc-booking-flow-muted">
-                <span>Platform fee</span>
-                <span>{formatInr(completedBill.completedPlatformFee)}</span>
-              </div>
               <div className="mt-1 flex justify-between lc-booking-flow-muted">
                 <span>Taxes (GST)</span>
                 <span>{formatInr(completedBill.completedTaxes)}</span>
@@ -2105,12 +2097,8 @@ export function IndividualBookingFlowPage() {
                     </div>
                   ) : null}
                   <div className="mt-1 flex justify-between lc-booking-flow-muted">
-                    <span>Platform fee</span>
-                    <span>{formatInr(calculatedBill.platformFee)}</span>
-                  </div>
-                  <div className="flex justify-between lc-booking-flow-muted">
-                    <span>Taxes</span>
-                    <span>{formatInr(calculatedBill.taxes)}</span>
+                    <span>Taxes (GST)</span>
+                    <span>{formatInr(calculatedBill.taxes || 0)}</span>
                   </div>
 
                   {/* Wallet Discount Section */}

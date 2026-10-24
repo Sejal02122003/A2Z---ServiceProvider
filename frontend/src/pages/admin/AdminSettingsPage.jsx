@@ -416,7 +416,7 @@ export function AdminSettingsPage() {
         <SettingsSection
           icon={Percent}
           title="Platform Fee"
-          description="Fee charged to customers on each booking"
+          description="Fee charged to service providers on each booking"
         >
 
           <div>

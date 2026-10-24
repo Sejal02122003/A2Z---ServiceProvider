@@ -96,15 +96,11 @@ export default function InvoicePrintView({ data }) {
         <div className="w-1/2">
           <div className="flex justify-between py-2 text-sm text-gray-600 border-b border-gray-100">
             <span>Subtotal</span>
-            <span>₹{(invoice?.subtotal || 0).toLocaleString('en-IN')}</span>
+            <span>₹{(invoice?.subtotal || booking?.basePrice || 0).toLocaleString('en-IN')}</span>
           </div>
           <div className="flex justify-between py-2 text-sm text-gray-600 border-b border-gray-100">
-            <span>Platform Fee</span>
-            <span>₹{(booking?.platformFee || 0).toLocaleString('en-IN')}</span>
-          </div>
-          <div className="flex justify-between py-2 text-sm text-gray-600 border-b border-gray-100">
-            <span>GST (18%)</span>
-            <span>₹{(invoice?.gstTotal || 0).toLocaleString('en-IN')}</span>
+            <span>GST (Taxes)</span>
+            <span>₹{(invoice?.gstTotal || booking?.taxes || 0).toLocaleString('en-IN')}</span>
           </div>
           <div className="flex justify-between py-4 text-lg font-bold text-gray-900 border-b-2 border-gray-900">
             <span>Total Amount</span>

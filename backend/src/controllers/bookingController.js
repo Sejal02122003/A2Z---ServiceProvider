@@ -102,8 +102,8 @@ export const calculateBill = asyncHandler(async (req, res) => {
     }
 
     const taxes = gstPercentage > 0 ? (basePrice * gstPercentage) / 100 : 0
-    const baseAmount = basePrice + platformFee
-    const totalAmount = baseAmount + taxes
+    // Customer does not pay platform fee; customer pays basePrice + taxes
+    const totalAmount = basePrice + taxes
 
     let commissionAmount = 0
     if (settings.commission.isActive && settings.commission.type === 'global') {
@@ -164,7 +164,7 @@ export const calculateBill = asyncHandler(async (req, res) => {
         taxes,
         totalAmount,
         commissionAmount,
-        laborShare: basePrice - commissionAmount,
+        laborShare: Math.max(0, basePrice - commissionAmount - platformFee),
         paymentModes: settings.paymentModes || { cashEnabled: true, onlineEnabled: true },
         breakdown,
         walletInfo,
@@ -310,7 +310,6 @@ export const calculateBill = asyncHandler(async (req, res) => {
     }
   }
 
-  const baseAmount = basePrice + platformFee
   let taxes = 0
 
   let gstPercentage = 0
@@ -329,7 +328,8 @@ export const calculateBill = asyncHandler(async (req, res) => {
     taxes = (basePrice * gstPercentage) / 100
   }
 
-  const totalAmount = baseAmount + taxes
+  // Customer does not pay platform fee; customer pays basePrice + taxes
+  const totalAmount = basePrice + taxes
 
   // Also pre-calculate commission to show to admin internally, but user doesn't necessarily need to see it
   let commissionAmount = 0
@@ -367,7 +367,7 @@ export const calculateBill = asyncHandler(async (req, res) => {
       taxes,
       totalAmount,
       commissionAmount, // Internal calculation preview
-      laborShare: basePrice - commissionAmount,
+      laborShare: Math.max(0, basePrice - commissionAmount - platformFee),
       paymentModes: settings.paymentModes || { cashEnabled: true, onlineEnabled: true },
       breakdown,
       walletInfo,
@@ -610,7 +610,6 @@ export const createBooking = asyncHandler(async (req, res) => {
       : (basePrice * settings.platformFee.value) / 100
   }
 
-  const baseAmount = basePrice + platformFee
   let taxes = 0
 
   let gstPercentage = 0
@@ -632,7 +631,8 @@ export const createBooking = asyncHandler(async (req, res) => {
     taxes = (basePrice * gstPercentage) / 100
   }
 
-  const rawTotalAmount = baseAmount + taxes
+  // Customer does not pay platform fee; customer pays basePrice + taxes
+  const rawTotalAmount = basePrice + taxes
   let finalPayableAmount = rawTotalAmount
   let walletDiscountData = { applied: false, amount: 0, walletTransactionId: null }
 
@@ -663,7 +663,7 @@ export const createBooking = asyncHandler(async (req, res) => {
     commissionAmount = (basePrice * settings.commission.globalPercentage) / 100
   }
 
-  const laborShare = basePrice - commissionAmount
+  const laborShare = Math.max(0, basePrice - commissionAmount - platformFee)
 
   const startOtp = Math.floor(1000 + Math.random() * 9000).toString()
   const completionOtp = Math.floor(1000 + Math.random() * 9000).toString()

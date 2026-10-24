@@ -151,8 +151,9 @@ export function calculateCompletedBookingBill(booking) {
     completedTaxes = Math.round(originalTaxes * completionRatio)
   }
 
+  // Platform fee is paid by service provider, not customer
   const completedTotalAmount = Math.round(
-    completedBasePrice + completedPlatformFee + completedTaxes
+    completedBasePrice + completedTaxes
   )
 
   return {

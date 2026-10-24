@@ -390,10 +390,6 @@ export function Checkout() {
                 <span>-{formatInr(bill.maxHourDiscount)}</span>
               </div>
             )}
-            <div className="flex justify-between">
-              <span className="text-slate-600">Platform Fee</span>
-              <span className="font-bold text-slate-900">{formatInr(bill.platformFee)}</span>
-            </div>
             {bill.taxes != null && (
               <div className="flex justify-between">
                 <span className="text-slate-600">Taxes (GST)</span>
