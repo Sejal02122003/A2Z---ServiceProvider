@@ -189,14 +189,24 @@ export const calculateBill = asyncHandler(async (req, res) => {
     let categoryId = null
     if (service) {
       const serviceFallbackPrice = Number(service.hourlyPrice || service.basePrice || service.pricePerUnit || 0)
+      let hasExplicitSubDiscount = false
       if (ssId && Array.isArray(service.subServices)) {
         const foundSub = service.subServices.find(ss => String(ss._id) === String(ssId))
-        if (foundSub && Number(foundSub.price) > 0) {
-          originalHourlyRate = Number(foundSub.price)
+        if (foundSub) {
           name = `${service.name} (${foundSub.name})`
-        } else if (foundSub) {
-          originalHourlyRate = serviceFallbackPrice
-          name = `${service.name} (${foundSub.name})`
+          const subPrice = Number(foundSub.price) || 0
+          const subOrigPrice = Number(foundSub.originalPrice) || 0
+          if (subOrigPrice > subPrice && subPrice > 0) {
+            originalHourlyRate = subOrigPrice
+            hourlyRate = subPrice
+            hasExplicitSubDiscount = true
+            discountValue = Math.round(((subOrigPrice - subPrice) / subOrigPrice) * 100)
+            discountType = 'PERCENTAGE'
+          } else if (subPrice > 0) {
+            originalHourlyRate = subPrice
+          } else {
+            originalHourlyRate = serviceFallbackPrice
+          }
         } else {
           originalHourlyRate = serviceFallbackPrice
           name = service.name
@@ -205,8 +215,10 @@ export const calculateBill = asyncHandler(async (req, res) => {
         originalHourlyRate = serviceFallbackPrice
         name = service.name
       }
-      discountType = service.discountType || 'PERCENTAGE'
-      discountValue = Number(service.discountValue || 0)
+      if (!hasExplicitSubDiscount) {
+        discountType = service.discountType || 'PERCENTAGE'
+        discountValue = Number(service.discountValue || 0)
+      }
       offerBadge = service.offerBadge || ''
       const sub = await LabourSubcategory.findById(service.subcategoryId)
       if (sub) categoryId = sub.categoryId
@@ -219,14 +231,16 @@ export const calculateBill = asyncHandler(async (req, res) => {
       if (!originalHourlyRate || originalHourlyRate <= 0) {
         originalHourlyRate = serviceFallbackPrice
       }
-      if (discountValue > 0) {
-        if (discountType === 'PERCENTAGE') {
-          hourlyRate = Math.max(0, Math.round(originalHourlyRate * (1 - discountValue / 100)))
+      if (!hasExplicitSubDiscount) {
+        if (discountValue > 0) {
+          if (discountType === 'PERCENTAGE') {
+            hourlyRate = Math.max(0, Math.round(originalHourlyRate * (1 - discountValue / 100)))
+          } else {
+            hourlyRate = Math.max(0, originalHourlyRate - discountValue)
+          }
         } else {
-          hourlyRate = Math.max(0, originalHourlyRate - discountValue)
+          hourlyRate = originalHourlyRate
         }
-      } else {
-        hourlyRate = originalHourlyRate
       }
       if (!hourlyRate || hourlyRate <= 0) {
         hourlyRate = originalHourlyRate
@@ -527,18 +541,22 @@ export const createBooking = asyncHandler(async (req, res) => {
       let subServiceDoc = null
       let subServiceName = undefined
       let subServicePrice = null
+      let subServiceOrigPrice = null
       if (itm.subServiceId && Array.isArray(srv.subServices)) {
         subServiceDoc = srv.subServices.find(ss => String(ss._id) === String(itm.subServiceId))
         if (subServiceDoc) {
           subServiceName = subServiceDoc.name
           if (Number(subServiceDoc.price) > 0) {
             subServicePrice = Number(subServiceDoc.price)
+            if (Number(subServiceDoc.originalPrice) > subServicePrice) {
+              subServiceOrigPrice = Number(subServiceDoc.originalPrice)
+            }
           }
         }
       }
 
       const srvFallback = Number(srv.hourlyPrice || srv.basePrice || srv.pricePerUnit || 0)
-      let baseRate = subServicePrice !== null ? subServicePrice : srvFallback
+      let baseRate = subServiceOrigPrice || (subServicePrice !== null ? subServicePrice : srvFallback)
 
       if (matchingZone && srv.zones && srv.zones.length > 0 && !itm.subServiceId) {
         const zonePricing = srv.zones.find(z => String(z.zone) === String(matchingZone._id))
@@ -548,8 +566,8 @@ export const createBooking = asyncHandler(async (req, res) => {
       }
       if (!baseRate || baseRate <= 0) baseRate = srvFallback
 
-      let unitPrice = baseRate
-      if (srv.discountValue > 0) {
+      let unitPrice = subServiceOrigPrice ? subServicePrice : baseRate
+      if (!subServiceOrigPrice && srv.discountValue > 0) {
         if (srv.discountType === 'PERCENTAGE') {
           unitPrice = Math.max(0, Math.round(baseRate * (1 - srv.discountValue / 100)))
         } else {
@@ -730,7 +748,12 @@ export const createBooking = asyncHandler(async (req, res) => {
         if (ssId && Array.isArray(srv.subServices)) {
           const foundSub = srv.subServices.find(ss => String(ss._id) === String(ssId))
           if (foundSub && Number(foundSub.price) > 0) {
-            baseRate = Number(foundSub.price)
+            const subPrice = Number(foundSub.price)
+            const subOrig = Number(foundSub.originalPrice) || 0
+            if (subOrig > subPrice) {
+              return subPrice // explicit subService discount already applied
+            }
+            baseRate = subPrice
           } else {
             baseRate = srvFallback
           }

@@ -86,6 +86,24 @@ export function AppSubCategoryServicePage() {
       const prev = readBookingDraft() || {}
       const subSvc = bookingService.selectedSubService
       const sName = subSvc ? `${bookingService.name} (${subSvc.name})` : (bookingService.name || '')
+      
+      let effectiveSubPrice = 0
+      if (subSvc) {
+        const sPrice = Number(subSvc.price) || 0
+        const sOrig = Number(subSvc.originalPrice) || 0
+        if (sOrig > sPrice && sPrice > 0) {
+          effectiveSubPrice = sPrice
+        } else if (Number(bookingService.discountValue) > 0 && sPrice > 0) {
+          effectiveSubPrice = bookingService.discountType === 'PERCENTAGE'
+            ? Math.max(0, Math.round(sPrice * (1 - Number(bookingService.discountValue) / 100)))
+            : Math.max(0, sPrice - Number(bookingService.discountValue))
+        } else {
+          effectiveSubPrice = sPrice
+        }
+      } else {
+        effectiveSubPrice = Number(bookingService.hourlyPrice || bookingService.basePrice || 0)
+      }
+
       writeBookingDraft({
         ...prev,
         entryPoint: 'category',
@@ -95,10 +113,10 @@ export function AppSubCategoryServicePage() {
         categoryName: cat.name || '',
         serviceId: String(bookingService._id),
         serviceName: sName,
-        servicePrice: subSvc ? Number(subSvc.price) : Number(bookingService.hourlyPrice || bookingService.basePrice || 0),
+        servicePrice: effectiveSubPrice,
         subServiceId: subSvc ? String(subSvc._id) : undefined,
         subServiceName: subSvc ? subSvc.name : undefined,
-        subServicePrice: subSvc ? subSvc.price : undefined,
+        subServicePrice: effectiveSubPrice,
         bookingType,
         matchMode: 'smart',
         selectedWorkers: [],
@@ -407,7 +425,32 @@ export function AppSubCategoryServicePage() {
                                     (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0) ||
                                     a.name.localeCompare(b.name)
                                 )
-                                .map((subItem) => (
+                                .map((subItem) => {
+                                  const subOrigPrice = Number(subItem.originalPrice) || 0
+                                  const subPrice = Number(subItem.price) || 0
+                                  let origPrice = subPrice
+                                  let finalPrice = subPrice
+                                  let hasSubOffer = false
+                                  let discountPercent = 0
+
+                                  if (subOrigPrice > subPrice && subPrice > 0) {
+                                    origPrice = subOrigPrice
+                                    finalPrice = subPrice
+                                    hasSubOffer = true
+                                    discountPercent = Math.round(((origPrice - finalPrice) / origPrice) * 100)
+                                  } else if (Number(service.discountValue) > 0 && subPrice > 0) {
+                                    origPrice = subPrice
+                                    if (service.discountType === 'PERCENTAGE') {
+                                      finalPrice = Math.max(0, Math.round(subPrice * (1 - Number(service.discountValue) / 100)))
+                                      discountPercent = Number(service.discountValue)
+                                    } else {
+                                      finalPrice = Math.max(0, subPrice - Number(service.discountValue))
+                                      discountPercent = Math.round(((origPrice - finalPrice) / origPrice) * 100)
+                                    }
+                                    hasSubOffer = finalPrice < origPrice
+                                  }
+
+                                  return (
                                 <div
                                   key={subItem._id}
                                   className="flex items-center justify-between gap-2.5 rounded-2xl border border-slate-200/90 bg-white p-3 shadow-xs transition hover:border-brand/50 hover:shadow-sm w-full min-w-0 box-border"
@@ -422,10 +465,30 @@ export function AppSubCategoryServicePage() {
                                       <span>{subItem.estimatedDurationMins || 30} mins</span>
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-1.5 shrink-0">
-                                    <span className="font-mono text-sm font-black text-blue-600 block text-right mr-1">
-                                      ₹{subItem.price}
-                                    </span>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <div className="text-right flex flex-col justify-center items-end mr-0.5 leading-tight">
+                                      {hasSubOffer ? (
+                                        <>
+                                          <span className="font-mono text-[11px] font-medium text-slate-400 line-through">
+                                            ₹{origPrice}
+                                          </span>
+                                          <div className="flex items-center gap-1">
+                                            <span className="font-mono text-sm font-black text-blue-600">
+                                              ₹{finalPrice}
+                                            </span>
+                                            {discountPercent > 0 && (
+                                              <span className="rounded bg-rose-50 px-1 py-0.5 text-[9px] font-black text-rose-600 border border-rose-200/60 leading-none">
+                                                {discountPercent}% OFF
+                                              </span>
+                                            )}
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <span className="font-mono text-sm font-black text-blue-600 block">
+                                          ₹{finalPrice}
+                                        </span>
+                                      )}
+                                    </div>
                                     {isInCart(service._id, subItem._id) ? (
                                       <div className="flex items-center border border-emerald-300 rounded-xl bg-emerald-50 shadow-2xs overflow-hidden">
                                         <button
@@ -487,7 +550,8 @@ export function AppSubCategoryServicePage() {
                                     </button>
                                   </div>
                                 </div>
-                              ))}
+                                  )
+                                })}
                             </div>
                           </div>
                         )}

@@ -57,16 +57,28 @@ export function BookingCartProvider({ children }) {
       const ssName = subService?.name || undefined
       const displayName = ssName ? `${sName} (${ssName})` : sName
 
-      const basePrice = subService?.price !== undefined
-        ? Number(subService.price)
-        : Number(service.hourlyPrice || service.basePrice || service.pricePerUnit || 0)
+      const subOriginalPrice = Number(subService?.originalPrice) || 0
+      const subPrice = Number(subService?.price) || 0
 
-      let unitPrice = basePrice
-      if (service.discountValue > 0) {
-        if (service.discountType === 'PERCENTAGE') {
-          unitPrice = Math.max(0, Math.round(basePrice * (1 - service.discountValue / 100)))
-        } else {
-          unitPrice = Math.max(0, basePrice - service.discountValue)
+      let origPrice = 0
+      let unitPrice = 0
+
+      if (subService && subOriginalPrice > subPrice && subPrice > 0) {
+        origPrice = subOriginalPrice
+        unitPrice = subPrice
+      } else {
+        const basePrice = subService?.price !== undefined
+          ? Number(subService.price)
+          : Number(service.hourlyPrice || service.basePrice || service.pricePerUnit || 0)
+
+        origPrice = basePrice
+        unitPrice = basePrice
+        if (service.discountValue > 0) {
+          if (service.discountType === 'PERCENTAGE') {
+            unitPrice = Math.max(0, Math.round(basePrice * (1 - service.discountValue / 100)))
+          } else {
+            unitPrice = Math.max(0, basePrice - service.discountValue)
+          }
         }
       }
 
@@ -95,8 +107,8 @@ export function BookingCartProvider({ children }) {
           subcategoryName: options.subcategoryName || undefined,
           iconUrl: service.iconUrl || '',
           price: unitPrice,
-          originalPrice: basePrice,
-          savings: Math.max(0, basePrice - unitPrice),
+          originalPrice: origPrice,
+          savings: Math.max(0, origPrice - unitPrice),
           offerBadge: service.offerBadge || '',
           quantity: options.quantity || 1,
           hours: options.hours || 1,
