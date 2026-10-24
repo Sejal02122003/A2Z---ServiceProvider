@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useLocation, useNavigate, useParams, Navigate } from 'react-router-dom'
-import { ArrowLeft, Wrench, ChevronDown, ChevronUp, Loader2, Sparkles, Tag, Flame } from 'lucide-react'
+import { ArrowLeft, Wrench, ChevronDown, ChevronUp, Loader2, Sparkles, Tag, Flame, Clock } from 'lucide-react'
 import { getCategoryImageUrl } from '../../lib/labourCategoryDisplay.js'
 import { BookingTypeSheet } from '../../components/app/booking/BookingTypeSheet.jsx'
 import { readBookingDraft, writeBookingDraft } from '../../lib/individualBookingDraft.js'
@@ -127,9 +127,9 @@ export function AppSubCategoryServicePage() {
   const services = cat.services || []
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 -mx-4 -mt-[max(0.5rem,env(safe-area-inset-top,0px))]">
+    <div className="flex flex-col min-h-screen bg-slate-50 w-full overflow-x-hidden">
       {/* Header */}
-      <div className="sticky top-[max(0.5rem,env(safe-area-inset-top,0.5rem))] z-30 px-4 pt-2 pb-1 bg-slate-50/80 backdrop-blur-md">
+      <div className="sticky top-0 z-30 px-4 pt-[max(0.75rem,env(safe-area-inset-top,0.75rem))] pb-2 bg-slate-50/90 backdrop-blur-md">
         <div className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <div className="flex items-center gap-3.5">
             <button 
@@ -146,7 +146,7 @@ export function AppSubCategoryServicePage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-4 space-y-6">
+      <div className="flex-1 px-4 py-4 space-y-6">
         <section>
           {cat.subtitle ? (
             <p className="text-sm text-slate-600 leading-relaxed bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
@@ -329,20 +329,21 @@ export function AppSubCategoryServicePage() {
                               {service.subServices.filter(ss => ss.isActive !== false).map((subItem) => (
                                 <div
                                   key={subItem._id}
-                                  className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-xs hover:border-brand/40 transition"
+                                  className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-brand/50 hover:shadow-sm"
                                 >
-                                  <div className="min-w-0 pr-2">
+                                  <div className="flex-1 min-w-0 pr-1">
                                     <h4 className="text-sm font-bold text-slate-900 truncate">{subItem.name}</h4>
                                     {subItem.description && (
                                       <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{subItem.description}</p>
                                     )}
-                                    <span className="inline-block text-[11px] font-medium text-slate-400 mt-0.5">
-                                      ⏱️ {subItem.estimatedDurationMins || 30} mins
-                                    </span>
+                                    <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400 mt-1">
+                                      <Clock className="h-3 w-3 text-slate-400 shrink-0" />
+                                      <span>{subItem.estimatedDurationMins || 30} mins</span>
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-3 shrink-0">
+                                  <div className="flex items-center gap-2.5 shrink-0 pl-1">
                                     <div className="text-right">
-                                      <span className="font-mono text-sm font-black text-blue-600">
+                                      <span className="font-mono text-sm font-black text-blue-600 block">
                                         ₹{subItem.price}
                                       </span>
                                     </div>
@@ -356,7 +357,7 @@ export function AppSubCategoryServicePage() {
                                         })
                                         setBookingTypeOpen(true)
                                       }}
-                                      className="rounded-lg bg-brand px-3 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95 hover:bg-brand/90"
+                                      className="inline-flex items-center justify-center rounded-xl bg-brand px-3.5 py-2 text-xs font-black uppercase tracking-wider text-white shadow-sm shadow-brand/25 transition active:scale-95 hover:bg-brand/90 hover:shadow-md whitespace-nowrap cursor-pointer min-w-[64px]"
                                     >
                                       Book
                                     </button>

@@ -479,8 +479,10 @@ export function AppShell() {
 
         <main
           className={`relative z-10 flex-1 ${
-            pathname.startsWith('/app/partner-onboarding') || pathname.startsWith('/app/onboarding')
-              ? 'p-0 pb-16'
+            pathname.startsWith('/app/partner-onboarding') ||
+            pathname.startsWith('/app/onboarding') ||
+            pathname.startsWith('/app/sub-category')
+              ? 'p-0 pb-28'
               : `px-4 pb-32 ${hideShellHeader
                   ? 'pt-[max(0.5rem,env(safe-area-inset-top,0px))]'
                   : isIndividualAppHome
