@@ -358,7 +358,15 @@ export async function calculateWalletDiscount(userId, eligibleBillAmount) {
 
   let walletBalance = 0
   if (userId) {
-    const wallet = await Wallet.findOne({ userId }).lean()
+    let wallet = await Wallet.findOne({ userId }).lean()
+    if (!wallet) {
+      try {
+        const created = await getOrCreateUserWallet(userId)
+        wallet = created?.toObject ? created.toObject() : created
+      } catch (err) {
+        console.error('[WALLET_ERROR] Could not auto-create wallet in calculateWalletDiscount:', err)
+      }
+    }
     if (wallet) {
       walletBalance = wallet.balance !== undefined ? wallet.balance : (wallet.selfBalance || 0)
     }
@@ -368,10 +376,12 @@ export async function calculateWalletDiscount(userId, eligibleBillAmount) {
     return {
       enabled: false,
       walletBalance,
+      availableBalance: walletBalance,
       maxWalletDiscount: 0,
       actualWalletDiscount: 0,
       eligibleBillAmount: billAmount,
       discountPercentage: settings.walletDiscountPercentage || 0,
+      percentage: settings.walletDiscountPercentage || 0,
       minimumBookingAmount: settings.minimumBookingAmount || 0,
     }
   }
@@ -381,10 +391,12 @@ export async function calculateWalletDiscount(userId, eligibleBillAmount) {
       enabled: true,
       meetsMinimum: false,
       walletBalance,
+      availableBalance: walletBalance,
       maxWalletDiscount: 0,
       actualWalletDiscount: 0,
       eligibleBillAmount: billAmount,
       discountPercentage: settings.walletDiscountPercentage,
+      percentage: settings.walletDiscountPercentage,
       minimumBookingAmount: settings.minimumBookingAmount,
     }
   }
@@ -396,10 +408,12 @@ export async function calculateWalletDiscount(userId, eligibleBillAmount) {
     enabled: true,
     meetsMinimum: true,
     walletBalance,
+    availableBalance: walletBalance,
     maxWalletDiscount: maxPercentageDiscount,
     actualWalletDiscount: Math.max(0, actualWalletDiscount),
     eligibleBillAmount: billAmount,
     discountPercentage: settings.walletDiscountPercentage,
+    percentage: settings.walletDiscountPercentage,
     minimumBookingAmount: settings.minimumBookingAmount,
   }
 }

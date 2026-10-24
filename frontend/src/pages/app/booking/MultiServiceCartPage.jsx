@@ -126,9 +126,11 @@ export function MultiServiceCartPage() {
 
   // Wallet discount calculations
   const walletInfo = billData?.walletInfo
-  const walletAvailable = Number(walletInfo?.walletBalance || 0)
-  const maxWalletDiscount = Number(walletInfo?.maxWalletDiscount || 0)
-  const canUseWallet = walletInfo?.enabled && maxWalletDiscount > 0
+  const walletAvailable = Number(walletInfo?.walletBalance ?? walletInfo?.availableBalance ?? 0)
+  const actualWalletDiscount = Number(walletInfo?.actualWalletDiscount ?? 0)
+  const maxWalletDiscount = Number(walletInfo?.maxWalletDiscount ?? 0)
+  const discountPercentage = walletInfo?.discountPercentage ?? walletInfo?.percentage ?? 20
+  const canUseWallet = (walletInfo?.enabled !== false) && walletAvailable > 0 && actualWalletDiscount > 0
 
   const subTotal = billData?.subTotal ?? 0
   const originalSubTotal = billData?.originalSubTotal ?? subTotal
@@ -136,7 +138,7 @@ export function MultiServiceCartPage() {
   const taxes = billData?.taxes ?? 0
   const platformFee = billData?.platformFee ?? 0
 
-  const walletDiscountApplied = useWallet && canUseWallet ? maxWalletDiscount : 0
+  const walletDiscountApplied = useWallet && canUseWallet ? actualWalletDiscount : 0
   const totalAmount = Math.max(0, (billData?.totalAmount ?? subTotal + taxes) - (useWallet ? walletDiscountApplied : 0))
 
   const handleCheckout = async () => {
@@ -184,7 +186,7 @@ export function MultiServiceCartPage() {
         lat: coordinates.lat || 28.6139,
         lng: coordinates.lng || 77.2090,
         paymentMethod,
-        useWallet,
+        useWallet: Boolean(useWallet && canUseWallet),
         notes: notes.trim() || undefined,
       }
 
@@ -604,7 +606,7 @@ export function MultiServiceCartPage() {
         </section>
 
         {/* Wallet Discount Option */}
-        {canUseWallet && (
+        {walletAvailable > 0 ? (
           <section className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-3xl border border-amber-200/80 p-4 shadow-xs">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -614,20 +616,51 @@ export function MultiServiceCartPage() {
                 <div>
                   <h3 className="text-xs font-bold text-amber-950">A2Z Customer Wallet</h3>
                   <p className="text-[11px] font-medium text-amber-800">
-                    Balance: ₹{walletAvailable} • Save ₹{maxWalletDiscount} on this booking
+                    Balance: ₹{walletAvailable}{actualWalletDiscount > 0 ? ` • Save up to ₹${actualWalletDiscount}` : ''}
                   </p>
                 </div>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useWallet}
-                  onChange={(e) => setUseWallet(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
-              </label>
+              {canUseWallet ? (
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useWallet}
+                    onChange={(e) => setUseWallet(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
+              ) : (
+                <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">
+                  Min order ₹{walletInfo?.minimumBookingAmount || 0}
+                </span>
+              )}
             </div>
+            {useWallet && canUseWallet && (
+              <div className="mt-2.5 pt-2 border-t border-amber-200/80 flex justify-between items-center text-xs font-bold text-emerald-800">
+                <span>✓ Wallet Discount Applied ({discountPercentage}% max)</span>
+                <span className="font-mono text-sm">-₹{walletDiscountApplied}</span>
+              </div>
+            )}
+          </section>
+        ) : (
+          <section className="bg-slate-50 rounded-2xl border border-slate-200/80 p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-slate-200 text-slate-500 flex items-center justify-center">
+                <WalletIcon className="h-4 w-4" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-slate-800">A2Z Wallet</h3>
+                <p className="text-[11px] text-slate-500">Balance: ₹0 • Earn 15% cashback on completion</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/app/wallet')}
+              className="text-xs font-bold text-brand hover:underline px-2 py-1"
+            >
+              View Wallet
+            </button>
           </section>
         )}
 

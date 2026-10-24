@@ -2047,34 +2047,87 @@ export function IndividualBookingFlowPage() {
                   </div>
 
                   {/* Wallet Discount Section */}
-                  {calculatedBill.walletInfo?.enabled && calculatedBill.walletInfo?.availableBalance > 0 && calculatedBill.walletInfo?.actualWalletDiscount > 0 && (
-                    <div className="mt-3 p-3 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 border border-amber-200 dark:border-amber-800/40 rounded-xl space-y-2">
-                      <div className="flex items-center justify-between">
+                  {(() => {
+                    const walletInfo = calculatedBill.walletInfo;
+                    const walletBalance = Number(walletInfo?.walletBalance ?? walletInfo?.availableBalance ?? 0);
+                    const actualWalletDiscount = Number(walletInfo?.actualWalletDiscount ?? 0);
+                    const discountPercentage = walletInfo?.discountPercentage ?? walletInfo?.percentage ?? 20;
+                    const canApplyWallet = (walletInfo?.enabled !== false) && walletBalance > 0 && actualWalletDiscount > 0;
+
+                    if (walletBalance > 0) {
+                      return (
+                        <div className="mt-3 p-3.5 bg-gradient-to-r from-amber-50 via-orange-50/50 to-amber-50 border border-amber-200/90 rounded-2xl space-y-2.5 shadow-2xs">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-2 rounded-xl bg-amber-500 text-white shadow-2xs">
+                                <Wallet className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-slate-900">A2Z Customer Wallet</p>
+                                <p className="text-[11px] font-medium text-amber-900">
+                                  Available: <span className="font-bold">{formatInr(walletBalance)}</span>
+                                  {actualWalletDiscount > 0 ? ` • Save up to ${formatInr(actualWalletDiscount)}` : ''}
+                                </p>
+                              </div>
+                            </div>
+                            {canApplyWallet ? (
+                              <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={useWallet}
+                                  onChange={(e) => setUseWallet(e.target.checked)}
+                                  className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                              </label>
+                            ) : (
+                              <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">
+                                Min order {formatInr(walletInfo?.minimumBookingAmount || 0)}
+                              </span>
+                            )}
+                          </div>
+                          {useWallet && canApplyWallet && (
+                            <div className="flex justify-between items-center text-xs font-bold text-emerald-700 pt-2 border-t border-amber-200/80">
+                              <span className="flex items-center gap-1">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                Wallet Discount Applied ({discountPercentage}% max):
+                              </span>
+                              <span className="font-mono text-sm">-{formatInr(actualWalletDiscount)}</span>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+
+                    return (
+                      <div className="mt-3 p-3 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className="p-1 rounded-lg bg-amber-500/10 text-amber-600">
+                          <div className="p-1.5 rounded-lg bg-slate-200/80 text-slate-500">
                             <Wallet className="w-4 h-4" />
                           </div>
                           <div>
-                            <p className="text-xs font-bold text-slate-900 dark:text-white">Use Wallet Balance</p>
-                            <p className="text-[11px] text-slate-500">Available: {formatInr(calculatedBill.walletInfo.availableBalance)}</p>
+                            <p className="text-xs font-bold text-slate-800">A2Z Wallet</p>
+                            <p className="text-[11px] text-slate-500">Balance: ₹0 • Earn 15% cashback on completion</p>
                           </div>
                         </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={useWallet}
-                            onChange={(e) => setUseWallet(e.target.checked)}
-                            className="sr-only peer"
-                          />
-                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
-                        </label>
+                        <button
+                          type="button"
+                          onClick={() => navigate('/app/wallet')}
+                          className="text-xs font-bold text-brand hover:underline px-2 py-1"
+                        >
+                          View Wallet
+                        </button>
                       </div>
-                      {useWallet && (
-                        <div className="flex justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400 pt-1 border-t border-amber-200/60">
-                          <span>Wallet Discount Applied ({calculatedBill.walletInfo.percentage}% max):</span>
-                          <span>-{formatInr(calculatedBill.walletInfo.actualWalletDiscount)}</span>
-                        </div>
-                      )}
+                    )
+                  })()}
+
+                  {useWallet && (Number(calculatedBill.walletInfo?.actualWalletDiscount) > 0) && (
+                    <div className="mt-2 flex justify-between font-semibold text-emerald-600">
+                      <span className="flex items-center gap-1">
+                        <Wallet className="h-3.5 w-3.5 text-emerald-600" />
+                        Wallet Discount
+                      </span>
+                      <span>-{formatInr(calculatedBill.walletInfo?.actualWalletDiscount)}</span>
                     </div>
                   )}
 

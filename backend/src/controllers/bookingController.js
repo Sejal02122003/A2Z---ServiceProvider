@@ -113,9 +113,11 @@ export const calculateBill = asyncHandler(async (req, res) => {
     let walletInfo = {
       enabled: false,
       walletBalance: 0,
+      availableBalance: 0,
       maxWalletDiscount: 0,
       actualWalletDiscount: 0,
       discountPercentage: 0,
+      percentage: 0,
       minimumBookingAmount: 0,
     }
     if (req.user?._id) {
@@ -380,9 +382,11 @@ export const calculateBill = asyncHandler(async (req, res) => {
   let walletInfo = {
     enabled: false,
     walletBalance: 0,
+    availableBalance: 0,
     maxWalletDiscount: 0,
     actualWalletDiscount: 0,
     discountPercentage: 0,
+    percentage: 0,
     minimumBookingAmount: 0,
   }
   if (req.user?._id) {
