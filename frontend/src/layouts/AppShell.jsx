@@ -22,11 +22,13 @@ import { APP_HOME_LOCATION, APP_HOME_PATH, hasBookingFlowQuery } from '../lib/bo
 import { notificationApi } from '../api/notificationApi.js'
 import { useSocket } from '../context/SocketContext.jsx'
 import { FloatingCartBar } from '../components/app/booking/FloatingCartBar.jsx'
+import { useBookingCart } from '../context/BookingCartContext.jsx'
 
 export function AppShell() {
   const { pathname, search } = useLocation()
   const navigate = useNavigate()
   const { logout, user, isGuest } = useAuth()
+  const { cartCount } = useBookingCart()
   const socket = useSocket()
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -483,8 +485,8 @@ export function AppShell() {
             pathname.startsWith('/app/partner-onboarding') ||
             pathname.startsWith('/app/onboarding') ||
             pathname.startsWith('/app/sub-category')
-              ? 'p-0 pb-28'
-              : `px-4 pb-32 ${hideShellHeader
+              ? `p-0 ${cartCount > 0 ? 'pb-36' : 'pb-28'}`
+              : `px-4 ${cartCount > 0 ? 'pb-48' : 'pb-32'} ${hideShellHeader
                   ? 'pt-[max(0.5rem,env(safe-area-inset-top,0px))]'
                   : isIndividualAppHome
                     ? 'pt-0'

@@ -39,9 +39,12 @@ export function FloatingCartBar() {
           animate={{ y: 0, opacity: 1, scale: 1 }}
           exit={{ y: 90, opacity: 0, scale: 0.95 }}
           transition={{ type: 'spring', damping: 24, stiffness: 300 }}
-          className={`fixed inset-x-3 sm:inset-x-4 z-[999] max-w-md mx-auto pointer-events-auto transition-all duration-300 ${
-            hasBottomNav ? 'bottom-[4.75rem] sm:bottom-[5.25rem]' : 'bottom-4'
-          }`}
+          style={{
+            bottom: hasBottomNav
+              ? 'calc(5.25rem + max(0.75rem, env(safe-area-inset-bottom, 0px)))'
+              : 'calc(1rem + env(safe-area-inset-bottom, 0px))',
+          }}
+          className="fixed inset-x-3 sm:inset-x-4 z-40 max-w-md mx-auto pointer-events-auto transition-all duration-300"
         >
           <div className="flex items-center justify-between rounded-2xl sm:rounded-3xl bg-white px-4 py-2.5 sm:px-5 sm:py-3 shadow-[0_12px_40px_rgba(0,0,0,0.18),0_4px_12px_rgba(0,0,0,0.08)] border border-slate-200/90 backdrop-blur-md">
             {/* Left: Cart Icon + Item Count */}
