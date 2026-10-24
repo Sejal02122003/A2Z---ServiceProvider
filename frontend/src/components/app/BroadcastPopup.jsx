@@ -129,6 +129,10 @@ export function BroadcastPopup() {
     }
   }, [incoming])
 
+  const services = incoming?.services || []
+  const requiresSelection = incoming?.requiresServiceSelection && services.length > 1
+  const selectedService = services.find(s => (s.itemId || s.serviceId) === selectedServiceId)
+
   const handleAccept = useCallback(async () => {
     if (!incoming) return
 
@@ -171,10 +175,6 @@ export function BroadcastPopup() {
   }, [incoming])
 
   if (!isLabour) return null
-
-  const services = incoming?.services || []
-  const requiresSelection = incoming?.requiresServiceSelection && services.length > 1
-  const selectedService = services.find(s => (s.itemId || s.serviceId) === selectedServiceId)
 
   return (
     <AnimatePresence>

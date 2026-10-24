@@ -107,7 +107,14 @@ function App() {
             }
           />
 
-          <Route path="/admin/login" element={<AdminLoginPage />} />
+          <Route
+            path="/admin/login"
+            element={
+              <ErrorBoundary>
+                <AdminLoginPage />
+              </ErrorBoundary>
+            }
+          />
 
           <Route
             path="/admin"
@@ -177,9 +184,15 @@ function App() {
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-        <BroadcastPopup />
-        <SimulatedOpportunityPopup />
-        <BookingConfirmedToast />
+        <ErrorBoundary>
+          <BroadcastPopup />
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <SimulatedOpportunityPopup />
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <BookingConfirmedToast />
+        </ErrorBoundary>
           </BookingCartProvider>
         </AuthProvider>
       </BrandingProvider>
