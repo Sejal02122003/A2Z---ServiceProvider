@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useLocation, useNavigate, useParams, Navigate } from 'react-router-dom'
 import { ArrowLeft, Wrench, ChevronDown, ChevronUp, Loader2, Sparkles, Tag, Flame, Clock, CheckCircle2, XCircle, Check, X, ShoppingBag, Plus, Minus } from 'lucide-react'
 import { getCategoryImageUrl } from '../../lib/labourCategoryDisplay.js'
@@ -28,11 +28,18 @@ export function AppSubCategoryServicePage() {
     cartCount,
     cartSubtotal,
     addToCart,
-    removeFromCart,
     updateQuantity,
     isInCart,
     getItemQuantity,
   } = useBookingCart()
+
+  const services = useMemo(
+    () =>
+      [...(cat?.services || [])].sort(
+        (a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0) || a.name.localeCompare(b.name)
+      ),
+    [cat?.services]
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -134,14 +141,6 @@ export function AppSubCategoryServicePage() {
   if (!cat) {
     return null
   }
-
-  const services = useMemo(
-    () =>
-      [...(cat.services || [])].sort(
-        (a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0) || a.name.localeCompare(b.name)
-      ),
-    [cat.services]
-  )
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 w-full overflow-x-hidden">
