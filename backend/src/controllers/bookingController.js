@@ -1010,10 +1010,10 @@ export const getBookingStatus = asyncHandler(async (req, res) => {
     .populate('packageBooking.packageId')
     .populate('packageBooking.inclusions.serviceId')
     .populate('multiServiceBooking.items.serviceId')
-    .populate('multiServiceBooking.items.assignedLabourId', 'fullName phone profileImageUrl')
-    .populate('laborId', 'fullName phone profileImageUrl')
+    .populate('multiServiceBooking.items.assignedLabourId', 'fullName phone profileImageUrl labourProfile rating experienceYears')
+    .populate('laborId', 'fullName phone profileImageUrl labourProfile rating experienceYears')
     .populate('userId', 'fullName phone')
-    .populate('assignments.labourId', 'fullName phone profileImageUrl serviceIds labourProfile')
+    .populate('assignments.labourId', 'fullName phone profileImageUrl serviceIds labourProfile rating experienceYears')
     .lean()
 
   if (!booking) {

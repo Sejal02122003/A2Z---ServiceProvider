@@ -1,57 +1,71 @@
-import { useEffect, useRef, useState } from 'react'
-import { io } from 'socket.io-client'
-import { useSelector } from 'react-redux'
-
-const BACKEND_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5005/api/v1').replace('/api/v1', '')
+import { useEffect, useState } from 'react'
+import { useSocket } from '../context/SocketContext.jsx'
 
 export function useBookingSocket(bookingId) {
-  const { token } = useSelector((state) => state.auth)
-  const [socketStatus, setSocketStatus] = useState('disconnected')
+  const socket = useSocket()
+  const [socketStatus, setSocketStatus] = useState(socket?.connected ? 'connected' : 'disconnected')
   const [bookingEvent, setBookingEvent] = useState(null)
-  const socketRef = useRef(null)
 
   useEffect(() => {
-    if (!token) return
+    if (!socket) return
 
-    const socket = io(BACKEND_URL, {
-      auth: { token },
-      transports: ['websocket'],
-    })
-    
-    socketRef.current = socket
+    const onConnect = () => setSocketStatus('connected')
+    const onDisconnect = () => setSocketStatus('disconnected')
 
-    socket.on('connect', () => setSocketStatus('connected'))
-    socket.on('disconnect', () => setSocketStatus('disconnected'))
-    socket.on('connect_error', (err) => console.error('Socket error:', err))
+    if (socket.connected) {
+      setSocketStatus('connected')
+    }
 
-    socket.on('BOOKING_BROADCAST_STARTED', (data) => {
-      if (!bookingId || String(data.bookingId) === String(bookingId)) {
+    socket.on('connect', onConnect)
+    socket.on('disconnect', onDisconnect)
+
+    const handleBroadcastStarted = (data) => {
+      if (!bookingId || !data?.bookingId || String(data.bookingId) === String(bookingId)) {
         setBookingEvent({ type: 'BOOKING_BROADCAST_STARTED', data })
       }
-    })
+    }
 
-    socket.on('BOOKING_ACCEPTED', (data) => {
-      if (!bookingId || String(data.bookingId) === String(bookingId)) {
+    const handleAccepted = (data) => {
+      if (!bookingId || !data?.bookingId || String(data.bookingId) === String(bookingId)) {
         setBookingEvent({ type: 'BOOKING_ACCEPTED', data })
       }
-    })
+    }
 
-    socket.on('BOOKING_FAILED', (data) => {
-      if (!bookingId || String(data.bookingId) === String(bookingId)) {
+    const handleFailed = (data) => {
+      if (!bookingId || !data?.bookingId || String(data.bookingId) === String(bookingId)) {
         setBookingEvent({ type: 'BOOKING_FAILED', data })
       }
-    })
+    }
 
-    socket.on('BOOKING_STATUS_UPDATE', (data) => {
-      if (!bookingId || String(data.bookingId) === String(bookingId)) {
+    const handleStatusUpdate = (data) => {
+      if (!bookingId || !data?.bookingId || String(data.bookingId) === String(bookingId)) {
         setBookingEvent({ type: 'BOOKING_STATUS_UPDATE', data })
       }
-    })
+    }
+
+    const handleCancelled = (data) => {
+      if (!bookingId || !data?.bookingId || String(data.bookingId) === String(bookingId)) {
+        setBookingEvent({ type: 'BOOKING_CANCELLED', data })
+      }
+    }
+
+    socket.on('BOOKING_BROADCAST_STARTED', handleBroadcastStarted)
+    socket.on('BOOKING_ACCEPTED', handleAccepted)
+    socket.on('BOOKING_FAILED', handleFailed)
+    socket.on('BOOKING_STATUS_UPDATE', handleStatusUpdate)
+    socket.on('BOOKING_CANCELLED', handleCancelled)
 
     return () => {
-      socket.disconnect()
+      socket.off('connect', onConnect)
+      socket.off('disconnect', onDisconnect)
+      socket.off('BOOKING_BROADCAST_STARTED', handleBroadcastStarted)
+      socket.off('BOOKING_ACCEPTED', handleAccepted)
+      socket.off('BOOKING_FAILED', handleFailed)
+      socket.off('BOOKING_STATUS_UPDATE', handleStatusUpdate)
+      socket.off('BOOKING_CANCELLED', handleCancelled)
     }
-  }, [token, bookingId])
+  }, [socket, bookingId])
 
   return { socketStatus, bookingEvent, clearEvent: () => setBookingEvent(null) }
 }
+

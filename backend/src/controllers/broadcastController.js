@@ -376,13 +376,23 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
           name: labour.fullName,
           phone: labour.phone,
           profileImageUrl: labour.profileImageUrl,
+          rating: labour.labourProfile?.rating,
+          experienceYears: labour.labourProfile?.experienceYears,
+          serviceName: assignedServiceName || 'Service',
         },
         partnerName: labour.fullName,
         partnerPhone: labour.phone,
         partnerAvatar: labour.profileImageUrl,
+        partnerRating: labour.labourProfile?.rating,
+        partnerExperience: labour.labourProfile?.experienceYears,
         serviceName: assignedServiceName || 'Service',
         startOtp: newAssignment.startOtp,
         completionOtp: newAssignment.completionOtp,
+      })
+
+      emitToUser(booking.userId, 'BOOKING_STATUS_UPDATE', {
+        bookingId: booking._id,
+        status: booking.status,
       })
 
       if (booking.status === 'ACCEPTED') {

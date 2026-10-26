@@ -11,6 +11,8 @@ import {
   Phone,
   Star,
   User,
+  ShieldCheck,
+  Sparkles,
 } from 'lucide-react'
 import { bookingsApi } from '../../api/bookingsApi.js'
 import { ApiError } from '../../api/http.js'
@@ -99,10 +101,38 @@ export function JobTracking() {
     if (!socket || !bookingId) return
 
     const handleAccepted = (data) => {
-      if (data.bookingId === bookingId) {
-        setBooking((prev) => prev ? { ...prev, status: 'ACCEPTED', laborId: data.laborId } : prev)
+      if (!data?.bookingId || String(data.bookingId) === String(bookingId)) {
+        const partnerObj = data.partner || {
+          _id: data.laborId,
+          fullName: data.partnerName,
+          phone: data.partnerPhone,
+          profileImageUrl: data.partnerAvatar,
+          rating: data.partnerRating,
+          experienceYears: data.partnerExperience,
+        }
+        setBooking((prev) => prev ? {
+          ...prev,
+          status: 'ACCEPTED',
+          laborId: partnerObj,
+          startOtp: data.startOtp || prev.startOtp,
+          completionOtp: data.completionOtp || prev.completionOtp,
+          assignments: (prev.assignments && prev.assignments.length > 0)
+            ? prev.assignments.map((a, idx) => idx === 0 ? {
+                ...a,
+                labourId: partnerObj,
+                startOtp: data.startOtp || a.startOtp,
+                completionOtp: data.completionOtp || a.completionOtp,
+                status: 'ACCEPTED',
+              } : a)
+            : [{
+                labourId: partnerObj,
+                startOtp: data.startOtp,
+                completionOtp: data.completionOtp,
+                status: 'ACCEPTED',
+              }],
+        } : prev)
         dispatch(updateBookingStatusAction('ACCEPTED'))
-        // Refetch to get labor details
+        // Refetch to get populated labor details
         bookingsApi.getBookingStatus(bookingId)
           .then((res) => {
             const b = res.data?.booking
@@ -113,7 +143,7 @@ export function JobTracking() {
     }
 
     const handleStatusUpdate = (data) => {
-      if (data.bookingId === bookingId) {
+      if (!data?.bookingId || String(data.bookingId) === String(bookingId)) {
         setBooking((prev) => prev ? { ...prev, status: data.status } : prev)
         dispatch(updateBookingStatusAction(data.status))
         if (data.status === 'COMPLETED') {
@@ -138,6 +168,27 @@ export function JobTracking() {
       socket.off('LABOUR_LOCATION_UPDATE', handleLocationUpdate)
     }
   }, [socket, bookingId, dispatch])
+
+  // Polling fallback every 3s while searching for workers
+  useEffect(() => {
+    if (!bookingId) return
+    const isPending = !booking || ['CREATED', 'BROADCASTING'].includes((booking.status || '').toUpperCase())
+    if (!isPending) return
+
+    const interval = setInterval(() => {
+      bookingsApi.getBookingStatus(bookingId)
+        .then((res) => {
+          const b = res.data?.booking
+          if (b) {
+            setBooking(b)
+            dispatch(setActiveBooking({ bookingId: b._id, status: b.status }))
+          }
+        })
+        .catch(() => {})
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [bookingId, booking, dispatch])
 
   const currentStepIndex = useMemo(() => {
     if (!booking) return 0
@@ -252,6 +303,33 @@ export function JobTracking() {
     <div className="flex min-h-screen flex-col bg-slate-50 font-sans pb-24">
       <AppStackScreenHeader title="Job Tracking" backTo="/app" />
 
+      {/* Celebratory Accepted Banner */}
+      {['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED'].includes(booking.status) && (
+        <GlassPanel className="border-emerald-200/90 bg-gradient-to-br from-emerald-500 via-teal-600 to-emerald-700 p-5 text-white shadow-lg shadow-emerald-950/15">
+          <div className="flex items-start gap-3.5">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md text-white shadow-inner">
+              <CheckCircle2 className="h-7 w-7 text-white" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/20 backdrop-blur-sm px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+                  <Sparkles className="h-3 w-3" /> Booking Accepted
+                </span>
+                <span className="text-[11px] font-mono text-emerald-100">
+                  #{String(booking._id).slice(-6).toUpperCase()}
+                </span>
+              </div>
+              <h3 className="mt-1.5 text-lg font-black tracking-tight text-white">
+                Your booking has been accepted!
+              </h3>
+              <p className="mt-0.5 text-xs font-medium text-emerald-100">
+                A qualified service provider has confirmed your request and is assigned to your job.
+              </p>
+            </div>
+          </div>
+        </GlassPanel>
+      )}
+
       {/* Status Badge */}
       <GlassPanel className="border-brand/20 bg-brand/5 px-4 py-3 text-center">
         <p className="text-xs font-bold uppercase tracking-wider text-brand">Current Status</p>
@@ -346,27 +424,53 @@ export function JobTracking() {
 
       {/* Laborer Details */}
       {labor && (
-        <GlassPanel className="overflow-hidden p-0">
-          <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Assigned Service Provider</p>
+        <GlassPanel className="overflow-hidden border-slate-200/90 p-0 shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 py-2.5">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Assigned Service Provider</p>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-700 border border-emerald-200/60">
+              <ShieldCheck className="h-3 w-3 text-emerald-600" /> Verified Partner
+            </span>
           </div>
-          <div className="flex items-center gap-4 p-4">
-            {labor.profileImageUrl || labor.profilePic ? (
-              <img src={labor.profileImageUrl || labor.profilePic} alt="" className="h-14 w-14 rounded-2xl object-cover ring-2 ring-white" />
-            ) : (
-              <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand/10 text-brand">
-                <User className="h-7 w-7" />
-              </span>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="text-base font-extrabold text-slate-900">{labor.fullName || 'Service Provider'}</p>
-              {labor.phone && (
-                <a href={`tel:${labor.phone}`} className="mt-1 flex items-center gap-1 text-sm font-semibold text-brand">
-                  <Phone className="h-3.5 w-3.5" aria-hidden />
-                  {labor.phone}
-                </a>
-              )}
+          <div className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <img
+                  src={labor.profileImageUrl || labor.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(labor.fullName || 'Service Provider')}&background=059669&color=fff&size=128`}
+                  alt=""
+                  className="h-16 w-16 rounded-2xl object-cover ring-2 ring-emerald-500/20 shadow-sm"
+                />
+                <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white ring-2 ring-white">
+                  <Check className="h-3 w-3" />
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-lg font-black text-slate-900 truncate">{labor.fullName || 'Service Provider'}</p>
+                <p className="text-xs font-medium text-slate-500 mt-0.5">Verified Professional</p>
+                {(labor.rating || labor.labourProfile?.rating) ? (
+                  <div className="mt-1 flex items-center gap-1.5 text-xs font-bold text-amber-500">
+                    <span>⭐ {labor.rating || labor.labourProfile?.rating}</span>
+                    <span className="text-[10px] text-slate-400 font-normal">Rating</span>
+                  </div>
+                ) : (
+                  <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Verified & Background Checked</span>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {labor.phone && (
+              <div className="mt-4 pt-3 border-t border-slate-100">
+                <a
+                  href={`tel:${labor.phone}`}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 px-4 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-[0.98] transition"
+                >
+                  <Phone className="h-4 w-4" />
+                  <span>Call Provider ({labor.phone})</span>
+                </a>
+              </div>
+            )}
           </div>
         </GlassPanel>
       )}
@@ -518,7 +622,7 @@ export function JobTracking() {
       </GlassPanel>
 
       {/* OTP Display for Customer */}
-      {(booking.status === 'EN_ROUTE' && displayStartOtp) ? (
+      {(['ACCEPTED', 'ASSIGNED', 'EN_ROUTE'].includes(booking.status) && displayStartOtp) ? (
         booking.assignments?.length > 1 ? (
           <GlassPanel className="border-brand/20 bg-brand/5 p-4">
             <p className="text-xs font-bold uppercase tracking-wider text-brand text-center mb-3">Start OTPs</p>

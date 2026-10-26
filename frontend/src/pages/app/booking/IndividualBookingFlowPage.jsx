@@ -20,6 +20,7 @@ import {
   Sparkles,
   Loader2,
   Package,
+  ShieldCheck,
 } from 'lucide-react'
 import { AppStackScreenHeader } from '../../../components/app/AppStackScreenHeader.jsx'
 import { AppButton } from '../../../components/app-ui/buttons/AppButton.jsx'
@@ -144,6 +145,34 @@ export function IndividualBookingFlowPage() {
   const [currentReviewIndex, setCurrentReviewIndex] = useState(0)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [restrictionError, setRestrictionError] = useState(null)
+  const [acceptedPartnerEvent, setAcceptedPartnerEvent] = useState(null)
+
+  const playAcceptedChime = useCallback(() => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext
+      if (!AudioCtx) return
+      const ctx = new AudioCtx()
+      if (ctx.state === 'suspended') {
+        ctx.resume()
+      }
+      const now = ctx.currentTime
+      const freqs = [523.25, 659.25, 783.99] // C5 -> E5 -> G5 cheerful chime
+      freqs.forEach((freq, idx) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = 'triangle'
+        osc.frequency.setValueAtTime(freq, now + idx * 0.1)
+        gain.gain.setValueAtTime(0.25, now + idx * 0.1)
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.28)
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start(now + idx * 0.1)
+        osc.stop(now + idx * 0.1 + 0.28)
+      })
+    } catch (e) {
+      console.warn('[Audio Chime]', e)
+    }
+  }, [])
 
   const handleOpenReview = useCallback(() => {
     if (realUser?.role === 'contractor' && activeBooking?.assignments?.length > 0) {
@@ -305,6 +334,42 @@ export function IndividualBookingFlowPage() {
     if (bookingEvent.type === 'BOOKING_ACCEPTED') {
       const bId = activeBookingId || bookingEvent.data?.bookingId
       if (bId) setActiveBookingId(bId)
+      setAcceptedPartnerEvent(bookingEvent.data)
+      playAcceptedChime()
+
+      setActiveBooking((prev) => {
+        const base = prev || { _id: bId }
+        const partnerObj = bookingEvent.data?.partner || {
+          _id: bookingEvent.data?.laborId,
+          fullName: bookingEvent.data?.partnerName,
+          phone: bookingEvent.data?.partnerPhone,
+          profileImageUrl: bookingEvent.data?.partnerAvatar,
+          rating: bookingEvent.data?.partnerRating,
+          experienceYears: bookingEvent.data?.partnerExperience,
+        }
+        return {
+          ...base,
+          status: bookingEvent.data?.status || 'ACCEPTED',
+          startOtp: bookingEvent.data?.startOtp || base.startOtp,
+          completionOtp: bookingEvent.data?.completionOtp || base.completionOtp,
+          laborId: partnerObj,
+          assignments: (base.assignments && base.assignments.length > 0)
+            ? base.assignments.map((a, idx) => idx === 0 ? {
+                ...a,
+                labourId: partnerObj,
+                startOtp: bookingEvent.data?.startOtp || a.startOtp,
+                completionOtp: bookingEvent.data?.completionOtp || a.completionOtp,
+                status: 'ACCEPTED',
+              } : a)
+            : [{
+                labourId: partnerObj,
+                startOtp: bookingEvent.data?.startOtp,
+                completionOtp: bookingEvent.data?.completionOtp,
+                status: 'ACCEPTED',
+              }],
+        }
+      })
+
       goStep('active')
       if (realUser && bId) {
         bookingsApi.getBookingStatus(bId).then(res => {
@@ -316,9 +381,16 @@ export function IndividualBookingFlowPage() {
     } else if (bookingEvent.type === 'BOOKING_STATUS_UPDATE') {
       const newStatus = bookingEvent.data?.status
       setActiveBooking(prev => prev ? { ...prev, status: newStatus } : null)
+      if (['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED'].includes(newStatus)) {
+        if (step === 'searching') goStep('active')
+        if (realUser && activeBookingId) {
+          bookingsApi.getBookingStatus(activeBookingId).then(res => {
+            if (res.data?.booking) setActiveBooking(res.data.booking)
+          }).catch(() => {})
+        }
+      }
       if (newStatus === 'COMPLETED') {
-        // Refresh booking details
-        if (realUser) {
+        if (realUser && activeBookingId) {
           bookingsApi.getBookingStatus(activeBookingId).then(res => {
             if (res.data?.booking) {
               setActiveBooking(res.data.booking)
@@ -335,14 +407,54 @@ export function IndividualBookingFlowPage() {
       clearBookingDraft()
       navigate('/app', { replace: true })
     }
-  }, [bookingEvent, activeBookingId, goStep, realUser, navigate])
+  }, [bookingEvent, activeBookingId, goStep, realUser, navigate, playAcceptedChime, handleOpenReview, clearBookingDraft, step])
+
+  // Polling fallback to ensure instant transition when provider accepts
+  useEffect(() => {
+    if (!realUser || !activeBookingId) return
+
+    const bookingStatus = (activeBooking?.status || '').toUpperCase()
+    const needsPolling =
+      step === 'searching' ||
+      !activeBooking ||
+      ['CREATED', 'BROADCASTING'].includes(bookingStatus)
+
+    if (!needsPolling) return
+
+    const interval = setInterval(() => {
+      bookingsApi
+        .getBookingStatus(activeBookingId)
+        .then((res) => {
+          const fetchedBooking = res.data?.booking
+          if (!fetchedBooking) return
+
+          setActiveBooking(fetchedBooking)
+          const s = (fetchedBooking.status || '').toUpperCase()
+          const hasWorker = Boolean(
+            (typeof fetchedBooking.laborId === 'object' && fetchedBooking.laborId?.fullName) ||
+            (fetchedBooking.assignments && fetchedBooking.assignments.some(a => a.labourId && (a.labourId.fullName || a.labourId._id)))
+          )
+          const isNowAccepted = ['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED', 'COMPLETED'].includes(s) || hasWorker
+
+          if (isNowAccepted && step === 'searching') {
+            playAcceptedChime()
+            goStep('active')
+          }
+        })
+        .catch((err) => {
+          console.warn('[Booking Polling]', err.message)
+        })
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [realUser, activeBookingId, activeBooking, step, goStep, playAcceptedChime])
 
   useEffect(() => {
     if (activeBooking?.status === 'CANCELLED' && step === 'active') {
       clearBookingDraft()
       navigate('/app', { replace: true })
     }
-  }, [activeBooking?.status, step, navigate])
+  }, [activeBooking?.status, step, navigate, clearBookingDraft])
 
   useEffect(() => {
     const cid = categoryIdParam
@@ -879,7 +991,55 @@ export function IndividualBookingFlowPage() {
     )
   }
 
+  const rawLabor = activeBooking?.laborId
+  const assignmentLabor = activeBooking?.assignments?.[0]?.labourId
+  const eventPartner = acceptedPartnerEvent?.partner || (acceptedPartnerEvent?.partnerName ? {
+    _id: acceptedPartnerEvent.laborId || acceptedPartnerEvent.partner?.id,
+    fullName: acceptedPartnerEvent.partnerName,
+    phone: acceptedPartnerEvent.partnerPhone,
+    profileImageUrl: acceptedPartnerEvent.partnerAvatar,
+    rating: acceptedPartnerEvent.partnerRating,
+    experienceYears: acceptedPartnerEvent.partnerExperience,
+  } : null)
+
+  const worker =
+    (typeof rawLabor === 'object' && rawLabor?.fullName ? rawLabor : null) ||
+    (typeof assignmentLabor === 'object' && assignmentLabor?.fullName ? assignmentLabor : null) ||
+    eventPartner ||
+    (typeof rawLabor === 'object' && rawLabor?._id ? rawLabor : null) ||
+    (typeof assignmentLabor === 'object' && assignmentLabor?._id ? assignmentLabor : null)
+
+  const bookingStatus = (activeBooking?.status || acceptedPartnerEvent?.status || '').toUpperCase()
+  const isAccepted =
+    ['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED', 'COMPLETED'].includes(bookingStatus) ||
+    Boolean(worker?.fullName || (activeBooking?.assignments && activeBooking.assignments.length > 0))
+
+  const displayStartOtp =
+    activeBooking?.assignments?.[0]?.startOtp ||
+    activeBooking?.startOtp ||
+    acceptedPartnerEvent?.startOtp
+
+  const displayCompletionOtp =
+    activeBooking?.assignments?.[0]?.completionOtp ||
+    activeBooking?.completionOtp ||
+    acceptedPartnerEvent?.completionOtp
+
+  useEffect(() => {
+    if (step === 'searching' && isAccepted) {
+      goStep('active')
+    }
+  }, [step, isAccepted, goStep])
+
   if (step === 'searching' && !noMatch) {
+    if (isAccepted) {
+      return (
+        <div className="flex min-h-[50vh] flex-col items-center justify-center space-y-3 py-16 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+          <p className="text-sm font-bold text-slate-700">Connecting with your assigned provider...</p>
+        </div>
+      )
+    }
+
     return (
       <div className="pb-8">
         <AppStackScreenHeader title="Matching service provider" onBack={() => goStep('summary')} />
@@ -964,7 +1124,6 @@ export function IndividualBookingFlowPage() {
 
   if (step === 'active' || step === 'payment' || step === 'billing') {
     const booking = activeBooking
-    const worker = booking?.laborId
     const statusSequence = ['CREATED', 'BROADCASTING', 'ACCEPTED', 'EN_ROUTE', 'STARTED', 'COMPLETED']
     const timelineIdx = booking ? statusSequence.indexOf(booking.status) - 2 : 0
 
@@ -978,7 +1137,9 @@ export function IndividualBookingFlowPage() {
               ? 'Billing'
               : booking?.status === 'CANCELLED'
               ? 'Booking Cancelled'
-              : 'Worker on the way'
+              : isAccepted
+              ? 'Booking Accepted'
+              : 'Finding Service Provider'
           }
           onBack={() => (step === 'payment' ? goStep(booking?.status === 'COMPLETED' ? 'billing' : 'active') : navigate('/app/my-bookings', { replace: true }))}
         />
@@ -1076,7 +1237,7 @@ export function IndividualBookingFlowPage() {
           </GlassPanel>
         )}
 
-        {booking && booking.status !== 'CANCELLED' && !worker && step !== 'billing' && ['CREATED', 'BROADCASTING'].includes(booking.status) && (
+        {booking && booking.status !== 'CANCELLED' && !isAccepted && step !== 'billing' && ['CREATED', 'BROADCASTING'].includes(booking.status) && (
           <GlassPanel className="p-5 text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-brand/10 text-brand mb-3">
               <Sparkles className="h-6 w-6 animate-pulse" />
@@ -1090,111 +1251,197 @@ export function IndividualBookingFlowPage() {
           </GlassPanel>
         )}
 
+        {/* Accepted Announcement Card */}
+        {step !== 'billing' && booking && booking.status !== 'CANCELLED' && isAccepted && (
+          <GlassPanel className="border-emerald-200/90 bg-gradient-to-br from-emerald-500 via-teal-600 to-emerald-700 p-5 text-white shadow-lg shadow-emerald-950/15">
+            <div className="flex items-start gap-3.5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md text-white shadow-inner">
+                <CheckCircle2 className="h-7 w-7 text-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/20 backdrop-blur-sm px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+                    <Sparkles className="h-3 w-3" /> Booking Accepted
+                  </span>
+                  {booking?._id && (
+                    <span className="text-[11px] font-mono text-emerald-100">
+                      #{String(booking._id).slice(-6).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <h3 className="mt-1.5 text-lg font-black tracking-tight text-white">
+                  Your booking has been accepted!
+                </h3>
+                <p className="mt-0.5 text-xs font-medium text-emerald-100">
+                  {booking.quantity > 1 
+                    ? 'Service providers are confirmed and preparing for your request.'
+                    : 'A qualified service partner has confirmed your request and is assigned to your job.'}
+                </p>
+              </div>
+            </div>
+          </GlassPanel>
+        )}
+
+        {/* Multi-Worker Bookings */}
         {step !== 'billing' && booking && booking.status !== 'CANCELLED' && booking.quantity > 1 ? (
           <div className="space-y-4">
-            <div className="lc-booking-flow-card">
-              <p className="lc-booking-flow-label font-bold">Assigned Service Providers ({booking.assignments?.length || 0} / {booking.quantity})</p>
+            <div className="lc-booking-flow-card flex items-center justify-between">
+              <div>
+                <p className="lc-booking-flow-label font-bold">Assigned Service Providers</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {booking.assignments?.length || 0} of {booking.quantity} confirmed
+                </p>
+              </div>
+              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">
+                {booking.assignments?.length || 0}/{booking.quantity} Assigned
+              </span>
             </div>
+
             {booking.assignments?.map((assignment, idx) => {
-              const worker = assignment.labourId;
+              const workerItem = assignment.labourId;
               const assignTimelineIdx = statusSequence.indexOf(assignment.status) - 2;
               return (
-                <div key={worker?._id || idx} className="space-y-4">
-                  <GlassPanel className="overflow-hidden border-slate-200/90 p-0">
-                    <motion.div className="flex gap-4 p-4">
-                      <img
-                        src={worker?.profileImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(worker?.fullName || 'W')}`}
-                        alt=""
-                        className="h-16 w-16 rounded-2xl object-cover ring-2 ring-white"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-lg font-black text-slate-900">{worker?.fullName || 'Unknown'}</p>
-                        <p className="text-xs font-semibold text-brand">{worker?.phone}</p>
-                        <p className="mt-1 text-[11px] text-slate-500">{draft.categoryName}</p>
+                <div key={workerItem?._id || idx} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex gap-3.5 items-center">
+                    <img
+                      src={workerItem?.profileImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(workerItem?.fullName || `Worker ${idx + 1}`)}&background=059669&color=fff&size=128`}
+                      alt=""
+                      className="h-14 w-14 rounded-2xl object-cover ring-2 ring-emerald-500/20"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-base font-black text-slate-900 truncate">{workerItem?.fullName || `Worker #${idx + 1}`}</p>
+                        <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
                       </div>
-                    </motion.div>
-                    <div className="grid grid-cols-1 gap-2 border-t border-slate-100 bg-slate-50/80 p-3">
+                      <p className="text-xs font-semibold text-emerald-700">{workerItem?.phone || 'Contact via app'}</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">{assignment.serviceName || draft.categoryName}</p>
+                    </div>
+                    {workerItem?.phone && (
                       <a
-                        href={`tel:${worker?.phone}`}
-                        className="flex flex-col items-center justify-center gap-1 rounded-xl bg-white py-2.5 text-[10px] font-bold text-slate-800 ring-1 ring-slate-200/90"
+                        href={`tel:${workerItem.phone}`}
+                        className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition"
                       >
-                        <Phone className="h-4 w-4 text-brand" aria-hidden />
+                        <Phone className="h-3.5 w-3.5" />
                         Call
                       </a>
-                    </div>
-                  </GlassPanel>
-
-                  <div className="lc-booking-flow-card">
-                    <p className="lc-booking-flow-label">Status</p>
-                    <ol className="mt-3 space-y-2">
-                      {[
-                        { id: 'accepted', label: 'Accepted' },
-                        { id: 'en_route', label: 'En Route' },
-                        { id: 'started', label: 'Job Started' },
-                        { id: 'completed', label: 'Completed' },
-                      ].map((t, i) => {
-                        const done = i <= Math.max(0, assignTimelineIdx);
-                        return (
-                          <li key={t.id} className="flex items-center gap-3">
-                            <span
-                              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${done ? 'bg-brand text-white' : 'bg-slate-100 text-slate-400'
-                                }`}
-                            >
-                              {done ? <Check className="h-3.5 w-3.5" /> : i + 1}
-                            </span>
-                            <span className={`text-sm font-semibold ${done ? 'text-black' : 'text-black/40'}`}>{t.label}</span>
-                          </li>
-                        )
-                      })}
-                    </ol>
+                    )}
                   </div>
 
                   {assignment.status !== 'COMPLETED' && assignment.startOtp && (
-                    <div className="lc-booking-flow-card">
-                      <p className="lc-booking-flow-label mb-2">Security OTPs</p>
-                      <div className="flex gap-4">
-                        <div className="flex-1 rounded-xl bg-slate-50 border border-slate-200 p-3 text-center">
-                          <p className="text-[10px] text-slate-500 font-semibold">Start OTP</p>
-                          <p className="text-xl font-black text-slate-800 tracking-widest">{assignment.startOtp}</p>
-                        </div>
-                        <div className="flex-1 rounded-xl bg-slate-50 border border-slate-200 p-3 text-center">
-                          <p className="text-[10px] text-slate-500 font-semibold">Completion OTP</p>
-                          <p className="text-xl font-black text-slate-800 tracking-widest">{assignment.completionOtp}</p>
-                        </div>
+                    <div className="rounded-xl bg-emerald-50/60 border border-emerald-200/70 p-3 flex gap-3 text-center">
+                      <div className="flex-1">
+                        <p className="text-[9px] font-bold text-emerald-800 uppercase tracking-wider">Start OTP</p>
+                        <p className="text-lg font-black text-slate-900 tracking-widest">{assignment.startOtp}</p>
                       </div>
+                      {assignment.completionOtp && (
+                        <div className="flex-1 border-l border-emerald-200/60">
+                          <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Completion OTP</p>
+                          <p className="text-lg font-black text-slate-900 tracking-widest">{assignment.completionOtp}</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               )
             })}
+
+            {/* Broadcast pulse if still finding remaining workers */}
+            {(booking.assignments?.length || 0) < booking.quantity && (
+              <GlassPanel className="p-4 text-center border-amber-200 bg-amber-50/50">
+                <div className="flex items-center justify-center gap-2 text-amber-800 text-xs font-bold">
+                  <Sparkles className="h-4 w-4 animate-spin text-amber-600" />
+                  <span>Searching for {booking.quantity - (booking.assignments?.length || 0)} more service provider(s)...</span>
+                </div>
+              </GlassPanel>
+            )}
           </div>
         ) : (
-          worker && step !== 'billing' ? (
+          /* Single Worker Flow */
+          (isAccepted || worker) && step !== 'billing' ? (
             <div className="space-y-4">
-              <GlassPanel className="overflow-hidden border-slate-200/90 p-0">
-                <motion.div className="flex gap-4 p-4">
-                  <img
-                    src={worker.profileImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(worker.fullName || 'W')}`}
-                    alt=""
-                    className="h-16 w-16 rounded-2xl object-cover ring-2 ring-white"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-lg font-black text-slate-900">{worker.fullName || 'Unknown'}</p>
-                    <p className="text-xs font-semibold text-brand">{worker.phone}</p>
-                    <p className="mt-1 text-[11px] text-slate-500">{draft.categoryName}</p>
+              <GlassPanel className="overflow-hidden border-slate-200/90 p-0 shadow-sm">
+                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 py-2.5">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Assigned Service Provider
+                  </p>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-700 border border-emerald-200/60">
+                    <ShieldCheck className="h-3 w-3 text-emerald-600" /> Verified Partner
+                  </span>
+                </div>
+
+                <div className="p-4">
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <img
+                        src={worker?.profileImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(worker?.fullName || 'Service Provider')}&background=059669&color=fff&size=128`}
+                        alt={worker?.fullName || 'Service Provider'}
+                        className="h-16 w-16 rounded-2xl object-cover ring-2 ring-emerald-500/20 shadow-sm"
+                      />
+                      <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white ring-2 ring-white">
+                        <Check className="h-3 w-3" />
+                      </span>
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-lg font-black text-slate-900 truncate">
+                        {worker?.fullName || 'Service Provider'}
+                      </h4>
+                      <p className="text-xs font-medium text-slate-500 mt-0.5">
+                        {draft.categoryName || booking?.category?.name || 'Requested Service'}
+                      </p>
+                      {(worker?.rating || worker?.labourProfile?.rating) ? (
+                        <div className="mt-1 flex items-center gap-1.5 text-xs font-bold text-amber-500">
+                          <span>⭐ {worker.rating || worker.labourProfile?.rating}</span>
+                          <span className="text-[10px] text-slate-400 font-normal">Rating</span>
+                        </div>
+                      ) : (
+                        <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>Verified & Background Checked</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </motion.div>
-                <div className="grid grid-cols-1 gap-2 border-t border-slate-100 bg-slate-50/80 p-3">
-                  <a
-                    href={`tel:${worker.phone}`}
-                    className="flex flex-col items-center justify-center gap-1 rounded-xl bg-white py-2.5 text-[10px] font-bold text-slate-800 ring-1 ring-slate-200/90"
-                  >
-                    <Phone className="h-4 w-4 text-brand" aria-hidden />
-                    Call
-                  </a>
+
+                  {worker?.phone && (
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
+                      <a
+                        href={`tel:${worker.phone}`}
+                        className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 px-4 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-[0.98] transition"
+                      >
+                        <Phone className="h-4 w-4" />
+                        <span>Call Provider ({worker.phone})</span>
+                      </a>
+                    </div>
+                  )}
                 </div>
               </GlassPanel>
 
+              {/* Security OTPs Card */}
+              {displayStartOtp && booking?.status !== 'COMPLETED' && (
+                <div className="lc-booking-flow-card">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="lc-booking-flow-label">Security OTPs</p>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Verification Codes</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-emerald-50/70 border border-emerald-200/80 p-3.5 text-center">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">Start OTP</p>
+                      <p className="text-2xl font-black text-slate-900 tracking-[0.2em] mt-1">{displayStartOtp}</p>
+                      <p className="text-[9px] text-slate-500 mt-1 font-medium">Share upon arrival</p>
+                    </div>
+                    {displayCompletionOtp && (
+                      <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5 text-center">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Completion OTP</p>
+                        <p className="text-2xl font-black text-slate-900 tracking-[0.2em] mt-1">{displayCompletionOtp}</p>
+                        <p className="text-[9px] text-slate-500 mt-1 font-medium">Share after job done</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Live Status Stepper */}
               <div className="lc-booking-flow-card">
                 <p className="lc-booking-flow-label">Status</p>
                 <ol className="mt-3 space-y-2">
@@ -1208,33 +1455,20 @@ export function IndividualBookingFlowPage() {
                     return (
                       <li key={t.id} className="flex items-center gap-3">
                         <span
-                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${done ? 'bg-brand text-white' : 'bg-slate-100 text-slate-400'
-                            }`}
+                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
+                            done ? 'bg-brand text-white' : 'bg-slate-100 text-slate-400'
+                          }`}
                         >
                           {done ? <Check className="h-3.5 w-3.5" /> : i + 1}
                         </span>
-                        <span className={`text-sm font-semibold ${done ? 'text-black' : 'text-black/40'}`}>{t.label}</span>
+                        <span className={`text-sm font-semibold ${done ? 'text-black' : 'text-black/40'}`}>
+                          {t.label}
+                        </span>
                       </li>
                     )
                   })}
                 </ol>
               </div>
-
-              {booking.status !== 'COMPLETED' && (booking.assignments?.[0]?.startOtp || booking.startOtp) && (
-                <div className="lc-booking-flow-card">
-                  <p className="lc-booking-flow-label mb-2">Security OTPs</p>
-                  <div className="flex gap-4">
-                    <div className="flex-1 rounded-xl bg-slate-50 border border-slate-200 p-3 text-center">
-                      <p className="text-[10px] text-slate-500 font-semibold">Start OTP</p>
-                      <p className="text-xl font-black text-slate-800 tracking-widest">{booking.assignments?.[0]?.startOtp || booking.startOtp}</p>
-                    </div>
-                    <div className="flex-1 rounded-xl bg-slate-50 border border-slate-200 p-3 text-center">
-                      <p className="text-[10px] text-slate-500 font-semibold">Completion OTP</p>
-                      <p className="text-xl font-black text-slate-800 tracking-widest">{booking.assignments?.[0]?.completionOtp || booking.completionOtp}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           ) : null
         )}
