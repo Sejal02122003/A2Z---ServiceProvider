@@ -153,6 +153,20 @@ export default function AdminWalletRewardsPage() {
       return;
     }
 
+    const discountVal = Number(settings.walletDiscountPercentage);
+    if (isNaN(discountVal) || !isFinite(discountVal) || discountVal < 0 || discountVal > 100) {
+      setErrorMsg('Maximum wallet deduction percentage must be a valid number between 0% and 100%');
+      setSaving(false);
+      return;
+    }
+
+    const minBookingVal = Number(settings.minimumBookingAmount);
+    if (isNaN(minBookingVal) || !isFinite(minBookingVal) || minBookingVal < 0) {
+      setErrorMsg('Minimum booking amount must be a non-negative number');
+      setSaving(false);
+      return;
+    }
+
     try {
       const res = await walletsApi.updateAdminWalletSettings({
         enabled: settings.enabled,
@@ -609,56 +623,129 @@ export default function AdminWalletRewardsPage() {
               </div>
 
               {/* Setting C: Max Wallet Discount Percentage */}
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
-                  <Percent className="w-4 h-4 text-primary-500" />
-                  Maximum Wallet Discount at Checkout (%)
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={settings.walletDiscountPercentage}
-                    onChange={(e) => setSettings({ ...settings, walletDiscountPercentage: Number(e.target.value) })}
-                    className="w-full px-4 pr-8 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    placeholder="20"
-                    required
-                  />
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400 font-semibold">
-                    %
+              <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/40 dark:bg-emerald-950/20 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-emerald-200/60 dark:border-emerald-900/40">
+                  <div className="flex items-center gap-2">
+                    <Percent className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">Customer Wallet Deduction Percentage</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Controls the maximum portion of an eligible order amount payable using customer wallet funds.
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Maximum percentage of the eligible service bill that can be covered using the customer's wallet balance.
-                </p>
-              </div>
 
-              {/* Setting D: Minimum Booking Amount */}
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
-                  <IndianRupee className="w-4 h-4 text-emerald-500" />
-                  Minimum Booking Bill for Wallet Usage (₹)
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 font-semibold">
-                    ₹
+                {/* Currently Active Banner */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-900/80 border border-emerald-200/80 dark:border-emerald-800/40 text-xs shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full ${settings.enabled && Number(settings.walletDiscountPercentage) > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">
+                      Currently Active Wallet Deduction Limit:
+                    </span>
                   </div>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={settings.minimumBookingAmount}
-                    onChange={(e) => setSettings({ ...settings, minimumBookingAmount: Number(e.target.value) })}
-                    className="w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    placeholder="0"
-                    required
-                  />
+                  <div className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                    {settings.enabled ? `${settings.walletDiscountPercentage}% max deduction` : 'Inactive (Master Wallet Disabled)'}
+                  </div>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  If booking bill is less than this amount, wallet discount cannot be applied (0 = no minimum restriction).
-                </p>
+
+                {/* Percentage input & presets */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                      Max Wallet Deduction (0% - 100%)
+                    </label>
+                    <span className="text-[11px] font-semibold text-slate-400">
+                      Default: 20%
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={settings.walletDiscountPercentage}
+                      onChange={(e) => setSettings({ ...settings, walletDiscountPercentage: e.target.value === '' ? '' : Number(e.target.value) })}
+                      className="w-full pr-8 pl-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      placeholder="20"
+                      required
+                    />
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400 font-bold">
+                      %
+                    </div>
+                  </div>
+
+                  {/* Preset Quick Buttons */}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {[0, 5, 10, 15, 20, 25, 30, 50, 100].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setSettings({ ...settings, walletDiscountPercentage: preset })}
+                        className={`px-3 py-1 text-xs font-bold rounded-lg border transition-all ${
+                          Number(settings.walletDiscountPercentage) === preset
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-400'
+                        }`}
+                      >
+                        {preset}%
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Real-time validation warning */}
+                  {(Number(settings.walletDiscountPercentage) < 0 || Number(settings.walletDiscountPercentage) > 100 || isNaN(Number(settings.walletDiscountPercentage))) && (
+                    <p className="text-xs font-semibold text-rose-500 flex items-center gap-1 mt-1">
+                      <AlertCircle className="w-3.5 h-3.5" /> Percentage must be a valid number between 0% and 100%.
+                    </p>
+                  )}
+                </div>
+
+                {/* Setting D: Minimum Booking Amount */}
+                <div className="pt-2 border-t border-emerald-200/50 dark:border-emerald-900/30 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                      <IndianRupee className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      Minimum Booking Bill for Wallet Usage (₹)
+                    </label>
+                    <span className="text-[11px] font-semibold text-slate-400">
+                      0 = No minimum
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 font-bold">
+                      ₹
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={settings.minimumBookingAmount}
+                      onChange={(e) => setSettings({ ...settings, minimumBookingAmount: e.target.value === '' ? '' : Number(e.target.value) })}
+                      className="w-full pl-8 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      placeholder="0"
+                      required
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    If an order amount is less than this value, wallet funds cannot be applied.
+                  </p>
+                </div>
+
+                {/* Audit metadata */}
+                {(settings.updatedAt || settings.updatedBy) && (
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 pt-2 border-t border-emerald-200/50 dark:border-emerald-900/30 flex flex-wrap items-center justify-between gap-1">
+                    <span>
+                      Last Updated: {settings.updatedAt ? new Date(settings.updatedAt).toLocaleString('en-IN') : 'Default Config'}
+                    </span>
+                    {settings.updatedBy && (
+                      <span>
+                        Updated By: {settings.updatedBy.fullName || settings.updatedBy.email || 'Admin'}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Submit Button */}

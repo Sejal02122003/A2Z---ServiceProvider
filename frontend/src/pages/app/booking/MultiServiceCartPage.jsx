@@ -127,9 +127,9 @@ export function MultiServiceCartPage() {
   // Wallet discount calculations
   const walletInfo = billData?.walletInfo
   const walletAvailable = Number(walletInfo?.walletBalance ?? walletInfo?.availableBalance ?? 0)
-  const actualWalletDiscount = Number(walletInfo?.actualWalletDiscount ?? 0)
-  const maxWalletDiscount = Number(walletInfo?.maxWalletDiscount ?? 0)
-  const discountPercentage = walletInfo?.discountPercentage ?? walletInfo?.percentage ?? 20
+  const actualWalletDiscount = Number(walletInfo?.walletDeduction ?? walletInfo?.actualWalletDiscount ?? 0)
+  const maxWalletDiscount = Number(walletInfo?.maxWalletUsage ?? walletInfo?.maxWalletDiscount ?? 0)
+  const discountPercentage = walletInfo?.walletUsagePercentage ?? walletInfo?.discountPercentage ?? walletInfo?.percentage ?? 20
   const canUseWallet = (walletInfo?.enabled !== false) && walletAvailable > 0 && actualWalletDiscount > 0
 
   const subTotal = billData?.subTotal ?? 0

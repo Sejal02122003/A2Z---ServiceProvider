@@ -122,3 +122,81 @@ export const getPublicWalletSettings = asyncHandler(async (req, res) => {
     },
   })
 })
+
+/**
+ * POST /api/wallets/checkout-calculation
+ * Calculates authoritative wallet deduction and remaining payable for customer checkout
+ */
+export const calculateCheckoutWallet = asyncHandler(async (req, res) => {
+  const userId = req.user._id
+  const { serviceId, packageId, items, eligibleOrderAmount, eligibleBillAmount } = req.body
+
+  let eligibleAmount = 0
+
+  if (packageId) {
+    const { ServicePackage } = await import('../models/ServicePackage.js')
+    const pkg = await ServicePackage.findById(packageId).lean()
+    if (!pkg) {
+      return sendError(res, { message: 'Service package not found', statusCode: HTTP_STATUS.NOT_FOUND })
+    }
+    if (pkg.status !== 'ACTIVE') {
+      return sendError(res, { message: 'Selected package is not active or available', statusCode: HTTP_STATUS.BAD_REQUEST })
+    }
+    const packagePrice = Number(pkg.price) || 0
+    let gstPercentage = 0
+    if (pkg.categoryId) {
+      const { LabourCategory } = await import('../models/LabourCategory.js')
+      const category = await LabourCategory.findById(pkg.categoryId)
+      if (category && category.isGstActive) {
+        gstPercentage = category.gstPercentage || 0
+      }
+    }
+    const taxes = gstPercentage > 0 ? (packagePrice * gstPercentage) / 100 : 0
+    eligibleAmount = packagePrice + taxes
+  } else if (serviceId) {
+    const { LabourService } = await import('../models/LabourService.js')
+    const service = await LabourService.findById(serviceId).lean()
+    if (!service) {
+      return sendError(res, { message: 'Service not found', statusCode: HTTP_STATUS.NOT_FOUND })
+    }
+    const basePrice = Number(service.hourlyPrice || service.basePrice || service.pricePerUnit || 0)
+    let gstPercentage = 0
+    if (service.categoryId) {
+      const { LabourCategory } = await import('../models/LabourCategory.js')
+      const category = await LabourCategory.findById(service.categoryId)
+      if (category && category.isGstActive) {
+        gstPercentage = category.gstPercentage || 0
+      }
+    }
+    const taxes = gstPercentage > 0 ? (basePrice * gstPercentage) / 100 : 0
+    eligibleAmount = basePrice + taxes
+  } else if (eligibleOrderAmount !== undefined || eligibleBillAmount !== undefined) {
+    const rawAmt = eligibleOrderAmount !== undefined ? eligibleOrderAmount : eligibleBillAmount
+    if (rawAmt === null || typeof rawAmt === 'boolean' || isNaN(Number(rawAmt)) || Number(rawAmt) < 0) {
+      return sendError(res, { message: 'Invalid eligible order amount: must be a non-negative number', statusCode: HTTP_STATUS.BAD_REQUEST })
+    }
+    eligibleAmount = Number(rawAmt)
+  } else {
+    return sendError(res, { message: 'Please provide serviceId, packageId, or eligibleOrderAmount', statusCode: HTTP_STATUS.BAD_REQUEST })
+  }
+
+  const calculation = await calculateWalletDiscount(userId, eligibleAmount)
+
+  const checkoutData = {
+    eligibleOrderAmount: calculation.eligibleOrderAmount,
+    walletBalance: calculation.walletBalance,
+    walletUsagePercentage: calculation.walletUsagePercentage,
+    maxWalletUsage: calculation.maxWalletUsage,
+    walletDeduction: calculation.walletDeduction,
+    remainingPayable: calculation.remainingPayable,
+  }
+
+  return sendSuccess(res, {
+    message: 'Checkout calculation completed',
+    checkout: checkoutData,
+    data: {
+      checkout: checkoutData,
+      walletInfo: calculation,
+    },
+  })
+})

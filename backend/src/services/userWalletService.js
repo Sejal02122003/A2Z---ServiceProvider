@@ -85,8 +85,13 @@ export async function updateWalletSettings(data, adminUserId, updateReason = '')
   }
 
   if (walletDiscountPercentage !== undefined) {
+    if (walletDiscountPercentage === null || walletDiscountPercentage === '' || typeof walletDiscountPercentage === 'boolean') {
+      throw new Error('Wallet discount percentage must be a valid number between 0 and 100')
+    }
     const num = Number(walletDiscountPercentage)
-    if (isNaN(num) || num < 0 || num > 100) throw new Error('Wallet discount percentage must be between 0 and 100')
+    if (isNaN(num) || !isFinite(num) || num < 0 || num > 100) {
+      throw new Error('Wallet discount percentage must be between 0 and 100')
+    }
     update.walletDiscountPercentage = num
   }
   if (minimumBookingAmount !== undefined) {
@@ -351,9 +356,21 @@ export async function ensureWelcomeBonus(userId) {
 
 /**
  * Calculate maximum allowable wallet discount for a bill
+ * 
+ * Formula:
+ * maximumWalletUsage = eligibleOrderAmount * percentage / 100
+ * actualWalletDeduction = min(walletBalance, maximumWalletUsage)
+ * remainingPayable = eligibleOrderAmount - actualWalletDeduction
  */
 export async function calculateWalletDiscount(userId, eligibleBillAmount) {
-  const billAmount = Math.max(0, Number(eligibleBillAmount) || 0)
+  if (eligibleBillAmount === null || eligibleBillAmount === undefined || typeof eligibleBillAmount === 'boolean') {
+    throw new Error('Invalid order amount: amount must be a valid number')
+  }
+  const billAmount = Number(eligibleBillAmount)
+  if (isNaN(billAmount) || !isFinite(billAmount) || billAmount < 0) {
+    throw new Error('Invalid order amount: cannot be negative or invalid number')
+  }
+
   const settings = await getWalletSettings()
 
   let walletBalance = 0
@@ -372,16 +389,44 @@ export async function calculateWalletDiscount(userId, eligibleBillAmount) {
     }
   }
 
-  if (!settings.enabled || settings.walletDiscountPercentage <= 0) {
+  const percentage = Number(settings.walletDiscountPercentage ?? 20)
+
+  if (billAmount === 0) {
     return {
-      enabled: false,
+      enabled: Boolean(settings.enabled),
+      meetsMinimum: true,
+      eligibleOrderAmount: 0,
+      eligibleBillAmount: 0,
       walletBalance,
       availableBalance: walletBalance,
+      walletUsagePercentage: percentage,
+      discountPercentage: percentage,
+      percentage,
+      maxWalletUsage: 0,
       maxWalletDiscount: 0,
+      walletDeduction: 0,
       actualWalletDiscount: 0,
+      remainingPayable: 0,
+      minimumBookingAmount: settings.minimumBookingAmount || 0,
+    }
+  }
+
+  if (!settings.enabled || percentage <= 0 || walletBalance <= 0) {
+    return {
+      enabled: Boolean(settings.enabled),
+      meetsMinimum: true,
+      eligibleOrderAmount: billAmount,
       eligibleBillAmount: billAmount,
-      discountPercentage: settings.walletDiscountPercentage || 0,
-      percentage: settings.walletDiscountPercentage || 0,
+      walletBalance,
+      availableBalance: walletBalance,
+      walletUsagePercentage: percentage,
+      discountPercentage: percentage,
+      percentage,
+      maxWalletUsage: 0,
+      maxWalletDiscount: 0,
+      walletDeduction: 0,
+      actualWalletDiscount: 0,
+      remainingPayable: billAmount,
       minimumBookingAmount: settings.minimumBookingAmount || 0,
     }
   }
@@ -390,47 +435,94 @@ export async function calculateWalletDiscount(userId, eligibleBillAmount) {
     return {
       enabled: true,
       meetsMinimum: false,
+      eligibleOrderAmount: billAmount,
+      eligibleBillAmount: billAmount,
       walletBalance,
       availableBalance: walletBalance,
+      walletUsagePercentage: percentage,
+      discountPercentage: percentage,
+      percentage,
+      maxWalletUsage: 0,
       maxWalletDiscount: 0,
+      walletDeduction: 0,
       actualWalletDiscount: 0,
-      eligibleBillAmount: billAmount,
-      discountPercentage: settings.walletDiscountPercentage,
-      percentage: settings.walletDiscountPercentage,
+      remainingPayable: billAmount,
       minimumBookingAmount: settings.minimumBookingAmount,
     }
   }
 
-  const maxPercentageDiscount = Math.round((billAmount * settings.walletDiscountPercentage) / 100)
-  const actualWalletDiscount = Math.min(walletBalance, maxPercentageDiscount)
+  const maxWalletUsage = Math.min(billAmount, Math.round((billAmount * percentage) / 100))
+  const actualWalletDeduction = Math.min(walletBalance, maxWalletUsage, billAmount)
+  const remainingPayable = Math.max(0, Math.round((billAmount - actualWalletDeduction) * 100) / 100)
 
   return {
     enabled: true,
     meetsMinimum: true,
+    eligibleOrderAmount: billAmount,
+    eligibleBillAmount: billAmount,
     walletBalance,
     availableBalance: walletBalance,
-    maxWalletDiscount: maxPercentageDiscount,
-    actualWalletDiscount: Math.max(0, actualWalletDiscount),
-    eligibleBillAmount: billAmount,
-    discountPercentage: settings.walletDiscountPercentage,
-    percentage: settings.walletDiscountPercentage,
-    minimumBookingAmount: settings.minimumBookingAmount,
+    walletUsagePercentage: percentage,
+    discountPercentage: percentage,
+    percentage,
+    maxWalletUsage,
+    maxWalletDiscount: maxWalletUsage,
+    walletDeduction: Math.max(0, actualWalletDeduction),
+    actualWalletDiscount: Math.max(0, actualWalletDeduction),
+    remainingPayable,
+    minimumBookingAmount: settings.minimumBookingAmount || 0,
   }
 }
 
 /**
  * Atomically deduct wallet balance for confirmed booking
  */
-export async function deductWalletForBooking({ userId, bookingId, eligibleBillAmount, requestedUseWallet }) {
+export async function deductWalletForBooking({ userId, bookingId, eligibleBillAmount, requestedUseWallet, frozenWalletDeduction, idempotencyKey }) {
   if (!requestedUseWallet || !userId) {
-    return { applied: false, amount: 0, walletTransactionId: null }
+    return { applied: false, amount: 0, walletDeduction: 0, walletTransactionId: null }
   }
 
-  const calculation = await calculateWalletDiscount(userId, eligibleBillAmount)
-  const deductionAmount = calculation.actualWalletDiscount
+  // Idempotency: prevent double debits for the same booking allocation
+  if (bookingId) {
+    const existingTx = await WalletTransaction.findOne({
+      referenceId: bookingId,
+      context: 'SERVICE_DISCOUNT',
+      type: 'DEBIT',
+      status: 'COMPLETED',
+    })
+
+    if (existingTx) {
+      console.log(`[WALLET_IDEMPOTENCY] Booking ${bookingId} already has wallet deduction ${existingTx._id}`)
+      return {
+        applied: true,
+        alreadyApplied: true,
+        amount: existingTx.amount,
+        walletDeduction: existingTx.amount,
+        balanceBefore: existingTx.balanceBefore,
+        balanceAfter: existingTx.balanceAfter,
+        walletTransactionId: existingTx._id,
+      }
+    }
+  }
+
+  let calculation = null
+  let deductionAmount = 0
+  if (frozenWalletDeduction !== undefined && frozenWalletDeduction !== null) {
+    deductionAmount = Number(frozenWalletDeduction)
+    const settings = await getWalletSettings()
+    calculation = {
+      walletUsagePercentage: Number(settings.walletDiscountPercentage ?? 20),
+      eligibleOrderAmount: eligibleBillAmount || deductionAmount,
+      maxWalletUsage: deductionAmount,
+      remainingPayable: Math.max(0, (eligibleBillAmount || deductionAmount) - deductionAmount),
+    }
+  } else {
+    calculation = await calculateWalletDiscount(userId, eligibleBillAmount)
+    deductionAmount = calculation.walletDeduction
+  }
 
   if (deductionAmount <= 0) {
-    return { applied: false, amount: 0, walletTransactionId: null }
+    return { applied: false, amount: 0, walletDeduction: 0, walletTransactionId: null }
   }
 
   // Atomic deduction: ensure balance >= deductionAmount
@@ -450,34 +542,75 @@ export async function deductWalletForBooking({ userId, bookingId, eligibleBillAm
 
   if (!wallet) {
     console.warn(`[WALLET_ERROR] Insufficient wallet balance for userId: ${userId}, required: ${deductionAmount}`)
-    return { applied: false, amount: 0, walletTransactionId: null, error: 'INSUFFICIENT_BALANCE' }
+    return { applied: false, amount: 0, walletDeduction: 0, walletTransactionId: null, error: 'INSUFFICIENT_BALANCE' }
   }
 
   const balanceAfter = wallet.balance !== undefined ? wallet.balance : (wallet.selfBalance || 0)
   const balanceBefore = balanceAfter + deductionAmount
+  const finalIdempotencyKey = idempotencyKey || (bookingId ? `BOOKING_WALLET_DEDUCT_${bookingId}` : `WALLET_DEDUCT_${userId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`)
 
-  const tx = await WalletTransaction.create({
-    walletId: wallet._id,
-    userId,
-    amount: deductionAmount,
-    type: 'DEBIT',
-    targetWallet: 'SELF',
-    context: 'SERVICE_DISCOUNT',
-    balanceBefore,
-    balanceAfter,
-    referenceType: 'BOOKING',
-    referenceId: bookingId,
-    description: `Service discount applied on booking`,
-    status: 'COMPLETED',
-  })
+  try {
+    const tx = await WalletTransaction.create({
+      walletId: wallet._id,
+      userId,
+      bookingId: bookingId || undefined,
+      amount: deductionAmount,
+      type: 'DEBIT',
+      targetWallet: 'SELF',
+      context: 'SERVICE_DISCOUNT',
+      balanceBefore,
+      balanceAfter,
+      referenceType: 'BOOKING',
+      referenceId: bookingId || undefined,
+      idempotencyKey: finalIdempotencyKey,
+      description: `Wallet deduction of ₹${deductionAmount} (${calculation.walletUsagePercentage}%) applied on booking`,
+      metadata: {
+        eligibleOrderAmount: calculation.eligibleOrderAmount,
+        walletUsagePercentage: calculation.walletUsagePercentage,
+        maxWalletUsage: calculation.maxWalletUsage,
+        walletBalanceBefore: balanceBefore,
+        walletBalanceAfter: balanceAfter,
+      },
+      status: 'COMPLETED',
+    })
 
-  console.log(`[WALLET] Service discount applied userId: ${userId} bookingId: ${bookingId} amount: ${deductionAmount}`)
-  return {
-    applied: true,
-    amount: deductionAmount,
-    balanceBefore,
-    balanceAfter,
-    walletTransactionId: tx._id,
+    console.log(`[WALLET] Service discount applied userId: ${userId} bookingId: ${bookingId} amount: ${deductionAmount} (percentage: ${calculation.walletUsagePercentage}%)`)
+    return {
+      applied: true,
+      amount: deductionAmount,
+      walletDeduction: deductionAmount,
+      percentage: calculation.walletUsagePercentage,
+      walletUsagePercentage: calculation.walletUsagePercentage,
+      eligibleOrderAmount: calculation.eligibleOrderAmount,
+      maxWalletUsage: calculation.maxWalletUsage,
+      remainingPayable: calculation.remainingPayable,
+      balanceBefore,
+      balanceAfter,
+      walletTransactionId: tx._id,
+    }
+  } catch (err) {
+    if (err.code === 11000 || err.message?.includes('duplicate key')) {
+      console.warn(`[WALLET_IDEMPOTENCY] Duplicate transaction key detected for booking ${bookingId}`)
+      // Rollback the balance debit since the duplicate transaction write failed
+      await Wallet.updateOne(
+        { _id: wallet._id },
+        { $inc: { balance: deductionAmount, selfBalance: deductionAmount } }
+      )
+      const existing = await WalletTransaction.findOne({ idempotencyKey: finalIdempotencyKey })
+      return {
+        applied: true,
+        alreadyApplied: true,
+        amount: existing?.amount || deductionAmount,
+        walletDeduction: existing?.amount || deductionAmount,
+        walletTransactionId: existing?._id,
+      }
+    }
+    // Revert wallet balance on any unexpected transaction failure
+    await Wallet.updateOne(
+      { _id: wallet._id },
+      { $inc: { balance: deductionAmount, selfBalance: deductionAmount } }
+    )
+    throw err
   }
 }
 
@@ -491,15 +624,17 @@ export async function refundWalletForBooking({ userId, bookingId, amount, reason
   }
 
   // Prevent duplicate refund for same booking
-  const existingRefund = await WalletTransaction.findOne({
-    userId,
-    referenceId: bookingId,
-    context: 'REFUND',
-  })
+  if (bookingId) {
+    const existingRefund = await WalletTransaction.findOne({
+      userId,
+      referenceId: bookingId,
+      context: 'REFUND',
+    })
 
-  if (existingRefund) {
-    console.log(`[WALLET] Refund already processed for bookingId: ${bookingId}`)
-    return { refunded: false, alreadyRefunded: true, amount: existingRefund.amount }
+    if (existingRefund) {
+      console.log(`[WALLET] Refund already processed for bookingId: ${bookingId}`)
+      return { refunded: false, alreadyRefunded: true, amount: existingRefund.amount, walletTransactionId: existingRefund._id }
+    }
   }
 
   const wallet = await Wallet.findOneAndUpdate(
@@ -514,24 +649,41 @@ export async function refundWalletForBooking({ userId, bookingId, amount, reason
 
   const balanceAfter = wallet.balance !== undefined ? wallet.balance : (wallet.selfBalance || 0)
   const balanceBefore = balanceAfter - refundAmount
+  const idempotencyKey = bookingId ? `WALLET_REFUND_${bookingId}` : undefined
 
-  const tx = await WalletTransaction.create({
-    walletId: wallet._id,
-    userId,
-    amount: refundAmount,
-    type: 'CREDIT',
-    targetWallet: 'SELF',
-    context: 'REFUND',
-    balanceBefore,
-    balanceAfter,
-    referenceType: 'BOOKING',
-    referenceId: bookingId,
-    description: `Wallet refund: ${reason}`,
-    status: 'COMPLETED',
-  })
+  try {
+    const tx = await WalletTransaction.create({
+      walletId: wallet._id,
+      userId,
+      bookingId: bookingId || undefined,
+      amount: refundAmount,
+      type: 'CREDIT',
+      targetWallet: 'SELF',
+      context: 'REFUND',
+      balanceBefore,
+      balanceAfter,
+      referenceType: 'BOOKING',
+      referenceId: bookingId || undefined,
+      idempotencyKey,
+      description: `Wallet refund: ${reason}`,
+      status: 'COMPLETED',
+    })
 
-  console.log(`[WALLET] Wallet refunded userId: ${userId} bookingId: ${bookingId} amount: ${refundAmount}`)
-  return { refunded: true, amount: refundAmount, walletTransactionId: tx._id }
+    console.log(`[WALLET] Wallet refunded userId: ${userId} bookingId: ${bookingId} amount: ${refundAmount}`)
+    return { refunded: true, amount: refundAmount, balanceBefore, balanceAfter, walletTransactionId: tx._id }
+  } catch (err) {
+    if (err.code === 11000 || err.message?.includes('duplicate key')) {
+      console.warn(`[WALLET_IDEMPOTENCY] Duplicate key on refund for booking ${bookingId}`)
+      // Revert the double-credited balance
+      await Wallet.updateOne(
+        { _id: wallet._id },
+        { $inc: { balance: -refundAmount, selfBalance: -refundAmount } }
+      )
+      const existing = await WalletTransaction.findOne({ idempotencyKey })
+      return { refunded: false, alreadyRefunded: true, amount: existing?.amount || refundAmount, walletTransactionId: existing?._id }
+    }
+    throw err
+  }
 }
 
 /**

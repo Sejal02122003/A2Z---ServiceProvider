@@ -49,6 +49,13 @@ export const walletsApi = {
     return apiRequest('/wallets/public-settings', { method: 'GET' })
   },
 
+  calculateCheckoutWallet: (payload) => {
+    return apiRequest('/wallets/checkout-calculation', {
+      method: 'POST',
+      body: payload,
+    })
+  },
+
   // Admin Wallet & Rewards APIs
   getAdminWalletSettings: () => {
     return apiRequest('/admin/wallets/settings', { method: 'GET' })

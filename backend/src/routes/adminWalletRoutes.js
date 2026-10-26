@@ -30,6 +30,30 @@ router.put(
       .optional()
       .isBoolean()
       .withMessage('enabled must be a boolean'),
+    body('walletDiscountPercentage')
+      .optional()
+      .custom((val) => {
+        if (val === null || val === '' || typeof val === 'boolean') {
+          throw new Error('Wallet deduction percentage must be a valid number between 0 and 100')
+        }
+        const num = Number(val)
+        if (isNaN(num) || !isFinite(num) || num < 0 || num > 100) {
+          throw new Error('Wallet deduction percentage must be a valid number between 0 and 100')
+        }
+        return true
+      }),
+    body('minimumBookingAmount')
+      .optional()
+      .custom((val) => {
+        if (val === null || val === '' || typeof val === 'boolean') {
+          throw new Error('Minimum booking amount must be a non-negative number')
+        }
+        const num = Number(val)
+        if (isNaN(num) || !isFinite(num) || num < 0) {
+          throw new Error('Minimum booking amount must be a non-negative number')
+        }
+        return true
+      }),
     body('serviceCreditEnabled')
       .optional()
       .isBoolean()

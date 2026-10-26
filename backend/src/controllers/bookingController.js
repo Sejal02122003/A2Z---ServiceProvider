@@ -170,6 +170,14 @@ export const calculateBill = asyncHandler(async (req, res) => {
         paymentModes: settings.paymentModes || { cashEnabled: true, onlineEnabled: true },
         breakdown,
         walletInfo,
+        checkout: {
+          eligibleOrderAmount: totalAmount,
+          walletBalance: walletInfo?.walletBalance ?? 0,
+          walletUsagePercentage: walletInfo?.walletUsagePercentage ?? walletInfo?.percentage ?? 0,
+          maxWalletUsage: walletInfo?.maxWalletUsage ?? walletInfo?.maxWalletDiscount ?? 0,
+          walletDeduction: walletInfo?.walletDeduction ?? walletInfo?.actualWalletDiscount ?? 0,
+          remainingPayable: walletInfo?.remainingPayable ?? Math.max(0, totalAmount - (walletInfo?.walletDeduction ?? 0)),
+        },
         restriction: await checkCustomerBookingRestriction(req.user?._id),
       }
     })
@@ -430,6 +438,14 @@ export const calculateBill = asyncHandler(async (req, res) => {
       isMultiService,
       itemsCount: breakdown.length,
       walletInfo,
+      checkout: {
+        eligibleOrderAmount: totalAmount,
+        walletBalance: walletInfo?.walletBalance ?? 0,
+        walletUsagePercentage: walletInfo?.walletUsagePercentage ?? walletInfo?.percentage ?? 0,
+        maxWalletUsage: walletInfo?.maxWalletUsage ?? walletInfo?.maxWalletDiscount ?? 0,
+        walletDeduction: walletInfo?.walletDeduction ?? walletInfo?.actualWalletDiscount ?? 0,
+        remainingPayable: walletInfo?.remainingPayable ?? Math.max(0, totalAmount - (walletInfo?.walletDeduction ?? 0)),
+      },
       restriction: await checkCustomerBookingRestriction(req.user?._id),
     }
   })
@@ -834,7 +850,7 @@ export const createBooking = asyncHandler(async (req, res) => {
   // Customer does not pay platform fee; customer pays basePrice + taxes
   const rawTotalAmount = basePrice + taxes
   let finalPayableAmount = rawTotalAmount
-  let walletDiscountData = { applied: false, amount: 0, walletTransactionId: null }
+  let walletDiscountData = { applied: false, amount: 0, percentage: 0, eligibleAmount: 0, walletTransactionId: null }
 
   if (req.body.useWallet && req.user?._id) {
     try {
@@ -849,6 +865,8 @@ export const createBooking = asyncHandler(async (req, res) => {
         walletDiscountData = {
           applied: true,
           amount: deductionRes.amount,
+          percentage: deductionRes.percentage || deductionRes.walletUsagePercentage || 0,
+          eligibleAmount: rawTotalAmount,
           walletTransactionId: deductionRes.walletTransactionId,
         }
         finalPayableAmount = Math.max(0, rawTotalAmount - deductionRes.amount)
@@ -868,43 +886,62 @@ export const createBooking = asyncHandler(async (req, res) => {
   const startOtp = Math.floor(1000 + Math.random() * 9000).toString()
   const completionOtp = Math.floor(1000 + Math.random() * 9000).toString()
 
-  const booking = await Booking.create({
-    userId: req.user._id,
-    subcategoryId: bookingSubcategoryId,
-    serviceId: bookingServiceId,
-    subServiceId: req.body.subServiceId || undefined,
-    subServiceName: req.body.subServiceName || undefined,
-    type,
-    scheduledAt: type === 'SCHEDULED' ? parseISTDateTime(scheduledAt, timeSlot) : undefined,
-    timeSlot: type === 'SCHEDULED' ? timeSlot : (type === 'INSTANT' ? timeSlot : undefined),
-    endTime: type === 'SCHEDULED' ? endTime : undefined,
-    images: Array.isArray(imageNames) ? imageNames : [],
-    notes,
-    hours: bookingHours,
-    quantity: totalQuantity,
-    contractorInfo,
-    maxHourDiscount,
-    packageBooking: packageBookingData,
-    multiServiceBooking: multiServiceBookingData,
-    address: { 
-      locationText,
-      coordinates: {
-        type: 'Point',
-        coordinates: [parsedLng, parsedLat] // GeoJSON uses [longitude, latitude]
+  let booking
+  try {
+    booking = await Booking.create({
+      userId: req.user._id,
+      subcategoryId: bookingSubcategoryId,
+      serviceId: bookingServiceId,
+      subServiceId: req.body.subServiceId || undefined,
+      subServiceName: req.body.subServiceName || undefined,
+      type,
+      scheduledAt: type === 'SCHEDULED' ? parseISTDateTime(scheduledAt, timeSlot) : undefined,
+      timeSlot: type === 'SCHEDULED' ? timeSlot : (type === 'INSTANT' ? timeSlot : undefined),
+      endTime: type === 'SCHEDULED' ? endTime : undefined,
+      images: Array.isArray(imageNames) ? imageNames : [],
+      notes,
+      hours: bookingHours,
+      quantity: totalQuantity,
+      contractorInfo,
+      maxHourDiscount,
+      packageBooking: packageBookingData,
+      multiServiceBooking: multiServiceBookingData,
+      address: { 
+        locationText,
+        coordinates: {
+          type: 'Point',
+          coordinates: [parsedLng, parsedLat] // GeoJSON uses [longitude, latitude]
+        }
+      },
+      basePrice,
+      platformFee,
+      taxes,
+      walletDiscount: walletDiscountData,
+      totalAmount: finalPayableAmount,
+      commissionAmount,
+      laborShare,
+      paymentMethod,
+      status: 'CREATED',
+      startOtp,
+      completionOtp
+    })
+  } catch (createErr) {
+    // Critical rollback: if wallet deduction was already made, refund customer wallet immediately
+    if (walletDiscountData.applied && walletDiscountData.amount > 0) {
+      try {
+        const { refundWalletForBooking } = await import('../services/userWalletService.js')
+        await refundWalletForBooking({
+          userId: req.user._id,
+          bookingId: null,
+          amount: walletDiscountData.amount,
+          reason: 'Rollback due to booking creation failure',
+        })
+      } catch (rollbackErr) {
+        console.error('[WALLET_ROLLBACK_ERROR] Failed to rollback wallet deduction on booking creation failure:', rollbackErr)
       }
-    },
-    basePrice,
-    platformFee,
-    taxes,
-    walletDiscount: walletDiscountData,
-    totalAmount: finalPayableAmount,
-    commissionAmount,
-    laborShare,
-    paymentMethod,
-    status: 'CREATED',
-    startOtp,
-    completionOtp
-  })
+    }
+    throw createErr
+  }
 
   // Increment booking count on the package if applicable
   if (packageId) {
@@ -913,12 +950,13 @@ export const createBooking = asyncHandler(async (req, res) => {
     })
   }
 
-  // Link transaction referenceId to created booking
+  // Link transaction referenceId & bookingId to created booking
   if (walletDiscountData.walletTransactionId) {
     import('../models/WalletTransaction.js').then(({ WalletTransaction }) => {
       WalletTransaction.findByIdAndUpdate(walletDiscountData.walletTransactionId, {
+        bookingId: booking._id,
         referenceId: booking._id,
-        description: `Service discount of ₹${walletDiscountData.amount} applied on booking #${String(booking._id).slice(-6).toUpperCase()}`,
+        description: `Wallet deduction of ₹${walletDiscountData.amount} (${walletDiscountData.percentage}%) applied on booking #${String(booking._id).slice(-6).toUpperCase()}`,
       }).catch(err => console.error('Error linking wallet tx reference:', err))
     })
   }

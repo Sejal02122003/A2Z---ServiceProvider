@@ -283,7 +283,7 @@ export function Checkout() {
         lng,
         saveAddress,
         paymentMethod,
-        useWallet: Boolean(useWallet && bill?.walletInfo?.actualWalletDiscount > 0),
+        useWallet: Boolean(useWallet && ((bill?.walletInfo?.walletDeduction ?? 0) > 0 || (bill?.walletInfo?.actualWalletDiscount ?? 0) > 0)),
       })
 
       const booking = res.data?.booking
@@ -397,35 +397,57 @@ export function Checkout() {
               </div>
             )}
 
-            {/* Wallet Balance & Discount Section */}
-            {bill.walletInfo?.enabled && bill.walletInfo?.availableBalance > 0 && bill.walletInfo?.actualWalletDiscount > 0 && (
-              <div className="mt-3 p-3 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 border border-amber-200 dark:border-amber-800/40 rounded-xl space-y-2">
+            {/* Wallet Balance & Dynamic Deduction Section */}
+            {bill.walletInfo?.enabled && (
+              <div className="mt-3 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 border border-amber-200 dark:border-amber-800/40 rounded-xl space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="p-1 rounded-lg bg-amber-500/10 text-amber-600">
+                    <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
                       <Wallet className="w-4 h-4" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-slate-900 dark:text-white">Use Wallet Balance</p>
-                      <p className="text-[11px] text-slate-500">Available: {formatInr(bill.walletInfo.availableBalance)}</p>
+                      <p className="text-xs font-bold text-slate-900 dark:text-white">Pay via Customer Wallet</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Available Balance: <span className="font-semibold text-slate-800 dark:text-slate-200">{formatInr(bill.walletInfo.walletBalance ?? bill.walletInfo.availableBalance ?? 0)}</span>
+                      </p>
                     </div>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={useWallet}
-                      onChange={(e) => setUseWallet(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
-                  </label>
+                  {((bill.walletInfo.walletBalance ?? bill.walletInfo.availableBalance ?? 0) > 0 && ((bill.walletInfo.walletDeduction ?? bill.walletInfo.actualWalletDiscount ?? 0) > 0)) ? (
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={useWallet}
+                        onChange={(e) => setUseWallet(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                    </label>
+                  ) : (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200">
+                      {bill.walletInfo.meetsMinimum === false ? `Min bill ₹${bill.walletInfo.minimumBookingAmount}` : '₹0 Balance'}
+                    </span>
+                  )}
                 </div>
-                {useWallet && (
-                  <div className="flex justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400 pt-1 border-t border-amber-200/60">
-                    <span>Wallet Discount Applied ({bill.walletInfo.percentage}% max):</span>
-                    <span>-{formatInr(bill.walletInfo.actualWalletDiscount)}</span>
+
+                {/* Transparent calculation breakdown */}
+                <div className="text-[11px] space-y-1 pt-1.5 border-t border-amber-200/60 dark:border-amber-800/40 text-slate-600 dark:text-slate-400">
+                  <div className="flex justify-between">
+                    <span>Eligible Order Amount:</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{formatInr(bill.totalAmount)}</span>
                   </div>
-                )}
+                  <div className="flex justify-between">
+                    <span>Admin Wallet Usage Limit:</span>
+                    <span className="font-bold text-amber-700 dark:text-amber-400">
+                      {bill.walletInfo.walletUsagePercentage ?? bill.walletInfo.percentage ?? 0}% (Max {formatInr(bill.walletInfo.maxWalletUsage ?? bill.walletInfo.maxWalletDiscount ?? 0)})
+                    </span>
+                  </div>
+                  {useWallet && ((bill.walletInfo.walletDeduction ?? bill.walletInfo.actualWalletDiscount ?? 0) > 0) && (
+                    <div className="flex justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400 pt-1 border-t border-amber-200/60">
+                      <span>Wallet Deduction Applied:</span>
+                      <span>-{formatInr(bill.walletInfo.walletDeduction ?? bill.walletInfo.actualWalletDiscount ?? 0)}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -433,8 +455,8 @@ export function Checkout() {
               <span className="font-extrabold text-slate-900">Total Payable</span>
               <span className="font-extrabold text-brand">
                 {formatInr(
-                  useWallet && bill.walletInfo?.actualWalletDiscount > 0
-                    ? Math.max(0, bill.totalAmount - bill.walletInfo.actualWalletDiscount)
+                  useWallet && ((bill.walletInfo?.walletDeduction ?? bill.walletInfo?.actualWalletDiscount ?? 0) > 0)
+                    ? (bill.walletInfo?.remainingPayable ?? Math.max(0, bill.totalAmount - (bill.walletInfo?.walletDeduction ?? bill.walletInfo?.actualWalletDiscount ?? 0)))
                     : bill.totalAmount
                 )}
               </span>

@@ -95,6 +95,8 @@ const bookingSchema = new mongoose.Schema(
     walletDiscount: {
       applied: { type: Boolean, default: false },
       amount: { type: Number, default: 0 },
+      percentage: { type: Number, default: 0 },
+      eligibleAmount: { type: Number, default: 0 },
       walletTransactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'WalletTransaction' },
     },
     serviceCredit: {

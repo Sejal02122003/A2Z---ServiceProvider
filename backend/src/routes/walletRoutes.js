@@ -16,6 +16,7 @@ router.use(protect)
 // Customer / General user wallet endpoints
 router.get('/user/me', userWallet.getMyUserWallet)
 router.get('/user/transactions', userWallet.getMyUserTransactions)
+router.post('/checkout-calculation', userWallet.calculateCheckoutWallet)
 
 // Both LABOUR and ADMIN can view wallets, but we restrict endpoints accordingly
 router.get('/me', restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR), wallet.getMyWallet)

@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { Settings, Percent, IndianRupee, Wallet, Receipt, AlertTriangle, CheckCircle2, Loader2, Clock, Image as ImageIcon, Trash2, Radio } from 'lucide-react'
 import { adminSettingsApi } from '../../api/adminSettingsApi.js'
+import { walletsApi } from '../../api/walletsApi.js'
 import { fetchAdminLabourCategoryTree, updateAdminLabourCategoryGst } from '../../api/adminLabourCategoriesApi.js'
 import { ApiError } from '../../api/http.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
@@ -137,6 +138,9 @@ export function AdminSettingsPage() {
   // Max-Hour Discount
   const [maxHourDiscountPercentage, setMaxHourDiscountPercentage] = useState('')
 
+  // Wallet Deduction Percentage Settings
+  const [walletSettings, setWalletSettings] = useState({ enabled: true, walletDiscountPercentage: 20, updatedAt: null, updatedBy: null })
+
 
 
   const showToast = useCallback((message, variant = 'success') => {
@@ -146,6 +150,21 @@ export function AdminSettingsPage() {
 
   useEffect(() => {
     let cancelled = false
+    walletsApi.getAdminWalletSettings()
+      .then((res) => {
+        if (cancelled) return
+        const ws = res.data?.settings || res.data
+        if (ws) {
+          setWalletSettings({
+            enabled: ws.enabled !== false,
+            walletDiscountPercentage: ws.walletDiscountPercentage ?? 20,
+            updatedAt: ws.updatedAt,
+            updatedBy: ws.updatedBy,
+          })
+        }
+      })
+      .catch((err) => console.error('Failed to load wallet settings in AdminSettingsPage:', err))
+
     adminSettingsApi.getSettings()
       .then((res) => {
         if (cancelled) return
@@ -818,6 +837,121 @@ export function AdminSettingsPage() {
           >
             Save Discount
           </AppPrimaryButton>
+        </SettingsSection>
+
+        {/* Dynamic Wallet Deduction Percentage Section */}
+        <SettingsSection
+          icon={Wallet}
+          title="Customer Wallet Deduction Settings"
+          description="Control the maximum percentage of an eligible order amount payable using customer wallet funds."
+          accent="brand"
+        >
+          <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+            <div>
+              <p className="text-xs font-bold text-slate-800">Enable Wallet Balance Usage</p>
+              <p className="text-[11px] text-slate-500">Allow customers to use wallet funds at checkout.</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={walletSettings.enabled}
+                onChange={(e) => setWalletSettings({ ...walletSettings, enabled: e.target.checked })}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+            </label>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between">
+              <label className={labelClass}>Max Wallet Usage Limit (%)</label>
+              <span className="text-[11px] font-semibold text-slate-400">Accepts 0 - 100%</span>
+            </div>
+            <div className="relative mt-1.5">
+              <input
+                className={inputClass}
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                placeholder="20"
+                value={walletSettings.walletDiscountPercentage}
+                onChange={(e) => setWalletSettings({ ...walletSettings, walletDiscountPercentage: e.target.value === '' ? '' : Number(e.target.value) })}
+              />
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400 font-bold">
+                %
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {[0, 10, 20, 30, 50, 100].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setWalletSettings({ ...walletSettings, walletDiscountPercentage: preset })}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition ${
+                    Number(walletSettings.walletDiscountPercentage) === preset
+                      ? 'bg-brand text-white border-brand'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-brand/40'
+                  }`}
+                >
+                  {preset}%
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {walletSettings.updatedAt && (
+            <p className="text-[11px] text-slate-400">
+              Last saved: {new Date(walletSettings.updatedAt).toLocaleString('en-IN')}
+              {walletSettings.updatedBy?.fullName ? ` by ${walletSettings.updatedBy.fullName}` : ''}
+            </p>
+          )}
+
+          <div className="flex items-center justify-between pt-2">
+            <AppPrimaryButton
+              type="button"
+              loading={saving === 'WalletDeduction'}
+              onClick={async () => {
+                const val = Number(walletSettings.walletDiscountPercentage)
+                if (isNaN(val) || !isFinite(val) || val < 0 || val > 100) {
+                  showToast('Wallet deduction percentage must be between 0% and 100%', 'error')
+                  return
+                }
+                setSaving('WalletDeduction')
+                try {
+                  const res = await walletsApi.updateAdminWalletSettings({
+                    enabled: Boolean(walletSettings.enabled),
+                    walletDiscountPercentage: val,
+                  })
+                  if (res.success) {
+                    showToast('Wallet deduction settings updated successfully!')
+                    const updated = res.data?.settings || res.data
+                    if (updated) {
+                      setWalletSettings({
+                        enabled: updated.enabled !== false,
+                        walletDiscountPercentage: updated.walletDiscountPercentage ?? val,
+                        updatedAt: updated.updatedAt,
+                        updatedBy: updated.updatedBy,
+                      })
+                    }
+                  }
+                } catch (err) {
+                  showToast(err.message || 'Failed to update wallet settings', 'error')
+                } finally {
+                  setSaving('')
+                }
+              }}
+            >
+              Save Wallet Percentage
+            </AppPrimaryButton>
+
+            <Link
+              to="/admin/wallet-rewards"
+              className="text-xs font-bold text-brand hover:underline"
+            >
+              Open Full Wallet Hub & Simulator →
+            </Link>
+          </div>
         </SettingsSection>
 
       </div>
