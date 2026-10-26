@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useLocation, useNavigate, useParams, Navigate } from 'react-router-dom'
-import { ArrowLeft, Wrench, ChevronDown, ChevronUp, Loader2, Sparkles, Tag, Flame, Clock, CheckCircle2, XCircle, Check, X, Plus, Minus } from 'lucide-react'
+import { ArrowLeft, Wrench, ChevronDown, ChevronUp, Loader2, Sparkles, Tag, Flame, Clock, CheckCircle2, XCircle, Check, X, Plus, Minus, Wallet } from 'lucide-react'
 import { getCategoryImageUrl } from '../../lib/labourCategoryDisplay.js'
 import { BookingTypeSheet } from '../../components/app/booking/BookingTypeSheet.jsx'
 import { readBookingDraft, writeBookingDraft } from '../../lib/individualBookingDraft.js'
@@ -10,6 +10,8 @@ import { readAppUserLocation } from '../../lib/appUserLocationStorage.js'
 import { getServiceOfferDetails } from '../../lib/serviceOfferUtils.js'
 import { ServiceOfferBadge } from '../../components/app/services/ServiceOfferBadge.jsx'
 import { useBookingCart } from '../../context/BookingCartContext.jsx'
+import { walletsApi } from '../../api/walletsApi.js'
+import { useAuth } from '../../hooks/useAuth.js'
 
 export function AppSubCategoryServicePage() {
   const { id } = useParams()
@@ -20,6 +22,42 @@ export function AppSubCategoryServicePage() {
   const [bookingTypeOpen, setBookingTypeOpen] = useState(false)
   const [bookingService, setBookingService] = useState(null)
   
+  const { user, isAuthenticated } = useAuth()
+  const [walletSettings, setWalletSettings] = useState({
+    enabled: true,
+    walletDiscountPercentage: 20,
+    welcomeBonusAmount: 1000,
+    serviceCreditEnabled: true,
+    serviceCreditPercentage: 15,
+  })
+  const [userWallet, setUserWallet] = useState(null)
+
+  useEffect(() => {
+    let isMounted = true
+    walletsApi
+      .getPublicWalletSettings()
+      .then((res) => {
+        if (isMounted && res?.data) {
+          setWalletSettings((prev) => ({ ...prev, ...res.data }))
+        }
+      })
+      .catch(() => {})
+
+    if (isAuthenticated) {
+      walletsApi
+        .getMyUserWallet()
+        .then((res) => {
+          if (isMounted && res?.data?.wallet) {
+            setUserWallet(res.data.wallet)
+          }
+        })
+        .catch(() => {})
+    }
+    return () => {
+      isMounted = false
+    }
+  }, [isAuthenticated])
+
   const [cat, setCat] = useState(() => location.state?.cat || null)
   const [loading, setLoading] = useState(() => !(location.state?.cat?.services?.length > 0))
   const [fetchDone, setFetchDone] = useState(() => !!(location.state?.cat?.services?.length > 0))
@@ -192,16 +230,24 @@ export function AppSubCategoryServicePage() {
         </section>
 
         <section className="space-y-3">
-          <div className="flex items-center justify-between pl-1">
+          <div className="flex items-center justify-between pl-1 flex-wrap gap-2">
             <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">
               Available Services
             </h2>
-            {services.some(s => s.discountValue > 0) && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60">
-                <Flame className="h-3 w-3 fill-amber-500 text-amber-500" />
-                Active Offers Available
-              </span>
-            )}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {services.some(s => s.discountValue > 0) && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60">
+                  <Flame className="h-3 w-3 fill-amber-500 text-amber-500" />
+                  Active Offers Available
+                </span>
+              )}
+              {walletSettings?.enabled !== false && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200/60 shadow-2xs">
+                  <Wallet className="h-3 w-3 text-emerald-600" />
+                  {walletSettings?.walletDiscountPercentage || 20}% Wallet Offers
+                </span>
+              )}
+            </div>
           </div>
 
           {services.length === 0 ? (
@@ -215,6 +261,13 @@ export function AppSubCategoryServicePage() {
               {services.map((service) => {
                 const isExpanded = expandedServiceId === service._id;
                 const offer = getServiceOfferDetails(service);
+                const serviceRawPrice = Number(offer.discountedPrice || offer.originalPrice || service.price || 0);
+                const walletDiscountPct = Number(walletSettings?.walletDiscountPercentage || 20);
+                const serviceCreditPct = Number(walletSettings?.serviceCreditPercentage || 15);
+                const walletSavingsAmount = Math.round((serviceRawPrice * walletDiscountPct) / 100);
+                const effectiveWalletPrice = Math.max(0, serviceRawPrice - walletSavingsAmount);
+                const walletCashbackAmount = Math.round((serviceRawPrice * serviceCreditPct) / 100);
+                const hasWalletOffer = Boolean(walletSettings?.enabled !== false && walletDiscountPct > 0 && serviceRawPrice > 0);
 
                 return (
                   <div
@@ -255,6 +308,9 @@ export function AppSubCategoryServicePage() {
                           {offer.hasOffer && (
                             <ServiceOfferBadge label={offer.offerBadge} variant="compact" />
                           )}
+                          {hasWalletOffer && (
+                            <ServiceOfferBadge label={`${walletDiscountPct}% Wallet OFF`} variant="wallet" />
+                          )}
                           {Array.isArray(service.subServices) && service.subServices.length > 0 && (
                             <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-200/60">
                               {service.subServices.filter(ss => ss.isActive !== false).length} options
@@ -264,11 +320,19 @@ export function AppSubCategoryServicePage() {
                         {service.description && !isExpanded ? (
                           <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{service.description}</p>
                         ) : null}
-                        {offer.hasOffer && !isExpanded && (
-                          <p className="text-[11px] font-bold text-emerald-600 mt-0.5">
-                            Save {offer.displaySavings}{offer.unitLabel}
-                          </p>
-                        )}
+                        <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                          {offer.hasOffer && !isExpanded && (
+                            <p className="text-[11px] font-bold text-amber-600">
+                              Save {offer.displaySavings}{offer.unitLabel}
+                            </p>
+                          )}
+                          {hasWalletOffer && !isExpanded && (
+                            <p className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                              {offer.hasOffer && <span>•</span>}
+                              <span>Save up to ₹{walletSavingsAmount} with Wallet</span>
+                            </p>
+                          )}
+                        </div>
                       </div>
 
                       {/* Pricing Tag */}
@@ -296,7 +360,7 @@ export function AppSubCategoryServicePage() {
 
                     {isExpanded && (
                       <div className="px-3 sm:px-4 pb-4 pt-2 bg-slate-50/50 border-t border-slate-100 space-y-3 w-full min-w-0 box-border">
-                        {/* Offer Highlight Banner in Expanded View */}
+                        {/* Special Discount Offer Banner in Expanded View */}
                         {offer.hasOffer && (
                           <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-amber-500/10 via-rose-500/10 to-orange-500/10 border border-amber-300/40 p-3">
                             <div className="flex items-center gap-2.5">
@@ -314,6 +378,43 @@ export function AppSubCategoryServicePage() {
                             </div>
                             <span className="shrink-0 font-extrabold text-xs text-emerald-700 bg-emerald-100/80 px-2 py-1 rounded-lg">
                               Save {offer.displaySavings}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Wallet Offer Highlight Banner in Expanded View */}
+                        {hasWalletOffer && (
+                          <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-cyan-500/10 border border-emerald-400/40 p-3 shadow-2xs">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
+                                <Wallet className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="text-xs font-bold text-emerald-950">
+                                    Wallet Offer: Save up to {walletDiscountPct}% OFF
+                                  </p>
+                                  <span className="rounded bg-emerald-100/90 text-emerald-800 text-[9px] font-black px-1.5 py-0.5 border border-emerald-300/60">
+                                    A2Z Wallet
+                                  </span>
+                                  {userWallet?.balance > 0 && (
+                                    <span className="text-[10px] font-bold text-emerald-700 bg-white/80 px-1.5 py-0.2 rounded border border-emerald-200">
+                                      Balance: ₹{userWallet.balance.toLocaleString('en-IN')}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-emerald-800 font-medium mt-0.5 leading-snug">
+                                  Pay with Wallet balance to get it for only <strong className="text-emerald-950 font-bold">₹{effectiveWalletPrice}{offer.unitLabel}</strong>!
+                                  {walletSettings?.serviceCreditEnabled !== false && (
+                                    <span className="text-teal-900 font-semibold ml-1">
+                                      + Earn {serviceCreditPct}% (₹{walletCashbackAmount}) cashback after service.
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="shrink-0 font-extrabold text-xs text-emerald-800 bg-emerald-100/90 px-2.5 py-1 rounded-lg border border-emerald-300/60 shadow-2xs">
+                              Save ₹{walletSavingsAmount}
                             </span>
                           </div>
                         )}
@@ -338,6 +439,12 @@ export function AppSubCategoryServicePage() {
                                 <span className="text-blue-600 font-bold">{offer.displayPrice}</span>
                               )}
                             </p>
+                            {hasWalletOffer && walletSavingsAmount > 0 && (
+                              <p className="text-[11px] font-bold text-emerald-700 mt-1 flex items-center gap-1">
+                                <Wallet className="h-3 w-3 text-emerald-600 shrink-0" />
+                                <span>₹{effectiveWalletPrice}{offer.unitLabel} with Wallet (Save ₹{walletSavingsAmount})</span>
+                              </p>
+                            )}
                           </div>
                           <div>
                             <p className="text-[10px] font-bold uppercase text-slate-400">Status</p>
@@ -449,6 +556,9 @@ export function AppSubCategoryServicePage() {
                                     hasSubOffer = finalPrice < origPrice
                                   }
 
+                                  const subWalletSavings = Math.round((finalPrice * walletDiscountPct) / 100);
+                                  const subPriceWithWallet = Math.max(0, finalPrice - subWalletSavings);
+
                                   return (
                                     <div
                                       key={subItem._id}
@@ -472,25 +582,35 @@ export function AppSubCategoryServicePage() {
 
                                       {/* Pricing & Action Buttons */}
                                       <div className="flex items-center justify-between gap-2 pt-2.5 mt-2.5 border-t border-slate-100">
-                                        <div className="flex items-center gap-2 flex-wrap min-w-0">
-                                          {hasSubOffer ? (
-                                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                                        <div className="flex flex-col min-w-0">
+                                          <div className="flex items-baseline gap-1.5 flex-wrap">
+                                            {hasSubOffer ? (
+                                              <>
+                                                <span className="font-mono text-base font-black text-blue-600">
+                                                  ₹{finalPrice}
+                                                </span>
+                                                <span className="font-mono text-xs font-medium text-slate-400 line-through">
+                                                  ₹{origPrice}
+                                                </span>
+                                                {discountPercent > 0 && (
+                                                  <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[9px] font-black text-rose-600 border border-rose-200/60 leading-none">
+                                                    {discountPercent}% OFF
+                                                  </span>
+                                                )}
+                                              </>
+                                            ) : (
                                               <span className="font-mono text-base font-black text-blue-600">
                                                 ₹{finalPrice}
                                               </span>
-                                              <span className="font-mono text-xs font-medium text-slate-400 line-through">
-                                                ₹{origPrice}
+                                            )}
+                                          </div>
+                                          {hasWalletOffer && subWalletSavings > 0 && (
+                                            <div className="flex items-center gap-1 mt-1">
+                                              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200/70">
+                                                <Wallet className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
+                                                ₹{subPriceWithWallet} with Wallet (Save ₹{subWalletSavings})
                                               </span>
-                                              {discountPercent > 0 && (
-                                                <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[9px] font-black text-rose-600 border border-rose-200/60 leading-none">
-                                                  {discountPercent}% OFF
-                                                </span>
-                                              )}
                                             </div>
-                                          ) : (
-                                            <span className="font-mono text-base font-black text-blue-600">
-                                              ₹{finalPrice}
-                                            </span>
                                           )}
                                         </div>
 

@@ -1,15 +1,24 @@
-import { Sparkles, Tag, Flame } from 'lucide-react'
+import { Sparkles, Tag, Flame, Wallet } from 'lucide-react'
 
 /**
  * Premium Offer Badge component for service cards, lists, and headers.
  */
 export function ServiceOfferBadge({ 
   label, 
-  variant = 'compact', // 'compact' | 'ribbon' | 'pill' | 'highlight'
+  variant = 'compact', // 'compact' | 'ribbon' | 'pill' | 'highlight' | 'wallet'
   className = '',
   icon: Icon = Tag
 }) {
   if (!label) return null
+
+  if (variant === 'wallet') {
+    return (
+      <span className={`inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-extrabold text-emerald-800 ring-1 ring-inset ring-emerald-600/25 ${className}`}>
+        <Wallet className="h-2.5 w-2.5 text-emerald-600 shrink-0" />
+        <span>{label}</span>
+      </span>
+    )
+  }
 
   if (variant === 'ribbon') {
     return (
