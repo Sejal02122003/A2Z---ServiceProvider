@@ -424,7 +424,7 @@ export function JobTracking() {
                         </div>
                       )}
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-900 truncate">{item.serviceName}</p>
+                        <p className="text-sm font-bold text-slate-900 break-words">{item.serviceName}</p>
                         {item.subServiceName && (
                           <p className="text-xs text-brand font-semibold">{item.subServiceName}</p>
                         )}

@@ -173,7 +173,7 @@ export function AppSubCategoryServicePage() {
               <ArrowLeft className="h-5 w-5" />
             </button>
             <div className="flex flex-col justify-center min-w-0">
-              <h1 className="text-[20px] font-bold tracking-tight text-slate-900 leading-none truncate">{cat.name || 'Services'}</h1>
+              <h1 className="text-[20px] font-bold tracking-tight text-slate-900 leading-tight break-words">{cat.name || 'Services'}</h1>
             </div>
           </div>
         </div>
@@ -251,7 +251,7 @@ export function AppSubCategoryServicePage() {
                       {/* Name & Offer Details */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <h3 className="font-bold text-slate-900 text-sm leading-snug line-clamp-2">{service.name}</h3>
+                          <h3 className="font-bold text-slate-900 text-sm leading-snug break-words">{service.name}</h3>
                           {offer.hasOffer && (
                             <ServiceOfferBadge label={offer.offerBadge} variant="compact" />
                           )}
@@ -450,105 +450,115 @@ export function AppSubCategoryServicePage() {
                                   }
 
                                   return (
-                                <div
-                                  key={subItem._id}
-                                  className="flex items-center justify-between gap-2.5 rounded-2xl border border-slate-200/90 bg-white p-3 shadow-xs transition hover:border-brand/50 hover:shadow-sm w-full min-w-0 box-border"
-                                >
-                                  <div className="flex-1 min-w-0 pr-1">
-                                    <h4 className="text-sm font-bold text-slate-900 truncate leading-snug">{subItem.name}</h4>
-                                    {subItem.description && (
-                                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{subItem.description}</p>
-                                    )}
-                                    <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400 mt-1">
-                                      <Clock className="h-3 w-3 text-slate-400 shrink-0" />
-                                      <span>{subItem.estimatedDurationMins || 30} mins</span>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2 shrink-0">
-                                    <div className="text-right flex flex-col justify-center items-end mr-0.5 leading-tight">
-                                      {hasSubOffer ? (
-                                        <>
-                                          <span className="font-mono text-[11px] font-medium text-slate-400 line-through">
-                                            ₹{origPrice}
-                                          </span>
-                                          <div className="flex items-center gap-1">
-                                            <span className="font-mono text-sm font-black text-blue-600">
+                                    <div
+                                      key={subItem._id}
+                                      className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-brand/50 hover:shadow-sm w-full min-w-0 box-border"
+                                    >
+                                      {/* Sub-Service Name & Details */}
+                                      <div className="w-full min-w-0">
+                                        <h4 className="text-sm font-bold text-slate-900 leading-snug break-words">
+                                          {subItem.name}
+                                        </h4>
+                                        {subItem.description && (
+                                          <p className="text-xs text-slate-500 mt-1 leading-relaxed break-words">
+                                            {subItem.description}
+                                          </p>
+                                        )}
+                                        <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400 mt-1.5">
+                                          <Clock className="h-3 w-3 text-slate-400 shrink-0" />
+                                          <span>{subItem.estimatedDurationMins || 30} mins</span>
+                                        </div>
+                                      </div>
+
+                                      {/* Pricing & Action Buttons */}
+                                      <div className="flex items-center justify-between gap-2 pt-2.5 mt-2.5 border-t border-slate-100">
+                                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                          {hasSubOffer ? (
+                                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                                              <span className="font-mono text-base font-black text-blue-600">
+                                                ₹{finalPrice}
+                                              </span>
+                                              <span className="font-mono text-xs font-medium text-slate-400 line-through">
+                                                ₹{origPrice}
+                                              </span>
+                                              {discountPercent > 0 && (
+                                                <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[9px] font-black text-rose-600 border border-rose-200/60 leading-none">
+                                                  {discountPercent}% OFF
+                                                </span>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <span className="font-mono text-base font-black text-blue-600">
                                               ₹{finalPrice}
                                             </span>
-                                            {discountPercent > 0 && (
-                                              <span className="rounded bg-rose-50 px-1 py-0.5 text-[9px] font-black text-rose-600 border border-rose-200/60 leading-none">
-                                                {discountPercent}% OFF
+                                          )}
+                                        </div>
+
+                                        <div className="flex items-center gap-2 shrink-0">
+                                          {isInCart(service._id, subItem._id) ? (
+                                            <div className="flex items-center border border-emerald-300 rounded-xl bg-emerald-50 shadow-2xs overflow-hidden">
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  const curr = getItemQuantity(service._id, subItem._id)
+                                                  updateQuantity(`${service._id}_${subItem._id}`, curr - 1)
+                                                }}
+                                                className="p-1.5 text-emerald-700 hover:bg-emerald-100 transition"
+                                                title="Decrease quantity"
+                                              >
+                                                <Minus className="h-3 w-3" />
+                                              </button>
+                                              <span className="px-2 text-xs font-bold text-emerald-900 font-mono">
+                                                {getItemQuantity(service._id, subItem._id)}
                                               </span>
-                                            )}
-                                          </div>
-                                        </>
-                                      ) : (
-                                        <span className="font-mono text-sm font-black text-blue-600 block">
-                                          ₹{finalPrice}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {isInCart(service._id, subItem._id) ? (
-                                      <div className="flex items-center border border-emerald-300 rounded-xl bg-emerald-50 shadow-2xs overflow-hidden">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation()
-                                            const curr = getItemQuantity(service._id, subItem._id)
-                                            updateQuantity(`${service._id}_${subItem._id}`, curr - 1)
-                                          }}
-                                          className="p-1 text-emerald-700 hover:bg-emerald-100 transition"
-                                        >
-                                          <Minus className="h-3 w-3" />
-                                        </button>
-                                        <span className="px-1.5 text-xs font-bold text-emerald-900 font-mono">
-                                          {getItemQuantity(service._id, subItem._id)}
-                                        </span>
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation()
-                                            const curr = getItemQuantity(service._id, subItem._id)
-                                            updateQuantity(`${service._id}_${subItem._id}`, curr + 1)
-                                          }}
-                                          className="p-1 text-emerald-700 hover:bg-emerald-100 transition"
-                                        >
-                                          <Plus className="h-3 w-3" />
-                                        </button>
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  const curr = getItemQuantity(service._id, subItem._id)
+                                                  updateQuantity(`${service._id}_${subItem._id}`, curr + 1)
+                                                }}
+                                                className="p-1.5 text-emerald-700 hover:bg-emerald-100 transition"
+                                                title="Increase quantity"
+                                              >
+                                                <Plus className="h-3 w-3" />
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                addToCart(service, subItem, {
+                                                  categoryId: cat?._id,
+                                                  categoryName: cat?.name,
+                                                  subcategoryId: cat?._id,
+                                                  subcategoryName: cat?.name,
+                                                })
+                                              }}
+                                              className="inline-flex items-center justify-center rounded-xl border border-brand/40 bg-brand/5 px-3 py-1.5 text-xs font-bold text-brand shadow-2xs hover:bg-brand hover:text-white transition active:scale-95 cursor-pointer"
+                                            >
+                                              + Add
+                                            </button>
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              setBookingService({
+                                                ...service,
+                                                selectedSubService: subItem,
+                                              })
+                                              setBookingTypeOpen(true)
+                                            }}
+                                            className="inline-flex items-center justify-center rounded-xl bg-brand px-3.5 py-1.5 text-xs font-black uppercase tracking-wider text-white shadow-sm shadow-brand/25 transition active:scale-95 hover:bg-brand/90 hover:shadow-md whitespace-nowrap cursor-pointer shrink-0"
+                                          >
+                                            Book
+                                          </button>
+                                        </div>
                                       </div>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          addToCart(service, subItem, {
-                                            categoryId: cat?._id,
-                                            categoryName: cat?.name,
-                                            subcategoryId: cat?._id,
-                                            subcategoryName: cat?.name,
-                                          })
-                                        }}
-                                        className="inline-flex items-center justify-center rounded-xl border border-brand/40 bg-brand/5 px-2.5 py-1.5 text-xs font-bold text-brand shadow-2xs hover:bg-brand hover:text-white transition active:scale-95"
-                                      >
-                                        + Add
-                                      </button>
-                                    )}
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setBookingService({
-                                          ...service,
-                                          selectedSubService: subItem,
-                                        })
-                                        setBookingTypeOpen(true)
-                                      }}
-                                      className="inline-flex items-center justify-center rounded-xl bg-brand px-3 py-1.5 text-xs font-black uppercase tracking-wider text-white shadow-sm shadow-brand/25 transition active:scale-95 hover:bg-brand/90 hover:shadow-md whitespace-nowrap cursor-pointer shrink-0"
-                                    >
-                                      Book
-                                    </button>
-                                  </div>
-                                </div>
+                                    </div>
                                   )
                                 })}
                             </div>

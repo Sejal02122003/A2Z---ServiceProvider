@@ -116,7 +116,7 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
                 </>
               )}
             </div>
-            <p className="truncate text-base font-extrabold text-slate-900 leading-tight">
+            <p className="break-words text-base font-extrabold text-slate-900 leading-snug">
               {booking.multiServiceBooking?.isMultiService && booking.multiServiceBooking.items?.length > 0
                 ? booking.multiServiceBooking.items.map(it => it.subServiceName ? `${it.serviceName} (${it.subServiceName})` : it.serviceName).join(', ')
                 : booking.packageBooking?.isPackage
