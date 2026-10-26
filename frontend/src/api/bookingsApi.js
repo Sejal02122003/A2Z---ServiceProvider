@@ -59,6 +59,13 @@ export const bookingsApi = {
     })
   },
 
+  rescheduleBooking: (id, payload) => {
+    return apiRequest(`/bookings/${id}/reschedule`, {
+      method: 'POST',
+      body: payload,
+    })
+  },
+
   getCancellationEligibility: (id) => {
     return apiRequest(`/bookings/${id}/cancel-eligibility`, {
       method: 'GET',

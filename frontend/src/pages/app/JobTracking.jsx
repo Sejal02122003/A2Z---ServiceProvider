@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
+  Calendar,
   Check,
   CheckCircle2,
   Loader2,
@@ -19,6 +20,7 @@ import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { BookingReviewModal } from '../../components/app/booking/BookingReviewModal.jsx'
 import { CancelBookingModal } from '../../components/app/booking/CancelBookingModal.jsx'
+import { RescheduleBookingModal } from '../../components/app/booking/RescheduleBookingModal.jsx'
 
 const BOOKING_STEPS = [
   { id: 'CREATED', label: 'Booking Created' },
@@ -41,6 +43,7 @@ export function JobTracking() {
   const [error, setError] = useState('')
   const [showReview, setShowReview] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false)
   const [labourLocation, setLabourLocation] = useState(null)
 
   const [cancellingItemId, setCancellingItemId] = useState(null)
@@ -559,13 +562,21 @@ export function JobTracking() {
         )
       ) : null}
 
-      {/* Customer Cancellation Option */}
-      {['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED'].includes(booking.status) && (
-        <div className="pt-2">
+      {/* Customer Reschedule & Cancellation Options */}
+      {['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED', 'PARTIALLY_ACCEPTED'].includes(booking.status) && (
+        <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
+          <button
+            type="button"
+            onClick={() => setShowRescheduleModal(true)}
+            className="flex-1 rounded-2xl border border-blue-200 bg-blue-50/80 py-3 px-4 text-sm font-bold text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition shadow-sm flex items-center justify-center gap-2"
+          >
+            <Calendar className="h-4 w-4" />
+            <span>Reschedule Booking</span>
+          </button>
           <button
             type="button"
             onClick={() => setShowCancelModal(true)}
-            className="w-full rounded-2xl border border-rose-200 bg-rose-50/70 py-3 px-4 text-sm font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-300 transition shadow-sm flex items-center justify-center gap-2"
+            className="flex-1 rounded-2xl border border-rose-200 bg-rose-50/70 py-3 px-4 text-sm font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-300 transition shadow-sm flex items-center justify-center gap-2"
           >
             <span>Cancel This Booking</span>
           </button>
@@ -580,6 +591,16 @@ export function JobTracking() {
         onSuccess={() => {
           setShowCancelModal(false)
           navigate('/app', { replace: true })
+        }}
+      />
+
+      {/* Reschedule Booking Modal */}
+      <RescheduleBookingModal
+        open={showRescheduleModal}
+        booking={booking}
+        onClose={() => setShowRescheduleModal(false)}
+        onSuccess={(updatedBooking) => {
+          setBooking(updatedBooking)
         }}
       />
 

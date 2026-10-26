@@ -259,6 +259,27 @@ const bookingSchema = new mongoose.Schema(
     cancellationReason: { type: String, trim: true },
     penaltyDeducted: { type: Number, default: 0 },
 
+    // Reschedule Tracking
+    isRescheduled: { type: Boolean, default: false },
+    rescheduledAt: { type: Date },
+    rescheduledBy: {
+      type: String,
+      enum: ['CUSTOMER', 'ADMIN', 'CONTRACTOR'],
+    },
+    rescheduleReason: { type: String, trim: true },
+    rescheduleCount: { type: Number, default: 0 },
+    rescheduleHistory: [
+      {
+        rescheduledAt: { type: Date, default: Date.now },
+        rescheduledBy: { type: String },
+        oldScheduledAt: { type: Date },
+        newScheduledAt: { type: Date },
+        oldTimeSlot: { type: String },
+        newTimeSlot: { type: String },
+        reason: { type: String },
+      },
+    ],
+
     // Legacy fields (kept for backward compatibility or simple 1-to-1 bookings)
     startedAt: { type: Date },
     startOtp: { type: String },

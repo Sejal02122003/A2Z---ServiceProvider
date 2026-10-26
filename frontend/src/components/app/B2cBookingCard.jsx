@@ -6,6 +6,7 @@ import { GlassPanel } from '../ui/GlassPanel.jsx'
 import { bookingsApi } from '../../api/bookingsApi.js'
 import { getLabourBookingShare } from '../../lib/bookingLabourShare.js'
 import { CancelBookingModal } from './booking/CancelBookingModal.jsx'
+import { RescheduleBookingModal } from './booking/RescheduleBookingModal.jsx'
 
 const STATUS_STYLES = {
   CREATED: 'bg-amber-100 text-amber-800 border-amber-200',
@@ -43,6 +44,7 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
   const [confirmModalData, setConfirmModalData] = useState(null)
   const [successModalOpen, setSuccessModalOpen] = useState(false)
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false)
 
   const handleAddExtraTimeClick = (e, targetLabourId) => {
     e.stopPropagation()
@@ -114,6 +116,11 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
                   <span className="text-[10px] font-bold text-slate-400">•</span>
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{booking.type}</span>
                 </>
+              )}
+              {booking.isRescheduled && (
+                <span className="rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-[9px] font-bold text-sky-700 uppercase">
+                  📅 Rescheduled
+                </span>
               )}
             </div>
             <p className="break-words text-base font-extrabold text-slate-900 leading-snug">
@@ -381,9 +388,20 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
           </div>
         )}
 
-        {/* Action Row for Customer Cancel */}
-        {!isLabour && ['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED'].includes(status) && (
-          <div className="flex items-center justify-end px-4 pb-3 pt-1 bg-white border-t border-slate-100/60">
+        {/* Action Row for Customer Reschedule & Cancel */}
+        {!isLabour && ['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED', 'PARTIALLY_ACCEPTED'].includes(status) && (
+          <div className="flex items-center justify-end gap-2 px-4 pb-3 pt-1 bg-white border-t border-slate-100/60">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setRescheduleModalOpen(true)
+              }}
+              className="rounded-xl border border-blue-200 bg-blue-50/70 px-3.5 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition shadow-sm flex items-center gap-1.5"
+            >
+              <Calendar className="h-3.5 w-3.5" />
+              <span>Reschedule</span>
+            </button>
             <button
               type="button"
               onClick={(e) => {
@@ -407,6 +425,19 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
       onSuccess={(updatedBooking, cancellationData) => {
         if (onBookingUpdated) {
           onBookingUpdated(updatedBooking, cancellationData)
+        }
+      }}
+    />
+
+    {/* Reschedule Booking Modal */}
+    <RescheduleBookingModal
+      open={rescheduleModalOpen}
+      booking={booking}
+      onClose={() => setRescheduleModalOpen(false)}
+      onSuccess={(updatedBooking) => {
+        setRescheduleModalOpen(false)
+        if (onBookingUpdated) {
+          onBookingUpdated(updatedBooking)
         }
       }}
     />

@@ -77,6 +77,19 @@ router.post(
 )
 
 router.post(
+  '/:id/reschedule',
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  [
+    body('scheduledAt').notEmpty().withMessage('scheduledAt date is required'),
+    body('timeSlot').optional().trim(),
+    body('reason').optional().trim(),
+    body('reasonNote').optional().trim(),
+  ],
+  validateRequest,
+  booking.rescheduleBookingController
+)
+
+router.post(
   '/:id/items/:itemId/cancel',
   restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
   [

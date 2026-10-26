@@ -1919,4 +1919,202 @@ export const cancelBookingItem = asyncHandler(async (req, res) => {
   })
 })
 
+export const rescheduleBookingController = asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { scheduledAt, timeSlot, endTime, reason, reasonNote } = req.body
+
+  if (!scheduledAt) {
+    return sendError(res, {
+      message: 'New scheduled date is required to reschedule',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+    })
+  }
+
+  const booking = await Booking.findById(id)
+    .populate('serviceId', 'name')
+    .populate('subcategoryId', 'name')
+    .populate('packageBooking.packageId', 'name')
+
+  if (!booking) {
+    return sendError(res, {
+      message: 'Booking not found',
+      statusCode: HTTP_STATUS.NOT_FOUND,
+    })
+  }
+
+  // Authorization check: must be owner, contractor, or admin
+  const isOwner = String(booking.userId) === String(req.user._id)
+  const isAdmin = req.user.role === 'admin'
+  const isContractor = req.user.role === 'contractor' && String(booking.userId) === String(req.user._id)
+
+  if (!isOwner && !isAdmin && !isContractor) {
+    return sendError(res, {
+      message: 'Unauthorized to reschedule this booking',
+      statusCode: HTTP_STATUS.FORBIDDEN,
+    })
+  }
+
+  // Allowed statuses
+  const reschedulableStatuses = ['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED', 'PARTIALLY_ACCEPTED']
+  if (!reschedulableStatuses.includes(booking.status)) {
+    return sendError(res, {
+      message: `Cannot reschedule booking in status "${booking.status}". Only upcoming/pending bookings can be rescheduled.`,
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+    })
+  }
+
+  const effectiveSlot = timeSlot || booking.timeSlot || '09:00 AM'
+  const newScheduledDate = parseISTDateTime(scheduledAt, effectiveSlot)
+
+  if (!newScheduledDate || isNaN(newScheduledDate.getTime())) {
+    return sendError(res, {
+      message: 'Invalid date or time slot provided',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+    })
+  }
+
+  // Ensure scheduled time is not in the deep past (allow 10 minute buffer for local clock differences)
+  if (newScheduledDate.getTime() < Date.now() - 10 * 60 * 1000) {
+    return sendError(res, {
+      message: 'Cannot reschedule to a past date or time. Please select an upcoming slot.',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+    })
+  }
+
+  const oldScheduledAt = booking.scheduledAt || booking.createdAt
+  const oldTimeSlot = booking.timeSlot || ''
+  const effectiveReason = [reason, reasonNote].filter(Boolean).join(': ') || 'Customer requested reschedule'
+  const rescheduledByRole = isAdmin ? 'ADMIN' : (req.user.role === 'contractor' ? 'CONTRACTOR' : 'CUSTOMER')
+
+  const historyEntry = {
+    rescheduledAt: new Date(),
+    rescheduledBy: rescheduledByRole,
+    oldScheduledAt,
+    newScheduledAt: newScheduledDate,
+    oldTimeSlot,
+    newTimeSlot: effectiveSlot,
+    reason: effectiveReason,
+  }
+
+  // Update booking fields
+  booking.scheduledAt = newScheduledDate
+  booking.timeSlot = effectiveSlot
+  if (endTime) booking.endTime = endTime
+  booking.type = 'SCHEDULED'
+  booking.date = typeof scheduledAt === 'string' ? scheduledAt.split('T')[0] : newScheduledDate.toISOString().split('T')[0]
+  booking.isRescheduled = true
+  booking.rescheduledAt = new Date()
+  booking.rescheduledBy = rescheduledByRole
+  booking.rescheduleReason = effectiveReason
+  booking.rescheduleCount = (booking.rescheduleCount || 0) + 1
+  if (!Array.isArray(booking.rescheduleHistory)) {
+    booking.rescheduleHistory = []
+  }
+  booking.rescheduleHistory.push(historyEntry)
+
+  await booking.save()
+
+  // Reschedule reminder jobs asynchronously
+  import('../services/bookingReminderService.js')
+    .then(({ rescheduleRemindersForBooking }) => {
+      rescheduleRemindersForBooking(booking._id).catch(err => {
+        console.error('[REMINDER_ENGINE] Failed to reschedule reminders for booking:', err)
+      })
+    })
+    .catch(err => console.error('Failed to import bookingReminderService:', err))
+
+  const shortCode = String(booking._id).slice(-6).toUpperCase()
+  const formattedTimeStr = newScheduledDate.toLocaleDateString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }) + (effectiveSlot ? ` (${effectiveSlot})` : '')
+
+  // Create In-App Notification for customer
+  import('../models/InAppNotification.js')
+    .then(async ({ InAppNotification }) => {
+      await InAppNotification.create({
+        userId: booking.userId,
+        title: 'Booking Rescheduled 📅',
+        body: `Your booking #${shortCode} has been rescheduled to ${formattedTimeStr}.`,
+        type: 'BOOKING_UPDATE',
+        metadata: { bookingId: booking._id, action: 'RESCHEDULED', newScheduledAt: newScheduledDate },
+      }).catch(e => console.warn('InAppNotification error:', e.message))
+    })
+    .catch(err => console.error(err))
+
+  // Notify assigned labourer/partners if present
+  const assignedPartnerIds = new Set()
+  if (booking.laborId) assignedPartnerIds.add(String(booking.laborId._id || booking.laborId))
+  if (booking.acceptedLabourId) assignedPartnerIds.add(String(booking.acceptedLabourId))
+  if (Array.isArray(booking.assignments)) {
+    booking.assignments.forEach(a => {
+      const lid = a.labourId?._id || a.labourId
+      if (lid) assignedPartnerIds.add(String(lid))
+    })
+  }
+
+  if (assignedPartnerIds.size > 0) {
+    import('../utils/pushNotificationHelper.js')
+      .then(({ sendNotificationToUser }) => {
+        for (const partnerId of assignedPartnerIds) {
+          sendNotificationToUser(partnerId, {
+            title: 'Customer Rescheduled Booking ⏰',
+            body: `Job #${shortCode} has been rescheduled to ${formattedTimeStr}. Please check your calendar.`,
+            data: { type: 'booking_rescheduled', bookingId: String(booking._id) },
+          }).catch(err => console.error('Push error on reschedule:', err))
+        }
+      })
+      .catch(err => console.error(err))
+
+    import('../models/InAppNotification.js')
+      .then(async ({ InAppNotification }) => {
+        for (const partnerId of assignedPartnerIds) {
+          await InAppNotification.create({
+            userId: partnerId,
+            title: 'Job Rescheduled By Customer ⏰',
+            body: `Booking #${shortCode} rescheduled to ${formattedTimeStr}.`,
+            type: 'BOOKING_UPDATE',
+            metadata: { bookingId: booking._id, action: 'RESCHEDULED', newScheduledAt: newScheduledDate },
+          }).catch(e => console.warn('InAppNotification error for partner:', e.message))
+        }
+      })
+      .catch(err => console.error(err))
+  }
+
+  // Socket notification
+  import('../socket.js')
+    .then(({ emitToUser }) => {
+      emitToUser(booking.userId, 'BOOKING_RESCHEDULED', {
+        bookingId: booking._id,
+        scheduledAt: newScheduledDate,
+        timeSlot: effectiveSlot,
+        date: booking.date,
+        isRescheduled: true,
+      })
+      for (const partnerId of assignedPartnerIds) {
+        emitToUser(partnerId, 'BOOKING_RESCHEDULED', {
+          bookingId: booking._id,
+          scheduledAt: newScheduledDate,
+          timeSlot: effectiveSlot,
+          date: booking.date,
+          isRescheduled: true,
+        })
+      }
+    })
+    .catch(err => console.error('Socket error on reschedule:', err))
+
+  return sendSuccess(res, {
+    message: `Booking successfully rescheduled to ${formattedTimeStr}`,
+    data: {
+      booking,
+      scheduledAt: newScheduledDate,
+      timeSlot: effectiveSlot,
+      formattedTimeStr,
+    },
+  })
+})
+
+
 
