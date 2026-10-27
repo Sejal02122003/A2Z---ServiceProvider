@@ -69,9 +69,9 @@ export function AppSearchableSelect({
           <div className="max-h-48 overflow-y-auto">
             {filteredOptions.length > 0 ? (
               <ul className="space-y-1">
-                {filteredOptions.map((opt) => (
+                {filteredOptions.map((opt, idx) => (
                   <li
-                    key={opt.value}
+                    key={opt.value || opt.id || opt.label || `opt-${idx}`}
                     className={`cursor-pointer rounded-xl px-3 py-2 text-sm transition-colors hover:bg-brand/5 ${
                       value === opt.value ? 'bg-brand/10 font-bold text-brand' : 'text-slate-700'
                     }`}

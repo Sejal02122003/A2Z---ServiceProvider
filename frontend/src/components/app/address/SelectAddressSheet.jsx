@@ -280,8 +280,8 @@ export function SelectAddressSheet({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {addresses.map((addr) => {
-                    const isSelected = activeAddressId === addr._id
+                  {addresses.map((addr, index) => {
+                    const isSelected = activeAddressId && addr._id && activeAddressId === addr._id
                     const distance = calculateDistanceKm(
                       currentGps?.lat,
                       currentGps?.lng,
@@ -295,7 +295,7 @@ export function SelectAddressSheet({
 
                     return (
                       <div
-                        key={addr._id}
+                        key={addr._id || `addr-${index}-${addr.lat || 0}-${addr.lng || 0}`}
                         onClick={() => handleSelect(addr)}
                         className={`group relative cursor-pointer rounded-2xl border bg-white p-4 transition shadow-xs hover:border-slate-300 ${
                           isSelected

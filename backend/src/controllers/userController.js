@@ -2678,24 +2678,38 @@ export const getUserAddresses = asyncHandler(async (req, res) => {
     return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
   }
 
+  user.savedAddresses = user.savedAddresses || []
+
+  // Ensure every existing address has a valid _id
+  let modified = false
+  user.savedAddresses.forEach((addr) => {
+    if (!addr._id) {
+      addr._id = new mongoose.Types.ObjectId()
+      modified = true
+    }
+  })
+
   // If user has no savedAddresses array entries, but has legacy savedAddress.text
-  if ((!user.savedAddresses || user.savedAddresses.length === 0) && user.savedAddress?.text) {
-    user.savedAddresses = [
-      {
-        tag: 'Home',
-        customTag: '',
-        addressDetails: '',
-        locationText: user.savedAddress.text,
-        areaName: user.city || '',
-        city: user.city || '',
-        state: user.state || '',
-        lat: user.savedAddress.lat || 22.7196,
-        lng: user.savedAddress.lng || 75.8577,
-        receiverName: user.fullName || '',
-        receiverPhone: user.phone || '',
-        isDefault: true,
-      },
-    ]
+  if (user.savedAddresses.length === 0 && user.savedAddress?.text) {
+    user.savedAddresses.push({
+      _id: new mongoose.Types.ObjectId(),
+      tag: 'Home',
+      customTag: '',
+      addressDetails: '',
+      locationText: user.savedAddress.text,
+      areaName: user.city || '',
+      city: user.city || '',
+      state: user.state || '',
+      lat: user.savedAddress.lat || 22.7196,
+      lng: user.savedAddress.lng || 75.8577,
+      receiverName: user.fullName || '',
+      receiverPhone: user.phone || '',
+      isDefault: true,
+    })
+    modified = true
+  }
+
+  if (modified) {
     await user.save()
   }
 
@@ -2805,13 +2819,17 @@ export const updateUserAddress = asyncHandler(async (req, res) => {
     return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
   }
 
-  const address = user.savedAddresses.id(addressId)
-  if (!address) {
-    return sendError(res, { message: 'Address not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  user.savedAddresses = user.savedAddresses || []
+
+  let address = user.savedAddresses.find((a) => String(a._id) === String(addressId))
+  if (!address && user.savedAddresses.id) {
+    try {
+      address = user.savedAddresses.id(addressId)
+    } catch {}
   }
 
   const {
-    tag,
+    tag = 'Home',
     customTag,
     addressDetails,
     locationText,
@@ -2827,23 +2845,46 @@ export const updateUserAddress = asyncHandler(async (req, res) => {
     isDefault,
   } = req.body
 
-  if (tag && ['Home', 'Work', 'Other'].includes(tag)) address.tag = tag
-  if (customTag !== undefined) address.customTag = customTag
-  if (addressDetails !== undefined) address.addressDetails = addressDetails
-  if (locationText !== undefined) address.locationText = locationText
-  if (areaName !== undefined) address.areaName = areaName
-  if (city !== undefined) address.city = city
-  if (state !== undefined) address.state = state
-  if (pincode !== undefined) address.pincode = pincode
-  if (lat != null) address.lat = Number(lat)
-  if (lng != null) address.lng = Number(lng)
-  if (receiverName !== undefined) address.receiverName = receiverName
-  if (receiverPhone !== undefined) address.receiverPhone = receiverPhone
-  if (doorImageUrl !== undefined) address.doorImageUrl = doorImageUrl
+  if (!address) {
+    // If not found in user.savedAddresses, gracefully create entry
+    const newAddress = {
+      _id: mongoose.Types.ObjectId.isValid(addressId) ? addressId : new mongoose.Types.ObjectId(),
+      tag: ['Home', 'Work', 'Other'].includes(tag) ? tag : 'Home',
+      customTag: customTag || '',
+      addressDetails: addressDetails || '',
+      locationText: (locationText || '').trim(),
+      areaName: areaName || '',
+      city: city || '',
+      state: state || '',
+      pincode: pincode || '',
+      lat: Number(lat) || 22.7196,
+      lng: Number(lng) || 75.8577,
+      receiverName: receiverName || user.fullName || '',
+      receiverPhone: receiverPhone || user.phone || '',
+      doorImageUrl: doorImageUrl || '',
+      isDefault: Boolean(isDefault || user.savedAddresses.length === 0),
+    }
+    user.savedAddresses.push(newAddress)
+    address = user.savedAddresses[user.savedAddresses.length - 1]
+  } else {
+    if (tag && ['Home', 'Work', 'Other'].includes(tag)) address.tag = tag
+    if (customTag !== undefined) address.customTag = customTag
+    if (addressDetails !== undefined) address.addressDetails = addressDetails
+    if (locationText !== undefined) address.locationText = locationText
+    if (areaName !== undefined) address.areaName = areaName
+    if (city !== undefined) address.city = city
+    if (state !== undefined) address.state = state
+    if (pincode !== undefined) address.pincode = pincode
+    if (lat != null) address.lat = Number(lat)
+    if (lng != null) address.lng = Number(lng)
+    if (receiverName !== undefined) address.receiverName = receiverName
+    if (receiverPhone !== undefined) address.receiverPhone = receiverPhone
+    if (doorImageUrl !== undefined) address.doorImageUrl = doorImageUrl
+  }
 
   if (isDefault) {
     user.savedAddresses.forEach((addr) => {
-      addr.isDefault = String(addr._id) === String(addressId)
+      addr.isDefault = String(addr._id) === String(address._id)
     })
     const fullText = address.addressDetails ? `${address.addressDetails}, ${address.locationText}` : address.locationText
     user.savedAddress = {

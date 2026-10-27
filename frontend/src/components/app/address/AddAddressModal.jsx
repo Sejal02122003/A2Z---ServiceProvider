@@ -369,7 +369,21 @@ export function AddAddressModal({
 
       let res
       if (initialAddress?._id) {
-        res = await updateSavedAddress(initialAddress._id, payload)
+        try {
+          res = await updateSavedAddress(initialAddress._id, payload)
+        } catch (updateErr) {
+          // If address not found on server (404), fall back to adding it as a new address
+          if (
+            updateErr?.status === 404 ||
+            updateErr?.response?.status === 404 ||
+            updateErr?.message?.includes('not found')
+          ) {
+            console.warn('Address not found on update, creating new address instead:', updateErr)
+            res = await addSavedAddress(payload)
+          } else {
+            throw updateErr
+          }
+        }
       } else {
         res = await addSavedAddress(payload)
       }
@@ -447,9 +461,9 @@ export function AddAddressModal({
             {/* Suggestions Dropdown */}
             {searchSuggestions.length > 0 && (
               <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-2xl border border-slate-200 bg-white py-1 shadow-xl">
-                {searchSuggestions.map((item) => (
+                {searchSuggestions.map((item, idx) => (
                   <button
-                    key={item.place_id}
+                    key={item.place_id || `sugg-${idx}`}
                     type="button"
                     onClick={() => handleSelectSuggestion(item.place_id, item.description)}
                     className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left text-xs transition hover:bg-slate-50"
