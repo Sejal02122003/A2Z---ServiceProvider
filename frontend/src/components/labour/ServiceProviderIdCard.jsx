@@ -14,20 +14,83 @@ import {
   Lock,
 } from 'lucide-react'
 
+export function resolvePartnerCity(user) {
+  if (!user) return 'Noida, NCR'
+
+  const candidates = [
+    user.city,
+    user.welcomeKit?.confirmedAddressSnapshot?.city,
+    user.welcomeKit?.address?.city,
+    user.welcomeKit?.deliveryCity,
+    user.savedAddresses?.find((a) => a.isDefault && a.city?.trim())?.city,
+    user.savedAddresses?.find((a) => a.city?.trim())?.city,
+    user.currentLocation,
+    user.permanentAddress,
+  ]
+
+  for (const raw of candidates) {
+    if (typeof raw === 'string') {
+      const val = raw.trim()
+      if (val && val !== '—' && val !== '-' && val !== 'Noida, NCR') {
+        if (val.length > 35 && val.includes(',')) {
+          const parts = val.split(',').map((p) => p.trim()).filter(Boolean)
+          if (parts.length >= 2) {
+            const likelyCity = parts.slice(-3, -1).find((p) => !/\d{5,}/.test(p) && p.length < 25)
+            if (likelyCity) return likelyCity
+          }
+        }
+        return val
+      }
+    }
+  }
+
+  return user.city?.trim() || user.currentLocation?.trim() || 'Noida, NCR'
+}
+
+export function resolvePartnerPhoto(user) {
+  if (!user) return ''
+
+  const candidates = [
+    user.profileImageUrl,
+    user.avatar,
+    user.profilePicture,
+    user.profilePic,
+    user.photoUrl,
+    user.labourProfile?.profilePhotoUrl,
+    user.contractorProfile?.profilePhotoUrl,
+  ]
+
+  for (const raw of candidates) {
+    if (typeof raw === 'string' && raw.trim()) {
+      return raw.trim()
+    }
+  }
+
+  return ''
+}
+
 export function ServiceProviderIdCard({ user, onPrint, className = '' }) {
   const [isFlipped, setIsFlipped] = useState(false)
+  const [imgError, setImgError] = useState(false)
 
   const partnerName = user?.fullName || 'Verified Service Provider'
   const partnerCode =
     user?.partnerIdCode ||
     (user?._id ? `A2Z-SP-${String(user._id).slice(-6).toUpperCase()}` : 'A2Z-SP-847291')
   const phone = user?.phone ? String(user.phone).slice(-10) : '9876543210'
-  const city = user?.city || user?.currentLocation || 'Noida, NCR'
+  const city = resolvePartnerCity(user)
   const roleTitle =
     user?.labourProfile?.skills?.[0] ||
+    user?.labourProfile?.categoryIds?.[0]?.name ||
     user?.labourProfile?.categories?.[0]?.name ||
+    user?.labourProfile?.serviceIds?.[0]?.name ||
     'Certified Service Partner'
-  const photoUrl = user?.avatar || user?.profilePicture || ''
+  const photoUrl = resolvePartnerPhoto(user)
+
+  // Reset imgError whenever photoUrl changes so new uploaded photo displays immediately
+  React.useEffect(() => {
+    setImgError(false)
+  }, [photoUrl])
 
   const issueDate = user?.idCardGeneratedAt
     ? new Date(user.idCardGeneratedAt).toLocaleDateString('en-IN', {
@@ -42,7 +105,7 @@ export function ServiceProviderIdCard({ user, onPrint, className = '' }) {
       })
 
   const qrData = encodeURIComponent(
-    `A2Z Verified Partner\nID: ${partnerCode}\nName: ${partnerName}\nPhone: +91 ${phone}\nTrade: ${roleTitle}\nStatus: Active & Verified`
+    `A2Z Verified Partner\nID: ${partnerCode}\nName: ${partnerName}\nPhone: +91 ${phone}\nCity: ${city}\nTrade: ${roleTitle}\nStatus: Active & Verified`
   )
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=3&data=${qrData}`
 
@@ -135,14 +198,13 @@ export function ServiceProviderIdCard({ user, onPrint, className = '' }) {
               <div className="relative mt-1 mb-2">
                 <div className="h-20 w-20 rounded-2xl p-0.5 bg-gradient-to-tr from-amber-400 via-emerald-400 to-teal-300 shadow-lg shadow-emerald-950/50">
                   <div className="h-full w-full rounded-2xl overflow-hidden bg-slate-800 flex items-center justify-center border-2 border-slate-900">
-                    {photoUrl ? (
+                    {photoUrl && !imgError ? (
                       <img
+                        key={photoUrl}
                         src={photoUrl}
                         alt={partnerName}
                         className="h-full w-full object-cover"
-                        onError={(e) => {
-                          e.target.style.display = 'none'
-                        }}
+                        onError={() => setImgError(true)}
                       />
                     ) : (
                       <span className="text-xl font-black text-amber-300">

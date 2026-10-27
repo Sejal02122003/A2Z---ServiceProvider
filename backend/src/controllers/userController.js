@@ -956,7 +956,32 @@ export const listUsers = asyncHandler(async (req, res) => {
         }
       }
     }
-    return { ...u, ...(lp ? { labourProfile: lp } : {}), ...(cp ? { contractorProfile: cp } : {}) }
+    let city = u.city
+    if (!city || typeof city !== 'string' || !city.trim() || city.trim() === 'Noida, NCR') {
+      const resolvedCity =
+        u.welcomeKit?.confirmedAddressSnapshot?.city ||
+        u.welcomeKit?.address?.city ||
+        u.welcomeKit?.deliveryCity ||
+        u.savedAddresses?.find((a) => a.isDefault && a.city?.trim())?.city ||
+        u.savedAddresses?.find((a) => a.city?.trim())?.city ||
+        u.currentLocation ||
+        ''
+      if (resolvedCity && resolvedCity.trim() && resolvedCity.trim() !== 'Noida, NCR') {
+        city = resolvedCity.trim()
+      }
+    }
+
+    const partnerIdCode =
+      u.partnerIdCode ||
+      (u._id ? `A2Z-SP-${String(u._id).slice(-6).toUpperCase()}` : undefined)
+
+    return {
+      ...u,
+      city: city || u.city || '',
+      ...(partnerIdCode ? { partnerIdCode } : {}),
+      ...(lp ? { labourProfile: lp } : {}),
+      ...(cp ? { contractorProfile: cp } : {}),
+    }
   })
 
   return sendSuccess(res, {
@@ -2124,6 +2149,14 @@ export const submitPartnerWelcomeKitAddress = asyncHandler(async (req, res) => {
   user.welcomeKit.deliveryCity = addressData.city
   user.welcomeKit.deliveryPincode = addressData.pincode
 
+  // Sync partner city and state on user root
+  if (addressData.city && (!user.city || user.city === 'Noida, NCR')) {
+    user.city = addressData.city
+  }
+  if (addressData.state && !user.state) {
+    user.state = addressData.state
+  }
+
   user.welcomeKit.auditTrail = user.welcomeKit.auditTrail || []
   user.welcomeKit.auditTrail.push({
     action: isResubmission ? 'ADDRESS_RESUBMITTED' : 'ADDRESS_SUBMITTED',
@@ -2344,6 +2377,14 @@ export const adminSubmitPartnerWelcomeKitAddress = asyncHandler(async (req, res)
   user.welcomeKit.deliveryCity = addressData.city
   user.welcomeKit.deliveryPincode = addressData.pincode
 
+  // Sync partner city and state on user root
+  if (addressData.city && (!user.city || user.city === 'Noida, NCR')) {
+    user.city = addressData.city
+  }
+  if (addressData.state && !user.state) {
+    user.state = addressData.state
+  }
+
   user.welcomeKit.auditTrail = user.welcomeKit.auditTrail || []
   user.welcomeKit.auditTrail.push({
     action: 'ADDRESS_SUBMITTED_BY_ADMIN',
@@ -2408,6 +2449,14 @@ export const confirmPartnerWelcomeKitAddress = asyncHandler(async (req, res) => 
     city: addr.city,
     state: addr.state,
     pincode: addr.pincode,
+  }
+
+  // Sync partner city and state on user root
+  if (addr.city && (!user.city || user.city === 'Noida, NCR')) {
+    user.city = addr.city
+  }
+  if (addr.state && !user.state) {
+    user.state = addr.state
   }
 
   user.welcomeKit.auditTrail = user.welcomeKit.auditTrail || []

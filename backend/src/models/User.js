@@ -516,6 +516,21 @@ userSchema.methods.toSafeObject = function toSafeObject(options = {}) {
     o.partnerIdCode = `A2Z-SP-${String(o._id).slice(-6).toUpperCase()}`
   }
 
+  // Ensure city is populated from known partner location fields if empty
+  if (!o.city || typeof o.city !== 'string' || !o.city.trim() || o.city.trim() === 'Noida, NCR') {
+    const resolvedCity =
+      o.welcomeKit?.confirmedAddressSnapshot?.city ||
+      o.welcomeKit?.address?.city ||
+      o.welcomeKit?.deliveryCity ||
+      o.savedAddresses?.find((a) => a.isDefault && a.city?.trim())?.city ||
+      o.savedAddresses?.find((a) => a.city?.trim())?.city ||
+      o.currentLocation ||
+      ''
+    if (resolvedCity && resolvedCity.trim() && resolvedCity.trim() !== 'Noida, NCR') {
+      o.city = resolvedCity.trim()
+    }
+  }
+
   return o
 }
 

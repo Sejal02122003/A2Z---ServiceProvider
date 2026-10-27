@@ -927,7 +927,7 @@ export function AdminLabourPage() {
                         </td>
                       )}
                       <td className="px-4 py-3 text-xs text-slate-700">
-                        {u.city || u.currentLocation || '—'}
+                        {u.city || u.welcomeKit?.confirmedAddressSnapshot?.city || u.welcomeKit?.address?.city || u.welcomeKit?.deliveryCity || u.currentLocation || '—'}
                       </td>
                       <td className="px-4 py-3">
                         {(() => {
@@ -1156,7 +1156,7 @@ export function AdminLabourPage() {
                   </div>
                 )}
                 <p className="mt-2 text-[11px] text-slate-500">
-                  Location: <span className="font-medium text-slate-700">{u.city || u.currentLocation || '—'}</span>
+                  Location: <span className="font-medium text-slate-700">{u.city || u.welcomeKit?.confirmedAddressSnapshot?.city || u.welcomeKit?.address?.city || u.welcomeKit?.deliveryCity || u.currentLocation || '—'}</span>
                 </p>
               </GlassPanel>
             ))}
@@ -1685,7 +1685,7 @@ export function AdminLabourPage() {
                   </div>
                   <div>
                     <span className="text-slate-400 font-semibold block uppercase text-[9px]">Location</span>
-                    <span className="font-semibold text-slate-800">{trialModalUser.city || trialModalUser.currentLocation || '—'}</span>
+                    <span className="font-semibold text-slate-800">{trialModalUser.city || trialModalUser.welcomeKit?.confirmedAddressSnapshot?.city || trialModalUser.welcomeKit?.address?.city || trialModalUser.welcomeKit?.deliveryCity || trialModalUser.currentLocation || '—'}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 font-semibold block uppercase text-[9px]">Booked Slot Date</span>

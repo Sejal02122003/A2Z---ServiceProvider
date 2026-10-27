@@ -368,8 +368,21 @@ export function AppProfilePage() {
     setEditEmailValue(user?.email || '')
     setEditPermanentAddress(user?.permanentAddress || '')
     setEditCurrentLocation(user?.currentLocation || '')
-    setEditCity(user?.city || '')
-    setEditState(user?.state || '')
+    setEditCity(
+      user?.city ||
+      user?.welcomeKit?.confirmedAddressSnapshot?.city ||
+      user?.welcomeKit?.address?.city ||
+      user?.welcomeKit?.deliveryCity ||
+      user?.savedAddresses?.[0]?.city ||
+      ''
+    )
+    setEditState(
+      user?.state ||
+      user?.welcomeKit?.confirmedAddressSnapshot?.state ||
+      user?.welcomeKit?.address?.state ||
+      user?.savedAddresses?.[0]?.state ||
+      ''
+    )
     setEditCountry(user?.country || 'India')
     setEditExperienceYears(user?.labourProfile?.experienceYears ?? '')
     setProfileErr('')
@@ -986,7 +999,11 @@ export function AppProfilePage() {
               label="City, State, Country" 
               value={
                 <span className="truncate max-w-[200px]">
-                  {[user?.city, user?.state, user?.country].filter(Boolean).join(', ') || '—'}
+                  {[
+                    user?.city || user?.welcomeKit?.confirmedAddressSnapshot?.city || user?.welcomeKit?.address?.city || user?.welcomeKit?.deliveryCity || user?.savedAddresses?.[0]?.city,
+                    user?.state || user?.welcomeKit?.confirmedAddressSnapshot?.state || user?.welcomeKit?.address?.state,
+                    user?.country || 'India',
+                  ].filter(Boolean).join(', ') || '—'}
                 </span>
               } 
             />
