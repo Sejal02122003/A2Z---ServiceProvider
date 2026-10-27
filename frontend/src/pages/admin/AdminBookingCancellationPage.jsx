@@ -29,6 +29,8 @@ import {
   Bell,
   ShieldX,
   Unlock,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react'
 import { bookingCancellationApi } from '../../api/bookingCancellationApi.js'
 import { ApiError } from '../../api/http.js'
@@ -1067,7 +1069,7 @@ export function AdminBookingCancellationPage() {
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
                       Cancellation Cutoff (Hours before Service)
                     </label>
-                    <div className="relative">
+                    <div className="flex items-center rounded-xl border border-slate-200 bg-white focus-within:border-brand focus-within:ring-1 focus-within:ring-brand overflow-hidden">
                       <input
                         type="number"
                         step="0.5"
@@ -1076,11 +1078,39 @@ export function AdminBookingCancellationPage() {
                         onChange={(e) =>
                           setSettings({ ...settings, cutoffHours: Number(e.target.value) })
                         }
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden focus:border-brand"
+                        className="w-full bg-transparent px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
-                      <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">
+                      <span className="text-xs font-bold text-slate-400 px-2 shrink-0 select-none">
                         Hours
                       </span>
+                      <div className="flex flex-col border-l border-slate-200 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSettings((s) => ({
+                              ...s,
+                              cutoffHours: Math.max(0, Number(((Number(s.cutoffHours) || 0) + 0.5).toFixed(1))),
+                            }))
+                          }
+                          className="px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition active:bg-slate-200 flex items-center justify-center cursor-pointer"
+                          title="Increase by 0.5 Hours"
+                        >
+                          <ChevronUp className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSettings((s) => ({
+                              ...s,
+                              cutoffHours: Math.max(0, Number(((Number(s.cutoffHours) || 0) - 0.5).toFixed(1))),
+                            }))
+                          }
+                          className="px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition active:bg-slate-200 border-t border-slate-100 flex items-center justify-center cursor-pointer"
+                          title="Decrease by 0.5 Hours"
+                        >
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </div>
                     </div>
                     <p className="text-[11px] font-medium text-slate-400 mt-1">
                       Default: 2 Hours. Cancellations &gt;= this cutoff incur ₹0 penalty.
@@ -1113,11 +1143,12 @@ export function AdminBookingCancellationPage() {
                       <label className="block text-xs font-bold text-slate-700 mb-1.5">
                         Fixed Late Penalty Amount (₹)
                       </label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-sm font-bold text-slate-400">₹</span>
+                      <div className="flex items-center rounded-xl border border-slate-200 bg-white focus-within:border-brand focus-within:ring-1 focus-within:ring-brand overflow-hidden">
+                        <span className="pl-3 text-sm font-bold text-slate-400 select-none">₹</span>
                         <input
                           type="number"
                           min="0"
+                          step="10"
                           value={settings.fixedPenaltyAmount}
                           onChange={(e) =>
                             setSettings({
@@ -1125,8 +1156,36 @@ export function AdminBookingCancellationPage() {
                               fixedPenaltyAmount: Number(e.target.value),
                             })
                           }
-                          className="w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden focus:border-brand"
+                          className="w-full bg-transparent px-2.5 py-2.5 text-sm font-bold text-slate-800 outline-hidden [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
+                        <div className="flex flex-col border-l border-slate-200 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSettings((s) => ({
+                                ...s,
+                                fixedPenaltyAmount: Math.max(0, (Number(s.fixedPenaltyAmount) || 0) + 50),
+                              }))
+                            }
+                            className="px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition active:bg-slate-200 flex items-center justify-center cursor-pointer"
+                            title="Increase by ₹50"
+                          >
+                            <ChevronUp className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSettings((s) => ({
+                                ...s,
+                                fixedPenaltyAmount: Math.max(0, (Number(s.fixedPenaltyAmount) || 0) - 50),
+                              }))
+                            }
+                            className="px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition active:bg-slate-200 border-t border-slate-100 flex items-center justify-center cursor-pointer"
+                            title="Decrease by ₹50"
+                          >
+                            <ChevronDown className="h-3 w-3" />
+                          </button>
+                        </div>
                       </div>
                       <p className="text-[11px] font-medium text-slate-400 mt-1">
                         Default: ₹200. Deducted from vendor wallet upon late cancellation.
@@ -1137,7 +1196,7 @@ export function AdminBookingCancellationPage() {
                       <label className="block text-xs font-bold text-slate-700 mb-1.5">
                         Percentage Penalty Rate (%)
                       </label>
-                      <div className="relative">
+                      <div className="flex items-center rounded-xl border border-slate-200 bg-white focus-within:border-brand focus-within:ring-1 focus-within:ring-brand overflow-hidden">
                         <input
                           type="number"
                           min="0"
@@ -1149,9 +1208,37 @@ export function AdminBookingCancellationPage() {
                               percentagePenaltyRate: Number(e.target.value),
                             })
                           }
-                          className="w-full rounded-xl border border-slate-200 bg-white pr-8 pl-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden focus:border-brand"
+                          className="w-full bg-transparent px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
-                        <span className="absolute right-3 top-2.5 text-sm font-bold text-slate-400">%</span>
+                        <span className="text-sm font-bold text-slate-400 px-2 shrink-0 select-none">%</span>
+                        <div className="flex flex-col border-l border-slate-200 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSettings((s) => ({
+                                ...s,
+                                percentagePenaltyRate: Math.min(100, Math.max(0, (Number(s.percentagePenaltyRate) || 0) + 1)),
+                              }))
+                            }
+                            className="px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition active:bg-slate-200 flex items-center justify-center cursor-pointer"
+                            title="Increase by 1%"
+                          >
+                            <ChevronUp className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSettings((s) => ({
+                                ...s,
+                                percentagePenaltyRate: Math.min(100, Math.max(0, (Number(s.percentagePenaltyRate) || 0) - 1)),
+                              }))
+                            }
+                            className="px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition active:bg-slate-200 border-t border-slate-100 flex items-center justify-center cursor-pointer"
+                            title="Decrease by 1%"
+                          >
+                            <ChevronDown className="h-3 w-3" />
+                          </button>
+                        </div>
                       </div>
                       <p className="text-[11px] font-medium text-slate-400 mt-1">
                         Calculated against partner share / booking total (0–100%).
@@ -1240,18 +1327,48 @@ export function AdminBookingCancellationPage() {
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
                       Warning Threshold (Cancellations)
                     </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={settings.customerWarningThreshold ?? 3}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          customerWarningThreshold: parseInt(e.target.value, 10) || 1,
-                        })
-                      }
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden focus:border-brand"
-                    />
+                    <div className="flex items-center rounded-xl border border-slate-200 bg-white focus-within:border-brand focus-within:ring-1 focus-within:ring-brand overflow-hidden">
+                      <input
+                        type="number"
+                        min="1"
+                        value={settings.customerWarningThreshold ?? 3}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            customerWarningThreshold: Math.max(1, parseInt(e.target.value, 10) || 1),
+                          })
+                        }
+                        className="w-full bg-transparent px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <div className="flex flex-col border-l border-slate-200 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSettings((s) => ({
+                              ...s,
+                              customerWarningThreshold: (s.customerWarningThreshold ?? 3) + 1,
+                            }))
+                          }
+                          className="px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition active:bg-slate-200 flex items-center justify-center cursor-pointer"
+                          title="Increase"
+                        >
+                          <ChevronUp className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSettings((s) => ({
+                              ...s,
+                              customerWarningThreshold: Math.max(1, (s.customerWarningThreshold ?? 3) - 1),
+                            }))
+                          }
+                          className="px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition active:bg-slate-200 border-t border-slate-100 flex items-center justify-center cursor-pointer"
+                          title="Decrease"
+                        >
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
                     <p className="text-[11px] font-medium text-slate-400 mt-1">
                       Default: 3. Warns customer upon reaching this count.
                     </p>
@@ -1262,18 +1379,48 @@ export function AdminBookingCancellationPage() {
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
                       Restriction Threshold (Cancellations)
                     </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={settings.customerRestrictionThreshold ?? 5}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          customerRestrictionThreshold: parseInt(e.target.value, 10) || 1,
-                        })
-                      }
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden focus:border-brand"
-                    />
+                    <div className="flex items-center rounded-xl border border-slate-200 bg-white focus-within:border-brand focus-within:ring-1 focus-within:ring-brand overflow-hidden">
+                      <input
+                        type="number"
+                        min="1"
+                        value={settings.customerRestrictionThreshold ?? 5}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            customerRestrictionThreshold: Math.max(1, parseInt(e.target.value, 10) || 1),
+                          })
+                        }
+                        className="w-full bg-transparent px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <div className="flex flex-col border-l border-slate-200 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSettings((s) => ({
+                              ...s,
+                              customerRestrictionThreshold: (s.customerRestrictionThreshold ?? 5) + 1,
+                            }))
+                          }
+                          className="px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition active:bg-slate-200 flex items-center justify-center cursor-pointer"
+                          title="Increase"
+                        >
+                          <ChevronUp className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSettings((s) => ({
+                              ...s,
+                              customerRestrictionThreshold: Math.max(1, (s.customerRestrictionThreshold ?? 5) - 1),
+                            }))
+                          }
+                          className="px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition active:bg-slate-200 border-t border-slate-100 flex items-center justify-center cursor-pointer"
+                          title="Decrease"
+                        >
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
                     <p className="text-[11px] font-medium text-slate-400 mt-1">
                       Default: 5. Triggers configured restriction action.
                     </p>
@@ -1284,18 +1431,51 @@ export function AdminBookingCancellationPage() {
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
                       Rolling Window (Days)
                     </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={settings.customerRollingWindowDays ?? 30}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          customerRollingWindowDays: parseInt(e.target.value, 10) || 1,
-                        })
-                      }
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden focus:border-brand"
-                    />
+                    <div className="flex items-center rounded-xl border border-slate-200 bg-white focus-within:border-brand focus-within:ring-1 focus-within:ring-brand overflow-hidden">
+                      <input
+                        type="number"
+                        min="1"
+                        value={settings.customerRollingWindowDays ?? 30}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            customerRollingWindowDays: Math.max(1, parseInt(e.target.value, 10) || 1),
+                          })
+                        }
+                        className="w-full bg-transparent px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <span className="text-xs font-bold text-slate-400 px-2 shrink-0 select-none">
+                        Days
+                      </span>
+                      <div className="flex flex-col border-l border-slate-200 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSettings((s) => ({
+                              ...s,
+                              customerRollingWindowDays: (s.customerRollingWindowDays ?? 30) + 5,
+                            }))
+                          }
+                          className="px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition active:bg-slate-200 flex items-center justify-center cursor-pointer"
+                          title="Increase by 5 Days"
+                        >
+                          <ChevronUp className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSettings((s) => ({
+                              ...s,
+                              customerRollingWindowDays: Math.max(1, (s.customerRollingWindowDays ?? 30) - 5),
+                            }))
+                          }
+                          className="px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition active:bg-slate-200 border-t border-slate-100 flex items-center justify-center cursor-pointer"
+                          title="Decrease by 5 Days"
+                        >
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
                     <p className="text-[11px] font-medium text-slate-400 mt-1">
                       Default: 30 days. Older cancellations drop off automatically.
                     </p>
@@ -1332,19 +1512,56 @@ export function AdminBookingCancellationPage() {
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
                       Restriction Duration (Days)
                     </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={settings.customerRestrictionDurationDays ?? 7}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          customerRestrictionDurationDays: parseInt(e.target.value, 10) || 1,
-                        })
-                      }
-                      disabled={settings.customerRestrictionMode !== 'TEMPORARY_RESTRICTION'}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden focus:border-brand disabled:opacity-50"
-                    />
+                    <div className={`flex items-center rounded-xl border border-slate-200 bg-white focus-within:border-brand focus-within:ring-1 focus-within:ring-brand overflow-hidden ${
+                      settings.customerRestrictionMode !== 'TEMPORARY_RESTRICTION' ? 'opacity-50 pointer-events-none' : ''
+                    }`}>
+                      <input
+                        type="number"
+                        min="1"
+                        value={settings.customerRestrictionDurationDays ?? 7}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            customerRestrictionDurationDays: Math.max(1, parseInt(e.target.value, 10) || 1),
+                          })
+                        }
+                        disabled={settings.customerRestrictionMode !== 'TEMPORARY_RESTRICTION'}
+                        className="w-full bg-transparent px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <span className="text-xs font-bold text-slate-400 px-2 shrink-0 select-none">
+                        Days
+                      </span>
+                      <div className="flex flex-col border-l border-slate-200 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSettings((s) => ({
+                              ...s,
+                              customerRestrictionDurationDays: (s.customerRestrictionDurationDays ?? 7) + 1,
+                            }))
+                          }
+                          disabled={settings.customerRestrictionMode !== 'TEMPORARY_RESTRICTION'}
+                          className="px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition active:bg-slate-200 flex items-center justify-center cursor-pointer"
+                          title="Increase"
+                        >
+                          <ChevronUp className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSettings((s) => ({
+                              ...s,
+                              customerRestrictionDurationDays: Math.max(1, (s.customerRestrictionDurationDays ?? 7) - 1),
+                            }))
+                          }
+                          disabled={settings.customerRestrictionMode !== 'TEMPORARY_RESTRICTION'}
+                          className="px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition active:bg-slate-200 border-t border-slate-100 flex items-center justify-center cursor-pointer"
+                          title="Decrease"
+                        >
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
                     <p className="text-[11px] font-medium text-slate-400 mt-1">
                       Default: 7 days. Only applies when Temporary Restriction mode is active.
                     </p>

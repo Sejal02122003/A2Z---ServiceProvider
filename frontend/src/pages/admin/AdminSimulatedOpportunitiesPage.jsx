@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Flame,
   ChevronDown,
+  ChevronUp,
   Sparkles,
   Eye,
   Ban,
@@ -743,18 +744,36 @@ export function AdminSimulatedOpportunitiesPage() {
                       <Users className="h-3.5 w-3.5 text-blue-600" />
                       Target Partners Count
                     </label>
-                    <div className="relative">
+                    <div className="flex items-center rounded-xl border border-slate-200 bg-white focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/10 overflow-hidden">
                       <input
                         type="number"
                         min="1"
                         max="200"
                         value={formVendorCount}
                         onChange={(e) => setFormVendorCount(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 p-3 pr-10 text-sm font-bold text-slate-900 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
+                        className="w-full bg-transparent p-3 text-sm font-bold text-slate-900 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
+                      <span className="text-xs font-semibold text-slate-400 px-2 shrink-0 select-none">
                         Vendors
                       </span>
+                      <div className="flex flex-col border-l border-slate-200 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setFormVendorCount((v) => Math.min(200, (parseInt(v, 10) || 0) + 1))}
+                          className="px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition active:bg-slate-200 flex items-center justify-center cursor-pointer"
+                          title="Increase"
+                        >
+                          <ChevronUp className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormVendorCount((v) => Math.max(1, (parseInt(v, 10) || 1) - 1))}
+                          className="px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition active:bg-slate-200 border-t border-slate-100 flex items-center justify-center cursor-pointer"
+                          title="Decrease"
+                        >
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
