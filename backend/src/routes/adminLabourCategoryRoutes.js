@@ -111,6 +111,7 @@ router.patch(
   '/labour-subcategories/:id',
   [
     param('id').isMongoId().withMessage('Invalid id'),
+    body('categoryId').optional().isMongoId().withMessage('Invalid categoryId'),
     body('iconUrl').optional().isString(),
   ],
   validateRequest,

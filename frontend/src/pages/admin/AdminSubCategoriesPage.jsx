@@ -228,7 +228,13 @@ function EditSubCategoryModal({ open, subcategory, categories, onClose, onSaved,
   useEffect(() => {
     if (open && subcategory) {
       setName(subcategory.name || '')
-      setCategoryId(subcategory.categoryId || (categories[0]?._id ?? ''))
+      const initialCatId =
+        typeof subcategory.categoryId === 'object' && subcategory.categoryId?._id
+          ? String(subcategory.categoryId._id)
+          : subcategory.categoryId
+            ? String(subcategory.categoryId)
+            : (categories[0]?._id ?? '')
+      setCategoryId(initialCatId)
       setDescription(subcategory.description || '')
       setSortOrder(subcategory.sortOrder ?? 0)
       setIconUrl(subcategory.iconUrl || '')
@@ -270,7 +276,7 @@ function EditSubCategoryModal({ open, subcategory, categories, onClose, onSaved,
     try {
       const payload = {
         name: name.trim(),
-        categoryId,
+        categoryId: String(categoryId),
         description: description.trim(),
         sortOrder: Number(sortOrder) || 0,
         iconUrl,

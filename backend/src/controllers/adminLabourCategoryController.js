@@ -260,8 +260,41 @@ export const patchSubcategory = asyncHandler(async (req, res) => {
   if (!sc) {
     return sendError(res, { message: 'Subcategory not found', statusCode: HTTP_STATUS.NOT_FOUND, code: 'NOT_FOUND' })
   }
-  const { name, description, sortOrder, isActive, iconUrl } = req.body
-  if (name != null) sc.name = String(name).trim()
+  const { name, categoryId, description, sortOrder, isActive, iconUrl } = req.body
+
+  let targetCategory = null
+  if (categoryId && String(categoryId) !== String(sc.categoryId)) {
+    targetCategory = await LabourCategory.findById(categoryId)
+    if (!targetCategory) {
+      return sendError(res, {
+        message: 'Selected category does not exist',
+        statusCode: HTTP_STATUS.BAD_REQUEST,
+        code: 'INVALID_CATEGORY',
+      })
+    }
+  }
+
+  const targetCategoryId = targetCategory ? targetCategory._id : sc.categoryId
+  const targetName = name != null ? String(name).trim() : sc.name
+
+  // Check duplicate name within target category if name or category changed
+  if (name != null || targetCategory) {
+    const duplicate = await LabourSubcategory.findOne({
+      categoryId: targetCategoryId,
+      name: { $regex: new RegExp(`^${targetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      _id: { $ne: sc._id },
+    })
+    if (duplicate) {
+      return sendError(res, {
+        message: 'A subcategory with this name already exists in the selected category',
+        statusCode: HTTP_STATUS.CONFLICT,
+        code: 'DUPLICATE',
+      })
+    }
+  }
+
+  if (targetCategory) sc.categoryId = targetCategory._id
+  if (name != null) sc.name = targetName
   if (description != null) sc.description = String(description)
   if (sortOrder != null) sc.sortOrder = Number(sortOrder) || 0
   if (isActive != null) sc.isActive = Boolean(isActive)
