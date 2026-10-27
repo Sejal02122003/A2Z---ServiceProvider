@@ -8,7 +8,7 @@ import { Review } from '../models/Review.js'
 import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
 import { USER_ROLES } from '../constants/roles.js'
 
-export const BROADCAST_TIMEOUT_MS = 300000 // 5 minutes flash broadcast timeout
+export const BROADCAST_TIMEOUT_MS = 90000 // 1.5 minutes (90 seconds) flash broadcast timeout
 
 /**
  * Starts the flash broadcast for a new booking based on a radius zone.
@@ -395,15 +395,46 @@ export async function startBroadcastCycle(bookingId) {
       // Pre-fetch service names for all contractor services
       let serviceNameMap = {}
       let singleServiceName = 'Requested Service'
+      let singleServiceDetail = ''
+      let singleCategoryName = ''
+      let singleSubServiceName = booking.subServiceName || ''
 
       if (booking.contractorInfo?.services?.length > 0) {
         const svcDocs = await LabourService.find({
           _id: { $in: booking.contractorInfo.services.map(s => s.serviceId) }
-        }).select('_id name').lean()
+        }).select('_id name description').lean()
         svcDocs.forEach(s => { serviceNameMap[String(s._id)] = s.name })
-      } else {
-        const service = await LabourService.findById(booking.serviceId).select('name').lean()
-        if (service) singleServiceName = service.name
+      } else if (booking.packageBooking?.isPackage) {
+        singleServiceName = booking.packageBooking.packageName || 'Service Package'
+        if (booking.packageBooking.inclusions?.length > 0) {
+          singleServiceDetail = booking.packageBooking.inclusions.map(i => i.name).filter(Boolean).join(', ')
+        }
+      } else if (booking.serviceId) {
+        const service = await LabourService.findById(booking.serviceId)
+          .populate('subcategoryId', 'name')
+          .lean()
+        if (service) {
+          singleServiceName = service.name
+          if (booking.subServiceName) {
+            singleServiceName = `${service.name} - ${booking.subServiceName}`
+            singleServiceDetail = booking.subServiceName
+          }
+          if (service.description) {
+            singleServiceDetail = singleServiceDetail
+              ? `${singleServiceDetail} • ${service.description}`
+              : service.description
+          }
+          if (service.subcategoryId?.name) {
+            singleCategoryName = service.subcategoryId.name
+          }
+        }
+      } else if (booking.subcategoryId) {
+        const { LabourSubcategory } = await import('../models/LabourSubcategory.js')
+        const subcat = await LabourSubcategory.findById(booking.subcategoryId).select('name').lean()
+        if (subcat) {
+          singleServiceName = subcat.name
+          singleCategoryName = subcat.name
+        }
       }
 
       // Count current open slots per service
@@ -578,6 +609,9 @@ export async function startBroadcastCycle(bookingId) {
               type: booking.type || 'SCHEDULED',
               customerName: booking.userId?.fullName || 'Customer',
               serviceName: singleServiceName,
+              serviceDetail: singleServiceDetail || booking.notes || '',
+              categoryName: singleCategoryName,
+              subServiceName: singleSubServiceName,
               isContractorBooking: false,
               requiresServiceSelection: false,
               date: booking.scheduledAt || booking.createdAt,

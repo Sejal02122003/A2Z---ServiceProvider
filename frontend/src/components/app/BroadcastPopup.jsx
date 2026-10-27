@@ -8,6 +8,16 @@ import { ApiError } from '../../api/http.js'
 import { useSocket } from '../../context/SocketContext.jsx'
 import { USER_ROLES } from '../../constants/userRoles.js'
 
+function formatScheduleDate(dateValue) {
+  if (!dateValue) return ''
+  const d = new Date(dateValue)
+  if (isNaN(d.getTime())) return String(dateValue)
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const year = d.getFullYear()
+  return `${day}/${month}/${year}`
+}
+
 export function BroadcastPopup() {
   const socket = useSocket()
   const navigate = useNavigate()
@@ -16,7 +26,7 @@ export function BroadcastPopup() {
   const timerRef = useRef(null)
 
   const [incoming, setIncoming] = useState(null)
-  const [timeLeft, setTimeLeft] = useState(30)
+  const [timeLeft, setTimeLeft] = useState(90)
   const [responding, setResponding] = useState(false)
   const [error, setError] = useState('')
   const [selectedServiceId, setSelectedServiceId] = useState(null)
@@ -70,7 +80,7 @@ export function BroadcastPopup() {
   const handleBroadcast = useCallback((data) => {
     if (!data) return
     console.log('--- BOOKING_RECEIVED EVENT ---', data)
-    const timeout = Math.max(5, Math.floor((data.timeoutMs || 30000) / 1000))
+    const timeout = Math.max(5, Math.floor((data.timeoutMs || 90000) / 1000))
     setIncoming(data)
     setTimeLeft(timeout)
     setError('')
@@ -228,7 +238,7 @@ export function BroadcastPopup() {
               <motion.div
                 initial={{ width: '100%' }}
                 animate={{ width: '0%' }}
-                transition={{ duration: (incoming.timeoutMs || 30000) / 1000, ease: 'linear' }}
+                transition={{ duration: (incoming.timeoutMs || 90000) / 1000, ease: 'linear' }}
                 className="absolute inset-y-0 left-0 bg-gradient-to-r from-brand to-blue-400"
               />
             </div>
@@ -260,21 +270,46 @@ export function BroadcastPopup() {
                 </div>
               </div>
 
-              {/* Customer Details */}
-              {(incoming.customerName || incoming.customer) && (
-                <div className="mt-4 rounded-2xl bg-brand/5 p-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-semibold text-brand/80">Customer</p>
-                    <p className="text-sm font-bold text-slate-900">{incoming.customerName || incoming.customer?.fullName || incoming.customer?.name}</p>
+              {/* Customer & Service Information Card */}
+              <div className="mt-4 rounded-2xl bg-brand/5 p-3.5 space-y-2.5 border border-brand/15">
+                <div className="flex items-center justify-between gap-2 border-b border-brand/10 pb-2">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-brand/80">Customer</p>
+                    <p className="text-sm font-extrabold text-slate-900 truncate">
+                      {incoming.customerName || incoming.customer?.fullName || incoming.customer?.name || 'Customer'}
+                    </p>
                   </div>
-                  {!requiresSelection && incoming.serviceName && (
-                    <div className="text-right">
-                      <p className="text-xs font-semibold text-brand/80">Service</p>
-                      <p className="text-sm font-bold text-slate-900 line-clamp-1">{incoming.serviceName}</p>
-                    </div>
+                  {incoming.categoryName && (
+                    <span className="shrink-0 rounded-lg bg-white/90 px-2 py-0.5 text-[10px] font-bold text-slate-700 shadow-2xs border border-brand/15">
+                      {incoming.categoryName}
+                    </span>
                   )}
                 </div>
-              )}
+
+                {!requiresSelection && incoming.serviceName && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-brand/80">Service</p>
+                      {incoming.subServiceName && (
+                        <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                          {incoming.subServiceName}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm font-black text-slate-900 leading-snug break-words">
+                      {incoming.serviceName}
+                    </p>
+                    {(incoming.serviceDetail || incoming.description || incoming.notes) && (
+                      <div className="mt-1.5 rounded-xl bg-white/80 p-2 text-xs text-slate-600 border border-slate-200/60 space-y-0.5">
+                        <span className="font-bold text-slate-700 block text-[11px]">Service Details:</span>
+                        <p className="leading-relaxed text-slate-600">
+                          {incoming.serviceDetail || incoming.description || incoming.notes}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Service Selection for multi-service contractor bookings */}
               {requiresSelection && (
@@ -339,7 +374,7 @@ export function BroadcastPopup() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500">Schedule</span>
                     <span className="font-bold text-slate-800">
-                      {incoming.date ? new Date(incoming.date).toLocaleDateString() : ''} {incoming.time ? `at ${incoming.time}` : ''}
+                      {incoming.date ? formatScheduleDate(incoming.date) : ''} {incoming.time ? `at ${incoming.time}` : ''}
                     </span>
                   </div>
                 )}

@@ -2,6 +2,7 @@ import { Booking } from '../models/Booking.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { KYC_STATUS } from '../constants/roles.js'
+import { BROADCAST_TIMEOUT_MS } from '../services/broadcastService.js'
 
 /**
  * Validate that labour can receive/accept bookings.
@@ -483,7 +484,7 @@ export const rejectBroadcast = asyncHandler(async (req, res) => {
 
 export const getActiveBroadcast = asyncHandler(async (req, res) => {
   const labour = req.user
-  const cutoff = new Date(Date.now() - 300000) // 5 minutes timeout window
+  const cutoff = new Date(Date.now() - BROADCAST_TIMEOUT_MS) // 1.5 minutes timeout window
 
   // Find recent bookings in BROADCASTING or PARTIALLY_ACCEPTED status
   const query = {
@@ -512,7 +513,7 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
   const booking = activeBookings[0]
   const isMultiService = Boolean(booking.multiServiceBooking?.isMultiService && booking.multiServiceBooking?.items?.length > 0)
   const bookingHours = booking.duration || booking.hours || 1
-  const remainingMs = Math.max(5000, 300000 - (Date.now() - new Date(booking.createdAt).getTime()))
+  const remainingMs = Math.max(5000, BROADCAST_TIMEOUT_MS - (Date.now() - new Date(booking.createdAt).getTime()))
 
   let payload = null
 
@@ -597,9 +598,39 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
     // Single service booking
     const { LabourService } = await import('../models/LabourService.js')
     let singleServiceName = 'Requested Service'
-    if (booking.serviceId) {
-      const svc = await LabourService.findById(booking.serviceId).select('name').lean()
-      if (svc) singleServiceName = svc.name
+    let singleServiceDetail = ''
+    let singleCategoryName = ''
+    let singleSubServiceName = booking.subServiceName || ''
+
+    if (booking.packageBooking?.isPackage) {
+      singleServiceName = booking.packageBooking.packageName || 'Service Package'
+      if (booking.packageBooking.inclusions?.length > 0) {
+        singleServiceDetail = booking.packageBooking.inclusions.map(i => i.name).filter(Boolean).join(', ')
+      }
+    } else if (booking.serviceId) {
+      const svc = await LabourService.findById(booking.serviceId).populate('subcategoryId', 'name').lean()
+      if (svc) {
+        singleServiceName = svc.name
+        if (booking.subServiceName) {
+          singleServiceName = `${svc.name} - ${booking.subServiceName}`
+          singleServiceDetail = booking.subServiceName
+        }
+        if (svc.description) {
+          singleServiceDetail = singleServiceDetail
+            ? `${singleServiceDetail} • ${svc.description}`
+            : svc.description
+        }
+        if (svc.subcategoryId?.name) {
+          singleCategoryName = svc.subcategoryId.name
+        }
+      }
+    } else if (booking.subcategoryId) {
+      const { LabourSubcategory } = await import('../models/LabourSubcategory.js')
+      const subcat = await LabourSubcategory.findById(booking.subcategoryId).select('name').lean()
+      if (subcat) {
+        singleServiceName = subcat.name
+        singleCategoryName = subcat.name
+      }
     }
     const singleShare = booking.laborShare || booking.basePrice || 0
 
@@ -608,6 +639,9 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       type: booking.type || 'SCHEDULED',
       customerName: booking.userId?.fullName || 'Customer',
       serviceName: singleServiceName,
+      serviceDetail: singleServiceDetail || booking.notes || '',
+      categoryName: singleCategoryName,
+      subServiceName: singleSubServiceName,
       isContractorBooking: false,
       requiresServiceSelection: false,
       date: booking.scheduledAt || booking.createdAt,
