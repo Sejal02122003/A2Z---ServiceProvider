@@ -187,28 +187,35 @@ export function SelectAddressSheet({
     }
   }
 
-  if (!open) return null
+  if (!open && !isAddModalOpen && !previewImageUrl) return null
 
   return createPortal(
-    <AnimatePresence>
-      <div className="fixed inset-0 z-[210] flex items-end sm:items-center sm:justify-center overflow-hidden">
-        {/* Backdrop */}
-        <motion.div
-          className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-        />
+    <>
+      <AnimatePresence>
+        {open && (
+          <div
+            key="select-address-wrapper"
+            className="fixed inset-0 z-[210] flex items-end sm:items-center sm:justify-center overflow-hidden"
+          >
+            {/* Backdrop */}
+            <motion.div
+              key="select-address-backdrop"
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={onClose}
+            />
 
-        {/* Bottom Sheet Modal */}
-        <motion.div
-          className="relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col rounded-t-[28px] sm:rounded-3xl bg-[#f8f9fa] shadow-2xl overflow-hidden"
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-        >
+            {/* Bottom Sheet Modal */}
+            <motion.div
+              key="select-address-panel"
+              className="relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col rounded-t-[28px] sm:rounded-3xl bg-[#f8f9fa] shadow-2xl overflow-hidden"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+            >
           {/* HEADER */}
           <div className="relative flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
             <h2 className="text-lg font-black tracking-tight text-slate-900">
@@ -440,10 +447,13 @@ export function SelectAddressSheet({
             </div>
           )}
         </motion.div>
-      </div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* ADD / EDIT ADDRESS MODAL */}
       <AddAddressModal
+        key="add-address-modal"
         open={isAddModalOpen}
         initialAddress={editingAddress}
         onClose={() => {
@@ -459,34 +469,40 @@ export function SelectAddressSheet({
       />
 
       {/* DOOR PHOTO PREVIEW MODAL */}
-      {previewImageUrl && (
-        <div
-          onClick={() => setPreviewImageUrl(null)}
-          className="fixed inset-0 z-[230] flex items-center justify-center bg-black/80 p-4"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative max-w-sm w-full overflow-hidden rounded-2xl bg-white p-3 shadow-2xl"
+      <AnimatePresence>
+        {previewImageUrl && (
+          <motion.div
+            key="door-preview-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setPreviewImageUrl(null)}
+            className="fixed inset-0 z-[230] flex items-center justify-center bg-black/80 p-4"
           >
-            <div className="flex items-center justify-between pb-2">
-              <p className="text-xs font-bold text-slate-800">Entrance / Door Photo</p>
-              <button
-                type="button"
-                onClick={() => setPreviewImageUrl(null)}
-                className="rounded-full p-1 text-slate-500 hover:bg-slate-100"
-              >
-                <X className="h-4 w-4" />
-              </button>
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="relative max-w-sm w-full overflow-hidden rounded-2xl bg-white p-3 shadow-2xl"
+            >
+              <div className="flex items-center justify-between pb-2">
+                <p className="text-xs font-bold text-slate-800">Entrance / Door Photo</p>
+                <button
+                  type="button"
+                  onClick={() => setPreviewImageUrl(null)}
+                  className="rounded-full p-1 text-slate-500 hover:bg-slate-100"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <img
+                src={previewImageUrl}
+                alt="Entrance"
+                className="w-full rounded-xl object-contain max-h-80"
+              />
             </div>
-            <img
-              src={previewImageUrl}
-              alt="Entrance"
-              className="w-full rounded-xl object-contain max-h-80"
-            />
-          </div>
-        </div>
-      )}
-    </AnimatePresence>,
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>,
     document.body
   )
 }

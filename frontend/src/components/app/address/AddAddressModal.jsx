@@ -417,6 +417,7 @@ export function AddAddressModal({
   return createPortal(
     <AnimatePresence>
       <motion.div
+        key="add-address-modal-container"
         className="fixed inset-0 z-[220] flex flex-col bg-white overflow-hidden"
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}

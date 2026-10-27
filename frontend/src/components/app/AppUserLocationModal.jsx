@@ -139,6 +139,7 @@ export function AppUserLocationModal({
     <AnimatePresence>
       {open ? (
       <motion.div
+        key="app-user-location-modal"
         className="fixed inset-0 z-[200] flex h-[100dvh] max-h-[100dvh] flex-col bg-white"
         initial={reduce ? false : { opacity: 0 }}
         animate={{ opacity: 1 }}

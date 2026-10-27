@@ -30,6 +30,7 @@ export function BookingModeSheet({ open, onClose, value, onSelect, categoryLabel
     <AnimatePresence>
       {open ? (
         <motion.div
+          key="booking-mode-sheet-modal"
           className="fixed inset-0 z-[205] flex items-end justify-center sm:items-center sm:p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

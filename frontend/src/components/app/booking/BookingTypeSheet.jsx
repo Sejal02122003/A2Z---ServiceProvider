@@ -35,6 +35,7 @@ export function BookingTypeSheet({ open, onClose, value, onSelect, categoryLabel
     <AnimatePresence>
       {open ? (
         <motion.div
+          key="booking-type-sheet-modal"
           className="fixed inset-0 z-[210] flex items-end justify-center sm:items-center sm:p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
