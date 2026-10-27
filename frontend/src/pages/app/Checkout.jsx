@@ -16,6 +16,7 @@ import { adminSettingsApi, getPublicSettings } from '../../api/adminSettingsApi.
 import { ApiError } from '../../api/http.js'
 import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
+import { SelectAddressSheet } from '../../components/app/address/SelectAddressSheet.jsx'
 import { useAuth } from '../../hooks/useAuth.js'
 
 const inputClass =
@@ -71,6 +72,7 @@ export function Checkout() {
   const [useWallet, setUseWallet] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [addressSheetOpen, setAddressSheetOpen] = useState(false)
   const inputRef = useRef(null)
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
@@ -550,10 +552,19 @@ export function Checkout() {
 
       {/* Address */}
       <GlassPanel className="p-4">
-        <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-          <MapPin className="mr-1 inline h-3.5 w-3.5" aria-hidden />
-          Work Location
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            <MapPin className="mr-1 inline h-3.5 w-3.5" aria-hidden />
+            Work Location
+          </label>
+          <button
+            type="button"
+            onClick={() => setAddressSheetOpen(true)}
+            className="text-xs font-bold text-brand hover:text-brand/80 transition"
+          >
+            Saved addresses
+          </button>
+        </div>
         <input
           ref={inputRef}
           type="text"
@@ -605,6 +616,30 @@ export function Checkout() {
           </>
         )}
       </button>
+
+      {/* Select Address Sheet */}
+      <SelectAddressSheet
+        open={addressSheetOpen}
+        onClose={() => setAddressSheetOpen(false)}
+        onSelectAddress={(saved) => {
+          if (saved) {
+            const display = saved.addressDetails
+              ? `${saved.addressDetails}, ${saved.locationText}`
+              : saved.locationText || saved.address || ''
+            setAddress(display)
+            if (saved.lat && saved.lng) {
+              setLat(saved.lat)
+              setLng(saved.lng)
+              if (mapInstance.current) {
+                mapInstance.current.panTo({ lat: saved.lat, lng: saved.lng })
+                if (markerInstance.current) {
+                  markerInstance.current.setPosition({ lat: saved.lat, lng: saved.lng })
+                }
+              }
+            }
+          }
+        }}
+      />
     </div>
   )
 }

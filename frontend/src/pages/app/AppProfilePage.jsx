@@ -32,6 +32,7 @@ import {
 } from 'lucide-react'
 import { KitStatusBadge } from '../../components/admin/welcomeKit/KitStatusBadge.jsx'
 import { ServiceProviderIdCardModal } from '../../components/labour/ServiceProviderIdCardModal.jsx'
+import { SelectAddressSheet } from '../../components/app/address/SelectAddressSheet.jsx'
 import { BOOT_ROUTES } from '../../constants/bootFlow.js'
 import { useAuth } from '../../hooks/useAuth.js'
 import {
@@ -151,6 +152,7 @@ export function AppProfilePage() {
   const cityInputRef = useRef(null)
   const stateInputRef = useRef(null)
 
+  const [addressSheetOpen, setAddressSheetOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [deleteErr, setDeleteErr] = useState('')
@@ -1000,6 +1002,42 @@ export function AppProfilePage() {
         )}
       </GlassPanel>
 
+      {/* Saved Addresses Panel */}
+      <GlassPanel className="border-slate-200/90 p-4 ring-1 ring-slate-100/90">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-brand" />
+            <h3 className="text-sm font-bold text-slate-900">Saved Addresses</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAddressSheetOpen(true)}
+            className="text-xs font-bold text-brand hover:text-brand/80 transition"
+          >
+            Manage
+          </button>
+        </div>
+        <p className="text-xs text-slate-500 mb-3">
+          Manage your home, work, and other saved delivery or service locations.
+        </p>
+        <button
+          type="button"
+          onClick={() => setAddressSheetOpen(true)}
+          className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50/60 p-3 text-left transition hover:bg-slate-100/80 active:scale-[0.99]"
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand/10 text-brand font-bold">
+              +
+            </span>
+            <div>
+              <p className="text-xs font-bold text-slate-800">Saved Addresses</p>
+              <p className="text-[11px] text-slate-500">Add or edit delivery addresses</p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-slate-400" />
+        </button>
+      </GlassPanel>
+
       {(user?.role === USER_ROLES.CUSTOMER || user?.role === USER_ROLES.CONTRACTOR) && (
         <GlassPanel className="border-slate-200/90 p-4 ring-1 ring-slate-100/90 flex flex-col items-center justify-center text-center">
           <Building2 className="h-8 w-8 text-brand mb-2" />
@@ -1132,6 +1170,12 @@ export function AppProfilePage() {
         isOpen={showIdCardModal}
         onClose={() => setShowIdCardModal(false)}
         user={user}
+      />
+
+      {/* Select Address Sheet */}
+      <SelectAddressSheet
+        open={addressSheetOpen}
+        onClose={() => setAddressSheetOpen(false)}
       />
     </motion.div>
   )

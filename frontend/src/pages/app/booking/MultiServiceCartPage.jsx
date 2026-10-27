@@ -27,6 +27,7 @@ import { paymentsApi } from '../../../api/paymentsApi.js'
 import { readAppUserLocation } from '../../../lib/appUserLocationStorage.js'
 import { GlassPanel } from '../../../components/ui/GlassPanel.jsx'
 import { getCategoryImageUrl } from '../../../lib/labourCategoryDisplay.js'
+import { SelectAddressSheet } from '../../../components/app/address/SelectAddressSheet.jsx'
 
 export function MultiServiceCartPage() {
   const navigate = useNavigate()
@@ -64,6 +65,7 @@ export function MultiServiceCartPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [bookingSuccessData, setBookingSuccessData] = useState(null)
+  const [addressSheetOpen, setAddressSheetOpen] = useState(false)
 
   // Auto-fill user location / address
   useEffect(() => {
@@ -577,17 +579,28 @@ export function MultiServiceCartPage() {
 
           {/* Service Address */}
           <div className="pt-2 border-t border-slate-100">
-            <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-1 mb-1">
-              <MapPin className="h-3.5 w-3.5 text-brand" />
-              Service Address
-            </label>
-            <input
-              type="text"
-              placeholder="Enter complete house/flat no., street, locality"
-              value={locationText}
-              onChange={(e) => setLocationText(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs font-semibold text-slate-800 focus:border-brand focus:bg-white focus:outline-hidden"
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                <MapPin className="h-3.5 w-3.5 text-brand" />
+                Service Address
+              </label>
+              <button
+                type="button"
+                onClick={() => setAddressSheetOpen(true)}
+                className="text-[11px] font-bold text-brand hover:text-brand/80 transition"
+              >
+                Change address
+              </button>
+            </div>
+            <div
+              onClick={() => setAddressSheetOpen(true)}
+              className="w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs font-semibold text-slate-800 transition hover:border-slate-300 flex items-center justify-between"
+            >
+              <span className="truncate">
+                {locationText || 'Tap to select or add address'}
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+            </div>
           </div>
 
           {/* Additional Instructions */}
@@ -816,6 +829,23 @@ export function MultiServiceCartPage() {
           </button>
         </div>
       </div>
+
+      {/* Select Address Sheet */}
+      <SelectAddressSheet
+        open={addressSheetOpen}
+        onClose={() => setAddressSheetOpen(false)}
+        onSelectAddress={(saved) => {
+          if (saved) {
+            const display = saved.addressDetails
+              ? `${saved.addressDetails}, ${saved.locationText}`
+              : saved.locationText || saved.address || ''
+            setLocationText(display)
+            if (saved.lat && saved.lng) {
+              setCoordinates({ lat: saved.lat, lng: saved.lng })
+            }
+          }
+        }}
+      />
     </div>
   )
 }

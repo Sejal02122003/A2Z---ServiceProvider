@@ -277,6 +277,30 @@ const welcomeKitSchema = new mongoose.Schema(
   { _id: false },
 )
 
+const savedAddressItemSchema = new mongoose.Schema(
+  {
+    tag: {
+      type: String,
+      enum: ['Home', 'Work', 'Other'],
+      default: 'Home',
+    },
+    customTag: { type: String, trim: true, default: '' },
+    addressDetails: { type: String, trim: true, default: '' }, // e.g. Floor, Company name, Tower, Flat no.
+    locationText: { type: String, trim: true, required: true }, // e.g. Inno EYE Office, Chhoti Gwaltol, Indore
+    areaName: { type: String, trim: true, default: '' },
+    city: { type: String, trim: true, default: '' },
+    state: { type: String, trim: true, default: '' },
+    pincode: { type: String, trim: true, default: '' },
+    lat: { type: Number, required: true },
+    lng: { type: Number, required: true },
+    receiverName: { type: String, trim: true, default: '' },
+    receiverPhone: { type: String, trim: true, default: '' },
+    doorImageUrl: { type: String, trim: true, default: '' },
+    isDefault: { type: Boolean, default: false },
+  },
+  { timestamps: true },
+)
+
 const userSchema = new mongoose.Schema(
   {
     phone: {
@@ -311,6 +335,10 @@ const userSchema = new mongoose.Schema(
       text: { type: String, trim: true, maxlength: 500 },
       lat: Number,
       lng: Number
+    },
+    savedAddresses: {
+      type: [savedAddressItemSchema],
+      default: [],
     },
     permanentAddress: { type: String, trim: true },
     currentLocation: { type: String, trim: true },

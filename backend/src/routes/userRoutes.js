@@ -36,6 +36,27 @@ router.get(
 
 router.use(protect)
 
+// Saved Addresses (Blinkit/Zomato style)
+router.get('/me/addresses', user.getUserAddresses)
+router.post(
+  '/me/addresses',
+  [
+    body('locationText').trim().notEmpty().withMessage('locationText is required'),
+    body('lat').isNumeric().withMessage('lat must be numeric'),
+    body('lng').isNumeric().withMessage('lng must be numeric'),
+    body('tag').optional().isIn(['Home', 'Work', 'Other']),
+    body('addressDetails').optional().trim(),
+    body('receiverName').optional().trim(),
+    body('receiverPhone').optional().trim(),
+  ],
+  validateRequest,
+  user.addUserAddress,
+)
+router.put('/me/addresses/:addressId', user.updateUserAddress)
+router.delete('/me/addresses/:addressId', user.deleteUserAddress)
+router.patch('/me/addresses/:addressId/default', user.setDefaultUserAddress)
+router.post('/me/addresses/import-blinkit', user.importBlinkitAddresses)
+
 router.get('/me', user.getProfile)
 router.delete('/me', user.deleteMe)
 router.patch(

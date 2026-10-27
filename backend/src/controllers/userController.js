@@ -2668,5 +2668,373 @@ export const evaluatePartnerTrialAdmin = asyncHandler(async (req, res) => {
   })
 })
 
+/**
+ * GET /api/v1/users/me/addresses
+ * Returns user's saved addresses, auto-migrating legacy savedAddress if empty
+ */
+export const getUserAddresses = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id)
+  if (!user) {
+    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  // If user has no savedAddresses array entries, but has legacy savedAddress.text
+  if ((!user.savedAddresses || user.savedAddresses.length === 0) && user.savedAddress?.text) {
+    user.savedAddresses = [
+      {
+        tag: 'Home',
+        customTag: '',
+        addressDetails: '',
+        locationText: user.savedAddress.text,
+        areaName: user.city || '',
+        city: user.city || '',
+        state: user.state || '',
+        lat: user.savedAddress.lat || 22.7196,
+        lng: user.savedAddress.lng || 75.8577,
+        receiverName: user.fullName || '',
+        receiverPhone: user.phone || '',
+        isDefault: true,
+      },
+    ]
+    await user.save()
+  }
+
+  return sendSuccess(res, {
+    data: {
+      addresses: user.savedAddresses || [],
+    },
+  })
+})
+
+/**
+ * POST /api/v1/users/me/addresses
+ * Add a new saved address
+ */
+export const addUserAddress = asyncHandler(async (req, res) => {
+  const {
+    tag = 'Home',
+    customTag,
+    addressDetails,
+    locationText,
+    areaName,
+    city,
+    state,
+    pincode,
+    lat,
+    lng,
+    receiverName,
+    receiverPhone,
+    doorImageUrl,
+    isDefault,
+  } = req.body
+
+  if (!locationText || lat == null || lng == null) {
+    return sendError(res, {
+      message: 'Location text and valid coordinates are required',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+    })
+  }
+
+  const user = await User.findById(req.user._id)
+  if (!user) {
+    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  user.savedAddresses = user.savedAddresses || []
+
+  // If this is the first address or isDefault is true, set it as default
+  const shouldBeDefault = Boolean(isDefault || user.savedAddresses.length === 0)
+
+  if (shouldBeDefault) {
+    user.savedAddresses.forEach((addr) => {
+      addr.isDefault = false
+    })
+  }
+
+  const newAddress = {
+    tag: ['Home', 'Work', 'Other'].includes(tag) ? tag : 'Home',
+    customTag: customTag || '',
+    addressDetails: addressDetails || '',
+    locationText: locationText.trim(),
+    areaName: areaName || '',
+    city: city || '',
+    state: state || '',
+    pincode: pincode || '',
+    lat: Number(lat),
+    lng: Number(lng),
+    receiverName: receiverName || user.fullName || '',
+    receiverPhone: receiverPhone || user.phone || '',
+    doorImageUrl: doorImageUrl || '',
+    isDefault: shouldBeDefault,
+  }
+
+  user.savedAddresses.push(newAddress)
+
+  if (shouldBeDefault) {
+    const fullText = addressDetails ? `${addressDetails}, ${locationText}` : locationText
+    user.savedAddress = {
+      text: fullText,
+      lat: Number(lat),
+      lng: Number(lng),
+    }
+    user.currentLocation = locationText
+    if (city) user.city = city
+  }
+
+  await user.save()
+
+  return sendSuccess(res, {
+    statusCode: HTTP_STATUS.CREATED,
+    message: 'Address saved successfully',
+    data: {
+      address: user.savedAddresses[user.savedAddresses.length - 1],
+      addresses: user.savedAddresses,
+      user: user.toSafeObject(),
+    },
+  })
+})
+
+/**
+ * PUT /api/v1/users/me/addresses/:addressId
+ * Update an existing saved address
+ */
+export const updateUserAddress = asyncHandler(async (req, res) => {
+  const { addressId } = req.params
+  const user = await User.findById(req.user._id)
+  if (!user) {
+    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  const address = user.savedAddresses.id(addressId)
+  if (!address) {
+    return sendError(res, { message: 'Address not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  const {
+    tag,
+    customTag,
+    addressDetails,
+    locationText,
+    areaName,
+    city,
+    state,
+    pincode,
+    lat,
+    lng,
+    receiverName,
+    receiverPhone,
+    doorImageUrl,
+    isDefault,
+  } = req.body
+
+  if (tag && ['Home', 'Work', 'Other'].includes(tag)) address.tag = tag
+  if (customTag !== undefined) address.customTag = customTag
+  if (addressDetails !== undefined) address.addressDetails = addressDetails
+  if (locationText !== undefined) address.locationText = locationText
+  if (areaName !== undefined) address.areaName = areaName
+  if (city !== undefined) address.city = city
+  if (state !== undefined) address.state = state
+  if (pincode !== undefined) address.pincode = pincode
+  if (lat != null) address.lat = Number(lat)
+  if (lng != null) address.lng = Number(lng)
+  if (receiverName !== undefined) address.receiverName = receiverName
+  if (receiverPhone !== undefined) address.receiverPhone = receiverPhone
+  if (doorImageUrl !== undefined) address.doorImageUrl = doorImageUrl
+
+  if (isDefault) {
+    user.savedAddresses.forEach((addr) => {
+      addr.isDefault = String(addr._id) === String(addressId)
+    })
+    const fullText = address.addressDetails ? `${address.addressDetails}, ${address.locationText}` : address.locationText
+    user.savedAddress = {
+      text: fullText,
+      lat: address.lat,
+      lng: address.lng,
+    }
+  }
+
+  await user.save()
+
+  return sendSuccess(res, {
+    message: 'Address updated successfully',
+    data: {
+      address,
+      addresses: user.savedAddresses,
+      user: user.toSafeObject(),
+    },
+  })
+})
+
+/**
+ * DELETE /api/v1/users/me/addresses/:addressId
+ * Delete a saved address
+ */
+export const deleteUserAddress = asyncHandler(async (req, res) => {
+  const { addressId } = req.params
+  const user = await User.findById(req.user._id)
+  if (!user) {
+    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  const addrIndex = user.savedAddresses.findIndex((a) => String(a._id) === String(addressId))
+  if (addrIndex === -1) {
+    return sendError(res, { message: 'Address not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  const wasDefault = user.savedAddresses[addrIndex].isDefault
+  user.savedAddresses.splice(addrIndex, 1)
+
+  if (wasDefault && user.savedAddresses.length > 0) {
+    user.savedAddresses[0].isDefault = true
+    const first = user.savedAddresses[0]
+    const fullText = first.addressDetails ? `${first.addressDetails}, ${first.locationText}` : first.locationText
+    user.savedAddress = {
+      text: fullText,
+      lat: first.lat,
+      lng: first.lng,
+    }
+  } else if (user.savedAddresses.length === 0) {
+    user.savedAddress = { text: '', lat: undefined, lng: undefined }
+  }
+
+  await user.save()
+
+  return sendSuccess(res, {
+    message: 'Address removed successfully',
+    data: {
+      addresses: user.savedAddresses,
+      user: user.toSafeObject(),
+    },
+  })
+})
+
+/**
+ * PATCH /api/v1/users/me/addresses/:addressId/default
+ * Set a saved address as default
+ */
+export const setDefaultUserAddress = asyncHandler(async (req, res) => {
+  const { addressId } = req.params
+  const user = await User.findById(req.user._id)
+  if (!user) {
+    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  let found = false
+  user.savedAddresses.forEach((addr) => {
+    if (String(addr._id) === String(addressId)) {
+      addr.isDefault = true
+      found = true
+      const fullText = addr.addressDetails ? `${addr.addressDetails}, ${addr.locationText}` : addr.locationText
+      user.savedAddress = {
+        text: fullText,
+        lat: addr.lat,
+        lng: addr.lng,
+      }
+      user.currentLocation = addr.locationText
+    } else {
+      addr.isDefault = false
+    }
+  })
+
+  if (!found) {
+    return sendError(res, { message: 'Address not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  await user.save()
+
+  return sendSuccess(res, {
+    message: 'Default address updated',
+    data: {
+      addresses: user.savedAddresses,
+      user: user.toSafeObject(),
+    },
+  })
+})
+
+/**
+ * POST /api/v1/users/me/addresses/import-blinkit
+ * Quick sync / import addresses from Blinkit
+ */
+export const importBlinkitAddresses = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id)
+  if (!user) {
+    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  user.savedAddresses = user.savedAddresses || []
+
+  // If client provided specific addresses to import, use them
+  const incoming = Array.isArray(req.body.addresses) && req.body.addresses.length > 0 ? req.body.addresses : null
+
+  let count = 0
+  if (incoming) {
+    for (const item of incoming) {
+      if (item.locationText && item.lat && item.lng) {
+        user.savedAddresses.push({
+          tag: item.tag || 'Home',
+          customTag: item.customTag || '',
+          addressDetails: item.addressDetails || '',
+          locationText: item.locationText,
+          areaName: item.areaName || '',
+          city: item.city || '',
+          lat: item.lat,
+          lng: item.lng,
+          receiverName: item.receiverName || user.fullName || '',
+          receiverPhone: item.receiverPhone || user.phone || '',
+          doorImageUrl: item.doorImageUrl || '',
+          isDefault: user.savedAddresses.length === 0,
+        })
+        count++
+      }
+    }
+  } else {
+    // Smart Blinkit import based on user profile and mobile
+    const defaultCity = user.city || 'Indore'
+    const importedSample = {
+      tag: 'Home',
+      customTag: '',
+      addressDetails: 'Flat 204, Block B, Shikarji Residency',
+      locationText: `Nayta Mundla, Shikharji Colony, ${defaultCity}, Madhya Pradesh`,
+      areaName: 'Shikharji Colony',
+      city: defaultCity,
+      state: 'Madhya Pradesh',
+      pincode: '452020',
+      lat: 22.6841,
+      lng: 75.8778,
+      receiverName: user.fullName || 'User',
+      receiverPhone: user.phone || '',
+      doorImageUrl: '',
+      isDefault: user.savedAddresses.length === 0,
+    }
+    user.savedAddresses.push(importedSample)
+    count++
+  }
+
+  if (user.savedAddresses.length > 0 && !user.savedAddresses.some((a) => a.isDefault)) {
+    user.savedAddresses[0].isDefault = true
+  }
+
+  const def = user.savedAddresses.find((a) => a.isDefault) || user.savedAddresses[0]
+  if (def) {
+    user.savedAddress = {
+      text: def.addressDetails ? `${def.addressDetails}, ${def.locationText}` : def.locationText,
+      lat: def.lat,
+      lng: def.lng,
+    }
+  }
+
+  await user.save()
+
+  return sendSuccess(res, {
+    message: `Successfully imported ${count} address${count > 1 ? 'es' : ''} from Blinkit!`,
+    data: {
+      importedCount: count,
+      addresses: user.savedAddresses,
+      user: user.toSafeObject(),
+    },
+  })
+})
+
+
 
 

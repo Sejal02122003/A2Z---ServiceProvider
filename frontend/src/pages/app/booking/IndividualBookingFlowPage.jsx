@@ -50,6 +50,7 @@ import { BookingStepProgress } from '../../../components/app/booking/BookingStep
 import { BookingServiceHighlight } from '../../../components/app/booking/BookingServiceHighlight.jsx'
 import { BookingReviewModal } from '../../../components/app/booking/BookingReviewModal.jsx'
 import { CancelBookingModal } from '../../../components/app/booking/CancelBookingModal.jsx'
+import { SelectAddressSheet } from '../../../components/app/address/SelectAddressSheet.jsx'
 import { useBookingSocket } from '../../../hooks/useBookingSocket.js'
 import { useAuth } from '../../../hooks/useAuth.js'
 import {
@@ -204,6 +205,7 @@ export function IndividualBookingFlowPage() {
   const autocompleteRef = useRef(null)
   const [mapsLoaded, setMapsLoaded] = useState(false)
   const [forceInput, setForceInput] = useState(false)
+  const [addressSheetOpen, setAddressSheetOpen] = useState(false)
   const mapRef = useRef(null)
   const mapInstance = useRef(null)
   const markerInstance = useRef(null)
@@ -700,14 +702,27 @@ export function IndividualBookingFlowPage() {
   }
 
   const applySavedAddress = () => {
-    const saved = readAppUserLocation()
-    if (saved && (saved.address || (saved.lat && saved.lng))) {
-      const displayAddress = saved.address || `GPS ${saved.lat.toFixed(5)}, ${saved.lng.toFixed(5)}`
-      syncDraft({ address: displayAddress, lat: saved.lat, lng: saved.lng })
+    setAddressSheetOpen(true)
+  }
+
+  const handleSelectAddressFromSheet = (saved) => {
+    if (saved) {
+      const displayAddress = saved.addressDetails
+        ? `${saved.addressDetails}, ${saved.locationText}`
+        : saved.locationText || saved.address || ''
+      syncDraft({
+        address: displayAddress,
+        lat: saved.lat,
+        lng: saved.lng,
+      })
+      if (mapInstance.current && saved.lat && saved.lng) {
+        mapInstance.current.panTo({ lat: saved.lat, lng: saved.lng })
+        if (markerInstance.current) {
+          markerInstance.current.setPosition({ lat: saved.lat, lng: saved.lng })
+        }
+      }
       setForceInput(true)
-      setFormError('') // clear any existing error
-    } else {
-      setFormError('No saved address found. Please save one in your profile first.')
+      setFormError('')
     }
   }
 
@@ -1958,7 +1973,7 @@ export function IndividualBookingFlowPage() {
                 <button
                   type="button"
                   onClick={pickLocation}
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-brand/25 bg-brand/5 py-2.5 text-[11px] font-bold text-brand"
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-brand/25 bg-brand/5 py-2.5 text-[11px] font-bold text-brand transition hover:bg-brand/10"
                 >
                   <Navigation className="h-3.5 w-3.5" aria-hidden />
                   Current location
@@ -1966,8 +1981,9 @@ export function IndividualBookingFlowPage() {
                 <button
                   type="button"
                   onClick={applySavedAddress}
-                  className="lc-booking-btn-secondary py-2.5 text-[11px]"
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-brand/25 bg-brand/5 py-2.5 text-[11px] font-bold text-brand transition hover:bg-brand/10"
                 >
+                  <MapPin className="h-3.5 w-3.5" aria-hidden />
                   Saved address
                 </button>
               </div>
@@ -2489,6 +2505,13 @@ export function IndividualBookingFlowPage() {
             </motion.div>
           </div>
         )}
+
+        {/* Address Selection Sheet */}
+        <SelectAddressSheet
+          open={addressSheetOpen}
+          onClose={() => setAddressSheetOpen(false)}
+          onSelectAddress={handleSelectAddressFromSheet}
+        />
       </div>
     </div>
   )
