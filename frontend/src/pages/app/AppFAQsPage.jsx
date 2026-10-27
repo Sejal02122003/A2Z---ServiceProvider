@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { apiRequest } from '../../api/http.js'
 import { useAuth } from '../../hooks/useAuth.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
+import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx'
 
 function FAQItem({ question, answer }) {
   const [open, setOpen] = useState(false)
@@ -89,13 +90,10 @@ export function AppFAQsPage() {
   }, [content])
 
   return (
-    <div className="mx-auto max-w-3xl pt-2 pb-12">
-      <div className="mb-6 px-1">
-        <h1 className="flex items-center gap-2 text-2xl font-extrabold tracking-tight text-slate-900">
-          <HelpCircle className="h-6 w-6 text-brand" />
-          FAQs
-        </h1>
-        <p className="mt-1 text-sm font-medium text-slate-500">
+    <div className="mx-auto max-w-3xl pt-2 pb-12 space-y-4">
+      <AppStackScreenHeader title="FAQs" backTo="/app" />
+      <div className="mb-2 px-1">
+        <p className="text-sm font-medium text-slate-500">
           Frequently asked questions and answers.
         </p>
       </div>

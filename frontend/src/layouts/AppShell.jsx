@@ -71,24 +71,7 @@ export function AppShell() {
   const isLabourJobs = user?.role === USER_ROLES.LABOUR && pathname === '/app/jobs'
   const isLabourEarnings = user?.role === USER_ROLES.LABOUR && pathname === '/app/earnings'
   const isLabourKyc = user?.role === USER_ROLES.LABOUR && pathname === '/app/kyc'
-  const hideShellHeader =
-    pathname.startsWith('/app/booking/flow') ||
-    pathname.startsWith('/app/tracking') ||
-    pathname.startsWith('/app/sub-category/') ||
-    pathname.startsWith('/app/active-job') ||
-    pathname.startsWith('/app/partner-onboarding') ||
-    pathname.startsWith('/app/onboarding') ||
-    pathname === '/app/bookings' ||
-    pathname === '/app/my-bookings' ||
-    pathname === '/app/search' ||
-    pathname === '/app/support' ||
-    pathname === '/app/profile' ||
-    pathname === '/app/wallet' ||
-    pathname === '/app/notifications' ||
-    isLabourAppHome ||
-    isLabourJobs ||
-    isLabourEarnings ||
-    isLabourKyc
+  const hideShellHeader = pathname !== '/app' || isLabourAppHome
   const title = getAppShellTitle(pathname)
   const drawerInitials = adminInitials(user)
   const profileImageUrl = user?.profileImageUrl?.trim()

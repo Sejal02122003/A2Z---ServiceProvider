@@ -3,6 +3,7 @@ import { Undo2 } from 'lucide-react'
 import { apiRequest } from '../../api/http.js'
 import { useAuth } from '../../hooks/useAuth.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
+import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx'
 
 export function AppRefundPolicyPage() {
   const { user } = useAuth()
@@ -34,13 +35,10 @@ export function AppRefundPolicyPage() {
   }, [user?.role])
 
   return (
-    <div className="mx-auto max-w-3xl pt-2 pb-12">
-      <div className="mb-6 px-1">
-        <h1 className="flex items-center gap-2 text-2xl font-extrabold tracking-tight text-slate-900">
-          <Undo2 className="h-6 w-6 text-brand" />
-          Refund Policy
-        </h1>
-        <p className="mt-1 text-sm font-medium text-slate-500">
+    <div className="mx-auto max-w-3xl pt-2 pb-12 space-y-4">
+      <AppStackScreenHeader title="Refund Policy" backTo="/app" />
+      <div className="mb-2 px-1">
+        <p className="text-sm font-medium text-slate-500">
           Guidelines and eligibility for processing refunds.
         </p>
       </div>

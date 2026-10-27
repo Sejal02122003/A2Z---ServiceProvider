@@ -7,6 +7,7 @@ import { ApiError } from '../../api/http.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import InvoicePrintView from '../../components/admin/InvoicePrintView.jsx'
 import { calculateCompletedBookingBill } from '../../lib/completedBillingHelper.js'
+import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx'
 
 export function AppBillingPage() {
   const navigate = useNavigate()
@@ -65,6 +66,7 @@ export function AppBillingPage() {
   return (
     <>
       <div className="space-y-4 pb-8 hide-on-print pt-2">
+        <AppStackScreenHeader title="Invoice & Billing" backTo="/app" />
 
         {loading ? (
           <div className="flex items-center justify-center py-16">
