@@ -22,6 +22,8 @@ import { fetchPublicPackageDetails } from '../../api/packagesApi.js'
 import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { writeBookingDraft, readBookingDraft } from '../../lib/individualBookingDraft.js'
+import { readAppUserLocation } from '../../lib/appUserLocationStorage.js'
+import { todayISODate } from '../../lib/individualBookings.js'
 
 export function PackageDetailsPage() {
   const { idOrSlug } = useParams()
@@ -86,18 +88,42 @@ export function PackageDetailsPage() {
     return list
   }, [pkg])
 
-  const handleBookNow = useCallback(() => {
+  const handleBookNow = useCallback((mode = 'scheduled') => {
     if (!pkg) return
     const currentDraft = readBookingDraft() || {}
+    const userLoc = readAppUserLocation() || {}
+    const today = todayISODate()
+
+    const nextHour = new Date()
+    nextHour.setHours(nextHour.getHours() + 2, 0, 0, 0)
+    const timeStr = `${String(nextHour.getHours()).padStart(2, '0')}:00`
+    const bookingMode = typeof mode === 'string' ? mode : 'scheduled'
+
     writeBookingDraft({
       ...currentDraft,
+      entryPoint: 'package',
+      isPackage: true,
       packageId: pkg._id,
       packageName: pkg.name,
       packagePrice: pkg.price,
+      packageOriginalPrice: pkg.originalPrice,
+      packageInclusions: pkg.inclusions || [],
+      packageDuration: pkg.estimatedDurationMins || 60,
+      packageBadge: pkg.badge,
+      packageImage: pkg.imageUrl,
       categoryId: pkg.categoryId?._id || pkg.categoryId,
+      categoryName: pkg.categoryId?.name || 'Service Package',
       subcategoryId: pkg.subcategoryId?._id || pkg.subcategoryId,
       serviceId: pkg.inclusions?.[0]?.serviceId?._id || pkg.inclusions?.[0]?.serviceId,
-      bookingType: 'scheduled',
+      serviceName: pkg.name,
+      bookingType: bookingMode,
+      durationKind: 'few_hours',
+      hours: pkg.estimatedDurationMins ? parseFloat((pkg.estimatedDurationMins / 60).toFixed(1)) : 1,
+      address: currentDraft.address || userLoc.address || userLoc.city || '',
+      lat: currentDraft.lat || userLoc.lat || 28.6139,
+      lng: currentDraft.lng || userLoc.lng || 77.2090,
+      serviceDate: currentDraft.serviceDate || today,
+      timeSlot: currentDraft.timeSlot || (bookingMode === 'scheduled' ? timeStr : ''),
     })
     navigate(`/app/booking/flow?step=details&packageId=${pkg._id}`)
   }, [pkg, navigate])

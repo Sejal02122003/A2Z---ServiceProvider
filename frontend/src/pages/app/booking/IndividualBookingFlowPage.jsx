@@ -243,8 +243,37 @@ export function IndividualBookingFlowPage() {
 
   useEffect(() => {
     const stored = readBookingDraft()
-    if (stored) queueMicrotask(() => setDraft(stored))
-  }, [])
+    if (stored) {
+      queueMicrotask(() => setDraft(stored))
+    }
+  }, [location.search, packageIdParam, categoryIdParam])
+
+  // Pre-fill location from stored app user location if draft.address is empty
+  useEffect(() => {
+    if (!draft.address) {
+      const loc = readAppUserLocation()
+      if (loc && (loc.address || loc.city)) {
+        syncDraft({
+          address: loc.address || loc.city,
+          lat: loc.lat || 28.6139,
+          lng: loc.lng || 77.2090,
+        })
+      }
+    }
+  }, [draft.address, syncDraft])
+
+  // Pre-fill default serviceDate and timeSlot if scheduled booking is chosen
+  useEffect(() => {
+    if (draft.bookingType === 'scheduled' && !draft.serviceDate) {
+      const nextHour = new Date()
+      nextHour.setHours(nextHour.getHours() + 2, 0, 0, 0)
+      const timeStr = `${String(nextHour.getHours()).padStart(2, '0')}:00`
+      syncDraft({
+        serviceDate: todayISODate(),
+        timeSlot: draft.timeSlot || timeStr,
+      })
+    }
+  }, [draft.bookingType, draft.serviceDate, draft.timeSlot, syncDraft])
 
   useEffect(() => {
     if (!autocompleteRef.current) return
@@ -277,6 +306,47 @@ export function IndividualBookingFlowPage() {
     if (packageIdParam) patch.packageId = packageIdParam
     syncDraft(patch)
   }, [categoryIdParam, groupIdParam, packageIdParam, syncDraft])
+
+  // Package Auto-Hydration: Load package details when packageId is present
+  useEffect(() => {
+    const pkgId = packageIdParam || draft.packageId
+    if (!pkgId) return
+    if (draft.packageName && draft.packageId === pkgId && draft.packagePrice && draft.isPackage) return
+
+    let cancelled = false
+    import('../../../api/packagesApi.js').then(({ fetchPublicPackageDetails }) => {
+      fetchPublicPackageDetails(pkgId).then((res) => {
+        if (cancelled) return
+        const pkg = res.data?.package
+        if (pkg) {
+          syncDraft({
+            entryPoint: 'package',
+            isPackage: true,
+            packageId: pkg._id,
+            packageName: pkg.name,
+            packagePrice: pkg.price,
+            packageOriginalPrice: pkg.originalPrice,
+            packageInclusions: pkg.inclusions || [],
+            packageDuration: pkg.estimatedDurationMins || 60,
+            packageBadge: pkg.badge,
+            packageImage: pkg.imageUrl,
+            categoryId: pkg.categoryId?._id || pkg.categoryId,
+            categoryName: pkg.categoryId?.name || 'Service Package',
+            subcategoryId: pkg.subcategoryId?._id || pkg.subcategoryId,
+            serviceId: pkg.inclusions?.[0]?.serviceId?._id || pkg.inclusions?.[0]?.serviceId,
+            serviceName: pkg.name,
+            bookingType: draft.bookingType || 'scheduled',
+            durationKind: 'few_hours',
+            hours: pkg.estimatedDurationMins ? parseFloat((pkg.estimatedDurationMins / 60).toFixed(1)) : 1,
+          })
+        }
+      }).catch((err) => {
+        console.error('Failed to load package details for booking:', err)
+      })
+    }).catch(console.error)
+
+    return () => { cancelled = true }
+  }, [packageIdParam, draft.packageId, draft.packageName, draft.packagePrice, draft.isPackage, draft.bookingType, syncDraft])
 
   useEffect(() => {
     if (!realUser) return
@@ -541,11 +611,11 @@ export function IndividualBookingFlowPage() {
   useEffect(() => {
     if (location.pathname !== BOOKING_FLOW_PATH) return
     if (step === 'active' || step === 'payment' || step === 'billing') return // allow active flows without a draft
-    if (!draft.categoryId && !categoryIdParam) {
-      // If they somehow enter without a category, they need to pick one.
+    if (!draft.categoryId && !categoryIdParam && !draft.packageId && !packageIdParam) {
+      // If they somehow enter without a category or package, they need to pick one.
       navigate('/app/search', { replace: true })
     }
-  }, [categoryIdParam, draft.categoryId, navigate, location.pathname, step])
+  }, [categoryIdParam, draft.categoryId, draft.packageId, packageIdParam, navigate, location.pathname, step])
 
   useEffect(() => {
     if (location.pathname !== BOOKING_FLOW_PATH) return
@@ -634,7 +704,7 @@ export function IndividualBookingFlowPage() {
       return
     }
 
-    if (!draft.categoryId && !draft.serviceId) {
+    if (!draft.categoryId && !draft.serviceId && !draft.packageId && !packageIdParam) {
       goStep('type')
       return
     }
@@ -980,6 +1050,12 @@ export function IndividualBookingFlowPage() {
         <GlassPanel className="p-6 text-center">
           <CheckCircle2 className="mx-auto h-16 w-16 text-blue-600" aria-hidden />
           <p className="mt-4 text-lg font-black text-slate-900">Your job is scheduled!</p>
+          {(draft.isPackage || draft.packageName) && (
+            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-3 py-1 text-xs font-extrabold text-brand">
+              <Package className="h-3.5 w-3.5" />
+              <span>{draft.packageName}</span>
+            </div>
+          )}
           <p className="mt-2 text-sm font-medium text-slate-600">
             We have confirmed your requirement. A worker will be assigned to you before your scheduled time.
           </p>
@@ -1871,7 +1947,9 @@ export function IndividualBookingFlowPage() {
   }
 
   const flowTitle =
-    step === 'type' ? 'Booking type' : step === 'details' ? 'Job details' : step === 'summary' ? 'Billing' : 'Review & confirm'
+    (draft.isPackage || draft.packageId || packageIdParam)
+      ? (step === 'details' ? 'Package Booking' : step === 'summary' ? 'Package Billing' : 'Review & confirm')
+      : (step === 'type' ? 'Booking type' : step === 'details' ? 'Job details' : step === 'summary' ? 'Billing' : 'Review & confirm')
 
   return (
     <div className="-mx-4 space-y-4 bg-white pb-8">
@@ -1882,6 +1960,7 @@ export function IndividualBookingFlowPage() {
           if (step === 'type') leaveFlow()
           else if (step === 'details') {
             if (draft.entryPoint === 'category') navigate(-1)
+            else if (draft.isPackage || draft.packageId || packageIdParam) navigate('/app/packages')
             else goStep('type')
           }
           else goStep('details')
@@ -1889,7 +1968,19 @@ export function IndividualBookingFlowPage() {
       />
 
       <div className="space-y-4 px-4">
-        <BookingServiceHighlight categoryName={draft.categoryName} serviceName={realUser?.role === 'contractor' && contractorServiceNames ? contractorServiceNames : draft.serviceName} />
+        <BookingServiceHighlight
+          categoryName={
+            draft.isPackage || draft.packageId || packageIdParam
+              ? (draft.packageName || draft.categoryName || 'Service Package')
+              : draft.categoryName
+          }
+          serviceName={
+            draft.isPackage || draft.packageId || packageIdParam
+              ? (draft.packageInclusions?.length ? `${draft.packageInclusions.length} Services Bundle` : 'Curated Service Package')
+              : (realUser?.role === 'contractor' && contractorServiceNames ? contractorServiceNames : draft.serviceName)
+          }
+          kicker={draft.isPackage || draft.packageId || packageIdParam ? 'Package Booking' : 'Booking for'}
+        />
 
         {step !== 'searching' ? (
           <div className="lc-booking-flow-card py-3">
@@ -1928,6 +2019,84 @@ export function IndividualBookingFlowPage() {
 
         {step === 'details' ? (
           <motion.div className="space-y-4">
+            {/* Package Overview & Mode Selector Card */}
+            {(draft.isPackage || draft.packageId || packageIdParam) && (
+              <div className="overflow-hidden rounded-2xl border border-brand/20 bg-gradient-to-br from-brand/5 via-white to-indigo-50/40 p-4 shadow-xs space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-brand">
+                      <Package className="h-3 w-3" />
+                      {draft.packageBadge || 'Service Package'}
+                    </span>
+                    <h3 className="text-base font-extrabold text-slate-900 leading-snug">
+                      {draft.packageName || 'Selected Package Bundle'}
+                    </h3>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-base font-black text-slate-900">
+                      ₹{Number(draft.packagePrice || 0).toLocaleString('en-IN')}
+                    </p>
+                    {draft.packageOriginalPrice && draft.packageOriginalPrice > draft.packagePrice && (
+                      <p className="text-[11px] font-bold text-emerald-600">
+                        Save ₹{(draft.packageOriginalPrice - draft.packagePrice).toLocaleString('en-IN')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {draft.packageInclusions && draft.packageInclusions.length > 0 && (
+                  <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                      <span>Services Included:</span>
+                      {draft.packageDuration && (
+                        <span className="text-slate-400 font-semibold">~{draft.packageDuration} mins</span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {draft.packageInclusions.map((inc, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-800 border border-slate-200/80 shadow-2xs"
+                        >
+                          <Check className="h-2.5 w-2.5 text-emerald-600 stroke-[3]" />
+                          {inc.name} {inc.quantity > 1 ? `(x${inc.quantity})` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-slate-100">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Choose Booking Mode</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => syncDraft({ bookingType: 'instant' })}
+                      className={`flex items-center justify-center gap-1.5 rounded-xl border-2 py-2.5 px-2.5 text-xs font-bold transition cursor-pointer ${
+                        draft.bookingType === 'instant'
+                          ? 'border-brand bg-brand/10 text-brand shadow-xs'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      <Zap className="h-3.5 w-3.5" />
+                      <span>Instant (ASAP)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => syncDraft({ bookingType: 'scheduled' })}
+                      className={`flex items-center justify-center gap-1.5 rounded-xl border-2 py-2.5 px-2.5 text-xs font-bold transition cursor-pointer ${
+                        draft.bookingType === 'scheduled'
+                          ? 'border-brand bg-brand/10 text-brand shadow-xs'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      <Calendar className="h-3.5 w-3.5" />
+                      <span>Scheduled</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             <div>
               <FieldLabel htmlFor="work-location">Work location</FieldLabel>
               {!mapsLoaded ? (
@@ -2159,8 +2328,12 @@ export function IndividualBookingFlowPage() {
                 <div className="flex justify-between gap-2">
                   <span className="lc-booking-flow-muted">Service</span>
                   <span className="text-right font-bold text-black">
-                    <span className="lc-booking-highlight-title block text-base">{draft.categoryName}</span>
-                    {realUser?.role === 'contractor' && contractorServiceNames ? (
+                    <span className="lc-booking-highlight-title block text-base">
+                      {draft.isPackage ? draft.packageName : draft.categoryName}
+                    </span>
+                    {draft.isPackage ? (
+                      <span className="text-xs font-semibold text-brand">All-In-One Package Bundle</span>
+                    ) : realUser?.role === 'contractor' && contractorServiceNames ? (
                       <span className="text-xs font-semibold">{contractorServiceNames}</span>
                     ) : draft.serviceName ? (
                       <span className="text-xs font-semibold">{draft.serviceName}</span>

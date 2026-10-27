@@ -14,11 +14,16 @@ import {
   Filter,
   Check,
   ShieldCheck,
+  Zap,
+  Calendar,
+  X,
 } from 'lucide-react'
 import { fetchPublicPackages } from '../../api/packagesApi.js'
 import { readAppUserLocation } from '../../lib/appUserLocationStorage.js'
 import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
+import { readBookingDraft, writeBookingDraft } from '../../lib/individualBookingDraft.js'
+import { todayISODate } from '../../lib/individualBookings.js'
 
 export function ServicePackagesPage() {
   const navigate = useNavigate()
@@ -84,8 +89,54 @@ export function ServicePackagesPage() {
     })
   }, [packages, selectedCategory])
 
-  const handleBookNow = (pkg) => {
+  const [bookingModalPkg, setBookingModalPkg] = useState(null)
+  const [bookingMode, setBookingMode] = useState('scheduled')
+
+  const proceedToBook = (pkg, mode = 'scheduled') => {
+    if (!pkg) return
+    const currentDraft = readBookingDraft() || {}
+    const userLoc = readAppUserLocation() || {}
+    const today = todayISODate()
+
+    const nextHour = new Date()
+    nextHour.setHours(nextHour.getHours() + 2, 0, 0, 0)
+    const timeStr = `${String(nextHour.getHours()).padStart(2, '0')}:00`
+
+    const newDraft = {
+      ...currentDraft,
+      entryPoint: 'package',
+      isPackage: true,
+      packageId: pkg._id,
+      packageName: pkg.name,
+      packagePrice: pkg.price,
+      packageOriginalPrice: pkg.originalPrice,
+      packageInclusions: pkg.inclusions || [],
+      packageDuration: pkg.estimatedDurationMins || 60,
+      packageBadge: pkg.badge,
+      packageImage: pkg.imageUrl,
+      categoryId: pkg.categoryId?._id || pkg.categoryId,
+      categoryName: pkg.categoryId?.name || 'Service Package',
+      subcategoryId: pkg.subcategoryId?._id || pkg.subcategoryId,
+      serviceId: pkg.inclusions?.[0]?.serviceId?._id || pkg.inclusions?.[0]?.serviceId,
+      serviceName: pkg.name,
+      bookingType: mode,
+      durationKind: 'few_hours',
+      hours: pkg.estimatedDurationMins ? parseFloat((pkg.estimatedDurationMins / 60).toFixed(1)) : 1,
+      address: currentDraft.address || userLoc.address || userLoc.city || '',
+      lat: currentDraft.lat || userLoc.lat || 28.6139,
+      lng: currentDraft.lng || userLoc.lng || 77.2090,
+      serviceDate: currentDraft.serviceDate || today,
+      timeSlot: currentDraft.timeSlot || (mode === 'scheduled' ? timeStr : ''),
+    }
+
+    writeBookingDraft(newDraft)
+    setBookingModalPkg(null)
     navigate(`/app/booking/flow?step=details&packageId=${pkg._id}`)
+  }
+
+  const handleBookNow = (pkg) => {
+    setBookingMode('scheduled')
+    setBookingModalPkg(pkg)
   }
 
   return (
@@ -358,6 +409,173 @@ export function ServicePackagesPage() {
               </motion.div>
             )
           })}
+        </div>
+      )}
+
+      {/* Booking Mode Bottom Sheet / Modal */}
+      {bookingModalPkg && (
+        <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl flex flex-col max-h-[88vh] sm:max-h-[85vh] overflow-hidden">
+            {/* 1. Header (Fixed Top) */}
+            <div className="shrink-0 flex items-center justify-between border-b border-slate-100 p-4 pb-3 bg-white">
+              <div className="flex items-center gap-2">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                  <Package className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 leading-tight">Book Service Package</h3>
+                  <p className="text-xs text-slate-500 truncate max-w-[240px]">{bookingModalPkg.name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBookingModalPkg(null)}
+                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* 2. Scrollable Body Content */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3.5 overscroll-contain">
+              {/* Package snapshot banner */}
+              <div className="rounded-2xl border border-brand/20 bg-gradient-to-br from-brand/5 via-white to-indigo-50/40 p-3.5 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-brand">
+                      {bookingModalPkg.badge || 'Package Deal'}
+                    </span>
+                    <h4 className="mt-1 text-sm font-extrabold text-slate-900 leading-snug">{bookingModalPkg.name}</h4>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-base font-black text-slate-900">₹{Number(bookingModalPkg.price).toLocaleString('en-IN')}</p>
+                    {bookingModalPkg.originalPrice && bookingModalPkg.originalPrice > bookingModalPkg.price && (
+                      <p className="text-[10px] font-bold text-emerald-600">Save ₹{(bookingModalPkg.originalPrice - bookingModalPkg.price).toLocaleString('en-IN')}</p>
+                    )}
+                  </div>
+                </div>
+
+                {bookingModalPkg.inclusions && bookingModalPkg.inclusions.length > 0 && (
+                  <div className="space-y-1 pt-1.5 border-t border-slate-100">
+                    <p className="text-[11px] font-bold text-slate-600">Includes {bookingModalPkg.inclusions.length} Services:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {bookingModalPkg.inclusions.map((inc, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700 border border-slate-200 shadow-2xs">
+                          <Check className="h-2.5 w-2.5 text-emerald-600 stroke-[3]" />
+                          {inc.name} {inc.quantity > 1 ? `(x${inc.quantity})` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Choose Booking Mode */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+                    Choose Booking Method
+                  </p>
+                  <span className="text-[10px] font-semibold text-slate-400">
+                    Select to proceed to next step
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2.5">
+                  {/* Scheduled Option */}
+                  <div
+                    onClick={() => proceedToBook(bookingModalPkg, 'scheduled')}
+                    className="relative rounded-2xl border-2 border-slate-200 bg-white p-3.5 transition-all cursor-pointer shadow-xs hover:shadow-md hover:border-brand hover:bg-brand/5 active:scale-[0.99] group"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand group-hover:bg-brand group-hover:text-white transition shadow-xs">
+                          <Calendar className="h-5 w-5" />
+                        </span>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-extrabold text-sm text-slate-900 group-hover:text-brand transition">Scheduled Booking</p>
+                            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-bold text-brand">
+                              Pick Slot
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Pick date & time slot of your choice
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          proceedToBook(bookingModalPkg, 'scheduled')
+                        }}
+                        className="shrink-0 inline-flex items-center gap-1 rounded-xl bg-brand px-3 py-2 text-xs font-bold text-white shadow-xs hover:opacity-95 transition"
+                      >
+                        <span>Schedule</span>
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Instant Option */}
+                  <div
+                    onClick={() => proceedToBook(bookingModalPkg, 'instant')}
+                    className="relative rounded-2xl border-2 border-slate-200 bg-white p-3.5 transition-all cursor-pointer shadow-xs hover:shadow-md hover:border-amber-400 hover:bg-amber-50/50 active:scale-[0.99] group"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-slate-950 font-black shadow-xs group-hover:bg-amber-400 transition">
+                          <Zap className="h-5 w-5" />
+                        </span>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-extrabold text-sm text-slate-900 group-hover:text-amber-700 transition">Instant (ASAP)</p>
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-900">
+                              Fastest
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Immediate dispatch • Partner arrives earliest
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          proceedToBook(bookingModalPkg, 'instant')
+                        }}
+                        className="shrink-0 inline-flex items-center gap-1 rounded-xl bg-amber-500 px-3 py-2 text-xs font-extrabold text-slate-950 shadow-xs hover:bg-amber-400 transition"
+                      >
+                        <span>Book Instant</span>
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Sticky Bottom Action Bar (ALWAYS 100% VISIBLE) */}
+            <div className="shrink-0 border-t border-slate-100 bg-white p-4 pt-3 flex items-center gap-3 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
+              <button
+                type="button"
+                onClick={() => setBookingModalPkg(null)}
+                className="rounded-xl border border-slate-200 px-4 py-3 text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => proceedToBook(bookingModalPkg, bookingMode)}
+                className="flex-1 rounded-xl bg-brand py-3.5 px-4 text-xs sm:text-sm font-black text-white shadow hover:opacity-95 active:scale-[0.99] transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Continue to Booking Details</span>
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
