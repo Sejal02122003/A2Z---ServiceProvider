@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import {
   ArrowUpRight,
   Award,
+  Ban,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -33,6 +34,7 @@ import {
   fetchAdminUserById,
   fetchAdminUsers,
   reviewLabourKycAdmin,
+  updateAdminUserStatus,
 } from '../../api/adminUsersApi.js'
 import { ApiError } from '../../api/http.js'
 import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
@@ -58,7 +60,7 @@ function readInitialKit(sp) {
 
 function readInitialStatus(sp) {
   const s = sp.get('status')?.toLowerCase()
-  if (s === 'active' || s === 'inactive') return s
+  if (s === 'active' || s === 'inactive' || s === 'blocked' || s === 'unblocked') return s
   return 'all'
 }
 
@@ -95,11 +97,14 @@ function KycPill({ status, submittedAt }) {
 function StatusPill({ active }) {
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ring-1 ${
-        active ? 'bg-blue-50 text-blue-900 ring-blue-200/80' : 'bg-slate-100 text-slate-600 ring-slate-200/80'
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ring-1 ${
+        active
+          ? 'bg-emerald-50 text-emerald-800 ring-emerald-200/80'
+          : 'bg-rose-50 text-rose-800 ring-rose-200/80'
       }`}
     >
-      {active ? 'Active' : 'Inactive'}
+      <span className={`size-1.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+      {active ? 'Unblocked' : 'Blocked'}
     </span>
   )
 }
@@ -335,6 +340,44 @@ export function AdminLabourPage() {
   const [evalBusy, setEvalBusy] = useState(false)
   const [evalError, setEvalError] = useState('')
   const [actionToast, setActionToast] = useState('')
+  const [togglingUserId, setTogglingUserId] = useState(null)
+
+  const handleToggleBlock = async (u) => {
+    const isCurrentlyActive = u.isActive !== false
+    const actionName = isCurrentlyActive ? 'block' : 'unblock'
+    const providerName = u.fullName || 'this service provider'
+    const confirmMsg = isCurrentlyActive
+      ? `Are you sure you want to BLOCK ${providerName}? They will be blocked from receiving new jobs, signing in, and broadcasting.`
+      : `Are you sure you want to UNBLOCK ${providerName}? Their account and access will be reactivated.`
+
+    if (!window.confirm(confirmMsg)) return
+
+    try {
+      setTogglingUserId(u._id)
+      await updateAdminUserStatus(u._id, !isCurrentlyActive)
+      setItems((prev) =>
+        prev.map((item) =>
+          item._id === u._id
+            ? {
+                ...item,
+                isActive: !isCurrentlyActive,
+                vendorStatus: !isCurrentlyActive ? 'BLOCKED' : item.vendorStatus === 'BLOCKED' ? 'CONFIRMED' : item.vendorStatus,
+              }
+            : item
+        )
+      )
+      setActionToast(
+        !isCurrentlyActive
+          ? `${providerName} unblocked successfully.`
+          : `${providerName} blocked successfully.`
+      )
+      setTimeout(() => setActionToast(''), 4000)
+    } catch (err) {
+      alert(err.message || `Failed to ${actionName} service provider`)
+    } finally {
+      setTogglingUserId(null)
+    }
+  }
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 350)
@@ -762,9 +805,9 @@ export function AdminLabourPage() {
                 onChange={(e) => setStatus(e.target.value)}
                 className="w-full appearance-none rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 pr-10 text-sm shadow-sm outline-none focus:ring-2 focus:ring-brand/35"
               >
-                <option value="all">Active & inactive</option>
-                <option value="active">Active only</option>
-                <option value="inactive">Inactive only</option>
+                <option value="all">All Accounts (Blocked & Unblocked)</option>
+                <option value="unblocked">Unblocked (Active)</option>
+                <option value="blocked">Blocked</option>
               </select>
               <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
                 <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1002,7 +1045,29 @@ export function AdminLabourPage() {
                         })()}
                       </td>
                       <td className="px-4 py-3">
-                        <StatusPill active={u.isActive !== false} />
+                        <div className="flex flex-col items-start gap-1.5">
+                          <StatusPill active={u.isActive !== false} />
+                          <button
+                            type="button"
+                            onClick={() => handleToggleBlock(u)}
+                            disabled={togglingUserId === u._id}
+                            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold transition shadow-2xs border cursor-pointer ${
+                              u.isActive !== false
+                                ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:border-rose-300'
+                                : 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 hover:border-emerald-300'
+                            } disabled:opacity-50`}
+                            title={u.isActive !== false ? 'Block this service provider account' : 'Unblock this service provider account'}
+                          >
+                            {togglingUserId === u._id ? (
+                              <RefreshCw className="size-3 animate-spin" />
+                            ) : u.isActive !== false ? (
+                              <Ban className="size-3 text-rose-600" />
+                            ) : (
+                              <ShieldCheck className="size-3 text-emerald-600" />
+                            )}
+                            <span>{u.isActive !== false ? 'Block' : 'Unblock'}</span>
+                          </button>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-600">{formatLastLoginDisplay(u.lastLoginAt) || '—'}</td>
                     </tr>
@@ -1035,7 +1100,28 @@ export function AdminLabourPage() {
                     {u.email ? <p className="mt-0.5 text-[11px] text-slate-500">{u.email}</p> : null}
                     <p className="mt-0.5 font-mono text-xs text-slate-600">+91 {u.phone || '—'}</p>
                   </div>
-                  <StatusPill active={u.isActive !== false} />
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <StatusPill active={u.isActive !== false} />
+                    <button
+                      type="button"
+                      onClick={() => handleToggleBlock(u)}
+                      disabled={togglingUserId === u._id}
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold transition shadow-2xs border cursor-pointer ${
+                        u.isActive !== false
+                          ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                          : 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                      } disabled:opacity-50`}
+                    >
+                      {togglingUserId === u._id ? (
+                        <RefreshCw className="size-3 animate-spin" />
+                      ) : u.isActive !== false ? (
+                        <Ban className="size-3 text-rose-600" />
+                      ) : (
+                        <ShieldCheck className="size-3 text-emerald-600" />
+                      )}
+                      <span>{u.isActive !== false ? 'Block' : 'Unblock'}</span>
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <KycPill status={(u.contractorProfile || u.labourProfile)?.kycStatus} submittedAt={(u.contractorProfile || u.labourProfile)?.kycSubmittedAt} />
@@ -1259,11 +1345,37 @@ export function AdminLabourPage() {
                         <div className="rounded-2xl border border-slate-200/80 bg-slate-50/75 p-4 space-y-3">
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                                   {detailUser.role === USER_ROLES.CONTRACTOR ? 'Contractor Partner' : 'Service Partner'}
                                 </span>
                                 <KycPill status={status} submittedAt={profile?.kycSubmittedAt} />
+                                <StatusPill active={detailUser.isActive !== false} />
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    await handleToggleBlock(detailUser)
+                                    setDetailUser((prev) => (prev ? { ...prev, isActive: !prev.isActive } : null))
+                                  }}
+                                  disabled={togglingUserId === detailUser._id}
+                                  className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold transition shadow-2xs border cursor-pointer ${
+                                    detailUser.isActive !== false
+                                      ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                                      : 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                                  } disabled:opacity-50`}
+                                >
+                                  {detailUser.isActive !== false ? (
+                                    <>
+                                      <Ban className="size-3 text-rose-600" />
+                                      <span>Block Account</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ShieldCheck className="size-3 text-emerald-600" />
+                                      <span>Unblock Account</span>
+                                    </>
+                                  )}
+                                </button>
                               </div>
                               <h4 className="text-lg font-black text-slate-900 mt-0.5">
                                 {detailUser.fullName || '—'}

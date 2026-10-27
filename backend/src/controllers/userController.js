@@ -685,11 +685,11 @@ export const listUsers = asyncHandler(async (req, res) => {
     }
   }
 
-  if (status === 'active') q.isActive = true
-  else if (status === 'inactive') q.isActive = false
+  if (status === 'active' || status === 'unblocked') q.isActive = true
+  else if (status === 'inactive' || status === 'blocked') q.isActive = false
   else if (status != null && status !== '' && status !== 'all') {
     return sendError(res, {
-      message: 'status must be active, inactive, or all',
+      message: 'status must be active, inactive, blocked, unblocked, or all',
       statusCode: HTTP_STATUS.BAD_REQUEST,
       code: 'INVALID_STATUS',
     })
@@ -1235,6 +1235,56 @@ export const testNotification = asyncHandler(async (req, res) => {
     });
   }
 });
+
+export const updateUserStatus = asyncHandler(async (req, res) => {
+  const { id } = req.params
+  const { isActive, status } = req.body
+
+  const user = await User.findById(id)
+  if (!user) {
+    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  // Prevent admin from blocking themselves
+  if (String(user._id) === String(req.user._id)) {
+    return sendError(res, { message: 'Cannot block or modify status of your own admin account', statusCode: HTTP_STATUS.BAD_REQUEST })
+  }
+
+  let nextActive = user.isActive
+  if (typeof isActive === 'boolean') {
+    nextActive = isActive
+  } else if (typeof status === 'string') {
+    const s = status.toLowerCase().trim()
+    if (s === 'blocked' || s === 'inactive') nextActive = false
+    else if (s === 'unblocked' || s === 'active') nextActive = true
+  }
+
+  user.isActive = nextActive
+
+  // If partner / service provider (labour or contractor), also sync vendorStatus appropriately
+  if (user.role === USER_ROLES.LABOUR || user.role === USER_ROLES.CONTRACTOR) {
+    if (!nextActive) {
+      user.vendorStatus = 'BLOCKED'
+    } else {
+      // Unblocking: restore vendorStatus to CONFIRMED if verified, else NOT_STARTED
+      if (user.vendorStatus === 'BLOCKED') {
+        const kycStatus = user.labourProfile?.kycStatus || user.contractorProfile?.kycStatus
+        user.vendorStatus = kycStatus === 'verified' ? 'CONFIRMED' : 'NOT_STARTED'
+      }
+    }
+  }
+
+  await user.save()
+
+  return sendSuccess(res, {
+    message: nextActive ? 'User account unblocked successfully' : 'User account blocked successfully',
+    data: {
+      user: typeof user.toSafeObject === 'function' ? user.toSafeObject() : user,
+      isActive: user.isActive,
+      vendorStatus: user.vendorStatus,
+    },
+  })
+})
 
 export const deleteUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id)

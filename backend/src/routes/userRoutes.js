@@ -278,6 +278,14 @@ router.patch(
 
 router.get('/:id', restrictTo(USER_ROLES.ADMIN), validateUserIdParam, validateRequest, user.getUserById)
 
+router.patch(
+  '/:id/status',
+  restrictTo(USER_ROLES.ADMIN),
+  validateUserIdParam,
+  validateRequest,
+  user.updateUserStatus,
+)
+
 router.delete('/:id', restrictTo(USER_ROLES.ADMIN), validateUserIdParam, validateRequest, user.deleteUser)
 
 export default router

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { X, Loader2, User, Phone, Mail, Building2, MapPin, Briefcase, FileCheck, IndianRupee, Award } from 'lucide-react'
-import { fetchAdminUserById } from '../../../api/adminUsersApi.js'
+import { X, Loader2, User, Phone, Mail, Building2, MapPin, Briefcase, FileCheck, IndianRupee, Award, Ban, ShieldCheck } from 'lucide-react'
+import { fetchAdminUserById, updateAdminUserStatus } from '../../../api/adminUsersApi.js'
 import { WelcomeKitCard } from '../../../components/admin/welcomeKit/WelcomeKitCard.jsx'
 import { formatTrialTimeSlot } from '../../../lib/formatTrialTimeSlot.js'
 
-export function AdminUserViewModal({ userId, onClose }) {
+export function AdminUserViewModal({ userId, onClose, onStatusChange }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [toggling, setToggling] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -74,6 +75,54 @@ export function AdminUserViewModal({ userId, onClose }) {
                     <span className="inline-flex items-center rounded-md bg-brand/10 px-2 py-0.5 text-xs font-bold text-brand uppercase tracking-wider">
                       {user.role === 'labour' ? 'Service Provider' : user.role}
                     </span>
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide ring-1 ${
+                        user.isActive !== false
+                          ? 'bg-emerald-50 text-emerald-800 ring-emerald-200'
+                          : 'bg-rose-50 text-rose-800 ring-rose-200'
+                      }`}
+                    >
+                      <span className={`size-1.5 rounded-full ${user.isActive !== false ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                      {user.isActive !== false ? 'Unblocked' : 'Blocked'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const isCurrentlyActive = user.isActive !== false
+                        const confirmMsg = isCurrentlyActive
+                          ? `Are you sure you want to BLOCK ${user.fullName || 'this user'}?`
+                          : `Are you sure you want to UNBLOCK ${user.fullName || 'this user'}?`
+                        if (!window.confirm(confirmMsg)) return
+                        try {
+                          setToggling(true)
+                          await updateAdminUserStatus(user._id, !isCurrentlyActive)
+                          setUser({ ...user, isActive: !isCurrentlyActive })
+                          if (onStatusChange) onStatusChange(user._id, !isCurrentlyActive)
+                        } catch (e) {
+                          alert(e.message || 'Failed to update status')
+                        } finally {
+                          setToggling(false)
+                        }
+                      }}
+                      disabled={toggling}
+                      className={`inline-flex items-center gap-1 rounded-md px-2.5 py-0.5 text-xs font-bold transition border cursor-pointer ${
+                        user.isActive !== false
+                          ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                          : 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                      } disabled:opacity-50`}
+                    >
+                      {user.isActive !== false ? (
+                        <>
+                          <Ban className="size-3 text-rose-600" />
+                          <span>Block Account</span>
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="size-3 text-emerald-600" />
+                          <span>Unblock Account</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>
