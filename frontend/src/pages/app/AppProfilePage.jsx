@@ -739,38 +739,38 @@ export function AppProfilePage() {
 
       {/* Official Service Provider Digital ID Card */}
       {(user?.role === USER_ROLES.LABOUR || user?.role === USER_ROLES.CONTRACTOR) && (
-        <div className="rounded-3xl border border-brand/30 bg-gradient-to-br from-slate-900 via-slate-800 to-brand-950 p-4 text-white shadow-lg space-y-3">
+        <div className="rounded-3xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50 via-teal-50/60 to-white p-4 text-slate-900 shadow-md shadow-emerald-950/5 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 shadow-md">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-md shadow-emerald-600/20">
                 <IdCard className="h-5 w-5" />
               </div>
               <div>
-                <span className="block text-[10px] font-black uppercase tracking-wider text-amber-300">
+                <span className="block text-[10px] font-black uppercase tracking-wider text-emerald-700">
                   Digital Credential
                 </span>
-                <span className="block text-sm font-bold text-white leading-tight">
+                <span className="block text-sm font-black text-slate-900 leading-tight">
                   Official Partner ID Card
                 </span>
               </div>
             </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-500/30">
-              <ShieldCheck className="h-3 w-3" />
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100/80 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-300/60">
+              <ShieldCheck className="h-3 w-3 text-emerald-700" />
               Verified ✓
             </span>
           </div>
 
-          <div className="flex items-center justify-between pt-2 border-t border-white/10 text-xs">
-            <span className="font-mono text-slate-300 font-bold text-[11px]">
+          <div className="flex items-center justify-between pt-2.5 border-t border-emerald-100/80 text-xs">
+            <span className="font-mono text-slate-600 font-bold text-[11px]">
               ID: {user?.partnerIdCode || `A2Z-SP-${user?._id ? String(user._id).slice(-6).toUpperCase() : '847291'}`}
             </span>
             <button
               type="button"
               onClick={() => setShowIdCardModal(true)}
-              className="inline-flex items-center gap-1 rounded-xl bg-white px-3.5 py-1.5 text-xs font-black text-slate-950 hover:bg-emerald-50 transition cursor-pointer shadow-sm active:scale-95"
+              className="inline-flex items-center gap-1 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 px-3.5 py-1.5 text-xs font-bold text-white transition cursor-pointer shadow-xs active:scale-95"
             >
               <span>View ID Card</span>
-              <ChevronRight className="h-3.5 w-3.5 text-brand" />
+              <ChevronRight className="h-3.5 w-3.5 text-white" />
             </button>
           </div>
         </div>
