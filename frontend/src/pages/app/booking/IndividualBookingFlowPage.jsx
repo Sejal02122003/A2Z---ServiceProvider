@@ -2044,10 +2044,22 @@ export function IndividualBookingFlowPage() {
                   </div>
                 </div>
 
+                {/* Package Details & Description */}
+                {(draft.packageDescription || draft.description) && (
+                  <div className="rounded-xl bg-white/90 p-2.5 text-xs text-slate-700 border border-slate-200/80 shadow-2xs space-y-0.5">
+                    <span className="font-extrabold text-slate-900 block text-[10px] uppercase tracking-wider text-slate-500">
+                      Description & Details:
+                    </span>
+                    <p className="leading-relaxed text-slate-600 font-medium">
+                      {draft.packageDescription || draft.description}
+                    </p>
+                  </div>
+                )}
+
                 {draft.packageInclusions && draft.packageInclusions.length > 0 && (
                   <div className="space-y-1.5 pt-2 border-t border-slate-100">
                     <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
-                      <span>Services Included:</span>
+                      <span>Services Included ({draft.packageInclusions.length}):</span>
                       {draft.packageDuration && (
                         <span className="text-slate-400 font-semibold">~{draft.packageDuration} mins</span>
                       )}
@@ -2385,15 +2397,33 @@ export function IndividualBookingFlowPage() {
                           <Package className="h-4 w-4 text-brand" />
                           {calculatedBill.package.name}
                         </span>
-                        {calculatedBill.package.badge && (
-                          <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-black text-slate-900 shadow-2xs">
-                            {calculatedBill.package.badge}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {calculatedBill.package.badge && (
+                            <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-black text-slate-900 shadow-2xs">
+                              {calculatedBill.package.badge}
+                            </span>
+                          )}
+                          {(calculatedBill.package.estimatedDurationMins || draft.packageDuration) && (
+                            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-bold text-indigo-800">
+                              ~{calculatedBill.package.estimatedDurationMins || draft.packageDuration} min
+                            </span>
+                          )}
+                        </div>
                       </div>
+
+                      {/* Package Description */}
+                      {(calculatedBill.package.description || calculatedBill.package.shortDescription || draft.packageDescription) && (
+                        <div className="rounded-lg bg-white/90 p-2 text-xs text-slate-700 border border-indigo-100/80 space-y-0.5">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">Package Details:</span>
+                          <p className="leading-relaxed text-slate-600 font-medium">
+                            {calculatedBill.package.description || calculatedBill.package.shortDescription || draft.packageDescription}
+                          </p>
+                        </div>
+                      )}
+
                       {calculatedBill.package.inclusions && calculatedBill.package.inclusions.length > 0 && (
                         <div className="space-y-1">
-                          <p className="text-[11px] font-bold text-slate-600">Includes:</p>
+                          <p className="text-[11px] font-bold text-slate-600">Includes ({calculatedBill.package.inclusions.length}):</p>
                           <div className="flex flex-wrap gap-1">
                             {calculatedBill.package.inclusions.map((inc, i) => (
                               <span key={i} className="rounded-md bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700 border border-slate-200 shadow-2xs">

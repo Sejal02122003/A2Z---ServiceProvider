@@ -108,6 +108,7 @@ export function ServicePackagesPage() {
       isPackage: true,
       packageId: pkg._id,
       packageName: pkg.name,
+      packageDescription: pkg.description || pkg.shortDescription || '',
       packagePrice: pkg.price,
       packageOriginalPrice: pkg.originalPrice,
       packageInclusions: pkg.inclusions || [],
@@ -455,9 +456,29 @@ export function ServicePackagesPage() {
                   </div>
                 </div>
 
+                {/* Package Details & Description */}
+                {(bookingModalPkg.description || bookingModalPkg.shortDescription) && (
+                  <div className="rounded-xl bg-white/80 p-2.5 text-xs text-slate-700 border border-slate-200/70 shadow-2xs space-y-0.5">
+                    <span className="font-extrabold text-slate-900 block text-[10px] uppercase tracking-wider text-slate-500">
+                      Description & Details:
+                    </span>
+                    <p className="leading-relaxed text-slate-600 font-medium">
+                      {bookingModalPkg.description || bookingModalPkg.shortDescription}
+                    </p>
+                  </div>
+                )}
+
                 {bookingModalPkg.inclusions && bookingModalPkg.inclusions.length > 0 && (
-                  <div className="space-y-1 pt-1.5 border-t border-slate-100">
-                    <p className="text-[11px] font-bold text-slate-600">Includes {bookingModalPkg.inclusions.length} Services:</p>
+                  <div className="space-y-1.5 pt-1.5 border-t border-slate-100">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                      <span>Includes {bookingModalPkg.inclusions.length} Services:</span>
+                      {bookingModalPkg.estimatedDurationMins && (
+                        <span className="flex items-center gap-1 text-slate-500 font-semibold text-[10px]">
+                          <Clock className="h-3 w-3" />
+                          ~{bookingModalPkg.estimatedDurationMins} min
+                        </span>
+                      )}
+                    </div>
                     <div className="flex flex-wrap gap-1">
                       {bookingModalPkg.inclusions.map((inc, i) => (
                         <span key={i} className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700 border border-slate-200 shadow-2xs">

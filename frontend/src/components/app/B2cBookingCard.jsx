@@ -153,9 +153,16 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
                 ))}
               </div>
             ) : booking.packageBooking?.isPackage && booking.packageBooking.inclusions?.length > 0 ? (
-              <p className="truncate text-xs text-indigo-700 font-medium mt-1">
-                Includes: {booking.packageBooking.inclusions.map(i => `${i.name}${i.quantity > 1 ? ` (x${i.quantity})` : ''}`).join(', ')}
-              </p>
+              <div className="mt-1 space-y-0.5">
+                {(booking.packageBooking.snapshot?.description || booking.packageBooking.snapshot?.shortDescription) && (
+                  <p className="text-xs text-slate-600 line-clamp-1 font-medium">
+                    {booking.packageBooking.snapshot?.description || booking.packageBooking.snapshot?.shortDescription}
+                  </p>
+                )}
+                <p className="truncate text-[11px] text-indigo-700 font-semibold">
+                  Includes ({booking.packageBooking.inclusions.length}): {booking.packageBooking.inclusions.map(i => `${i.name}${i.quantity > 1 ? ` (x${i.quantity})` : ''}`).join(', ')}
+                </p>
+              </div>
             ) : (!booking.contractorInfo?.services || booking.contractorInfo.services.length === 0) && subcategory?.name && (
                 <p className="truncate text-xs text-slate-500 font-medium mt-1">
                   {subcategory.name}

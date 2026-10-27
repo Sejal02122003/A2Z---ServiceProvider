@@ -406,8 +406,11 @@ export async function startBroadcastCycle(bookingId) {
         svcDocs.forEach(s => { serviceNameMap[String(s._id)] = s.name })
       } else if (booking.packageBooking?.isPackage) {
         singleServiceName = booking.packageBooking.packageName || 'Service Package'
-        if (booking.packageBooking.inclusions?.length > 0) {
-          singleServiceDetail = booking.packageBooking.inclusions.map(i => i.name).filter(Boolean).join(', ')
+        const pkgDesc = booking.packageBooking.snapshot?.description || booking.packageBooking.snapshot?.shortDescription || ''
+        const inclusionsSummary = (booking.packageBooking.inclusions || []).map(i => `${i.name}${i.quantity > 1 ? ` (x${i.quantity})` : ''}`).filter(Boolean).join(', ')
+        singleServiceDetail = pkgDesc ? `${pkgDesc}${inclusionsSummary ? ` • Includes: ${inclusionsSummary}` : ''}` : inclusionsSummary
+        if (booking.packageBooking.snapshot?.badge) {
+          singleCategoryName = booking.packageBooking.snapshot.badge
         }
       } else if (booking.serviceId) {
         const service = await LabourService.findById(booking.serviceId)
@@ -614,6 +617,19 @@ export async function startBroadcastCycle(bookingId) {
               subServiceName: singleSubServiceName,
               isContractorBooking: false,
               requiresServiceSelection: false,
+              isPackage: Boolean(booking.packageBooking?.isPackage),
+              packageName: booking.packageBooking?.packageName || (booking.packageBooking?.isPackage ? singleServiceName : undefined),
+              packageDescription: booking.packageBooking?.snapshot?.description || booking.packageBooking?.snapshot?.shortDescription || (booking.packageBooking?.isPackage ? singleServiceDetail : undefined),
+              packagePrice: booking.packageBooking?.packagePrice || (booking.packageBooking?.isPackage ? (booking.totalAmount || 0) : undefined),
+              packageOriginalPrice: booking.packageBooking?.originalPrice || undefined,
+              packageBadge: booking.packageBooking?.snapshot?.badge || undefined,
+              packageDuration: booking.packageBooking?.snapshot?.estimatedDurationMins || (booking.packageBooking?.isPackage ? (bookingHours * 60) : undefined),
+              packageInclusions: booking.packageBooking?.isPackage ? (booking.packageBooking.inclusions || []).map(inc => ({
+                serviceId: inc.serviceId,
+                name: inc.name,
+                quantity: inc.quantity || 1,
+                description: inc.description || ''
+              })) : undefined,
               date: booking.scheduledAt || booking.createdAt,
               time: booking.timeSlot || 'Earliest available',
               duration: bookingHours,
@@ -625,17 +641,25 @@ export async function startBroadcastCycle(bookingId) {
           })
           
           sendNotificationToUser(labor._id, {
-            title: booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer!',
-            body: `New ${singleServiceName} job available near you. Estimated earnings: ₹${singleShare}`,
+            title: booking.packageBooking?.isPackage
+              ? `New Package Booking: ${booking.packageBooking.packageName}! 📦`
+              : (booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer!'),
+            body: booking.packageBooking?.isPackage
+              ? `Package deal with ${booking.packageBooking.inclusions?.length || 0} services. Package price: ₹${booking.packageBooking.packagePrice}. Your earnings: ₹${singleShare}`
+              : `New ${singleServiceName} job available near you. Estimated earnings: ₹${singleShare}`,
             data: { type: 'booking_received', bookingId: String(booking._id) }
           })
 
           // Create In-App Notification record for Labour Notification feed
           const isSingleScheduled = booking.type === 'SCHEDULED' || booking.type === 'scheduled'
-          const singleNotifTitle = isSingleScheduled ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡'
-          const singleNotifBody = isSingleScheduled
-            ? `New ${singleServiceName} appointment scheduled for ${booking.timeSlot || 'Scheduled Time'}. Estimated earnings: ₹${singleShare}. Tap to accept!`
-            : `New ${singleServiceName} job available near you. Estimated earnings: ₹${singleShare}`
+          const singleNotifTitle = booking.packageBooking?.isPackage
+            ? `New Package Booking: ${booking.packageBooking.packageName}! 📦`
+            : (isSingleScheduled ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡')
+          const singleNotifBody = booking.packageBooking?.isPackage
+            ? `Package appointment for ${booking.timeSlot || 'Scheduled Time'}. Includes ${booking.packageBooking.inclusions?.length || 0} services. Estimated earnings: ₹${singleShare}. Tap to accept!`
+            : (isSingleScheduled
+              ? `New ${singleServiceName} appointment scheduled for ${booking.timeSlot || 'Scheduled Time'}. Estimated earnings: ₹${singleShare}. Tap to accept!`
+              : `New ${singleServiceName} job available near you. Estimated earnings: ₹${singleShare}`)
 
           import('../models/InAppNotification.js').then(({ InAppNotification }) => {
             InAppNotification.create({
@@ -648,6 +672,11 @@ export async function startBroadcastCycle(bookingId) {
               metadata: {
                 bookingId: booking._id,
                 bookingType: booking.type,
+                isPackage: Boolean(booking.packageBooking?.isPackage),
+                packageName: booking.packageBooking?.packageName,
+                packagePrice: booking.packageBooking?.packagePrice,
+                packageInclusions: booking.packageBooking?.inclusions || [],
+                packageDescription: booking.packageBooking?.snapshot?.description || booking.packageBooking?.snapshot?.shortDescription,
                 scheduledAt: booking.scheduledAt,
                 timeSlot: booking.timeSlot,
                 earnings: singleShare,

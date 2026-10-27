@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { AlertCircle, Check, Clock, IndianRupee, Loader2, MapPin, X, Zap } from 'lucide-react'
+import { AlertCircle, Check, CheckCircle2, Clock, IndianRupee, Loader2, MapPin, Package, Sparkles, X, Zap } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { broadcastsApi } from '../../api/broadcastsApi.js'
 import { ApiError } from '../../api/http.js'
@@ -270,46 +270,161 @@ export function BroadcastPopup() {
                 </div>
               </div>
 
-              {/* Customer & Service Information Card */}
-              <div className="mt-4 rounded-2xl bg-brand/5 p-3.5 space-y-2.5 border border-brand/15">
-                <div className="flex items-center justify-between gap-2 border-b border-brand/10 pb-2">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-brand/80">Customer</p>
-                    <p className="text-sm font-extrabold text-slate-900 truncate">
-                      {incoming.customerName || incoming.customer?.fullName || incoming.customer?.name || 'Customer'}
-                    </p>
-                  </div>
-                  {incoming.categoryName && (
-                    <span className="shrink-0 rounded-lg bg-white/90 px-2 py-0.5 text-[10px] font-bold text-slate-700 shadow-2xs border border-brand/15">
-                      {incoming.categoryName}
-                    </span>
-                  )}
-                </div>
-
-                {!requiresSelection && incoming.serviceName && (
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-brand/80">Service</p>
-                      {incoming.subServiceName && (
-                        <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                          {incoming.subServiceName}
+              {/* Customer & Service / Package Information Card */}
+              {Boolean(incoming.isPackage || incoming.packageName || (incoming.packageInclusions && incoming.packageInclusions.length > 0)) ? (
+                /* Dedicated Package Services Card */
+                <div className="mt-4 rounded-2xl bg-gradient-to-br from-indigo-50/90 via-white to-indigo-50/40 p-3.5 space-y-3 border-2 border-indigo-200/90 shadow-xs">
+                  {/* Package Header Banner */}
+                  <div className="flex items-center justify-between gap-2 border-b border-indigo-100 pb-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-2xs">
+                        <Package className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="text-xs font-black uppercase tracking-wider text-indigo-950">
+                        Service Package
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {incoming.packageBadge && (
+                        <span className="rounded-full bg-amber-400 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-slate-900 shadow-2xs">
+                          {incoming.packageBadge}
+                        </span>
+                      )}
+                      {incoming.packageDuration && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-800">
+                          <Clock className="h-3 w-3" />
+                          ~{incoming.packageDuration} min
                         </span>
                       )}
                     </div>
-                    <p className="text-sm font-black text-slate-900 leading-snug break-words">
-                      {incoming.serviceName}
-                    </p>
-                    {(incoming.serviceDetail || incoming.description || incoming.notes) && (
-                      <div className="mt-1.5 rounded-xl bg-white/80 p-2 text-xs text-slate-600 border border-slate-200/60 space-y-0.5">
-                        <span className="font-bold text-slate-700 block text-[11px]">Service Details:</span>
-                        <p className="leading-relaxed text-slate-600">
-                          {incoming.serviceDetail || incoming.description || incoming.notes}
-                        </p>
+                  </div>
+
+                  {/* Customer Info */}
+                  <div className="flex items-center justify-between text-xs pb-1 border-b border-slate-100">
+                    <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Customer:</span>
+                    <span className="font-extrabold text-slate-800">
+                      {incoming.customerName || incoming.customer?.fullName || incoming.customer?.name || 'Customer'}
+                    </span>
+                  </div>
+
+                  {/* Package Name */}
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">Package Name</p>
+                    <h4 className="text-base font-black text-slate-900 leading-snug break-words mt-0.5">
+                      {incoming.packageName || incoming.serviceName}
+                    </h4>
+                  </div>
+
+                  {/* Package Details & Description */}
+                  {(incoming.packageDescription || incoming.serviceDetail || incoming.description) && (
+                    <div className="rounded-xl bg-white p-2.5 text-xs text-slate-700 border border-indigo-100 shadow-2xs space-y-1">
+                      <span className="font-extrabold text-indigo-950 block text-[11px] uppercase tracking-wide">
+                        Package Details & Description:
+                      </span>
+                      <p className="leading-relaxed text-slate-600 font-medium">
+                        {incoming.packageDescription || incoming.serviceDetail || incoming.description}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Package Amount & Estimated Earnings */}
+                  <div className="rounded-xl bg-gradient-to-r from-indigo-50/70 via-white to-emerald-50/60 p-2.5 border border-indigo-100 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Package Amount</p>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-sm font-black text-slate-900">
+                          ₹{Number(incoming.packagePrice || incoming.totalAmount || 0).toLocaleString('en-IN')}
+                        </span>
+                        {incoming.packageOriginalPrice && incoming.packageOriginalPrice > (incoming.packagePrice || 0) && (
+                          <span className="text-[11px] text-slate-400 line-through font-semibold">
+                            ₹{Number(incoming.packageOriginalPrice).toLocaleString('en-IN')}
+                          </span>
+                        )}
                       </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Your Earnings</p>
+                      <span className="text-base font-black text-emerald-700">
+                        ₹{incoming.estimatedEarnings || incoming.laborShare || incoming.basePrice}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Included Services List */}
+                  {incoming.packageInclusions && incoming.packageInclusions.length > 0 && (
+                    <div className="rounded-xl bg-white p-2.5 border border-indigo-100 space-y-1.5 shadow-2xs">
+                      <span className="flex items-center gap-1 text-indigo-950 font-extrabold text-[11px] uppercase tracking-wide">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                        Included Services ({incoming.packageInclusions.length}):
+                      </span>
+                      <div className="space-y-1 pt-0.5">
+                        {incoming.packageInclusions.map((inc, i) => (
+                          <div
+                            key={i}
+                            className="flex items-start justify-between gap-2 rounded-lg bg-slate-50/90 px-2 py-1.5 text-xs border border-slate-100"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <span className="font-bold text-slate-800 flex items-center gap-1">
+                                <Check className="h-3 w-3 text-emerald-600 stroke-[3] shrink-0" />
+                                <span className="truncate">{inc.name}</span>
+                              </span>
+                              {inc.description && (
+                                <p className="text-[10px] text-slate-500 pl-4 leading-tight mt-0.5 font-medium">
+                                  {inc.description}
+                                </p>
+                              )}
+                            </div>
+                            <span className="shrink-0 rounded-md bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-700 border border-slate-200">
+                              Qty: {inc.quantity || 1}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Standard Service Information Card */
+                <div className="mt-4 rounded-2xl bg-brand/5 p-3.5 space-y-2.5 border border-brand/15">
+                  <div className="flex items-center justify-between gap-2 border-b border-brand/10 pb-2">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-brand/80">Customer</p>
+                      <p className="text-sm font-extrabold text-slate-900 truncate">
+                        {incoming.customerName || incoming.customer?.fullName || incoming.customer?.name || 'Customer'}
+                      </p>
+                    </div>
+                    {incoming.categoryName && (
+                      <span className="shrink-0 rounded-lg bg-white/90 px-2 py-0.5 text-[10px] font-bold text-slate-700 shadow-2xs border border-brand/15">
+                        {incoming.categoryName}
+                      </span>
                     )}
                   </div>
-                )}
-              </div>
+
+                  {!requiresSelection && incoming.serviceName && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-brand/80">Service</p>
+                        {incoming.subServiceName && (
+                          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                            {incoming.subServiceName}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm font-black text-slate-900 leading-snug break-words">
+                        {incoming.serviceName}
+                      </p>
+                      {(incoming.serviceDetail || incoming.description || incoming.notes) && (
+                        <div className="mt-1.5 rounded-xl bg-white/80 p-2 text-xs text-slate-600 border border-slate-200/60 space-y-0.5">
+                          <span className="font-bold text-slate-700 block text-[11px]">Service Details:</span>
+                          <p className="leading-relaxed text-slate-600">
+                            {incoming.serviceDetail || incoming.description || incoming.notes}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Service Selection for multi-service contractor bookings */}
               {requiresSelection && (

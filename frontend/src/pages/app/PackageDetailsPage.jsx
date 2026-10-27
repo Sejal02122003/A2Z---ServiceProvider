@@ -105,6 +105,7 @@ export function PackageDetailsPage() {
       isPackage: true,
       packageId: pkg._id,
       packageName: pkg.name,
+      packageDescription: pkg.description || pkg.shortDescription || '',
       packagePrice: pkg.price,
       packageOriginalPrice: pkg.originalPrice,
       packageInclusions: pkg.inclusions || [],

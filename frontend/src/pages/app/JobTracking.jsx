@@ -477,25 +477,69 @@ export function JobTracking() {
 
       {/* Package Info if booked as Package */}
       {booking.packageBooking?.isPackage && (
-        <GlassPanel className="p-4 text-sm border-indigo-200/80 bg-indigo-50/40">
+        <GlassPanel className="p-4 text-sm border-indigo-200/80 bg-gradient-to-br from-indigo-50/60 via-white to-indigo-50/30 space-y-3">
           <div className="flex items-center justify-between pb-2 border-b border-indigo-100">
-            <span className="font-extrabold text-indigo-950 flex items-center gap-1.5">
+            <span className="font-extrabold text-indigo-950 flex items-center gap-1.5 text-sm">
               <span>📦</span> {booking.packageBooking.packageName}
             </span>
-            {booking.packageBooking.snapshot?.badge && (
-              <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-black text-slate-900 shadow-2xs">
-                {booking.packageBooking.snapshot.badge}
-              </span>
-            )}
+            <div className="flex items-center gap-1.5">
+              {booking.packageBooking.snapshot?.badge && (
+                <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-900 shadow-2xs">
+                  {booking.packageBooking.snapshot.badge}
+                </span>
+              )}
+              {booking.packageBooking.snapshot?.estimatedDurationMins && (
+                <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-bold text-indigo-800">
+                  ~{booking.packageBooking.snapshot.estimatedDurationMins} min
+                </span>
+              )}
+            </div>
           </div>
+
+          {/* Package Description */}
+          {(booking.packageBooking.snapshot?.description || booking.packageBooking.snapshot?.shortDescription) && (
+            <div className="rounded-xl bg-white p-2.5 text-xs text-slate-700 border border-indigo-100/80 shadow-2xs space-y-0.5">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">Package Details:</span>
+              <p className="leading-relaxed text-slate-600 font-medium">
+                {booking.packageBooking.snapshot?.description || booking.packageBooking.snapshot?.shortDescription}
+              </p>
+            </div>
+          )}
+
+          {/* Package Amount */}
+          <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Package Amount:</span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-black text-slate-900 text-sm">
+                ₹{Number(booking.packageBooking.packagePrice || booking.totalAmount).toLocaleString('en-IN')}
+              </span>
+              {booking.packageBooking.originalPrice && booking.packageBooking.originalPrice > (booking.packageBooking.packagePrice || 0) && (
+                <span className="text-[10px] font-semibold text-slate-400 line-through">
+                  ₹{Number(booking.packageBooking.originalPrice).toLocaleString('en-IN')}
+                </span>
+              )}
+            </div>
+          </div>
+
           {booking.packageBooking.inclusions && booking.packageBooking.inclusions.length > 0 && (
-            <div className="mt-2.5 space-y-1.5">
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Included Services</p>
+            <div className="mt-2 space-y-1.5 pt-2 border-t border-indigo-100">
+              <p className="text-[11px] font-bold text-indigo-950 uppercase tracking-wider">
+                Included Services ({booking.packageBooking.inclusions.length})
+              </p>
               <div className="grid grid-cols-1 gap-1.5">
                 {booking.packageBooking.inclusions.map((inc, i) => (
-                  <div key={i} className="flex items-center justify-between bg-white px-2.5 py-1.5 rounded-lg border border-indigo-100 text-xs">
-                    <span className="font-semibold text-slate-800">✓ {inc.name}</span>
-                    <span className="font-bold text-slate-500">Qty: {inc.quantity || 1}</span>
+                  <div key={i} className="flex items-start justify-between bg-white px-2.5 py-1.5 rounded-lg border border-indigo-100 text-xs shadow-2xs">
+                    <div className="min-w-0 flex-1">
+                      <span className="font-semibold text-slate-800">✓ {inc.name}</span>
+                      {inc.description && (
+                        <p className="text-[10px] text-slate-500 leading-tight mt-0.5 font-medium pl-3">
+                          {inc.description}
+                        </p>
+                      )}
+                    </div>
+                    <span className="font-bold text-slate-600 shrink-0 text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">
+                      Qty: {inc.quantity || 1}
+                    </span>
                   </div>
                 ))}
               </div>

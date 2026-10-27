@@ -669,6 +669,84 @@ export function ActiveJob() {
             </div>
           )
         })()}
+        {booking.packageBooking?.isPackage && (
+          <div className="mb-3 rounded-2xl border-2 border-indigo-200/90 bg-gradient-to-br from-indigo-50/70 via-white to-indigo-50/30 p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between pb-2 border-b border-indigo-100">
+              <span className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-indigo-950">
+                <Package className="h-4 w-4 text-brand" />
+                {booking.packageBooking.packageName || 'Service Package'}
+              </span>
+              {booking.packageBooking.snapshot?.badge && (
+                <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-900 shadow-2xs">
+                  {booking.packageBooking.snapshot.badge}
+                </span>
+              )}
+            </div>
+
+            {/* Package Details & Description */}
+            {(booking.packageBooking.snapshot?.description || booking.packageBooking.snapshot?.shortDescription) && (
+              <div className="rounded-xl bg-white p-2.5 text-xs text-slate-700 border border-indigo-100 shadow-2xs space-y-0.5">
+                <span className="font-extrabold text-indigo-950 block text-[11px] uppercase tracking-wide">
+                  Package Details & Description:
+                </span>
+                <p className="leading-relaxed text-slate-600 font-medium">
+                  {booking.packageBooking.snapshot?.description || booking.packageBooking.snapshot?.shortDescription}
+                </p>
+              </div>
+            )}
+
+            {/* Package Amount & Est Duration */}
+            <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+              <div>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Package Amount:</span>
+                <p className="font-black text-slate-900 text-sm">
+                  ₹{Number(booking.packageBooking.packagePrice || booking.totalAmount).toLocaleString('en-IN')}
+                </p>
+              </div>
+              {booking.packageBooking.snapshot?.estimatedDurationMins && (
+                <div className="text-right">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Est. Duration:</span>
+                  <p className="font-extrabold text-indigo-800 text-xs">
+                    ~{booking.packageBooking.snapshot.estimatedDurationMins} Mins
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Included Services */}
+            {booking.packageBooking.inclusions && booking.packageBooking.inclusions.length > 0 && (
+              <div className="space-y-1.5 pt-1.5 border-t border-indigo-100">
+                <span className="flex items-center gap-1 text-[11px] font-extrabold text-indigo-950 uppercase tracking-wide">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  Included Services ({booking.packageBooking.inclusions.length}):
+                </span>
+                <div className="space-y-1">
+                  {booking.packageBooking.inclusions.map((inc, i) => (
+                    <div
+                      key={i}
+                      className="flex items-start justify-between gap-2 rounded-lg bg-white px-2.5 py-1.5 text-xs border border-indigo-100 shadow-2xs"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <span className="font-bold text-slate-800 flex items-center gap-1">
+                          <Check className="h-3 w-3 text-emerald-600 stroke-[3] shrink-0" />
+                          <span className="truncate">{inc.name}</span>
+                        </span>
+                        {inc.description && (
+                          <p className="text-[10px] text-slate-500 pl-4 leading-tight mt-0.5 font-medium">
+                            {inc.description}
+                          </p>
+                        )}
+                      </div>
+                      <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
+                        Qty: {inc.quantity || 1}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         {booking.paymentMethod && (
           <div className="mt-2 flex justify-between">
             <span className="text-slate-500">Payment</span>
