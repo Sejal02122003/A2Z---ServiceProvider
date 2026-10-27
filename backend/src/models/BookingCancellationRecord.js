@@ -158,6 +158,11 @@ const bookingCancellationRecordSchema = new mongoose.Schema(
     approvedAt: {
       type: Date,
     },
+    reBroadcasted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     adminNotes: {
       type: String,
       trim: true,

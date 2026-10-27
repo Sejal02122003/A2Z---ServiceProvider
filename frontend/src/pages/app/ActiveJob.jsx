@@ -39,6 +39,7 @@ import {
   createVendorMaterialRequest,
   fetchServiceProductMappings,
 } from '../../api/inventoryApi.js'
+import { LabourBounceCancelModal } from '../../components/labour/LabourBounceCancelModal.jsx'
 
 function formatCountdown(ms) {
   if (ms <= 0) return '00:00:00'
@@ -107,6 +108,7 @@ export function ActiveJob() {
   const user = useSelector((state) => state.auth.user)
   const reduce = useReducedMotion()
   const [showPaymentWaiting, setShowPaymentWaiting] = useState(false)
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const mapRef = useRef(null)
   const markerInstance = useRef(null)
 
@@ -402,27 +404,53 @@ export function ActiveJob() {
     }
   }, [socket, booking])
 
-  const handleCancel = useCallback(async (isMaterialOutStock = false) => {
-    const confirmMsg = isMaterialOutStock
-      ? 'Cancel this booking because required materials are out of stock in warehouse?'
-      : 'Are you sure? A ₹50 penalty will be applied to your wallet.'
+  const handleCancel = useCallback(
+    async (isMaterialOutStock = false) => {
+      if (isMaterialOutStock) {
+        const confirmed = window.confirm(
+          'Cancel this booking because required materials are out of stock in warehouse?'
+        )
+        if (!confirmed) return
 
-    const confirmed = window.confirm(confirmMsg)
-    if (!confirmed) return
+        setUpdating(true)
+        setUpdateError('')
+        try {
+          await bookingsApi.updateBookingStatus(bookingId, {
+            status: 'CANCELLED',
+            reason: 'Required materials out of stock in warehouse',
+          })
+          navigate('/app/my-bookings', { replace: true })
+        } catch (err) {
+          setUpdateError(err instanceof ApiError ? err.message : 'Failed to cancel')
+          setUpdating(false)
+        }
+        return
+      }
 
-    setUpdating(true)
-    setUpdateError('')
-    try {
-      await bookingsApi.updateBookingStatus(bookingId, {
-        status: 'CANCELLED',
-        reason: isMaterialOutStock ? 'Required materials out of stock' : 'Cancelled by service provider',
-      })
+      setCancelModalOpen(true)
+    },
+    [bookingId, navigate]
+  )
+
+  const handleCancelledCallback = useCallback(
+    ({ status, penaltyDeducted, requiresApproval }) => {
+      if (requiresApproval) {
+        alert(
+          'Cancellation request submitted. Flagged as CANCELLATION_REQUESTED for admin approval.'
+        )
+      } else if (penaltyDeducted > 0) {
+        alert(
+          `Booking cancelled. Late cancellation penalty of ₹${penaltyDeducted} was deducted from your wallet.`
+        )
+      } else {
+        alert(
+          'Booking cancelled successfully with ₹0 penalty (Standard >2h notice). The booking will be re-broadcast to nearby service providers.'
+        )
+      }
       navigate('/app/my-bookings', { replace: true })
-    } catch (err) {
-      setUpdateError(err instanceof ApiError ? err.message : 'Failed to cancel')
-      setUpdating(false)
-    }
-  }, [bookingId, navigate])
+    },
+    [navigate]
+  )
 
   // Trigger payment waiting popup ONLY if this specific labourer's status is COMPLETED
   useEffect(() => {
@@ -1067,6 +1095,15 @@ export function ActiveJob() {
                   >
                     {updating ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Start Job'}
                   </button>
+
+                  <button
+                    type="button"
+                    disabled={updating}
+                    onClick={() => handleCancel(false)}
+                    className="w-full rounded-xl border border-rose-200 bg-rose-50/70 py-2.5 text-xs font-bold text-rose-700 transition hover:bg-rose-100/80 active:scale-[0.98] disabled:opacity-50"
+                  >
+                    Emergency / Cancel Journey
+                  </button>
                 </GlassPanel>
               ) : status === 'STARTED' ? (
                 <GlassPanel className="space-y-4 border-blue-600/20 bg-blue-50 p-4 text-left">
@@ -1231,6 +1268,14 @@ export function ActiveJob() {
           )}
         </div>
       )}
+
+      {/* Partner Cancellation Modal */}
+      <LabourBounceCancelModal
+        open={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        booking={booking}
+        onCancelled={handleCancelledCallback}
+      />
 
       {/* Payment Waiting Modal */}
       {showPaymentWaiting && (

@@ -1157,6 +1157,29 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
     return sendError(res, { message: 'Unauthorized', statusCode: HTTP_STATUS.FORBIDDEN })
   }
 
+  if (status === 'CANCELLED' && isLabourer) {
+    try {
+      const { processVendorCancellation } = await import('../services/bookingCancellationService.js')
+      const cancelResult = await processVendorCancellation({
+        bookingId: booking._id,
+        vendorId: req.user._id,
+        reason: req.body.reason || 'Cancelled by service provider',
+        reasonCategory: req.body.reasonCategory || 'Health or Personal Issue',
+      })
+      return sendSuccess(res, {
+        message:
+          cancelResult.status === 'CANCELLATION_REQUESTED'
+            ? 'Cancellation requested. Sent to Admin Dashboard for approval.'
+            : cancelResult.penaltyDeducted > 0
+            ? `Booking cancelled. A late penalty of ₹${cancelResult.penaltyDeducted} was deducted.`
+            : 'Booking cancelled. Booking will be re-broadcast to nearby service providers.',
+        data: cancelResult,
+      })
+    } catch (err) {
+      return sendError(res, { message: err.message, statusCode: HTTP_STATUS.BAD_REQUEST })
+    }
+  }
+
   const validTransitions = {
     'ACCEPTED': ['EN_ROUTE', 'CANCELLED'],
     'EN_ROUTE': ['STARTED', 'CANCELLED'],

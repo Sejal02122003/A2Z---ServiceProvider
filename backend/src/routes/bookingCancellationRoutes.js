@@ -15,6 +15,7 @@ import {
   getAdminCustomerHistoryController,
   adminRestrictCustomerController,
   adminUnrestrictCustomerController,
+  recordAdminBouncePenaltyController,
 } from '../controllers/bookingCancellationController.js'
 import { protect, restrictTo } from '../middleware/auth.js'
 import { USER_ROLES } from '../constants/roles.js'
@@ -81,5 +82,6 @@ router.get('/admin/customer-cancellations', getAdminCustomerCancellationsControl
 router.get('/admin/customers/:id/history', getAdminCustomerHistoryController)
 router.post('/admin/customers/:id/restrict', adminRestrictCustomerController)
 router.post('/admin/customers/:id/unrestrict', adminUnrestrictCustomerController)
+router.post('/admin/bookings/:bookingId/bounce', recordAdminBouncePenaltyController)
 
 export default router

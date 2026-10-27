@@ -215,10 +215,48 @@ export async function recordBounceIncident({ booking, vendorId, reason = '', can
     ],
   })
 
-  if (settings.autoDeductEnabled) {
-    await applyPenaltyDeduction(penalty)
-  } else {
-    await sendPenaltyNotification(penalty, 'PENDING_REVIEW')
+  // Bounce penalty is recorded and deducted directly from partner's wallet (selfBalance) with an immutable ledger transaction
+  await applyPenaltyDeduction(penalty)
+
+  // Release abandoned vendor from booking and re-broadcast to find replacement partner
+  try {
+    const freshBooking = await Booking.findById(booking._id)
+    if (freshBooking && ['ACCEPTED', 'ASSIGNED', 'EN_ROUTE'].includes(freshBooking.status)) {
+      freshBooking.rejectedBy = freshBooking.rejectedBy || []
+      if (!freshBooking.rejectedBy.some((id) => String(id?._id || id) === String(vendorId))) {
+        freshBooking.rejectedBy.push(vendorId)
+      }
+      if (String(freshBooking.laborId?._id || freshBooking.laborId) === String(vendorId)) {
+        freshBooking.laborId = null
+      }
+      if (String(freshBooking.acceptedLabourId?._id || freshBooking.acceptedLabourId) === String(vendorId)) {
+        freshBooking.acceptedLabourId = null
+      }
+      if (Array.isArray(freshBooking.acceptedLabourIds)) {
+        freshBooking.acceptedLabourIds = freshBooking.acceptedLabourIds.filter(
+          (id) => String(id?._id || id) !== String(vendorId)
+        )
+      }
+      if (freshBooking.assignments && freshBooking.assignments.length > 0) {
+        freshBooking.assignments.forEach((a) => {
+          const lid = typeof a.labourId === 'object' ? a.labourId._id : a.labourId
+          if (String(lid) === String(vendorId)) {
+            a.status = 'CANCELLED'
+            a.cancellationReason = 'Partner Bounce / Abandonment'
+          }
+        })
+      }
+
+      freshBooking.status = 'CREATED'
+      await freshBooking.save()
+
+      const { startBroadcastCycle } = await import('./broadcastService.js')
+      startBroadcastCycle(freshBooking._id).catch((err) =>
+        console.error('[Bounce Re-broadcast Error]:', err)
+      )
+    }
+  } catch (reErr) {
+    console.warn('[Bounce Re-broadcast Warning]:', reErr.message)
   }
 
   return { created: true, penalty }
@@ -235,17 +273,13 @@ export async function applyPenaltyDeduction(penalty, adminUser = null) {
   const vendorId = penalty.vendorId
   let wallet = await Wallet.findOne({ userId: vendorId })
   if (!wallet) {
-    wallet = await Wallet.create({ userId: vendorId })
+    wallet = await Wallet.create({ userId: vendorId, selfBalance: 0, adminBalance: 0 })
   }
 
   const targetAmount = penalty.amount
-  const currentBalance = wallet.selfBalance || 0
+  const currentBalance = Number(wallet.selfBalance || 0)
   const balanceBefore = currentBalance
-
-  // Safely deduct up to available or track unpaid recovery
-  const deductedAmount = Math.max(0, Math.min(currentBalance, targetAmount))
-  const unpaidAmount = Math.max(0, targetAmount - deductedAmount)
-  const balanceAfter = currentBalance - deductedAmount
+  const balanceAfter = currentBalance - targetAmount
 
   wallet.selfBalance = balanceAfter
   await wallet.save()
@@ -268,14 +302,14 @@ export async function applyPenaltyDeduction(penalty, adminUser = null) {
   })
 
   penalty.status = PENALTY_STATUS.APPLIED
-  penalty.deductedAmount = deductedAmount
-  penalty.unpaidAmount = unpaidAmount
+  penalty.deductedAmount = targetAmount
+  penalty.unpaidAmount = 0
   penalty.walletTransactionId = txn._id
 
   penalty.actionAudit.push({
     action: 'DEDUCTION_APPLIED',
     performedBy: adminUser?._id || null,
-    notes: `Deducted ₹${deductedAmount} (Unpaid: ₹${unpaidAmount}) from wallet. Txn #${txn._id}`,
+    notes: `Deducted ₹${targetAmount} from selfBalance. Txn #${txn._id}`,
   })
 
   await penalty.save()

@@ -254,3 +254,42 @@ export const adminUnrestrictCustomerController = asyncHandler(async (req, res) =
   })
 })
 
+/**
+ * 16. Admin: Record Partner Bounce / No-Show Penalty
+ */
+export const recordAdminBouncePenaltyController = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params
+  const { reason } = req.body
+
+  const { Booking } = await import('../models/Booking.js')
+  const booking = await Booking.findById(bookingId)
+  if (!booking) {
+    return sendError(res, { message: 'Booking not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  const vendorId =
+    booking.laborId ||
+    booking.acceptedLabourId ||
+    (booking.acceptedLabourIds && booking.acceptedLabourIds[0])
+  if (!vendorId) {
+    return sendError(res, {
+      message: 'No assigned partner found on this booking to penalize',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+    })
+  }
+
+  const { recordBounceIncident } = await import('../services/penaltyService.js')
+  const result = await recordBounceIncident({
+    booking,
+    vendorId,
+    reason: reason || 'Partner Bounce / Abandonment recorded by Admin',
+    cancelledBy: 'ADMIN',
+    isExempt: false,
+  })
+
+  return sendSuccess(res, {
+    message: 'Partner bounce penalty recorded and deducted from wallet successfully',
+    data: result,
+  })
+})
+

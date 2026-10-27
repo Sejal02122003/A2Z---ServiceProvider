@@ -189,6 +189,14 @@ export function LabourBounceCancelModal({ open, onClose, booking, onCancelled })
               </div>
             )}
 
+            {/* Commitment Notice */}
+            <div className="rounded-xl border border-blue-200/60 bg-blue-50/70 p-3 text-xs text-blue-900 flex items-start gap-2">
+              <Info className="h-4 w-4 shrink-0 text-blue-600 mt-0.5" />
+              <p className="leading-snug">
+                <strong>Partner Commitment:</strong> When you accept a job, you are contractually committed to that time slot.
+              </p>
+            </div>
+
             {/* Classification Alert */}
             {isBlocked ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
@@ -196,10 +204,10 @@ export function LabourBounceCancelModal({ open, onClose, booking, onCancelled })
                   <Ban className="h-5 w-5 shrink-0 text-rose-600 mt-0.5" />
                   <div className="text-xs text-rose-950 space-y-1">
                     <p className="font-extrabold text-sm text-rose-900">
-                      Cancellation Blocked
+                      Late Cancellation Blocked (&lt; {cutoffHours}h Notice)
                     </p>
                     <p className="font-medium text-rose-800 leading-relaxed">
-                      Platform policy blocks cancellations less than {cutoffHours} hours before
+                      Platform policy blocks partner cancellations within {cutoffHours} hours of
                       the scheduled start time. Please contact admin support if you have an
                       unavoidable emergency.
                     </p>
@@ -212,12 +220,12 @@ export function LabourBounceCancelModal({ open, onClose, booking, onCancelled })
                   <AlertTriangle className="h-5 w-5 shrink-0 text-purple-600 mt-0.5" />
                   <div className="text-xs text-purple-950 space-y-1">
                     <p className="font-extrabold text-sm text-purple-900">
-                      Admin Approval Required
+                      Admin Approval Required (CANCELLATION_REQUESTED)
                     </p>
                     <p className="font-medium text-purple-800 leading-relaxed">
                       This job is within the {cutoffHours}-hour cutoff window. Submitting will
-                      send a cancellation request to the administrator. If approved, a penalty
-                      of <strong>₹{penaltyAmount}</strong> will be applied.
+                      flag the booking as <strong>CANCELLATION_REQUESTED</strong> and send it to
+                      the Admin Dashboard for review. If approved, a penalty of <strong>₹{penaltyAmount}</strong> will be assessed.
                     </p>
                   </div>
                 </div>
@@ -231,9 +239,9 @@ export function LabourBounceCancelModal({ open, onClose, booking, onCancelled })
                       Late Cancellation Penalty: ₹{penaltyAmount}
                     </p>
                     <p className="font-medium text-amber-800 leading-relaxed">
-                      Cancelling within {cutoffHours} hours causes customer delay. A late fee
-                      of <strong>₹{penaltyAmount}</strong> will be deducted from your earnings
-                      wallet.
+                      Cancelling within {cutoffHours} hours incurs a late penalty of <strong>₹{penaltyAmount}</strong>,
+                      which will be deducted directly from your wallet (<code>selfBalance</code>) with an immutable ledger transaction.
+                      The booking will be immediately re-broadcast to find another nearby partner.
                     </p>
                   </div>
                 </div>
@@ -244,12 +252,12 @@ export function LabourBounceCancelModal({ open, onClose, booking, onCancelled })
                   <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 mt-0.5" />
                   <div className="text-xs text-emerald-950 space-y-1">
                     <p className="font-extrabold text-sm text-emerald-900">
-                      Standard Cancellation (₹0 Fee)
+                      Standard Cancellation (&gt; {cutoffHours}h Notice): ₹0 Penalty
                     </p>
                     <p className="font-medium text-emerald-800 leading-relaxed">
                       {isExempt
                         ? 'Reporting fake/unreachable customers or customer-requested cancellations incurs ₹0 penalty.'
-                        : `You are cancelling at least ${cutoffHours} hours in advance. No late penalty will be applied.`}
+                        : `You gave more than ${cutoffHours} hours notice. This is classified as a standard cancellation with ₹0 penalty. The booking will be re-broadcast to find another nearby partner.`}
                     </p>
                   </div>
                 </div>

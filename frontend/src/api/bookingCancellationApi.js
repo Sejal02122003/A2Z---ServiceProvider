@@ -45,6 +45,11 @@ export const bookingCancellationApi = {
       method: 'POST',
       body: { waiverReason },
     }),
+  recordAdminBouncePenalty: (bookingId, data = {}) =>
+    apiRequest(`/booking-cancellations/admin/bookings/${bookingId}/bounce`, {
+      method: 'POST',
+      body: data,
+    }),
 
   // Vendor / Partner Endpoints
   getVendorEligibility: (bookingId) =>

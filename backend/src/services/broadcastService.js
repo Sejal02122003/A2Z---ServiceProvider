@@ -58,7 +58,8 @@ export async function startBroadcastCycle(bookingId) {
   const busyLabourIds = busyBookings.map(b => b.acceptedLabourId)
 
   const customerId = booking.userId?._id || booking.userId
-  const excludedUserIds = [...busyLabourIds]
+  const rejectedLaborIds = (booking.rejectedBy || []).map(id => String(id?._id || id))
+  const excludedUserIds = [...busyLabourIds, ...rejectedLaborIds]
   // Only exclude customer in production when customer is not also testing labour role
   if (customerId && process.env.NODE_ENV === 'production') {
     excludedUserIds.push(customerId)

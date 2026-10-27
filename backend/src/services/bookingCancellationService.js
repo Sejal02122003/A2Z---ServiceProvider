@@ -398,10 +398,24 @@ export async function processVendorCancellation({
   // -------------------------------------------------------------
   // Scenario B: Immediate Cancellation (Standard or Penalized)
   // -------------------------------------------------------------
-  booking.status = 'CANCELLED'
-  booking.cancelledBy = 'LABOUR'
-  booking.cancelledAt = now
-  booking.cancellationReason = reason || 'Worker cancellation'
+  // Add vendor to rejectedBy to avoid offering the same booking back to this partner
+  booking.rejectedBy = booking.rejectedBy || []
+  if (!booking.rejectedBy.some((id) => String(id?._id || id) === String(vendorId))) {
+    booking.rejectedBy.push(vendorId)
+  }
+
+  // Clear vendor from booking assignment
+  if (String(booking.laborId?._id || booking.laborId) === String(vendorId)) {
+    booking.laborId = null
+  }
+  if (String(booking.acceptedLabourId?._id || booking.acceptedLabourId) === String(vendorId)) {
+    booking.acceptedLabourId = null
+  }
+  if (Array.isArray(booking.acceptedLabourIds)) {
+    booking.acceptedLabourIds = booking.acceptedLabourIds.filter(
+      (id) => String(id?._id || id) !== String(vendorId)
+    )
+  }
 
   if (booking.assignments && booking.assignments.length > 0) {
     booking.assignments.forEach((a) => {
@@ -413,16 +427,27 @@ export async function processVendorCancellation({
     })
   }
 
+  if (booking.multiServiceBooking?.isMultiService && Array.isArray(booking.multiServiceBooking.items)) {
+    booking.multiServiceBooking.items.forEach((it) => {
+      const aId = typeof it.assignedLabourId === 'object' ? it.assignedLabourId._id : it.assignedLabourId
+      if (String(aId) === String(vendorId)) {
+        it.status = 'PENDING'
+        it.assignedLabourId = null
+      }
+    })
+  }
+
   let deductedAmount = 0
   let penaltyStatus = CANCELLATION_PENALTY_STATUS.NOT_APPLICABLE
   let transactionId = null
 
-  const penaltyToApply = isExempt ? 0 : eligibility.penaltyAmount || 0
+  const isStandard = eligibility.timingClassification === TIMING_CLASSIFICATION.STANDARD
+  const penaltyToApply = isExempt || isStandard ? 0 : eligibility.penaltyAmount || 0
 
   if (penaltyToApply > 0) {
     penaltyStatus = CANCELLATION_PENALTY_STATUS.PENDING
 
-    // Atomically execute wallet deduction
+    // Atomically execute wallet deduction from partner's selfBalance
     try {
       let wallet = await Wallet.findOne({ userId: vendorId })
       if (!wallet) {
@@ -439,6 +464,7 @@ export async function processVendorCancellation({
         walletId: wallet._id,
         userId: vendorId,
         type: 'DEBIT',
+        targetWallet: 'SELF',
         amount: penaltyToApply,
         balanceBefore,
         balanceAfter,
@@ -452,8 +478,112 @@ export async function processVendorCancellation({
       penaltyStatus = CANCELLATION_PENALTY_STATUS.RECOVERED
       transactionId = tx._id
       booking.penaltyDeducted = penaltyToApply
+
+      // Also create record in VendorPenalty ledger for unified penalty & dispute tracking
+      import('../models/VendorPenalty.js')
+        .then(({ VendorPenalty, PENALTY_TYPE, PENALTY_STATUS }) => {
+          VendorPenalty.create({
+            bookingId: booking._id,
+            vendorId,
+            customerId: booking.userId,
+            penaltyType: PENALTY_TYPE.BOUNCE_PENALTY,
+            status: PENALTY_STATUS.APPLIED,
+            amount: penaltyToApply,
+            deductedAmount: penaltyToApply,
+            walletTransactionId: tx._id,
+            incidentTime: now,
+            reason: `Late Cancellation Penalty: Cancelled within ${eligibility.cutoffHours}h of job start for booking #${shortCode} (${reason || 'Late cancellation'})`,
+            dedupeKey: `late_cancel_${booking._id}_${vendorId}`,
+            actionAudit: [
+              {
+                action: 'DEDUCTION_APPLIED',
+                notes: `₹${penaltyToApply} deducted from selfBalance for late cancellation. Tx #${tx._id}`,
+              },
+            ],
+          }).catch((err) => console.warn('[VendorPenalty Create Warning]', err?.message))
+        })
+        .catch(() => {})
     } catch (err) {
       console.error('[Cancellation Penalty Deduction Error]', err)
+    }
+  }
+
+  // Determine if booking should be re-broadcasted:
+  // 1. Standard cancellation (> 2 hours notice): Re-broadcast unconditionally to find another nearby partner.
+  // 2. Late cancellation with penalty: Re-broadcast if service start time has not already passed.
+  const shouldRebroadcast = isStandard || (eligibility.timeRemainingMinutes > 0)
+
+  if (shouldRebroadcast) {
+    // Check if there are other assigned partners in a bulk multi-partner booking
+    const remainingActiveAssignments = (booking.assignments || []).filter(
+      (a) => a.status === 'ACCEPTED' || a.status === 'EN_ROUTE' || a.status === 'STARTED'
+    )
+
+    if (remainingActiveAssignments.length > 0) {
+      booking.status = 'PARTIALLY_ACCEPTED'
+    } else {
+      booking.status = 'CREATED'
+    }
+
+    booking.cancelledBy = null
+    booking.cancellationReason = null
+    await booking.save()
+
+    // Trigger re-broadcast cycle for replacement partner
+    import('./broadcastService.js')
+      .then(({ startBroadcastCycle }) => {
+        startBroadcastCycle(booking._id).catch((err) =>
+          console.error('[Re-broadcast Error in processVendorCancellation]:', err)
+        )
+      })
+      .catch((err) => console.error(err))
+  } else {
+    // Scheduled time has passed; mark booking cancelled
+    booking.status = 'CANCELLED'
+    booking.cancelledBy = 'LABOUR'
+    booking.cancelledAt = now
+    booking.cancellationReason = reason || 'Worker cancellation'
+    await booking.save()
+
+    // Refund customer wallet discount if booking was fully cancelled
+    if (booking.walletDiscount?.applied && booking.walletDiscount?.amount > 0) {
+      import('./userWalletService.js')
+        .then(({ refundWalletForBooking }) => {
+          refundWalletForBooking({
+            userId: customerId,
+            bookingId: booking._id,
+            amount: booking.walletDiscount.amount,
+            reason: `Refund for cancelled booking #${shortCode}`,
+          }).catch((err) => console.error('Customer refund error on cancellation:', err))
+        })
+        .catch((err) => console.error(err))
+    }
+
+    // Cancel scheduled reminders for booking
+    import('./bookingReminderService.js')
+      .then(({ cancelRemindersForBooking }) => {
+        cancelRemindersForBooking(
+          booking._id,
+          `Booking cancelled by vendor: ${reason || 'Cancelled'}`
+        ).catch(console.error)
+      })
+      .catch((err) => console.error(err))
+  }
+
+  // Release cash booking charges reservation if cash booking
+  if (booking.paymentMethod === 'CASH') {
+    const expectedCharges =
+      (booking.platformFee || 0) + (booking.taxes || 0) + (booking.commissionAmount || 0)
+    if (vendorId && expectedCharges > 0) {
+      import('./labourWalletService.js')
+        .then(({ releaseCashBookingCharges }) => {
+          releaseCashBookingCharges({
+            labourId: vendorId,
+            bookingId: booking._id,
+            amount: expectedCharges,
+          }).catch((err) => console.error('Error releasing reservation on cancellation:', err))
+        })
+        .catch(() => {})
     }
   }
 
@@ -473,13 +603,14 @@ export async function processVendorCancellation({
       cutoffHoursSnapshot: eligibility.cutoffHours,
       reason: reason || 'Worker cancellation',
       reasonCategory: reasonCategory || 'Emergency',
-      penaltyType: isExempt ? 'NONE' : eligibility.penaltyType,
+      penaltyType: isExempt || isStandard ? 'NONE' : eligibility.penaltyType,
       penaltyRateOrAmount: eligibility.penaltyRateOrAmount,
       assessedPenaltyAmount: penaltyToApply,
       penaltyStatus,
       deductedAmount,
       walletTransactionId: transactionId,
       approvalStatus: APPROVAL_STATUS.NOT_REQUIRED,
+      reBroadcasted: shouldRebroadcast,
       dedupeKey,
     },
     { upsert: true, new: true }
@@ -488,53 +619,20 @@ export async function processVendorCancellation({
   booking.cancellationRecordId = record._id
   await booking.save()
 
-  // Refund customer wallet discount if booking had one
-  if (booking.walletDiscount?.applied && booking.walletDiscount?.amount > 0) {
-    import('./userWalletService.js')
-      .then(({ refundWalletForBooking }) => {
-        refundWalletForBooking({
-          userId: customerId,
-          bookingId: booking._id,
-          amount: booking.walletDiscount.amount,
-          reason: `Refund for cancelled booking #${shortCode}`,
-        }).catch((err) => console.error('Customer refund error on cancellation:', err))
-      })
-      .catch((err) => console.error(err))
-  }
-
-  // Release cash booking charges reservation if cash booking
-  if (booking.paymentMethod === 'CASH') {
-    const expectedCharges = (booking.platformFee || 0) + (booking.taxes || 0) + (booking.commissionAmount || 0)
-    if (vendorId && expectedCharges > 0) {
-      import('./labourWalletService.js')
-        .then(({ releaseCashBookingCharges }) => {
-          releaseCashBookingCharges({ labourId: vendorId, bookingId: booking._id, amount: expectedCharges })
-            .catch((err) => console.error('Error releasing reservation on cancellation:', err))
-        })
-        .catch(() => {})
-    }
-  }
-
-  // Cancel scheduled reminders for booking
-  import('./bookingReminderService.js')
-    .then(({ cancelRemindersForBooking }) => {
-      cancelRemindersForBooking(
-        booking._id,
-        `Booking cancelled by vendor: ${reason || 'Cancelled'}`
-      ).catch(console.error)
-    })
-    .catch((err) => console.error(err))
-
-  // Emit socket update
+  // Emit socket updates
   import('../socket.js')
     .then(({ emitToUser }) => {
       if (customerId) {
         emitToUser(customerId, 'BOOKING_STATUS_UPDATE', {
           bookingId: booking._id,
-          status: 'CANCELLED',
+          status: shouldRebroadcast ? 'BROADCASTING' : 'CANCELLED',
+          reBroadcasted: shouldRebroadcast,
           cancelledBy: 'LABOUR',
           cancellationReason: reason,
           penaltyDeducted: deductedAmount,
+          message: shouldRebroadcast
+            ? 'Service provider cancelled. Finding another nearby provider...'
+            : 'Booking cancelled by service provider.',
         })
       }
       emitToUser(vendorId, 'BOOKING_STATUS_UPDATE', {
@@ -543,6 +641,10 @@ export async function processVendorCancellation({
         cancelledBy: 'LABOUR',
         cancellationReason: reason,
         penaltyDeducted: deductedAmount,
+        message:
+          deductedAmount > 0
+            ? `Late cancellation penalty of ₹${deductedAmount} was deducted.`
+            : 'Standard cancellation (>2h notice) completed with ₹0 penalty.',
       })
     })
     .catch((err) => console.error(err))
@@ -551,9 +653,14 @@ export async function processVendorCancellation({
   try {
     if (customerId) {
       sendNotificationToUser(customerId, {
-        title: 'Booking Cancelled',
-        body: `Your booking #${shortCode} was cancelled: ${reason || 'Cancelled by provider'}`,
-        data: { type: 'booking_cancelled', bookingId: String(booking._id) },
+        title: shouldRebroadcast ? 'Finding Another Service Provider' : 'Booking Cancelled',
+        body: shouldRebroadcast
+          ? `Your service provider cancelled booking #${shortCode}. We are immediately finding another nearby professional for you.`
+          : `Your booking #${shortCode} was cancelled: ${reason || 'Cancelled by provider'}`,
+        data: {
+          type: shouldRebroadcast ? 'booking_rebroadcasting' : 'booking_cancelled',
+          bookingId: String(booking._id),
+        },
       })
     }
 
@@ -561,8 +668,8 @@ export async function processVendorCancellation({
       title: deductedAmount > 0 ? 'Late Cancellation Penalty Applied' : 'Booking Cancelled',
       body:
         deductedAmount > 0
-          ? `Late cancellation penalty of ₹${deductedAmount} deducted for cancelling booking #${shortCode}`
-          : `Booking #${shortCode} cancelled successfully.`,
+          ? `Late cancellation penalty of ₹${deductedAmount} deducted for cancelling booking #${shortCode}.`
+          : `Booking #${shortCode} cancelled with standard notice (>2h). ₹0 penalty applied.`,
       data: { type: 'booking_cancelled', bookingId: String(booking._id) },
     })
   } catch (e) {
@@ -571,7 +678,8 @@ export async function processVendorCancellation({
 
   return {
     success: true,
-    status: 'CANCELLED',
+    status: shouldRebroadcast ? 'REBROADCASTED' : 'CANCELLED',
+    reBroadcasted: shouldRebroadcast,
     timingClassification: eligibility.timingClassification,
     penaltyDeducted: deductedAmount,
     record,
@@ -594,11 +702,24 @@ export async function approveCancellationRequest({ recordId, adminUser, adminNot
 
   const shortCode = String(booking._id).slice(-6).toUpperCase()
 
-  // Mark booking as cancelled
-  booking.status = 'CANCELLED'
-  booking.cancelledBy = 'LABOUR'
-  booking.cancelledAt = new Date()
-  booking.cancellationReason = record.reason || 'Late cancellation approved by admin'
+  // Add vendor to rejectedBy to avoid offering same booking back to this partner
+  booking.rejectedBy = booking.rejectedBy || []
+  if (!booking.rejectedBy.some((id) => String(id?._id || id) === String(record.vendorId))) {
+    booking.rejectedBy.push(record.vendorId)
+  }
+
+  // Clear vendor from booking
+  if (String(booking.laborId?._id || booking.laborId) === String(record.vendorId)) {
+    booking.laborId = null
+  }
+  if (String(booking.acceptedLabourId?._id || booking.acceptedLabourId) === String(record.vendorId)) {
+    booking.acceptedLabourId = null
+  }
+  if (Array.isArray(booking.acceptedLabourIds)) {
+    booking.acceptedLabourIds = booking.acceptedLabourIds.filter(
+      (id) => String(id?._id || id) !== String(record.vendorId)
+    )
+  }
 
   if (booking.assignments && booking.assignments.length > 0) {
     booking.assignments.forEach((a) => {
@@ -606,6 +727,16 @@ export async function approveCancellationRequest({ recordId, adminUser, adminNot
       if (String(lid) === String(record.vendorId)) {
         a.status = 'CANCELLED'
         a.cancellationReason = record.reason
+      }
+    })
+  }
+
+  if (booking.multiServiceBooking?.isMultiService && Array.isArray(booking.multiServiceBooking.items)) {
+    booking.multiServiceBooking.items.forEach((it) => {
+      const aId = typeof it.assignedLabourId === 'object' ? it.assignedLabourId._id : it.assignedLabourId
+      if (String(aId) === String(record.vendorId)) {
+        it.status = 'PENDING'
+        it.assignedLabourId = null
       }
     })
   }
@@ -632,6 +763,7 @@ export async function approveCancellationRequest({ recordId, adminUser, adminNot
         walletId: wallet._id,
         userId: record.vendorId,
         type: 'DEBIT',
+        targetWallet: 'SELF',
         amount: record.assessedPenaltyAmount,
         balanceBefore,
         balanceAfter,
@@ -645,9 +777,66 @@ export async function approveCancellationRequest({ recordId, adminUser, adminNot
       penaltyStatus = CANCELLATION_PENALTY_STATUS.RECOVERED
       txId = tx._id
       booking.penaltyDeducted = deductedAmount
+
+      // Also create record in VendorPenalty ledger for unified penalty tracking
+      import('../models/VendorPenalty.js')
+        .then(({ VendorPenalty, PENALTY_TYPE, PENALTY_STATUS }) => {
+          VendorPenalty.create({
+            bookingId: booking._id,
+            vendorId: record.vendorId,
+            customerId: record.customerId,
+            penaltyType: PENALTY_TYPE.BOUNCE_PENALTY,
+            status: PENALTY_STATUS.APPLIED,
+            amount: deductedAmount,
+            deductedAmount,
+            walletTransactionId: txId,
+            incidentTime: new Date(),
+            reason: `Late Cancellation Penalty: Admin approved cancellation for booking #${shortCode}`,
+            dedupeKey: `late_approved_${booking._id}_${record.vendorId}`,
+            actionAudit: [
+              {
+                action: 'DEDUCTION_APPLIED',
+                performedBy: adminUser?._id || null,
+                notes: `₹${deductedAmount} deducted from selfBalance on admin approval. Tx #${txId}`,
+              },
+            ],
+          }).catch(() => {})
+        })
+        .catch(() => {})
     } catch (e) {
       console.error('[Approval Deduction Error]', e)
     }
+  }
+
+  const serviceTime = record.serviceStartDateTime ? new Date(record.serviceStartDateTime).getTime() : 0
+  const shouldRebroadcast = serviceTime > Date.now()
+
+  if (shouldRebroadcast) {
+    const remainingActiveAssignments = (booking.assignments || []).filter(
+      (a) => a.status === 'ACCEPTED' || a.status === 'EN_ROUTE' || a.status === 'STARTED'
+    )
+    if (remainingActiveAssignments.length > 0) {
+      booking.status = 'PARTIALLY_ACCEPTED'
+    } else {
+      booking.status = 'CREATED'
+    }
+    booking.cancelledBy = null
+    booking.cancellationReason = null
+    await booking.save()
+
+    import('./broadcastService.js')
+      .then(({ startBroadcastCycle }) => {
+        startBroadcastCycle(booking._id).catch((err) =>
+          console.error('[Approval Rebroadcast Error]:', err)
+        )
+      })
+      .catch((err) => console.error(err))
+  } else {
+    booking.status = 'CANCELLED'
+    booking.cancelledBy = 'LABOUR'
+    booking.cancelledAt = new Date()
+    booking.cancellationReason = record.reason || 'Late cancellation approved by admin'
+    await booking.save()
   }
 
   record.cancellationStatus = CANCELLATION_STATUS.APPROVED
@@ -659,9 +848,8 @@ export async function approveCancellationRequest({ recordId, adminUser, adminNot
   record.deductedAmount = deductedAmount
   record.penaltyStatus = penaltyStatus
   record.walletTransactionId = txId
+  record.reBroadcasted = shouldRebroadcast
   await record.save()
-
-  await booking.save()
 
   // Refund customer wallet if needed
   if (booking.walletDiscount?.applied && booking.walletDiscount?.amount > 0) {
