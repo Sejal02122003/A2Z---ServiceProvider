@@ -80,10 +80,32 @@ const inputClass =
 export function AuthEntryPage({ authGroup = 'users' }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { applySession } = useAuth()
+  const { applySession, isAuthenticated, user, loading } = useAuth()
   const { logoUrl } = useBranding()
   const reduce = useReducedMotion()
   const otpInputRefs = useRef([])
+
+  useEffect(() => {
+    if (!loading && isAuthenticated && user?.role) {
+      const isLabour = authGroup === 'labours' || user.role === USER_ROLES.LABOUR
+      if (isLabour && user.role === USER_ROLES.LABOUR) {
+        const kitReceived = Boolean(
+          user.welcomeKit?.isReceived ||
+          user.welcomeKit?.status === 'DELIVERED' ||
+          (user.welcomeKit?.uniformIssued && user.welcomeKit?.idCardIssued && user.welcomeKit?.bagIssued)
+        )
+        const categories = user.labourProfile?.categoryIds
+        const hasCategories = Array.isArray(categories) && categories.length > 0
+        if (!kitReceived || !hasCategories) {
+          navigate('/app/partner-onboarding', { replace: true })
+          return
+        }
+        navigate('/app', { replace: true })
+        return
+      }
+      navigate(getRoleHomePath(user.role), { replace: true })
+    }
+  }, [isAuthenticated, user, loading, authGroup, navigate])
 
   const [mode, setMode] = useState('login')
   const [step, setStep] = useState('form')

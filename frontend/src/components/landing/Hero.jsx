@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { ArrowRight, Star } from 'lucide-react'
 import { trustBadges } from '../../data/landingContent'
@@ -11,28 +12,27 @@ import { USER_ROLES } from '../../constants/userRoles.js'
 import { writeBootRole } from '../../lib/bootPersona.js'
 
 export function Hero() {
+  const navigate = useNavigate()
   const reduce = useReducedMotion()
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
 
   const handleHireLabour = (e) => {
     if (e && e.preventDefault) e.preventDefault()
-    if (user && user.role === USER_ROLES.CUSTOMER) {
-      window.location.href = '/app'
+    if (user) {
+      navigate('/app')
       return
     }
-    logout().finally(() => {
-      writeBootRole(USER_ROLES.CUSTOMER)
-      window.location.href = '/app'
-    })
+    writeBootRole(USER_ROLES.CUSTOMER)
+    navigate('/app')
   }
 
   const handleRegisterLabour = (e) => {
     if (e && e.preventDefault) e.preventDefault()
-    if (user && user.role === USER_ROLES.LABOUR) {
-      window.location.href = '/app/partner-onboarding'
+    if (user) {
+      navigate('/app')
       return
     }
-    window.location.href = '/labours/auth'
+    navigate('/labours/auth')
   }
 
   return (

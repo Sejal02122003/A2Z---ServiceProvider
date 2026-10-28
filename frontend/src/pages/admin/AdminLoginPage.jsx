@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ShieldCheck, Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, Loader2 } from 'lucide-react'
@@ -9,7 +9,14 @@ import { USER_ROLES } from '../../constants/userRoles.js'
 
 export function AdminLoginPage() {
   const navigate = useNavigate()
-  const { applySession } = useAuth()
+  const { applySession, isAuthenticated, user, loading } = useAuth()
+
+  useEffect(() => {
+    if (!loading && isAuthenticated && user?.role === USER_ROLES.ADMIN) {
+      navigate('/admin', { replace: true })
+    }
+  }, [isAuthenticated, user, loading, navigate])
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)

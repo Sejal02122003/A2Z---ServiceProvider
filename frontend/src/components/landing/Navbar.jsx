@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { HardHat, Menu, X } from 'lucide-react'
 import { ButtonLink } from '../ui/ButtonLink'
@@ -19,30 +19,29 @@ const links = [
 ]
 
 export function Navbar() {
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const reduce = useReducedMotion()
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
 
   const handleHireLabour = (e) => {
     if (e && e.preventDefault) e.preventDefault()
-    if (user && user.role === USER_ROLES.CUSTOMER) {
-      window.location.href = '/app'
+    if (user) {
+      navigate('/app')
       return
     }
-    logout().finally(() => {
-      writeBootRole(USER_ROLES.CUSTOMER)
-      window.location.href = '/app'
-    })
+    writeBootRole(USER_ROLES.CUSTOMER)
+    navigate('/app')
   }
 
   const handleRegisterLabour = (e) => {
     if (e && e.preventDefault) e.preventDefault()
-    if (user && user.role === USER_ROLES.LABOUR) {
-      window.location.href = '/app/partner-onboarding'
+    if (user) {
+      navigate('/app')
       return
     }
-    window.location.href = '/labours/auth'
+    navigate('/labours/auth')
   }
 
   useEffect(() => {
@@ -95,12 +94,21 @@ export function Navbar() {
         </nav>
 
         <div className="hidden items-center gap-2 lg:flex">
-          <Link
-            to="/auth"
-            className="rounded-xl px-3 py-2 text-sm font-semibold text-brand hover:bg-brand-muted/50"
-          >
-            Sign in
-          </Link>
+          {user ? (
+            <Link
+              to="/app"
+              className="rounded-xl px-3.5 py-2 text-sm font-bold text-white bg-brand shadow-sm hover:bg-brand/90 transition"
+            >
+              Open App
+            </Link>
+          ) : (
+            <Link
+              to="/auth"
+              className="rounded-xl px-3 py-2 text-sm font-semibold text-brand hover:bg-brand-muted/50"
+            >
+              Sign in
+            </Link>
+          )}
           <ButtonLink href="/app" variant="secondary" className="!py-2.5 !text-xs" onClick={handleRegisterLabour}>
             Register as Labour
           </ButtonLink>
@@ -146,13 +154,23 @@ export function Navbar() {
                 </motion.a>
               ))}
               <div className="mt-3 flex flex-col gap-2">
-                <Link
-                  to="/auth"
-                  className="rounded-2xl border border-brand/30 bg-brand-muted py-3 text-center text-sm font-semibold text-brand"
-                  onClick={() => setOpen(false)}
-                >
-                  Sign in / Register
-                </Link>
+                {user ? (
+                  <Link
+                    to="/app"
+                    className="rounded-2xl bg-brand py-3 text-center text-sm font-bold text-white shadow-sm"
+                    onClick={() => setOpen(false)}
+                  >
+                    Open App
+                  </Link>
+                ) : (
+                  <Link
+                    to="/auth"
+                    className="rounded-2xl border border-brand/30 bg-brand-muted py-3 text-center text-sm font-semibold text-brand"
+                    onClick={() => setOpen(false)}
+                  >
+                    Sign in / Register
+                  </Link>
+                )}
                 <ButtonLink href="/app" variant="primary" onClick={(e) => { setOpen(false); handleHireLabour(e); }}>
                   Hire Labour
                 </ButtonLink>

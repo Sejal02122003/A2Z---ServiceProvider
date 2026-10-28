@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth.js'
+import { getRoleHomePath } from '../lib/roleHomePath.js'
 import { AppPromoSection } from '../components/landing/AppPromoSection'
 import { FAQSection } from '../components/landing/FAQSection'
 import { FeaturesSection } from '../components/landing/FeaturesSection'
@@ -18,11 +21,22 @@ import { PageSkeleton } from '../components/ui/PageSkeleton'
 
 export function LandingPage() {
   const [boot, setBoot] = useState(true)
+  const navigate = useNavigate()
+  const { isAuthenticated, user, loading, token } = useAuth()
 
   useEffect(() => {
+    // If the user is logged in, immediately send them to their role's home in the app!
+    if (!loading && isAuthenticated && user?.role) {
+      navigate(getRoleHomePath(user.role), { replace: true })
+      return
+    }
     const t = window.setTimeout(() => setBoot(false), 700)
     return () => window.clearTimeout(t)
-  }, [])
+  }, [isAuthenticated, user?.role, loading, navigate])
+
+  if (loading || (token && user?.role)) {
+    return <PageSkeleton visible={true} />
+  }
 
   return (
     <>
