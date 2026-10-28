@@ -34,7 +34,20 @@ import { adminZonesApi } from '../../api/adminZonesApi.js'
 import { uploadMedia, assetUrlFromUpload } from '../../api/uploadApi.js'
 import { UPLOAD_FOLDERS } from '../../constants/uploadFolders.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
-import { ApiError } from '../../api/http.js'
+const BADGE_PRESETS = [
+  'POPULAR',
+  'BEST VALUE',
+  'SUPER SAVER',
+  'HOT DEAL',
+  'TRENDING',
+  'LIMITED OFFER',
+  'RECOMMENDED',
+  'PREMIUM',
+  'NEW',
+  'COMBO DEAL',
+  'TOP RATED',
+  'SEASONAL SPECIAL',
+]
 
 export function AdminPackagesPage() {
   const [packages, setPackages] = useState([])
@@ -83,6 +96,7 @@ export function AdminPackagesPage() {
   const [formBusy, setFormBusy] = useState(false)
   const [formError, setFormError] = useState('')
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [isCustomBadge, setIsCustomBadge] = useState(false)
 
   // Load Tree & Zones
   useEffect(() => {
@@ -170,6 +184,7 @@ export function AdminPackagesPage() {
   // Open Create Modal
   const openCreateModal = () => {
     setEditingPackageId(null)
+    setIsCustomBadge(false)
     const firstCat = categoryTree[0]
     const initialServices = allServices.filter(
       (s) => !firstCat || String(s.categoryId) === String(firstCat._id)
@@ -220,6 +235,7 @@ export function AdminPackagesPage() {
       const res = await fetchAdminPackageDetails(pkg._id)
       const data = res.data?.package
       if (data) {
+        setIsCustomBadge(Boolean(data.badge && !BADGE_PRESETS.includes(data.badge.toUpperCase())))
         setFormData({
           name: data.name || '',
           slug: data.slug || '',
@@ -785,16 +801,63 @@ export function AdminPackagesPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">
-                    Badge / Tag
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.badge}
-                    onChange={(e) => setFormData({ ...formData, badge: e.target.value })}
-                    placeholder="e.g. POPULAR, BEST VALUE"
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold outline-none focus:border-brand"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-bold text-slate-700">
+                      Badge / Tag
+                    </label>
+                    {formData.badge && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCustomBadge(false)
+                          setFormData((prev) => ({ ...prev, badge: '' }))
+                        }}
+                        className="text-[10px] font-bold text-slate-400 hover:text-rose-500 transition"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <select
+                    value={
+                      !formData.badge
+                        ? ''
+                        : isCustomBadge || !BADGE_PRESETS.includes(formData.badge.toUpperCase())
+                        ? 'CUSTOM'
+                        : formData.badge.toUpperCase()
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value
+                      if (val === 'CUSTOM') {
+                        setIsCustomBadge(true)
+                      } else {
+                        setIsCustomBadge(false)
+                        setFormData((prev) => ({ ...prev, badge: val }))
+                      }
+                    }}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-brand"
+                  >
+                    <option value="">Select Badge / Tag</option>
+                    {BADGE_PRESETS.map((tag) => (
+                      <option key={tag} value={tag}>
+                        {tag}
+                      </option>
+                    ))}
+                    <option value="CUSTOM">Custom / Edit Manually</option>
+                  </select>
+
+                  {(isCustomBadge || (formData.badge && !BADGE_PRESETS.includes(formData.badge.toUpperCase()))) && (
+                    <div className="mt-1.5">
+                      <input
+                        type="text"
+                        value={formData.badge}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, badge: e.target.value.toUpperCase() }))}
+                        placeholder="Type custom badge (e.g. SPECIAL OFFER)..."
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold uppercase text-slate-800 outline-none focus:border-brand"
+                        autoFocus
+                      />
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">
