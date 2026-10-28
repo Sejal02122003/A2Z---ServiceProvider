@@ -661,7 +661,9 @@ export async function startBroadcastCycle(bookingId) {
               packageInclusions: booking.packageBooking?.isPackage ? (booking.packageBooking.inclusions || []).map(inc => ({
                 serviceId: inc.serviceId,
                 name: inc.name,
+                brand: inc.brand || '',
                 quantity: inc.quantity || 1,
+                duration: inc.duration || '',
                 description: inc.description || ''
               })) : undefined,
               date: booking.scheduledAt || booking.createdAt,

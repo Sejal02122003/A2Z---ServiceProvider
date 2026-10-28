@@ -364,7 +364,7 @@ export function ServicePackagesPage() {
                               className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700 border border-slate-200/80 shadow-2xs"
                             >
                               <Check className="h-2.5 w-2.5 text-emerald-600 stroke-[3]" />
-                              {inc.name} {inc.quantity > 1 ? `(x${inc.quantity})` : ''}
+                              {inc.name} {inc.brand ? `(${inc.brand})` : ''} {inc.quantity > 1 ? `(x${inc.quantity})` : ''}
                             </span>
                           ))}
                           {pkg.inclusions.length > 3 && (
@@ -501,7 +501,7 @@ export function ServicePackagesPage() {
                       {bookingModalPkg.inclusions.map((inc, i) => (
                         <span key={i} className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700 border border-slate-200 shadow-2xs">
                           <Check className="h-2.5 w-2.5 text-emerald-600 stroke-[3]" />
-                          {inc.name} {inc.quantity > 1 ? `(x${inc.quantity})` : ''}
+                          {inc.name} {inc.brand ? `(${inc.brand})` : ''} {inc.quantity > 1 ? `(x${inc.quantity})` : ''} {inc.duration ? `• ${inc.duration}` : ''}
                         </span>
                       ))}
                     </div>

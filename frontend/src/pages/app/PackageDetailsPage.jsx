@@ -302,10 +302,24 @@ export function PackageDetailsPage() {
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 font-bold text-xs border border-emerald-100">
                   <Check className="h-3.5 w-3.5 stroke-[3]" />
                 </span>
-                <div>
+                <div className="min-w-0 flex-1">
                   <h4 className="text-sm font-extrabold text-slate-900 leading-tight">
                     {inc.name}
                   </h4>
+                  {(inc.brand || inc.duration) && (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                      {inc.brand && (
+                        <span className="inline-flex items-center rounded-md bg-teal-50 px-2 py-0.5 text-[10px] font-bold text-[#015F6C] border border-teal-200">
+                          Brand: {inc.brand}
+                        </span>
+                      )}
+                      {inc.duration && (
+                        <span className="inline-flex items-center rounded-md bg-cyan-50 px-2 py-0.5 text-[10px] font-bold text-cyan-800 border border-cyan-200">
+                          ⏱ {inc.duration}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {inc.description && (
                     <p className="text-xs text-slate-500 mt-1 leading-snug font-medium">
                       {inc.description}

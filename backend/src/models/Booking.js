@@ -129,7 +129,9 @@ const bookingSchema = new mongoose.Schema(
         {
           serviceId: { type: mongoose.Schema.Types.ObjectId, ref: 'LabourService' },
           name: { type: String, trim: true },
+          brand: { type: String, trim: true, default: '' },
           quantity: { type: Number, default: 1 },
+          duration: { type: String, trim: true, default: '' },
           description: { type: String, trim: true },
         },
       ],

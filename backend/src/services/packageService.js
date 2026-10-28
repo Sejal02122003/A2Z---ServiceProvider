@@ -28,32 +28,48 @@ export async function validateAndEnrichInclusions(inclusions, primarySubcategory
 
   for (const item of inclusions) {
     const sId = item.serviceId?._id || item.serviceId
-    if (!sId || !mongoose.Types.ObjectId.isValid(sId)) {
-      throw new Error(`Invalid service ID in inclusions: ${sId}`)
+    let service = null
+
+    if (sId && mongoose.Types.ObjectId.isValid(sId)) {
+      service = await LabourService.findById(sId)
+      if (service && !service.isActive) {
+        throw new Error(`Service "${service.name}" is currently disabled and cannot be added to a package`)
+      }
     }
 
-    const service = await LabourService.findById(sId)
-    if (!service) {
-      throw new Error(`Service not found: ${sId}`)
-    }
-    if (!service.isActive) {
-      throw new Error(`Service "${service.name}" is currently disabled and cannot be added to a package`)
+    const name = (item.name || service?.name || '').trim()
+    if (!name) {
+      throw new Error('Each inclusion must have a service name')
     }
 
+    const brand = (item.brand || '').trim()
     const quantity = Math.max(1, parseInt(item.quantity, 10) || 1)
-    const serviceRate = service.basePrice || service.hourlyPrice || 0
-    calculatedOriginalPrice += serviceRate * quantity
-    calculatedDuration += (service.estimatedDurationMins || 60) * quantity
+    const duration = (item.duration || (service?.estimatedDurationMins ? `${service.estimatedDurationMins} mins` : '')).trim()
+    const description = (item.description || service?.description || '').trim()
 
-    if (!resolvedSubcategoryId && service.subcategoryId) {
-      resolvedSubcategoryId = service.subcategoryId
+    if (service) {
+      const serviceRate = service.basePrice || service.hourlyPrice || 0
+      calculatedOriginalPrice += serviceRate * quantity
+      calculatedDuration += (service.estimatedDurationMins || 60) * quantity
+      if (!resolvedSubcategoryId && service.subcategoryId) {
+        resolvedSubcategoryId = service.subcategoryId
+      }
+    } else {
+      if (duration) {
+        const match = String(duration).match(/(\d+)/)
+        if (match) {
+          calculatedDuration += parseInt(match[1], 10) * quantity
+        }
+      }
     }
 
     enrichedInclusions.push({
-      serviceId: service._id,
-      name: service.name,
+      serviceId: service?._id || (sId && mongoose.Types.ObjectId.isValid(sId) ? sId : undefined),
+      name,
+      brand,
       quantity,
-      description: item.description?.trim() || service.description || '',
+      duration,
+      description,
     })
   }
 

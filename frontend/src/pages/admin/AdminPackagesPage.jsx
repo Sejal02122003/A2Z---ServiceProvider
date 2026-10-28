@@ -193,16 +193,15 @@ export function AdminPackagesPage() {
       zones: [],
       validFrom: '',
       validUntil: '',
-      inclusions: firstSrv
-        ? [
-            {
-              serviceId: String(firstSrv._id),
-              name: firstSrv.name,
-              quantity: 1,
-              description: '',
-            },
-          ]
-        : [],
+      inclusions: [
+        {
+          name: '',
+          brand: '',
+          quantity: 1,
+          duration: '',
+          description: '',
+        },
+      ],
       exclusions: ['Parts and spare materials if required are charged separately'],
       termsAndConditions: ['Standard service guarantee applies', 'Rescheduling available up to 2 hours prior'],
       sortOrder: 0,
@@ -239,12 +238,24 @@ export function AdminPackagesPage() {
           zones: (data.zones || []).map((z) => (typeof z === 'object' ? z._id : z)),
           validFrom: data.validFrom ? new Date(data.validFrom).toISOString().slice(0, 10) : '',
           validUntil: data.validUntil ? new Date(data.validUntil).toISOString().slice(0, 10) : '',
-          inclusions: (data.inclusions || []).map((inc) => ({
-            serviceId: inc.serviceId?._id || inc.serviceId,
-            name: inc.name || inc.serviceId?.name || '',
-            quantity: inc.quantity || 1,
-            description: inc.description || '',
-          })),
+          inclusions: Array.isArray(data.inclusions) && data.inclusions.length > 0
+            ? data.inclusions.map((inc) => ({
+                serviceId: inc.serviceId?._id || inc.serviceId || '',
+                name: inc.name || inc.serviceId?.name || '',
+                brand: inc.brand || '',
+                quantity: inc.quantity || 1,
+                duration: inc.duration || '',
+                description: inc.description || '',
+              }))
+            : [
+                {
+                  name: '',
+                  brand: '',
+                  quantity: 1,
+                  duration: '',
+                  description: '',
+                },
+              ],
           exclusions: data.exclusions || [],
           termsAndConditions: data.termsAndConditions || [],
           sortOrder: data.sortOrder || 0,
@@ -281,18 +292,15 @@ export function AdminPackagesPage() {
 
   // Inclusion handlers
   const addInclusion = () => {
-    const matchingServices = allServices.filter(
-      (s) => !formData.categoryId || String(s.categoryId) === String(formData.categoryId)
-    )
-    const defaultSrv = matchingServices[0] || allServices[0]
     setFormData((prev) => ({
       ...prev,
       inclusions: [
         ...prev.inclusions,
         {
-          serviceId: defaultSrv ? String(defaultSrv._id) : '',
-          name: defaultSrv ? defaultSrv.name : '',
+          name: '',
+          brand: '',
           quantity: 1,
+          duration: '',
           description: '',
         },
       ],
@@ -302,18 +310,9 @@ export function AdminPackagesPage() {
   const updateInclusion = (index, field, value) => {
     setFormData((prev) => {
       const updated = [...prev.inclusions]
-      if (field === 'serviceId') {
-        const srv = allServices.find((s) => String(s._id) === String(value))
-        updated[index] = {
-          ...updated[index],
-          serviceId: value,
-          name: srv ? srv.name : updated[index].name,
-        }
-      } else {
-        updated[index] = {
-          ...updated[index],
-          [field]: value,
-        }
+      updated[index] = {
+        ...updated[index],
+        [field]: value,
       }
       return { ...prev, inclusions: updated }
     })
@@ -351,9 +350,10 @@ export function AdminPackagesPage() {
       setFormError('At least one included service is required.')
       return
     }
-    for (const inc of formData.inclusions) {
-      if (!inc.serviceId) {
-        setFormError('Please select a service for all inclusions.')
+    for (let i = 0; i < formData.inclusions.length; i++) {
+      const inc = formData.inclusions[i]
+      if (!inc.name || !inc.name.trim()) {
+        setFormError(`Please enter a service name for row #${i + 1}.`)
         return
       }
     }
@@ -379,10 +379,12 @@ export function AdminPackagesPage() {
         validFrom: formData.validFrom || null,
         validUntil: formData.validUntil || null,
         inclusions: formData.inclusions.map((inc) => ({
-          serviceId: inc.serviceId,
-          name: inc.name,
+          serviceId: inc.serviceId && inc.serviceId.length === 24 ? inc.serviceId : undefined,
+          name: inc.name.trim(),
+          brand: (inc.brand || '').trim(),
           quantity: Number(inc.quantity) || 1,
-          description: inc.description || '',
+          duration: (inc.duration || '').trim(),
+          description: (inc.description || '').trim(),
         })),
         exclusions: formData.exclusions.filter(Boolean),
         termsAndConditions: formData.termsAndConditions.filter(Boolean),
@@ -625,7 +627,7 @@ export function AdminPackagesPage() {
                           {pkg.inclusions?.length || 0} services
                         </span>
                         <span className="text-[10px] text-slate-400 truncate max-w-[180px]">
-                          {pkg.inclusions?.map((i) => i.name).join(', ')}
+                          {pkg.inclusions?.map((i) => (i.brand ? `${i.name} (${i.brand})` : i.name)).join(', ')}
                         </span>
                       </div>
                     </td>
@@ -767,27 +769,9 @@ export function AdminPackagesPage() {
                     required
                     value={formData.categoryId}
                     onChange={(e) => {
-                      const newCatId = e.target.value
-                      const matchingServices = allServices.filter(
-                        (s) => !newCatId || String(s.categoryId) === String(newCatId)
-                      )
-                      const firstSrv = matchingServices[0] || allServices[0]
                       setFormData((prev) => ({
                         ...prev,
-                        categoryId: newCatId,
-                        inclusions:
-                          prev.inclusions.length > 0 && prev.inclusions[0].serviceId
-                            ? prev.inclusions
-                            : firstSrv
-                            ? [
-                                {
-                                  serviceId: String(firstSrv._id),
-                                  name: firstSrv.name,
-                                  quantity: 1,
-                                  description: '',
-                                },
-                              ]
-                            : [],
+                        categoryId: e.target.value,
                       }))
                     }}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:border-brand"
@@ -959,70 +943,127 @@ export function AdminPackagesPage() {
               <div className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-extrabold text-slate-900">Included Services *</h3>
+                    <h3 className="font-extrabold text-slate-900 flex items-center gap-2">
+                      <span>Included Services *</span>
+                      <span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[10px] font-bold text-cyan-800 border border-cyan-200">
+                        {formData.inclusions.length} {formData.inclusions.length === 1 ? 'Item' : 'Items'}
+                      </span>
+                    </h3>
                     <p className="text-[10px] text-slate-400">
-                      Select which existing services from the catalog make up this package.
+                      Enter service name, brand, quantity, and duration manually for this package.
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={addInclusion}
-                    className="rounded-lg bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100"
+                    className="inline-flex items-center gap-1 rounded-lg bg-teal-50 border border-teal-200 px-2.5 py-1 text-[11px] font-bold text-[#015F6C] hover:bg-teal-100 transition"
                   >
-                    + Add Service
+                    <Plus className="h-3.5 w-3.5" /> Add Service
                   </button>
+                </div>
+
+                {/* Column Headers (Desktop/Tablet) */}
+                <div className="hidden sm:grid sm:grid-cols-12 gap-2 px-3 py-1.5 bg-slate-50 rounded-lg text-[10px] font-bold uppercase tracking-wider text-slate-500 border border-slate-100">
+                  <div className="col-span-4">1. Service Name *</div>
+                  <div className="col-span-3">2. Brand Name</div>
+                  <div className="col-span-2 text-center">3. Quantity</div>
+                  <div className="col-span-2">4. Duration</div>
+                  <div className="col-span-1 text-right">Action</div>
                 </div>
 
                 <div className="space-y-2">
                   {formData.inclusions.map((inc, idx) => (
                     <div
                       key={idx}
-                      className="flex flex-col sm:flex-row items-center gap-2 p-2.5 rounded-xl border border-slate-100 bg-slate-50/70"
+                      className="p-2.5 rounded-xl border border-slate-200/90 bg-slate-50/70 hover:bg-white hover:border-[#01C7D0]/40 transition shadow-2xs"
                     >
-                      <div className="flex-1 w-full">
-                        <select
-                          value={inc.serviceId}
-                          onChange={(e) => updateInclusion(idx, 'serviceId', e.target.value)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800"
-                        >
-                          <option value="">Choose Service</option>
-                          {allServices
-                            .filter((s) => !formData.categoryId || String(s.categoryId) === String(formData.categoryId))
-                            .map((srv) => (
-                              <option key={srv._id} value={srv._id}>
-                                {srv.name} ({srv.categoryName} - ₹{srv.basePrice})
-                              </option>
-                            ))}
-                        </select>
+                      <div className="grid grid-cols-12 gap-2 items-center">
+                        {/* 1st Block: Service Name input manually without dropdown */}
+                        <div className="col-span-12 sm:col-span-4">
+                          <label className="block sm:hidden text-[10px] font-bold text-slate-500 mb-0.5">
+                            1. Service Name *
+                          </label>
+                          <input
+                            type="text"
+                            value={inc.name}
+                            onChange={(e) => updateInclusion(idx, 'name', e.target.value)}
+                            placeholder="e.g. Aroma Skin Glow Facial"
+                            className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:border-[#01C7D0] focus:ring-1 focus:ring-[#01C7D0] outline-none"
+                          />
+                        </div>
+
+                        {/* 2nd Block: Brand Name column */}
+                        <div className="col-span-12 sm:col-span-3">
+                          <label className="block sm:hidden text-[10px] font-bold text-slate-500 mb-0.5">
+                            2. Brand Name
+                          </label>
+                          <input
+                            type="text"
+                            value={inc.brand || ''}
+                            onChange={(e) => updateInclusion(idx, 'brand', e.target.value)}
+                            placeholder="e.g. L'Oreal / O3+ / Philips"
+                            className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-[#01C7D0] focus:ring-1 focus:ring-[#01C7D0] outline-none"
+                          />
+                        </div>
+
+                        {/* 3rd Block: Quantity option */}
+                        <div className="col-span-6 sm:col-span-2">
+                          <label className="block sm:hidden text-[10px] font-bold text-slate-500 mb-0.5">
+                            3. Quantity
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={inc.quantity}
+                            onChange={(e) => updateInclusion(idx, 'quantity', e.target.value)}
+                            placeholder="Qty"
+                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-bold text-center text-slate-800 focus:border-[#01C7D0] focus:ring-1 focus:ring-[#01C7D0] outline-none"
+                          />
+                        </div>
+
+                        {/* 4th Block: Duration box */}
+                        <div className="col-span-5 sm:col-span-2">
+                          <label className="block sm:hidden text-[10px] font-bold text-slate-500 mb-0.5">
+                            4. Duration
+                          </label>
+                          <input
+                            type="text"
+                            value={inc.duration || ''}
+                            onChange={(e) => updateInclusion(idx, 'duration', e.target.value)}
+                            placeholder="e.g. 45 mins"
+                            className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-[#01C7D0] focus:ring-1 focus:ring-[#01C7D0] outline-none"
+                          />
+                        </div>
+
+                        {/* Action Column */}
+                        <div className="col-span-1 flex items-center justify-end">
+                          {formData.inclusions.length > 1 ? (
+                            <button
+                              type="button"
+                              onClick={() => removeInclusion(idx)}
+                              className="p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 rounded-lg transition"
+                              title="Remove item"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData((prev) => {
+                                  const updated = [...prev.inclusions]
+                                  updated[0] = { name: '', brand: '', quantity: 1, duration: '', description: '' }
+                                  return { ...prev, inclusions: updated }
+                                })
+                              }}
+                              className="p-1.5 text-slate-300 hover:text-slate-500 rounded-lg transition"
+                              title="Clear fields"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="w-24 shrink-0">
-                        <input
-                          type="number"
-                          min={1}
-                          value={inc.quantity}
-                          onChange={(e) => updateInclusion(idx, 'quantity', e.target.value)}
-                          placeholder="Qty"
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-bold text-center"
-                        />
-                      </div>
-                      <div className="flex-1 w-full">
-                        <input
-                          type="text"
-                          value={inc.description}
-                          onChange={(e) => updateInclusion(idx, 'description', e.target.value)}
-                          placeholder="Optional notes e.g. 1 unit / 1.5 ton AC"
-                          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
-                        />
-                      </div>
-                      {formData.inclusions.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeInclusion(idx)}
-                          className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg shrink-0"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -1140,9 +1181,21 @@ export function AdminPackagesPage() {
                 <div className="rounded-xl bg-slate-50 p-3 space-y-1.5 border border-slate-100 text-xs">
                   <p className="font-bold text-slate-700">Included Services:</p>
                   {previewPackage.inclusions?.map((inc, i) => (
-                    <div key={i} className="flex justify-between text-slate-600">
-                      <span>✓ {inc.name}</span>
-                      <span className="font-bold text-slate-400">x{inc.quantity || 1}</span>
+                    <div key={i} className="flex justify-between items-center text-slate-600 py-0.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-slate-800">✓ {inc.name}</span>
+                        {inc.brand && (
+                          <span className="rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-bold text-teal-800 border border-teal-200">
+                            {inc.brand}
+                          </span>
+                        )}
+                        {inc.duration && (
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            ⏱ {inc.duration}
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-bold text-slate-400 shrink-0">x{inc.quantity || 1}</span>
                     </div>
                   ))}
                 </div>

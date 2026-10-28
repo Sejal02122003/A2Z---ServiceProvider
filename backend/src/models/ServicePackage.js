@@ -5,17 +5,27 @@ const inclusionSchema = new mongoose.Schema(
     serviceId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'LabourService',
-      required: [true, 'Service reference is required for inclusion'],
+      required: false,
     },
     name: {
       type: String,
       required: true,
       trim: true,
     },
+    brand: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     quantity: {
       type: Number,
       default: 1,
       min: [1, 'Quantity must be at least 1'],
+    },
+    duration: {
+      type: String,
+      trim: true,
+      default: '',
     },
     description: {
       type: String,

@@ -531,6 +531,20 @@ export function JobTracking() {
                   <div key={i} className="flex items-start justify-between bg-white px-2.5 py-1.5 rounded-lg border border-indigo-100 text-xs shadow-2xs">
                     <div className="min-w-0 flex-1">
                       <span className="font-semibold text-slate-800">✓ {inc.name}</span>
+                      {(inc.brand || inc.duration) && (
+                        <div className="flex flex-wrap items-center gap-1.5 pl-3 mt-0.5">
+                          {inc.brand && (
+                            <span className="rounded bg-teal-50 px-1.5 py-0.2 text-[9px] font-bold text-[#015F6C] border border-teal-200">
+                              {inc.brand}
+                            </span>
+                          )}
+                          {inc.duration && (
+                            <span className="text-[9px] text-slate-400 font-medium">
+                              ⏱ {inc.duration}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {inc.description && (
                         <p className="text-[10px] text-slate-500 leading-tight mt-0.5 font-medium pl-3">
                           {inc.description}

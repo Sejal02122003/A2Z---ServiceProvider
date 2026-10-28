@@ -381,6 +381,20 @@ export function BroadcastPopup() {
                                 <Check className="h-3 w-3 text-emerald-600 stroke-[3] shrink-0" />
                                 <span className="truncate">{inc.name}</span>
                               </span>
+                              {(inc.brand || inc.duration) && (
+                                <div className="flex flex-wrap items-center gap-1.5 pl-4 mt-0.5">
+                                  {inc.brand && (
+                                    <span className="rounded bg-teal-50 px-1.5 py-0.2 text-[9px] font-bold text-[#015F6C] border border-teal-200">
+                                      {inc.brand}
+                                    </span>
+                                  )}
+                                  {inc.duration && (
+                                    <span className="text-[9px] text-slate-400 font-medium">
+                                      ⏱ {inc.duration}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                               {inc.description && (
                                 <p className="text-[10px] text-slate-500 pl-4 leading-tight mt-0.5 font-medium">
                                   {inc.description}

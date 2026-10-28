@@ -145,7 +145,9 @@ export const calculateBill = asyncHandler(async (req, res) => {
     const breakdown = (pkg.inclusions || []).map(inc => ({
       serviceId: inc.serviceId,
       name: inc.name,
+      brand: inc.brand || '',
       quantity: inc.quantity || 1,
+      duration: inc.duration || '',
       description: inc.description || '',
       hourlyRate: 0,
       subTotal: 0,
@@ -766,7 +768,9 @@ export const createBooking = asyncHandler(async (req, res) => {
       inclusions: (pkg.inclusions || []).map(inc => ({
         serviceId: inc.serviceId,
         name: inc.name,
+        brand: inc.brand || '',
         quantity: inc.quantity || 1,
+        duration: inc.duration || '',
         description: inc.description || ''
       })),
       snapshot: {
