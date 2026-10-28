@@ -143,8 +143,10 @@ export function LabourAssignmentDetailModal({ open, onClose, job, rawJob, assign
   const displayStatus = assignment ? assignment.status : activeRawJob?.status
   
   useEffect(() => {
+    if (!socket) return
+
     const handleStatusUpdate = (data) => {
-      if (data.bookingId === activeRawJob?._id) {
+      if (data?.bookingId === activeRawJob?._id) {
         if (data.paymentStatus === 'PAID') {
           setLivePaymentStatus('PAID')
           setShowPaymentWaiting(true)
@@ -156,7 +158,9 @@ export function LabourAssignmentDetailModal({ open, onClose, job, rawJob, assign
       }
     }
     socket.on('BOOKING_STATUS_UPDATE', handleStatusUpdate)
-    return () => { socket.off('BOOKING_STATUS_UPDATE', handleStatusUpdate) }
+    return () => {
+      socket.off('BOOKING_STATUS_UPDATE', handleStatusUpdate)
+    }
   }, [socket, activeRawJob?._id])
 
   useEffect(() => {
