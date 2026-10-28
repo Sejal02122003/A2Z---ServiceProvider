@@ -1055,17 +1055,54 @@ export function LabourHomeScreen({ user }) {
                       transition={{ duration: 2, repeat: Infinity }}
                       aria-hidden
                     />
-                    <div className="relative flex items-start gap-2">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
-                        <Flame className="h-4 w-4" aria-hidden />
+                    <div className="relative flex items-start gap-2.5">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800 shadow-2xs">
+                        <Flame className="h-5 w-5" aria-hidden />
                       </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800">New job</p>
-                        <p className="text-sm font-extrabold text-slate-900">{formatInrFromPaise((offer.laborShare || 0) * 100)} payout</p>
-                        <p className="mt-0.5 text-xs text-slate-600">
-                          {offer.radiusKm ? `${offer.radiusKm} km radius` : ''} · {offer.type}
-                        </p>
-                        <p className="mt-0.5 truncate text-xs text-slate-500">{offer.address?.locationText}</p>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <p className="text-[10px] font-black uppercase tracking-wider text-amber-800">
+                            {offer.type === 'SCHEDULED' ? 'Scheduled Job' : 'Instant Flash Job'}
+                          </p>
+                          <span className="text-sm font-black text-slate-900 font-mono">
+                            ₹{offer.estimatedEarnings || offer.laborShare || 0} payout
+                          </span>
+                        </div>
+
+                        {/* Service Name & Quantity */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-sm font-extrabold text-slate-900 leading-snug">
+                            {offer.serviceName || (offer.services?.length ? offer.services.map(s => s.name).join(', ') : 'Requested Service')}
+                          </p>
+                          {(offer.quantity || (offer.services?.length && offer.services.reduce((acc, s) => acc + (s.quantity || 1), 0)) || 1) > 1 && (
+                            <span className="rounded-md bg-blue-100 px-1.5 py-0.5 text-[10px] font-black text-blue-800 border border-blue-200">
+                              Qty: {offer.quantity || offer.services.reduce((acc, s) => acc + (s.quantity || 1), 0)}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Service Timing */}
+                        {(offer.formattedDuration || offer.totalDurationMins || offer.duration) && (
+                          <div className="flex items-center gap-1 text-xs font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200 w-fit">
+                            <Clock className="h-3 w-3 text-brand shrink-0" />
+                            <span>
+                              Service Timing: {offer.formattedDuration || (offer.totalDurationMins ? `${offer.totalDurationMins} mins` : `${offer.duration || 1} hr`)}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Schedule & Location */}
+                        <div className="space-y-0.5 text-xs text-slate-600 pt-0.5">
+                          {(offer.time || offer.date) && (
+                            <p className="font-semibold text-slate-700">
+                              ⏰ {offer.time ? `At ${offer.time}` : ''} {offer.date ? `(${String(offer.date).slice(0, 10)})` : ''}
+                            </p>
+                          )}
+                          <p className="flex items-start gap-1 text-slate-500 truncate">
+                            <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400 mt-0.5" />
+                            <span className="truncate">{offer.customerLocation || offer.address?.locationText || 'Service location'}</span>
+                          </p>
+                        </div>
                       </div>
                     </div>
                     <div className="relative mt-3 flex gap-2">

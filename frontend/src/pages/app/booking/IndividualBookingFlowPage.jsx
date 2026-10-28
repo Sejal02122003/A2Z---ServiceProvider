@@ -21,6 +21,7 @@ import {
   Loader2,
   Package,
   ShieldCheck,
+  Clock,
 } from 'lucide-react'
 import { AppStackScreenHeader } from '../../../components/app/AppStackScreenHeader.jsx'
 import { AppButton } from '../../../components/app-ui/buttons/AppButton.jsx'
@@ -2435,6 +2436,19 @@ export function IndividualBookingFlowPage() {
                       )}
                     </div>
                   )}
+                  {/* Estimated Service Timing */}
+                  {(calculatedBill.formattedDuration || calculatedBill.totalDurationMins) && (
+                    <div className="flex justify-between items-center bg-teal-50/80 border border-teal-200/80 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-teal-950 mb-2">
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-brand" />
+                        <span>Estimated Service Timing</span>
+                      </span>
+                      <span className="font-extrabold text-teal-900">
+                        ~{calculatedBill.formattedDuration}
+                      </span>
+                    </div>
+                  )}
+
                   {calculatedBill.isPackage ? (
                     <div className="flex justify-between font-semibold text-black">
                       <span className="flex flex-col">

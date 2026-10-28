@@ -680,6 +680,24 @@ export function ActiveJob() {
             </div>
           ) : null;
         })()}
+        {booking && (
+          <>
+            <div className="flex justify-between items-center py-1 border-t border-slate-100 mt-2">
+              <span className="text-slate-500">Service Timing</span>
+              <span className="font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded text-xs border border-teal-200">
+                ~{booking.formattedDuration || (booking.totalDurationMins ? `${booking.totalDurationMins} mins` : `${booking.hours || 1} hr`)}
+              </span>
+            </div>
+            {(booking.quantity > 1 || (booking.multiServiceBooking?.items?.length > 0)) && (
+              <div className="flex justify-between items-center py-1">
+                <span className="text-slate-500">Service Quantity</span>
+                <span className="font-bold text-slate-900">
+                  {booking.quantity || booking.multiServiceBooking?.items?.reduce((acc, it) => acc + (it.quantity || 1), 0)} Items
+                </span>
+              </div>
+            )}
+          </>
+        )}
         {booking.multiServiceBooking?.isMultiService && (() => {
           const myItem = (booking.multiServiceBooking.items || []).find(it => {
             const lId = typeof it.assignedLabourId === 'object' ? it.assignedLabourId?._id : it.assignedLabourId
@@ -693,7 +711,13 @@ export function ActiveJob() {
               {myItem.subServiceName && (
                 <p className="text-xs text-brand font-semibold">{myItem.subServiceName}</p>
               )}
-              <p className="text-xs text-slate-500 mt-0.5">Quantity: {myItem.quantity || 1}</p>
+              <div className="flex items-center gap-2 mt-1 text-xs text-slate-600 flex-wrap">
+                <span>Quantity: <strong className="text-slate-800">{myItem.quantity || 1}</strong></span>
+                <span>•</span>
+                <span className="text-teal-800 font-bold bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200">
+                  Est. Timing: ~{myItem.formattedDuration || (myItem.totalDurationMins ? `${myItem.totalDurationMins} mins` : `${(myItem.estimatedDurationMins || 45) * (myItem.quantity || 1)} mins`)}
+                </span>
+              </div>
             </div>
           )
         })()}

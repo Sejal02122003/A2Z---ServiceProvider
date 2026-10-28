@@ -153,11 +153,20 @@ export function BookingCartProvider({ children }) {
     return cartItems.reduce((acc, curr) => acc + (curr.price || 0) * (curr.quantity || 1), 0)
   }, [cartItems])
 
+  const cartTotalDurationMins = useMemo(() => {
+    return cartItems.reduce((acc, curr) => {
+      const unitDuration = Number(curr.estimatedDurationMins) || 45
+      const qty = Number(curr.quantity) || 1
+      return acc + (unitDuration * qty)
+    }, 0)
+  }, [cartItems])
+
   const value = useMemo(
     () => ({
       cartItems,
       cartCount,
       cartSubtotal,
+      cartTotalDurationMins,
       addToCart,
       removeFromCart,
       updateQuantity,
@@ -169,6 +178,7 @@ export function BookingCartProvider({ children }) {
       cartItems,
       cartCount,
       cartSubtotal,
+      cartTotalDurationMins,
       addToCart,
       removeFromCart,
       updateQuantity,

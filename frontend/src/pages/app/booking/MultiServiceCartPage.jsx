@@ -29,12 +29,26 @@ import { GlassPanel } from '../../../components/ui/GlassPanel.jsx'
 import { getCategoryImageUrl } from '../../../lib/labourCategoryDisplay.js'
 import { SelectAddressSheet } from '../../../components/app/address/SelectAddressSheet.jsx'
 
+function formatDuration(mins) {
+  const m = Math.max(1, Math.round(Number(mins) || 45))
+  const hrs = Math.floor(m / 60)
+  const remainingMins = m % 60
+  if (hrs > 0 && remainingMins > 0) {
+    return `${hrs} hr ${remainingMins} mins`
+  }
+  if (hrs > 0 && remainingMins === 0) {
+    return `${hrs} hr${hrs > 1 ? 's' : ''}`
+  }
+  return `${m} mins`
+}
+
 export function MultiServiceCartPage() {
   const navigate = useNavigate()
   const { realUser } = useAuth()
   const {
     cartItems,
     cartCount,
+    cartTotalDurationMins,
     removeFromCart,
     updateQuantity,
     clearCart,
@@ -178,6 +192,8 @@ export function MultiServiceCartPage() {
           subServiceName: it.subServiceName || undefined,
           quantity: it.quantity || 1,
           hours: it.hours || 1,
+          estimatedDurationMins: it.estimatedDurationMins || 45,
+          totalDurationMins: (it.estimatedDurationMins || 45) * (it.quantity || 1),
         })),
         serviceId: cartItems[0]?.serviceId,
         subcategoryId: cartItems[0]?.subcategoryId,
@@ -283,7 +299,14 @@ export function MultiServiceCartPage() {
             <div className="flex justify-between text-xs font-semibold text-slate-700">
               <span>Total Services:</span>
               <span className="font-bold text-slate-900">
-                {bookingSuccessData.multiServiceBooking?.items?.length || 1} Services
+                {bookingSuccessData.multiServiceBooking?.items?.length || cartCount} Services
+              </span>
+            </div>
+            <div className="flex justify-between text-xs font-semibold text-slate-700">
+              <span>Estimated Service Timing:</span>
+              <span className="font-bold text-teal-800 flex items-center gap-1">
+                <Clock className="h-3 w-3 text-brand" />
+                {bookingSuccessData.formattedDuration || formatDuration(bookingSuccessData.totalDurationMins || (bookingSuccessData.hours * 60))}
               </span>
             </div>
             <div className="flex justify-between text-xs font-semibold text-slate-700">
@@ -444,10 +467,20 @@ export function MultiServiceCartPage() {
                         {item.categoryName}
                       </p>
                     )}
-                    <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500 font-medium">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3 text-slate-400" />
-                        {item.estimatedDurationMins || 45} mins
+                    <div className="flex items-center gap-2 mt-1.5 text-[11px] text-slate-500 font-medium flex-wrap">
+                      <span className="inline-flex items-center gap-1 text-slate-700 font-semibold bg-teal-50/80 px-2 py-0.5 rounded-md border border-teal-200/60">
+                        <Clock className="h-3 w-3 text-brand" />
+                        <span>
+                          Timing:{' '}
+                          <strong className="text-teal-900">
+                            {formatDuration((item.estimatedDurationMins || 45) * (item.quantity || 1))}
+                          </strong>
+                          {(item.quantity || 1) > 1 && (
+                            <span className="text-teal-700/80 font-normal ml-1">
+                              ({item.estimatedDurationMins || 45}m × {item.quantity})
+                            </span>
+                          )}
+                        </span>
                       </span>
                     </div>
 
@@ -733,7 +766,17 @@ export function MultiServiceCartPage() {
           </div>
 
           <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between text-slate-600 font-medium">
+            <div className="flex justify-between items-center bg-teal-50/70 border border-teal-200/70 rounded-xl px-2.5 py-2 text-xs font-semibold text-teal-950">
+              <span className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 text-brand" />
+                <span>Estimated Service Timing</span>
+              </span>
+              <span className="font-extrabold text-teal-900">
+                ~{billData?.formattedDuration || formatDuration(billData?.totalDurationMins || cartTotalDurationMins)}
+              </span>
+            </div>
+
+            <div className="flex justify-between text-slate-600 font-medium pt-1">
               <span>Items Total ({cartCount})</span>
               <span className="font-semibold text-slate-900 font-mono">
                 ₹{originalSubTotal.toLocaleString('en-IN')}

@@ -148,6 +148,12 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
                     }`}
                   >
                     <span>{it.subServiceName || it.serviceName}</span>
+                    {(it.quantity || 1) > 1 && <span className="font-black text-blue-700">×{it.quantity}</span>}
+                    {(it.formattedDuration || it.totalDurationMins) && (
+                      <span className="text-[9px] text-teal-700 font-semibold opacity-90">
+                        (~{it.formattedDuration || `${it.totalDurationMins}m`})
+                      </span>
+                    )}
                     <span className="text-[9px] opacity-75">({it.status})</span>
                   </span>
                 ))}
@@ -204,6 +210,25 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
             </span>
           </div>
           
+          {/* Service Timing & Quantity */}
+          {(booking.formattedDuration || booking.totalDurationMins || booking.hours || (booking.quantity && booking.quantity > 1)) && (
+            <div className="flex items-center gap-3 text-sm text-slate-700">
+              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-white shadow-sm border border-slate-100 shrink-0">
+                <Clock className="h-4 w-4 text-brand" />
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-slate-800">
+                  Est. Timing: {booking.formattedDuration || (booking.totalDurationMins ? `${booking.totalDurationMins} mins` : `${booking.hours || 1} hr`)}
+                </span>
+                {(booking.quantity > 1 || (booking.multiServiceBooking?.items?.length > 0)) && (
+                  <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 border border-slate-200">
+                    Qty: {booking.quantity || booking.multiServiceBooking?.items?.reduce((acc, it) => acc + (it.quantity || 1), 0)}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {booking.address?.locationText && (
             <div className="flex items-start gap-3 text-sm text-slate-700">
               <div className="flex items-center justify-center w-7 h-7 rounded-full bg-white shadow-sm border border-slate-100 shrink-0 mt-0.5">

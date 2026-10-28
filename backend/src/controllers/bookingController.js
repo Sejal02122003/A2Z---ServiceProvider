@@ -18,6 +18,19 @@ import {
   checkCustomerBookingRestriction,
 } from '../services/bookingCancellationService.js'
 
+export function formatDurationHuman(mins) {
+  const m = Math.max(1, Math.round(Number(mins) || 45))
+  const hrs = Math.floor(m / 60)
+  const remainingMins = m % 60
+  if (hrs > 0 && remainingMins > 0) {
+    return `${hrs} hr ${remainingMins} mins (${m} mins)`
+  }
+  if (hrs > 0 && remainingMins === 0) {
+    return `${hrs} hr${hrs > 1 ? 's' : ''} (${m} mins)`
+  }
+  return `${m} mins`
+}
+
 export const calculateBill = asyncHandler(async (req, res) => {
   const { serviceId, subServiceId, packageId, hours: rawHours = 1, quantity = 1, address, contractorServices } = req.body
   const hours = parseFloat(rawHours) || 1 // supports 0.5 = 30 min
@@ -165,6 +178,9 @@ export const calculateBill = asyncHandler(async (req, res) => {
         platformFee,
         taxes,
         totalAmount,
+        totalDurationMins: Number(pkg.estimatedDurationMins || 60) * (Number(quantity) || 1),
+        formattedDuration: formatDurationHuman(Number(pkg.estimatedDurationMins || 60) * (Number(quantity) || 1)),
+        estimatedDurationMins: Number(pkg.estimatedDurationMins || 60) * (Number(quantity) || 1),
         commissionAmount,
         laborShare: Math.max(0, basePrice - commissionAmount - platformFee),
         paymentModes: settings.paymentModes || { cashEnabled: true, onlineEnabled: true },
@@ -283,6 +299,11 @@ export const calculateBill = asyncHandler(async (req, res) => {
       categoryId,
       subcategoryId: service?.subcategoryId,
       iconUrl: service?.iconUrl,
+      estimatedDurationMins: Number(
+        (ssId && Array.isArray(service?.subServices) && service.subServices.find(ss => String(ss._id) === String(ssId))?.estimatedDurationMins) ||
+        service?.estimatedDurationMins ||
+        60
+      ),
     }
   }
 
@@ -300,15 +321,20 @@ export const calculateBill = asyncHandler(async (req, res) => {
 
   let primaryCategoryId = null
   let itemTaxesTotal = 0
+  let totalDurationMins = 0
 
   for (const item of servicesToCalculate) {
     if (!item.serviceId) continue
     const itemHours = Number(item.hours) || hours || 1
     const itemQty = Number(item.quantity) || 1
-    const { hourlyRate, originalHourlyRate, discountType, discountValue, offerBadge, name, categoryId, subcategoryId, iconUrl, error } = await resolveHourlyRate(item.serviceId, item.subServiceId)
+    const { hourlyRate, originalHourlyRate, discountType, discountValue, offerBadge, name, categoryId, subcategoryId, iconUrl, estimatedDurationMins: resolvedDurationMins, error } = await resolveHourlyRate(item.serviceId, item.subServiceId)
     if (error) return sendError(res, { message: error, statusCode: HTTP_STATUS.NOT_FOUND })
     
     if (!primaryCategoryId && categoryId) primaryCategoryId = categoryId
+
+    const itemUnitDuration = Number(item.estimatedDurationMins || resolvedDurationMins || 45)
+    const itemTotalDuration = itemUnitDuration * itemQty
+    totalDurationMins += itemTotalDuration
 
     const itemOriginalTotal = (originalHourlyRate || hourlyRate) * itemHours * itemQty
     const itemTotal = hourlyRate * itemHours * itemQty
@@ -345,6 +371,9 @@ export const calculateBill = asyncHandler(async (req, res) => {
       offerBadge,
       hours: itemHours,
       quantity: itemQty,
+      estimatedDurationMins: itemUnitDuration,
+      totalDurationMins: itemTotalDuration,
+      formattedDuration: formatDurationHuman(itemTotalDuration),
       subTotal: itemTotal,
       savings: itemDiscount,
       taxes: itemTax,
@@ -431,6 +460,10 @@ export const calculateBill = asyncHandler(async (req, res) => {
       platformFee,
       taxes,
       totalAmount,
+      totalDurationMins,
+      formattedDuration: formatDurationHuman(totalDurationMins),
+      estimatedDurationMins: totalDurationMins,
+      totalQuantity: servicesToCalculate.reduce((acc, it) => acc + (Number(it.quantity) || 1), 0),
       commissionAmount, // Internal calculation preview
       laborShare: Math.max(0, basePrice - commissionAmount - platformFee),
       paymentModes: settings.paymentModes || { cashEnabled: true, onlineEnabled: true },
@@ -534,6 +567,7 @@ export const createBooking = asyncHandler(async (req, res) => {
   let multiServiceTaxes = 0
   let totalQuantity = quantity
   let bookingHours = hours
+  let computedTotalDurationMins = 60
 
   if (isMultiService) {
     // ----------------------------------------------------
@@ -594,6 +628,10 @@ export const createBooking = asyncHandler(async (req, res) => {
 
       const itemQty = Number(itm.quantity) || 1
       const itemHours = Number(itm.hours) || hours || 1
+      const itemUnitDuration = Number(subServiceDoc?.estimatedDurationMins || srv.estimatedDurationMins || itm.estimatedDurationMins || 45)
+      const itemTotalDuration = itemUnitDuration * itemQty
+      computedTotalDurationMins = (computedTotalDurationMins === 60 && processedItems.length === 0 ? 0 : computedTotalDurationMins) + itemTotalDuration
+
       const itemTotal = unitPrice * itemHours * itemQty
       computedSubTotal += itemTotal
 
@@ -633,6 +671,9 @@ export const createBooking = asyncHandler(async (req, res) => {
         originalPrice: baseRate,
         quantity: itemQty,
         hours: itemHours,
+        estimatedDurationMins: itemUnitDuration,
+        totalDurationMins: itemTotalDuration,
+        formattedDuration: formatDurationHuman(itemTotalDuration),
         itemTotal,
         status: 'PENDING',
         startOtp: itemStartOtp,
@@ -651,6 +692,7 @@ export const createBooking = asyncHandler(async (req, res) => {
     bookingSubcategoryId = processedItems[0].subcategoryId
     subTotal = computedSubTotal
     totalQuantity = processedItems.reduce((acc, it) => acc + it.quantity, 0)
+    bookingHours = Math.max(0.5, parseFloat((computedTotalDurationMins / 60).toFixed(1)))
     maxHourDiscount = 0
     multiServiceBookingData = {
       isMultiService: true,
@@ -706,9 +748,9 @@ export const createBooking = asyncHandler(async (req, res) => {
     subTotal = Number(pkg.price) || 0
     maxHourDiscount = 0
     totalQuantity = 1
-    if (pkg.estimatedDurationMins) {
-      bookingHours = parseFloat((pkg.estimatedDurationMins / 60).toFixed(1)) || 1
-    }
+    const pkgDuration = Number(pkg.estimatedDurationMins || 60) * (Number(quantity) || 1)
+    computedTotalDurationMins = pkgDuration
+    bookingHours = Math.max(0.5, parseFloat((pkgDuration / 60).toFixed(1)))
 
     const packageOriginalPrice = Number(pkg.originalPrice) || subTotal
     const packageSavings = Math.max(0, packageOriginalPrice - subTotal)
@@ -799,16 +841,24 @@ export const createBooking = asyncHandler(async (req, res) => {
     }
 
     if (contractorInfo && contractorInfo.services && contractorInfo.services.length > 0) {
+      let contractorDuration = 0
       for (const item of contractorInfo.services) {
         const hrRate = await resolveHourlyRate(item.serviceId)
         item.price = hrRate // Store the unit hourly rate
         subTotal += hrRate * hours * (item.quantity || 1)
+        const srvDoc = await LabourService.findById(item.serviceId).select('estimatedDurationMins').lean()
+        contractorDuration += Number(srvDoc?.estimatedDurationMins || 60) * (item.quantity || 1)
       }
       totalQuantity = contractorInfo.services.reduce((acc, curr) => acc + (curr.quantity || 1), 0)
+      computedTotalDurationMins = contractorDuration || (hours * 60)
+      bookingHours = Math.max(0.5, parseFloat((computedTotalDurationMins / 60).toFixed(1)))
     } else {
       const hrRate = await resolveHourlyRate(serviceId)
       subTotal = hrRate * hours * quantity
       totalQuantity = quantity
+      const srvUnitDuration = Number(service.estimatedDurationMins || 60)
+      computedTotalDurationMins = srvUnitDuration * (Number(quantity) || 1)
+      bookingHours = Math.max(0.5, parseFloat((computedTotalDurationMins / 60).toFixed(1)))
     }
 
     if (hours >= 8 && settings?.maxHourDiscountPercentage > 0) {
@@ -902,6 +952,8 @@ export const createBooking = asyncHandler(async (req, res) => {
       notes,
       hours: bookingHours,
       quantity: totalQuantity,
+      totalDurationMins: computedTotalDurationMins,
+      formattedDuration: formatDurationHuman(computedTotalDurationMins),
       contractorInfo,
       maxHourDiscount,
       packageBooking: packageBookingData,

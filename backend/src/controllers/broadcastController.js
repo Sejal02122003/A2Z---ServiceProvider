@@ -4,6 +4,19 @@ import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { KYC_STATUS } from '../constants/roles.js'
 import { BROADCAST_TIMEOUT_MS } from '../services/broadcastService.js'
 
+function formatDurationHuman(mins) {
+  const m = Math.max(1, Math.round(Number(mins) || 45))
+  const hrs = Math.floor(m / 60)
+  const remainingMins = m % 60
+  if (hrs > 0 && remainingMins > 0) {
+    return `${hrs} hr ${remainingMins} mins (${m} mins)`
+  }
+  if (hrs > 0 && remainingMins === 0) {
+    return `${hrs} hr${hrs > 1 ? 's' : ''} (${m} mins)`
+  }
+  return `${m} mins`
+}
+
 /**
  * Validate that labour can receive/accept bookings.
  * Chain: KYC approved → trial OR subscription active → within hours → available
@@ -527,21 +540,37 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       itemId: String(it._id),
       serviceId: String(it.serviceId),
       name: it.subServiceName ? `${it.serviceName} - ${it.subServiceName}` : it.serviceName,
+      serviceName: it.serviceName,
+      subServiceName: it.subServiceName || '',
+      quantity: it.quantity || 1,
+      estimatedDurationMins: it.estimatedDurationMins || 45,
+      totalDurationMins: it.totalDurationMins || ((it.estimatedDurationMins || 45) * (it.quantity || 1)),
+      formattedDuration: it.formattedDuration || formatDurationHuman(it.totalDurationMins || ((it.estimatedDurationMins || 45) * (it.quantity || 1))),
       pricePerHour: it.unitPrice || 0,
+      unitPrice: it.unitPrice || 0,
+      itemTotal: it.itemTotal || 0,
       estimatedEarnings: Math.round(it.itemTotal * 0.90),
       openSlots: 1,
     }))
 
     const bestEarning = servicesPayload.reduce((max, s) => Math.max(max, s.estimatedEarnings), 0)
+    const totalBookingDuration = booking.totalDurationMins || Math.round(bookingHours * 60)
+    const formattedBookingDuration = booking.formattedDuration || formatDurationHuman(totalBookingDuration)
+    const totalBookingQty = (booking.multiServiceBooking?.items || []).reduce((acc, it) => acc + (it.quantity || 1), 0) || booking.quantity || 1
 
     payload = {
       bookingId: booking._id,
       type: booking.type || 'SCHEDULED',
       customerName: booking.userId?.fullName || 'Customer',
+      customerPhone: booking.userId?.phone || '',
       serviceName: servicesPayload.length === 1 ? servicesPayload[0].name : 'Multi-Service Booking',
       services: servicesPayload,
       isMultiServiceBooking: true,
       requiresServiceSelection: servicesPayload.length > 1,
+      quantity: totalBookingQty,
+      totalQuantity: totalBookingQty,
+      totalDurationMins: totalBookingDuration,
+      formattedDuration: formattedBookingDuration,
       date: booking.scheduledAt || booking.createdAt,
       time: booking.timeSlot || 'Earliest available',
       duration: bookingHours,
@@ -633,15 +662,23 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       }
     }
     const singleShare = booking.laborShare || booking.basePrice || 0
+    const singleDurationMins = booking.totalDurationMins || Math.round(bookingHours * 60)
+    const formattedSingleDuration = booking.formattedDuration || formatDurationHuman(singleDurationMins)
+    const singleQty = booking.quantity || 1
 
     payload = {
       bookingId: booking._id,
       type: booking.type || 'SCHEDULED',
       customerName: booking.userId?.fullName || 'Customer',
+      customerPhone: booking.userId?.phone || '',
       serviceName: singleServiceName,
       serviceDetail: singleServiceDetail || booking.notes || '',
       categoryName: singleCategoryName,
       subServiceName: singleSubServiceName,
+      quantity: singleQty,
+      totalQuantity: singleQty,
+      totalDurationMins: singleDurationMins,
+      formattedDuration: formattedSingleDuration,
       isContractorBooking: false,
       requiresServiceSelection: false,
       date: booking.scheduledAt || booking.createdAt,

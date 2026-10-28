@@ -10,6 +10,19 @@ import { USER_ROLES } from '../constants/roles.js'
 
 export const BROADCAST_TIMEOUT_MS = 90000 // 1.5 minutes (90 seconds) flash broadcast timeout
 
+function formatDurationHuman(mins) {
+  const m = Math.max(1, Math.round(Number(mins) || 45))
+  const hrs = Math.floor(m / 60)
+  const remainingMins = m % 60
+  if (hrs > 0 && remainingMins > 0) {
+    return `${hrs} hr ${remainingMins} mins (${m} mins)`
+  }
+  if (hrs > 0 && remainingMins === 0) {
+    return `${hrs} hr${hrs > 1 ? 's' : ''} (${m} mins)`
+  }
+  return `${m} mins`
+}
+
 /**
  * Starts the flash broadcast for a new booking based on a radius zone.
  */
@@ -458,31 +471,37 @@ export async function startBroadcastCycle(bookingId) {
         const isMultiService = Boolean(booking.multiServiceBooking?.isMultiService && booking.multiServiceBooking?.items?.length > 0)
 
         if (isMultiService) {
+          const mapMultiItem = (it) => ({
+            itemId: String(it._id),
+            serviceId: String(it.serviceId),
+            name: it.subServiceName ? `${it.serviceName} - ${it.subServiceName}` : it.serviceName,
+            serviceName: it.serviceName,
+            subServiceName: it.subServiceName || '',
+            quantity: it.quantity || 1,
+            estimatedDurationMins: it.estimatedDurationMins || 45,
+            totalDurationMins: it.totalDurationMins || ((it.estimatedDurationMins || 45) * (it.quantity || 1)),
+            formattedDuration: it.formattedDuration || formatDurationHuman(it.totalDurationMins || ((it.estimatedDurationMins || 45) * (it.quantity || 1))),
+            pricePerHour: it.unitPrice || 0,
+            unitPrice: it.unitPrice || 0,
+            itemTotal: it.itemTotal || 0,
+            estimatedEarnings: Math.round(it.itemTotal * 0.90),
+            openSlots: 1
+          })
+
           const openMultiItems = (booking.multiServiceBooking?.items || []).filter(it => it.status === 'PENDING')
           const matchingMulti = openMultiItems.filter(it =>
             laborServiceIds.includes(String(it.serviceId)) ||
             (it.subcategoryId && (labor.labourProfile?.subcategoryIds || []).map(id => String(id)).includes(String(it.subcategoryId)))
-          ).map(it => ({
-            itemId: String(it._id),
-            serviceId: String(it.serviceId),
-            name: it.subServiceName ? `${it.serviceName} - ${it.subServiceName}` : it.serviceName,
-            pricePerHour: it.unitPrice || 0,
-            estimatedEarnings: Math.round(it.itemTotal * 0.90),
-            openSlots: 1
-          }))
+          ).map(mapMultiItem)
 
           const servicesPayload = matchingMulti.length > 0
             ? matchingMulti
-            : openMultiItems.map(it => ({
-                itemId: String(it._id),
-                serviceId: String(it.serviceId),
-                name: it.subServiceName ? `${it.serviceName} - ${it.subServiceName}` : it.serviceName,
-                pricePerHour: it.unitPrice || 0,
-                estimatedEarnings: Math.round(it.itemTotal * 0.90),
-                openSlots: 1
-              }))
+            : openMultiItems.map(mapMultiItem)
 
           const bestEarning = servicesPayload.reduce((max, s) => Math.max(max, s.estimatedEarnings), 0)
+          const totalBookingDuration = booking.totalDurationMins || Math.round(bookingHours * 60)
+          const formattedBookingDuration = booking.formattedDuration || formatDurationHuman(totalBookingDuration)
+          const totalBookingQty = (booking.multiServiceBooking?.items || []).reduce((acc, it) => acc + (it.quantity || 1), 0) || booking.quantity || 1
 
           import('../socket.js').then(({ emitToUser }) => {
             console.log(`[BROADCAST] Emitting BOOKING_RECEIVED to labour ${labor.fullName || labor.phone} (${labor._id}) for multi-service booking ${booking._id}, earnings=₹${bestEarning}`)
@@ -490,10 +509,15 @@ export async function startBroadcastCycle(bookingId) {
               bookingId: booking._id,
               type: booking.type || 'SCHEDULED',
               customerName: booking.userId?.fullName || 'Customer',
+              customerPhone: booking.userId?.phone || '',
               serviceName: servicesPayload.length === 1 ? servicesPayload[0].name : 'Multi-Service Booking',
               services: servicesPayload,
               isMultiServiceBooking: true,
               requiresServiceSelection: servicesPayload.length > 1,
+              quantity: totalBookingQty,
+              totalQuantity: totalBookingQty,
+              totalDurationMins: totalBookingDuration,
+              formattedDuration: formattedBookingDuration,
               date: booking.scheduledAt || booking.createdAt,
               time: booking.timeSlot || 'Earliest available',
               duration: bookingHours,
@@ -505,8 +529,8 @@ export async function startBroadcastCycle(bookingId) {
           })
 
           sendNotificationToUser(labor._id, {
-            title: booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer!',
-            body: `New multi-service job available near you. Estimated earnings: ₹${bestEarning}`,
+            title: booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡',
+            body: `New multi-service job (${servicesPayload.length} services, ~${formattedBookingDuration}) near you. Estimated earnings: ₹${bestEarning}`,
             data: { type: 'booking_received', bookingId: String(booking._id) }
           })
         } else if (booking.contractorInfo?.services?.length > 0) {
@@ -606,16 +630,25 @@ export async function startBroadcastCycle(bookingId) {
         } else {
           // Single-service booking
           const singleShare = booking.laborShare || booking.basePrice || 0
+          const singleDurationMins = booking.totalDurationMins || Math.round(bookingHours * 60)
+          const formattedSingleDuration = booking.formattedDuration || formatDurationHuman(singleDurationMins)
+          const singleQty = booking.quantity || 1
+
           import('../socket.js').then(({ emitToUser }) => {
             console.log(`[BROADCAST] Emitting BOOKING_RECEIVED to labour ${labor.fullName || labor.phone} (${labor._id}) for single-service booking ${booking._id}, service=${singleServiceName}, earnings=₹${singleShare}`)
             emitToUser(labor._id, 'BOOKING_RECEIVED', {
               bookingId: booking._id,
               type: booking.type || 'SCHEDULED',
               customerName: booking.userId?.fullName || 'Customer',
+              customerPhone: booking.userId?.phone || '',
               serviceName: singleServiceName,
               serviceDetail: singleServiceDetail || booking.notes || '',
               categoryName: singleCategoryName,
               subServiceName: singleSubServiceName,
+              quantity: singleQty,
+              totalQuantity: singleQty,
+              totalDurationMins: singleDurationMins,
+              formattedDuration: formattedSingleDuration,
               isContractorBooking: false,
               requiresServiceSelection: false,
               isPackage: Boolean(booking.packageBooking?.isPackage),
@@ -644,10 +677,10 @@ export async function startBroadcastCycle(bookingId) {
           sendNotificationToUser(labor._id, {
             title: booking.packageBooking?.isPackage
               ? `New Package Booking: ${booking.packageBooking.packageName}! 📦`
-              : (booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer!'),
+              : (booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡'),
             body: booking.packageBooking?.isPackage
               ? `Package deal with ${booking.packageBooking.inclusions?.length || 0} services. Package price: ₹${booking.packageBooking.packagePrice}. Your earnings: ₹${singleShare}`
-              : `New ${singleServiceName} job available near you. Estimated earnings: ₹${singleShare}`,
+              : `New ${singleServiceName}${singleQty > 1 ? ` (Qty: ${singleQty})` : ''} job · ~${formattedSingleDuration} available near you. Estimated earnings: ₹${singleShare}`,
             data: { type: 'booking_received', bookingId: String(booking._id) }
           })
 

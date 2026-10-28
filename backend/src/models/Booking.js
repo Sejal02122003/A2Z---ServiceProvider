@@ -69,6 +69,13 @@ const bookingSchema = new mongoose.Schema(
       default: 1,
       min: 0.5 // supports 30-min (0.5) bookings
     },
+    totalDurationMins: {
+      type: Number,
+      default: 60,
+    },
+    formattedDuration: {
+      type: String,
+    },
     extraHours: {
       type: Number,
       default: 0
@@ -145,6 +152,9 @@ const bookingSchema = new mongoose.Schema(
           originalPrice: { type: Number, default: 0 },
           quantity: { type: Number, default: 1 },
           hours: { type: Number, default: 1 },
+          estimatedDurationMins: { type: Number, default: 45 },
+          totalDurationMins: { type: Number, default: 45 },
+          formattedDuration: { type: String },
           itemTotal: { type: Number, required: true },
           assignedLabourId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
           status: {

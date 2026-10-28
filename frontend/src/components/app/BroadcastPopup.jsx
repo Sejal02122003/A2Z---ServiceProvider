@@ -18,6 +18,19 @@ function formatScheduleDate(dateValue) {
   return `${day}/${month}/${year}`
 }
 
+function formatDuration(mins) {
+  const m = Math.max(1, Math.round(Number(mins) || 45))
+  const hrs = Math.floor(m / 60)
+  const remainingMins = m % 60
+  if (hrs > 0 && remainingMins > 0) {
+    return `${hrs} hr ${remainingMins} mins (${m}m)`
+  }
+  if (hrs > 0 && remainingMins === 0) {
+    return `${hrs} hr${hrs > 1 ? 's' : ''} (${m}m)`
+  }
+  return `${m} mins`
+}
+
 export function BroadcastPopup() {
   const socket = useSocket()
   const navigate = useNavigate()
@@ -400,19 +413,34 @@ export function BroadcastPopup() {
                     )}
                   </div>
 
-                  {!requiresSelection && incoming.serviceName && (
+                  {!requiresSelection && incoming.serviceName && (!incoming.services || incoming.services.length <= 1) && (
                     <div className="space-y-1">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-[11px] font-bold uppercase tracking-wider text-brand/80">Service</p>
-                        {incoming.subServiceName && (
-                          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                            {incoming.subServiceName}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {incoming.subServiceName && (
+                            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                              {incoming.subServiceName}
+                            </span>
+                          )}
+                          {(incoming.quantity || 1) > 1 && (
+                            <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-black text-blue-800 border border-blue-200">
+                              Qty: {incoming.quantity}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <p className="text-sm font-black text-slate-900 leading-snug break-words">
                         {incoming.serviceName}
                       </p>
+                      {(incoming.formattedDuration || incoming.totalDurationMins || incoming.duration) && (
+                        <div className="flex items-center gap-1.5 pt-0.5">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+                            <Clock className="h-3 w-3 text-brand" />
+                            <span>Service Timing: {incoming.formattedDuration || formatDuration(incoming.totalDurationMins || (incoming.duration * 60))}</span>
+                          </span>
+                        </div>
+                      )}
                       {(incoming.serviceDetail || incoming.description || incoming.notes) && (
                         <div className="mt-1.5 rounded-xl bg-white/80 p-2 text-xs text-slate-600 border border-slate-200/60 space-y-0.5">
                           <span className="font-bold text-slate-700 block text-[11px]">Service Details:</span>
@@ -421,6 +449,48 @@ export function BroadcastPopup() {
                           </p>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* Multi-Service Booked Items Breakdown (When multiple items exist without requiring single selection) */}
+                  {!requiresSelection && incoming.services && incoming.services.length > 1 && (
+                    <div className="space-y-2 pt-1 border-t border-brand/10">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-brand/80">
+                          Booked Services ({incoming.services.length})
+                        </p>
+                        <span className="text-[10px] font-bold text-slate-500">
+                          Total Qty: {incoming.quantity || incoming.services.reduce((acc, s) => acc + (s.quantity || 1), 0)}
+                        </span>
+                      </div>
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
+                        {incoming.services.map((svc, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between rounded-xl bg-white/95 p-2 border border-slate-200 shadow-2xs text-xs"
+                          >
+                            <div className="min-w-0 flex-1 pr-2">
+                              <p className="font-extrabold text-slate-900 truncate text-xs">{svc.name}</p>
+                              <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500 font-semibold flex-wrap">
+                                <span className="inline-flex items-center gap-0.5 text-teal-800 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200/70">
+                                  <Clock className="h-2.5 w-2.5 text-brand" />
+                                  ~{svc.formattedDuration || formatDuration(svc.totalDurationMins || ((svc.estimatedDurationMins || 45) * (svc.quantity || 1)))}
+                                </span>
+                                {(svc.quantity || 1) > 1 && (
+                                  <span className="text-slate-400">
+                                    ({svc.estimatedDurationMins || 45}m × {svc.quantity})
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="inline-block rounded-md bg-brand/10 px-2 py-0.5 text-[10px] font-black text-brand border border-brand/20">
+                                Qty: {svc.quantity || 1}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -449,9 +519,18 @@ export function BroadcastPopup() {
                         >
                           <div>
                             <p className="font-bold text-sm text-slate-900">{svc.name}</p>
-                            <p className="text-xs text-slate-500 mt-0.5">
-                              ₹{svc.pricePerHour}/hr · {incoming.duration || 1} hr{(incoming.duration || 1) > 1 ? 's' : ''}
-                            </p>
+                            <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                              <span>₹{svc.pricePerHour}/hr</span>
+                              <span>•</span>
+                              <span className="font-bold text-teal-700">
+                                ~{svc.formattedDuration || formatDuration(svc.totalDurationMins || ((svc.estimatedDurationMins || 45) * (svc.quantity || 1)))}
+                              </span>
+                              {(svc.quantity || 1) > 1 && (
+                                <span className="rounded bg-slate-100 px-1.5 py-0.2 text-[10px] font-extrabold text-slate-700">
+                                  Qty: {svc.quantity}
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="text-right">
@@ -493,10 +572,23 @@ export function BroadcastPopup() {
                     </span>
                   </div>
                 )}
-                {incoming.duration && (
+                {(incoming.quantity || incoming.totalQuantity) && (
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500">Duration</span>
-                    <span className="font-bold text-slate-800">{incoming.duration} {incoming.duration === 1 ? 'Hour' : 'Hours'}</span>
+                    <span className="text-slate-500">Service Quantity</span>
+                    <span className="font-extrabold text-slate-800 bg-white px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs">
+                      {incoming.quantity || incoming.totalQuantity} {Number(incoming.quantity || incoming.totalQuantity) === 1 ? 'Item' : 'Items'}
+                    </span>
+                  </div>
+                )}
+                {(incoming.formattedDuration || incoming.totalDurationMins || incoming.duration) && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-1.5 text-slate-500">
+                      <Clock className="h-3.5 w-3.5 text-brand" />
+                      <span>Service Timing</span>
+                    </span>
+                    <span className="font-extrabold text-teal-800 bg-teal-50 px-2 py-0.5 rounded-lg border border-teal-200 shadow-2xs">
+                      ~{incoming.formattedDuration || formatDuration(incoming.totalDurationMins || (Number(incoming.duration) * 60))}
+                    </span>
                   </div>
                 )}
                 {(incoming.customerLocation || incoming.address) && (
