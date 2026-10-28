@@ -2,12 +2,15 @@ import { Loader2 } from 'lucide-react'
 
 const variants = {
   primary:
-    'text-white shadow-[0_14px_44px_-14px_rgba(0,43,92,0.5)] bg-linear-to-r from-brand-bright to-brand hover:brightness-[1.06] disabled:shadow-none',
+    'text-white bg-[#015F6C] hover:bg-[#014b55] shadow-[0_10px_30px_-10px_rgba(1,95,108,0.5)] active:bg-[#013f48] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none',
   secondary:
-    'border border-slate-200/90 bg-white/90 text-slate-800 shadow-sm backdrop-blur-sm hover:border-brand/25 hover:bg-white',
-  ghost: 'border border-transparent bg-transparent text-slate-700 hover:bg-slate-50 hover:border-slate-200/80',
+    'border border-[#E2E8EA] bg-[#E5F9FA] text-[#015F6C] hover:bg-[#d6f4f6] shadow-sm active:bg-[#cbf0f2]',
+  outline:
+    'border border-[#015F6C] bg-white text-[#015F6C] hover:bg-[#E5F9FA] shadow-sm',
+  ghost:
+    'border border-transparent bg-transparent text-[#4D5960] hover:bg-[#F5FAFA] hover:text-[#263238]',
   danger:
-    'border border-rose-200/90 bg-rose-50 text-rose-800 shadow-sm hover:bg-rose-50/90',
+    'border border-rose-200 bg-rose-50 text-[#DC2626] shadow-sm hover:bg-rose-100/90',
 }
 
 const sizes = {
@@ -17,7 +20,7 @@ const sizes = {
 }
 
 const focus =
-  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand'
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#015F6C]'
 
 /**
  * @param {object} props

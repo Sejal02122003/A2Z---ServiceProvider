@@ -4,21 +4,43 @@
 @import "./themes/individual-home.css";
 @import "./themes/booking-flow.css";
 
-/* A2Z Services Hub theme · brand #009eb3 (cyan/teal) · matching A2Z logo */
+/* A2Z Services Hub canonical theme · Brand accent #01C7D0 (Turquoise), Action #015F6C (Deep Teal) */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Hanken Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
   --color-page: #ffffff;
+  --color-page-soft: #f5fafa;
   --color-page-accent: #ffffff;
-  --color-surface-950: #03171e;
-  --color-surface-900: #062631;
-  --color-surface-850: #0a3543;
-  --color-surface-800: #0f4657;
-  --color-brand: #009eb3;
-  --color-brand-bright: #00c5d6;
-  --color-brand-muted: #e0f7fa;
-  --color-neutral: #64748b;
-  --shadow-glow: 0 0 80px -20px rgb(0 158 179 / 0.25);
+  --color-surface: #ffffff;
+  --color-surface-950: #012227;
+  --color-surface-900: #01353c;
+  --color-surface-850: #01454f;
+  --color-surface-800: #015f6c;
+  
+  /* Canonical Brand Tokens */
+  --color-brand: #015f6c;
+  --color-brand-teal: #015f6c;
+  --color-brand-deep: #015f6c;
+  --color-brand-accent: #01c7d0;
+  --color-brand-turquoise: #01c7d0;
+  --color-brand-bright: #01c7d0;
+  --color-brand-charcoal: #4d5960;
+  --color-brand-muted: #e5f9fa;
+  --color-border-subtle: #e2e8ea;
+  
+  /* Text Tokens */
+  --color-text-primary: #263238;
+  --color-text-secondary: #64747b;
+  
+  /* Semantic Status Tokens */
+  --color-app-success: #16a34a;
+  --color-app-warning: #d97706;
+  --color-app-error: #dc2626;
+  --color-app-info: #2563eb;
+  --color-app-refund: #7c3aed;
+
+  --color-neutral: #64747b;
+  --shadow-glow: 0 0 80px -20px rgb(1 199 208 / 0.25);
 }
 
 html {
@@ -35,8 +57,8 @@ body {
   min-height: 100vh;
   min-height: 100dvh;
   font-family: var(--font-sans);
-  background: var(--color-page);
-  color: #0f172a;
+  background: var(--color-page-soft);
+  color: #263238;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
   overflow-y: auto;
@@ -53,13 +75,13 @@ body {
 }
 
 ::selection {
-  background: rgb(37 99 235 / 0.18);
-  color: #0f172a;
+  background: rgb(1 199 208 / 0.22);
+  color: #263238;
 }
 
 :focus-visible {
   outline: 2px solid var(--color-brand);
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {

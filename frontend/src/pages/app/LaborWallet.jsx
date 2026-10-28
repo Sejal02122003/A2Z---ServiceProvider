@@ -167,7 +167,7 @@ export function LaborWallet() {
             setRecharging(false)
           },
         },
-        theme: { color: '#009eb3' },
+        theme: { color: '#015F6C' },
       }
 
       const rzp = new window.Razorpay(options)
@@ -236,7 +236,7 @@ export function LaborWallet() {
             setClearing(false)
           },
         },
-        theme: { color: '#009eb3' },
+        theme: { color: '#015F6C' },
       }
 
       const rzp = new window.Razorpay(options)
@@ -288,20 +288,20 @@ export function LaborWallet() {
       <motion.div
         initial={reduce ? false : { opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 text-white shadow-xl shadow-slate-950/20"
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#012227] via-[#014852] to-[#015F6C] p-6 text-white shadow-xl shadow-[#012227]/25"
       >
-        <div className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-cyan-500/10 blur-3xl" />
-        <div className="pointer-events-none absolute -left-12 -bottom-12 h-44 w-44 rounded-full bg-blue-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-[#01C7D0]/20 blur-3xl" />
+        <div className="pointer-events-none absolute -left-12 -bottom-12 h-44 w-44 rounded-full bg-[#015F6C]/30 blur-3xl" />
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 backdrop-blur-md">
-              <Wallet className="h-4 w-4 text-cyan-300" />
+              <Wallet className="h-4 w-4 text-[#01C7D0]" />
             </span>
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Available to Accept Jobs</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-teal-100/90">Available to Accept Jobs</span>
           </div>
           {minRequired > 0 && (
-            <span className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-slate-300 backdrop-blur-md">
+            <span className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-teal-100 backdrop-blur-md">
               Min Req: {formatInr(minRequired)}
             </span>
           )}
@@ -309,7 +309,7 @@ export function LaborWallet() {
 
         <div className="mt-4">
           <p className="text-3xl sm:text-4xl font-black tracking-tight text-white">{formatInr(availableBalance)}</p>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-teal-100/80">
             Booking acceptance rule: Available balance must be ≥ Booking amount
           </p>
         </div>
@@ -318,7 +318,7 @@ export function LaborWallet() {
         <div className="mt-5 flex gap-3">
           <button
             onClick={() => setShowTopUpModal(true)}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-cyan-500 py-3 text-sm font-bold text-slate-950 shadow-md shadow-cyan-500/25 transition hover:bg-cyan-400 active:scale-[0.98]"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#01C7D0] py-3 text-sm font-bold text-[#263238] shadow-md shadow-[#01C7D0]/30 transition hover:bg-[#00b2bb] active:scale-[0.98]"
           >
             <PlusCircle className="h-4 w-4" />
             Recharge Wallet

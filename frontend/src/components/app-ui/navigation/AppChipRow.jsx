@@ -18,8 +18,8 @@ export function AppChip({ active, children, onClick, className = '' }) {
       onClick={onClick}
       className={`shrink-0 snap-start rounded-full border px-3.5 py-2 text-xs font-semibold transition ${
         active
-          ? 'border-brand/35 bg-brand/10 text-brand shadow-sm ring-1 ring-brand/15'
-          : 'border-slate-200/90 bg-white text-slate-600 hover:border-slate-300'
+          ? 'border-[#01C7D0]/40 bg-[#E5F9FA] text-[#015F6C] shadow-sm ring-1 ring-[#01C7D0]/30 font-bold'
+          : 'border-[#E2E8EA] bg-white text-[#64747B] hover:border-slate-300'
       } ${className}`}
     >
       {children}

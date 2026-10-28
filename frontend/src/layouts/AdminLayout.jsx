@@ -105,7 +105,7 @@ export function AdminLayout() {
           <img src="/logo.png" alt="A2Z" className="h-9 w-auto rounded-lg bg-white/95 p-1 object-contain shadow-sm ring-1 ring-white/20" />
           <span className={`min-w-0 truncate ${collapsed ? 'md:sr-only' : ''}`}>
             <span className="block text-sm font-black text-white">A2Z</span>
-            <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/80">
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[#01C7D0]">
               Control panel
             </span>
           </span>
@@ -147,7 +147,7 @@ export function AdminLayout() {
                       `group relative flex items-center gap-3 rounded-xl py-2.5 text-sm font-semibold transition-all duration-200 active:scale-[0.98] md:px-2 ${collapsed ? 'md:justify-center md:px-0' : 'px-3'
                       } ${isActive
                         ? 'bg-white text-brand shadow-md'
-                        : 'text-blue-100 hover:bg-white/15 hover:text-white'
+                        : 'text-teal-100/90 hover:bg-white/15 hover:text-white'
                       } ${collapsed && isActive ? 'md:ring-2 md:ring-white/50 md:ring-offset-2 md:ring-offset-brand' : ''
                       }`
                     }
@@ -157,7 +157,7 @@ export function AdminLayout() {
                         <span
                           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors duration-200 ${isActive
                               ? 'bg-brand/10 text-brand'
-                              : 'bg-white/10 text-blue-100 group-hover:text-white group-hover:bg-white/20'
+                              : 'bg-white/10 text-teal-100/90 group-hover:text-white group-hover:bg-white/20'
                             }`}
                         >
                           <Icon className="h-[18px] w-[18px]" aria-hidden />
@@ -165,7 +165,7 @@ export function AdminLayout() {
                         <span className={`min-w-0 flex-1 truncate ${collapsed ? 'md:sr-only' : ''}`}>{label}</span>
                         {!collapsed ? (
                           <ChevronRight
-                            className={`h-4 w-4 shrink-0 transition-all duration-200 ${isActive ? 'translate-x-0 text-brand opacity-100' : 'text-blue-200 opacity-0 group-hover:translate-x-0.5 group-hover:opacity-100'}`}
+                            className={`h-4 w-4 shrink-0 transition-all duration-200 ${isActive ? 'translate-x-0 text-brand opacity-100' : 'text-teal-200 opacity-0 group-hover:translate-x-0.5 group-hover:opacity-100'}`}
                             aria-hidden
                           />
                         ) : null}
@@ -184,7 +184,7 @@ export function AdminLayout() {
   )
 
   const sidebarClassName = `
-    flex h-dvh max-h-dvh shrink-0 flex-col overflow-hidden border-r border-cyan-900/40 bg-gradient-to-b from-[#021b24] via-[#003846] to-brand shadow-[6px_0_32px_-12px_rgba(0,158,179,0.3)] transition-[transform,width] duration-300 ease-out
+    flex h-dvh max-h-dvh shrink-0 flex-col overflow-hidden border-r border-[#012227]/40 bg-gradient-to-b from-[#012227] via-[#014852] to-[#015F6C] shadow-[6px_0_32px_-12px_rgba(1,95,108,0.3)] transition-[transform,width] duration-300 ease-out
     w-[min(18rem,88vw)] max-md:max-w-[18rem]
     ${collapsed ? 'md:w-19' : 'md:w-64'}
     fixed inset-y-0 left-0 z-50 md:relative md:z-20
@@ -192,7 +192,7 @@ export function AdminLayout() {
   `
 
   return (
-    <div className="flex h-dvh max-h-dvh w-full overflow-hidden bg-white text-slate-900">
+    <div className="flex h-dvh max-h-dvh w-full overflow-hidden bg-[#F5FAFA] text-[#263238]">
       <AnimatePresence>
         {mobileOpen ? (
           <motion.button

@@ -907,7 +907,7 @@ export function IndividualBookingFlowPage() {
             setIsPaying(false)
           }
         },
-        theme: { color: '#009eb3' },
+        theme: { color: '#015F6C' },
       }
 
       const rzp = new window.Razorpay(options)

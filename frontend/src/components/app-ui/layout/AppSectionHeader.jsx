@@ -11,7 +11,7 @@ export function AppSectionHeader({ title, actionLabel, actionTo, onActionClick, 
 
   return (
     <div className={`flex items-end justify-between gap-3 ${className}`}>
-      <h2 className="text-base font-extrabold tracking-tight text-slate-900">{title}</h2>
+      <h2 className="text-base font-extrabold tracking-tight text-[#263238]">{title}</h2>
       {actionLabel && actionTo ? (
         <Link to={actionTo} className="shrink-0 py-0.5">
           {actionContent}

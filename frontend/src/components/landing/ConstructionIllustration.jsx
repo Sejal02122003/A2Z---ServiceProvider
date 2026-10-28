@@ -28,13 +28,13 @@ export function ConstructionIllustration() {
             <stop offset="100%" stopColor="#d1fae5" />
           </linearGradient>
           <linearGradient id="lc-glow" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#009eb3" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#009eb3" stopOpacity="0.08" />
+            <stop offset="0%" stopColor="#015F6C" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#015F6C" stopOpacity="0.08" />
           </linearGradient>
           <linearGradient id="lc-beam" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#00c5d6" stopOpacity="0" />
-            <stop offset="50%" stopColor="#009eb3" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#00c5d6" stopOpacity="0" />
+            <stop offset="0%" stopColor="#01C7D0" stopOpacity="0" />
+            <stop offset="50%" stopColor="#015F6C" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#01C7D0" stopOpacity="0" />
           </linearGradient>
         </defs>
 
@@ -48,9 +48,9 @@ export function ConstructionIllustration() {
           <rect x="330" y="220" width="90" height="120" rx="12" fill="#f1f5f9" stroke="#cbd5e1" />
           <path
             d="M 120 200 L 120 96 L 200 120 L 120 200 Z"
-            fill="#009eb3"
+            fill="#01C7D0"
             fillOpacity="0.2"
-            stroke="#009eb3"
+            stroke="#015F6C"
             strokeWidth="2"
           />
           <rect x="60" y="88" width="4" height="120" fill="#94a3b8" />
@@ -69,19 +69,19 @@ export function ConstructionIllustration() {
           animate={reduce ? undefined : { x: [0, 6, 0] }}
           transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
         >
-          <ellipse cx="140" cy="318" rx="36" ry="10" fill="#0f172a" fillOpacity="0.12" />
+          <ellipse cx="140" cy="318" rx="36" ry="10" fill="#263238" fillOpacity="0.12" />
           <circle cx="140" cy="268" r="22" fill="#fde68a" />
-          <path d="M 118 288 L 162 288 L 156 332 L 124 332 Z" fill="#004e64" />
-          <rect x="126" y="246" width="28" height="16" rx="4" fill="#009eb3" />
+          <path d="M 118 288 L 162 288 L 156 332 L 124 332 Z" fill="#015F6C" />
+          <rect x="126" y="246" width="28" height="16" rx="4" fill="#01C7D0" />
         </motion.g>
 
         <motion.g
           animate={reduce ? undefined : { x: [0, -5, 0] }}
           transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut' }}
         >
-          <ellipse cx="280" cy="328" rx="40" ry="11" fill="#0f172a" fillOpacity="0.12" />
+          <ellipse cx="280" cy="328" rx="40" ry="11" fill="#263238" fillOpacity="0.12" />
           <circle cx="280" cy="276" r="24" fill="#fdba74" />
-          <path d="M 252 298 L 308 298 L 300 348 L 260 348 Z" fill="#004e64" fillOpacity="0.95" />
+          <path d="M 252 298 L 308 298 L 300 348 L 260 348 Z" fill="#015F6C" fillOpacity="0.95" />
           <rect x="268" y="252" width="32" height="18" rx="5" fill="#ffffff" />
         </motion.g>
 

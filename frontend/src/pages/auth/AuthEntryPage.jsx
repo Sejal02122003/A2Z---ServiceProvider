@@ -53,10 +53,10 @@ function FeedbackBanner({ variant, children }) {
   if (!children) return null
   const styles =
     variant === 'error'
-      ? 'border-amber-200/90 bg-amber-50 text-amber-950 ring-amber-100'
-      : 'border-blue-200/90 bg-blue-50 text-slate-950 ring-blue-100'
+      ? 'border-rose-200 bg-rose-50 text-[#DC2626]'
+      : 'border-blue-200 bg-blue-50 text-[#2563EB]'
   return (
-    <p role="alert" className={`rounded-2xl border px-4 py-3 text-sm font-medium leading-relaxed ring-1 ${styles}`}>
+    <p role="alert" className={`rounded-2xl border px-4 py-3 text-sm font-medium leading-relaxed ${styles}`}>
       {children}
     </p>
   )
@@ -66,7 +66,7 @@ function AuthField({ label, hint, children }) {
   return (
     <div>
       <div className="mb-1.5 flex items-baseline justify-between gap-2">
-        <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</label>
+        <label className="text-[11px] font-bold uppercase tracking-wide text-[#4D5960]">{label}</label>
         {hint}
       </div>
       {children}
@@ -75,7 +75,7 @@ function AuthField({ label, hint, children }) {
 }
 
 const inputClass =
-  'w-full rounded-full border border-slate-100 bg-slate-50 px-5 py-3 text-[15px] font-medium text-slate-900 outline-none transition focus:border-brand/30 focus:ring-2 focus:ring-brand/20 placeholder:text-slate-400'
+  'w-full rounded-full border border-[#E2E8EA] bg-white px-5 py-3 text-[15px] font-medium text-[#263238] outline-none transition focus:border-[#015F6C] focus:ring-2 focus:ring-[#015F6C]/20 placeholder:text-[#64747B]'
 
 export function AuthEntryPage({ authGroup = 'users' }) {
   const navigate = useNavigate()

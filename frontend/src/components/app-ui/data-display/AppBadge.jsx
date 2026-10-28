@@ -1,9 +1,12 @@
 const variants = {
-  neutral: 'bg-slate-100/90 text-slate-600 ring-slate-200/80',
-  brand: 'bg-brand/10 text-brand ring-brand/20',
-  amber: 'bg-amber-50/90 text-amber-950 ring-amber-200/90',
-  emerald: 'bg-blue-50/95 text-blue-900 ring-blue-200/80',
-  rose: 'bg-rose-50/95 text-rose-900 ring-rose-200/80',
+  neutral: 'bg-slate-100 text-[#4D5960] ring-[#E2E8EA]',
+  brand: 'bg-[#E5F9FA] text-[#015F6C] ring-[#01C7D0]/30 font-bold',
+  accent: 'bg-[#E5F9FA] text-[#015F6C] ring-[#01C7D0]/50 font-bold',
+  amber: 'bg-amber-50 text-[#B45309] ring-amber-200/90 font-bold',
+  emerald: 'bg-emerald-50 text-[#15803D] ring-emerald-200/90 font-bold',
+  rose: 'bg-rose-50 text-[#DC2626] ring-rose-200/90 font-bold',
+  blue: 'bg-blue-50 text-[#1D4ED8] ring-blue-200/90 font-bold',
+  purple: 'bg-purple-50 text-[#7C3AED] ring-purple-200/90 font-bold',
 }
 
 /**

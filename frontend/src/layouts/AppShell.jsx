@@ -362,12 +362,12 @@ export function AppShell() {
       <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-lg flex-col">
         {isIndividualAppHome ? (
           <div
-            className="pointer-events-none absolute left-1/2 top-0 z-0 h-[12.5rem] w-full max-w-lg -translate-x-1/2 bg-gradient-to-b from-[#002633] via-[#004e64] to-brand"
+            className="pointer-events-none absolute left-1/2 top-0 z-0 h-[12.5rem] w-full max-w-lg -translate-x-1/2 bg-gradient-to-b from-[#012227] via-[#015F6C] to-brand"
             aria-hidden
           />
         ) : (isLabourAppHome || isLabourNotifications) ? (
           <div
-            className="pointer-events-none absolute left-1/2 top-0 z-0 h-[min(52vh,26rem)] w-full max-w-lg -translate-x-1/2 rounded-b-[2rem] bg-gradient-to-b from-[#002633] via-[#004e64] to-brand"
+            className="pointer-events-none absolute left-1/2 top-0 z-0 h-[min(52vh,26rem)] w-full max-w-lg -translate-x-1/2 rounded-b-[2rem] bg-gradient-to-b from-[#012227] via-[#015F6C] to-brand"
             aria-hidden
           />
         ) : null}

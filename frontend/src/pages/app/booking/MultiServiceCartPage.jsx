@@ -242,7 +242,7 @@ export function MultiServiceCartPage() {
                   navigate(`/app/tracking/${createdBooking._id}`)
                 },
               },
-              theme: { color: '#009eb3' },
+              theme: { color: '#015F6C' },
             })
             rzp.open()
             return
