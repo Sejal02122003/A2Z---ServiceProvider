@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
@@ -91,6 +92,17 @@ export function ServicePackagesPage() {
 
   const [bookingModalPkg, setBookingModalPkg] = useState(null)
   const [bookingMode, setBookingMode] = useState('scheduled')
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (bookingModalPkg) {
+      const prev = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = prev
+      }
+    }
+  }, [bookingModalPkg])
 
   const proceedToBook = (pkg, mode = 'scheduled') => {
     if (!pkg) return
@@ -413,10 +425,16 @@ export function ServicePackagesPage() {
         </div>
       )}
 
-      {/* Booking Mode Bottom Sheet / Modal */}
-      {bookingModalPkg && (
-        <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl flex flex-col max-h-[88vh] sm:max-h-[85vh] overflow-hidden">
+      {/* Booking Mode Bottom Sheet / Modal (Portalled directly to document.body to break out of all stacking contexts) */}
+      {bookingModalPkg && typeof document !== 'undefined' && createPortal(
+        <div
+          onClick={() => setBookingModalPkg(null)}
+          className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[85vh] overflow-hidden"
+          >
             {/* 1. Header (Fixed Top) */}
             <div className="shrink-0 flex items-center justify-between border-b border-slate-100 p-4 pb-3 bg-white">
               <div className="flex items-center gap-2">
@@ -505,17 +523,23 @@ export function ServicePackagesPage() {
                 <div className="grid grid-cols-1 gap-2.5">
                   {/* Scheduled Option */}
                   <div
-                    onClick={() => proceedToBook(bookingModalPkg, 'scheduled')}
-                    className="relative rounded-2xl border-2 border-slate-200 bg-white p-3.5 transition-all cursor-pointer shadow-xs hover:shadow-md hover:border-brand hover:bg-brand/5 active:scale-[0.99] group"
+                    onClick={() => setBookingMode('scheduled')}
+                    className={`relative rounded-2xl border-2 p-3.5 transition-all cursor-pointer shadow-xs ${
+                      bookingMode === 'scheduled'
+                        ? 'border-brand bg-brand/5 ring-2 ring-brand/20'
+                        : 'border-slate-200 bg-white hover:border-brand/40'
+                    }`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-3">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand group-hover:bg-brand group-hover:text-white transition shadow-xs">
+                        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition shadow-xs ${
+                          bookingMode === 'scheduled' ? 'bg-brand text-white' : 'bg-brand/10 text-brand'
+                        }`}>
                           <Calendar className="h-5 w-5" />
                         </span>
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <p className="font-extrabold text-sm text-slate-900 group-hover:text-brand transition">Scheduled Booking</p>
+                            <p className="font-extrabold text-sm text-slate-900">Scheduled Booking</p>
                             <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-bold text-brand">
                               Pick Slot
                             </span>
@@ -541,17 +565,21 @@ export function ServicePackagesPage() {
 
                   {/* Instant Option */}
                   <div
-                    onClick={() => proceedToBook(bookingModalPkg, 'instant')}
-                    className="relative rounded-2xl border-2 border-slate-200 bg-white p-3.5 transition-all cursor-pointer shadow-xs hover:shadow-md hover:border-amber-400 hover:bg-amber-50/50 active:scale-[0.99] group"
+                    onClick={() => setBookingMode('instant')}
+                    className={`relative rounded-2xl border-2 p-3.5 transition-all cursor-pointer shadow-xs ${
+                      bookingMode === 'instant'
+                        ? 'border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/25'
+                        : 'border-slate-200 bg-white hover:border-amber-300'
+                    }`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-3">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-slate-950 font-black shadow-xs group-hover:bg-amber-400 transition">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-slate-950 font-black shadow-xs">
                           <Zap className="h-5 w-5" />
                         </span>
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <p className="font-extrabold text-sm text-slate-900 group-hover:text-amber-700 transition">Instant (ASAP)</p>
+                            <p className="font-extrabold text-sm text-slate-900">Instant (ASAP)</p>
                             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-bold text-amber-900">
                               Fastest
                             </span>
@@ -578,8 +606,8 @@ export function ServicePackagesPage() {
               </div>
             </div>
 
-            {/* 3. Sticky Bottom Action Bar (ALWAYS 100% VISIBLE) */}
-            <div className="shrink-0 border-t border-slate-100 bg-white p-4 pt-3 flex items-center gap-3 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
+            {/* 3. Sticky Bottom Action Bar (ALWAYS 100% VISIBLE ABOVE BOTTOM NAVIGATION) */}
+            <div className="shrink-0 border-t border-slate-100 bg-white p-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] flex items-center gap-3 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
               <button
                 type="button"
                 onClick={() => setBookingModalPkg(null)}
@@ -597,7 +625,8 @@ export function ServicePackagesPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
