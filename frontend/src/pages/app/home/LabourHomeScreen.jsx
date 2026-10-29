@@ -1065,7 +1065,7 @@ export function LabourHomeScreen({ user }) {
                             {offer.type === 'SCHEDULED' ? 'Scheduled Job' : 'Instant Flash Job'}
                           </p>
                           <span className="text-sm font-black text-slate-900 font-mono">
-                            ₹{offer.estimatedEarnings || offer.laborShare || 0} payout
+                            ₹{Math.round(Number(offer.estimatedEarnings || offer.laborShare || 0)).toLocaleString('en-IN')} payout
                           </span>
                         </div>
 

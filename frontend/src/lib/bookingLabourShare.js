@@ -54,13 +54,13 @@ export function getLabourBookingShare(booking, userId) {
 
       const myService = availableServices.find((as) => as.labourIdStr === uIdStr)
       if (myService && myService.share > 0) {
-        return myService.share
+        return Math.round(myService.share)
       } else {
-        return (Number(booking.laborShare) || 0) / (booking.assignments.length || 1)
+        return Math.round((Number(booking.laborShare) || 0) / (booking.assignments.length || 1))
       }
     } else {
       // Standard multi-labour split without per-service rates
-      return (Number(booking.laborShare) || 0) / (booking.assignments.length || 1)
+      return Math.round((Number(booking.laborShare) || 0) / (booking.assignments.length || 1))
     }
   }
 
@@ -70,5 +70,5 @@ export function getLabourBookingShare(booking, userId) {
     Number(booking.basePrice) ||
     0
 
-  return share
+  return Math.round(share)
 }

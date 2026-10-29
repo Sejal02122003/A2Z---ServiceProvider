@@ -607,10 +607,10 @@ function BookingDetailsModal({ booking, onClose }) {
                         const hours = booking.duration || booking.hours || 1;
                         share = Math.round(matchedSvc.price * hours * 0.90);
                       } else {
-                        share = booking.laborShare / booking.assignments.length;
+                        share = Math.round((booking.laborShare || 0) / (booking.assignments.length || 1));
                       }
                     } else {
-                      share = booking.laborShare / booking.assignments.length;
+                      share = Math.round((booking.laborShare || 0) / (booking.assignments.length || 1));
                     }
                     // Service name resolution priority:
                     // 1. Stored snapshot (a.serviceName) — set for new bookings at acceptance time
@@ -637,13 +637,13 @@ function BookingDetailsModal({ booking, onClose }) {
                             <p className="text-xs text-slate-600">{a.labourId?.phone || 'Awaiting Worker'}</p>
                             <p className="text-xs text-slate-500 mt-0.5">
                               Service: <span className="font-semibold text-slate-700">{assignedServiceName}</span>
-                              {a.pricePerHour > 0 && <span className="ml-1 text-slate-400">· ₹{a.pricePerHour}/hr</span>}
+                              {a.pricePerHour > 0 && <span className="ml-1 text-slate-400">· ₹{Math.round(a.pricePerHour)}/hr</span>}
                             </p>
                             <p className="text-xs font-semibold text-brand mt-1 uppercase">{a.status}</p>
                           </div>
                           <div className="text-right">
                             <p className="text-xs text-slate-500">Service Provider Share</p>
-                            <p className="font-bold text-sm text-brand">₹{share.toFixed(2)}</p>
+                            <p className="font-bold text-sm text-brand">₹{Math.round(share).toLocaleString('en-IN')}</p>
                           </div>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -825,13 +825,13 @@ function BookingDetailsModal({ booking, onClose }) {
             <div className="flex justify-between text-xs text-slate-600 py-1 mt-2">
               <span>Commission (Admin):</span>
               <span className="font-semibold text-brand">
-                ₹{completedBill.isContractorBooking ? Math.round(completedBill.completedBasePrice * 0.10) : booking.commissionAmount}
+                ₹{Math.round(completedBill.isContractorBooking ? (completedBill.completedBasePrice * 0.10) : (booking.commissionAmount || 0)).toLocaleString('en-IN')}
               </span>
             </div>
             <div className="flex justify-between text-xs text-slate-600 py-1">
               <span>Service Provider Share:</span>
               <span className="font-semibold text-green-600">
-                ₹{completedBill.isContractorBooking ? Math.round(completedBill.completedBasePrice * 0.90) : booking.laborShare}
+                ₹{Math.round(completedBill.isContractorBooking ? (completedBill.completedBasePrice * 0.90) : (booking.laborShare || 0)).toLocaleString('en-IN')}
               </span>
             </div>
           </div>

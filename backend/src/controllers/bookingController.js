@@ -184,7 +184,7 @@ export const calculateBill = asyncHandler(async (req, res) => {
         formattedDuration: formatDurationHuman(Number(pkg.estimatedDurationMins || 60) * (Number(quantity) || 1)),
         estimatedDurationMins: Number(pkg.estimatedDurationMins || 60) * (Number(quantity) || 1),
         commissionAmount,
-        laborShare: Math.max(0, basePrice - commissionAmount - platformFee),
+        laborShare: Math.round(Math.max(0, basePrice - commissionAmount - platformFee)),
         paymentModes: settings.paymentModes || { cashEnabled: true, onlineEnabled: true },
         breakdown,
         walletInfo,
@@ -467,7 +467,7 @@ export const calculateBill = asyncHandler(async (req, res) => {
       estimatedDurationMins: totalDurationMins,
       totalQuantity: servicesToCalculate.reduce((acc, it) => acc + (Number(it.quantity) || 1), 0),
       commissionAmount, // Internal calculation preview
-      laborShare: Math.max(0, basePrice - commissionAmount - platformFee),
+      laborShare: Math.round(Math.max(0, basePrice - commissionAmount - platformFee)),
       paymentModes: settings.paymentModes || { cashEnabled: true, onlineEnabled: true },
       breakdown,
       isMultiService,
@@ -935,7 +935,7 @@ export const createBooking = asyncHandler(async (req, res) => {
     commissionAmount = (basePrice * settings.commission.globalPercentage) / 100
   }
 
-  const laborShare = Math.max(0, basePrice - commissionAmount - platformFee)
+  const laborShare = Math.round(Math.max(0, basePrice - commissionAmount - platformFee))
 
   const startOtp = Math.floor(1000 + Math.random() * 9000).toString()
   const completionOtp = Math.floor(1000 + Math.random() * 9000).toString()
@@ -1714,7 +1714,7 @@ export const addExtraTime = asyncHandler(async (req, res) => {
     commissionAmount = (newBasePrice * settings.commission.globalPercentage) / 100
   }
 
-  const laborShare = newBasePrice - commissionAmount
+  const laborShare = Math.round(Math.max(0, newBasePrice - commissionAmount))
 
   // Update specific assignment or the whole booking
   if (assignmentId && booking.assignments && booking.assignments.length > 0) {

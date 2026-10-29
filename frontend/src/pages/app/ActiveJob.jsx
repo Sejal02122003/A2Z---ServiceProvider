@@ -676,7 +676,7 @@ export function ActiveJob() {
           return share > 0 ? (
             <div className="flex justify-between">
               <span className="text-slate-500">Your Earning</span>
-              <span className="font-bold text-slate-900">₹{share.toFixed(2)}</span>
+              <span className="font-bold text-slate-900">₹{Math.round(share).toLocaleString('en-IN')}</span>
             </div>
           ) : null;
         })()}

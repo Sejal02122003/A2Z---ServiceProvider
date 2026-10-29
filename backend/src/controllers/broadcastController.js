@@ -661,7 +661,7 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
         singleCategoryName = subcat.name
       }
     }
-    const singleShare = booking.laborShare || booking.basePrice || 0
+    const singleShare = Math.round(Number(booking.laborShare || booking.basePrice || 0))
     const singleDurationMins = booking.totalDurationMins || Math.round(bookingHours * 60)
     const formattedSingleDuration = booking.formattedDuration || formatDurationHuman(singleDurationMins)
     const singleQty = booking.quantity || 1

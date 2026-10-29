@@ -31,6 +31,13 @@ function formatDuration(mins) {
   return `${m} mins`
 }
 
+function formatFixedAmount(val) {
+  if (val == null || val === '') return '0'
+  const num = Number(val)
+  if (isNaN(num)) return String(val)
+  return Math.round(num).toLocaleString('en-IN')
+}
+
 export function BroadcastPopup() {
   const socket = useSocket()
   const navigate = useNavigate()
@@ -106,7 +113,7 @@ export function BroadcastPopup() {
       try {
         const title = data.type === 'SCHEDULED' ? 'Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡'
         new Notification(title, {
-          body: `${data.serviceName || 'Service'} · ₹${data.estimatedEarnings || 0}`,
+          body: `${data.serviceName || 'Service'} · ₹${formatFixedAmount(data.estimatedEarnings || 0)}`,
           icon: '/favicon.ico'
         })
       } catch { /* ignore */ }
@@ -346,11 +353,11 @@ export function BroadcastPopup() {
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Package Amount</p>
                       <div className="flex items-baseline gap-1.5">
                         <span className="text-sm font-black text-slate-900">
-                          ₹{Number(incoming.packagePrice || incoming.totalAmount || 0).toLocaleString('en-IN')}
+                          ₹{formatFixedAmount(incoming.packagePrice || incoming.totalAmount || 0)}
                         </span>
                         {incoming.packageOriginalPrice && incoming.packageOriginalPrice > (incoming.packagePrice || 0) && (
                           <span className="text-[11px] text-slate-400 line-through font-semibold">
-                            ₹{Number(incoming.packageOriginalPrice).toLocaleString('en-IN')}
+                            ₹{formatFixedAmount(incoming.packageOriginalPrice)}
                           </span>
                         )}
                       </div>
@@ -358,7 +365,7 @@ export function BroadcastPopup() {
                     <div className="text-right">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Your Earnings</p>
                       <span className="text-base font-black text-emerald-700">
-                        ₹{incoming.estimatedEarnings || incoming.laborShare || incoming.basePrice}
+                        ₹{formatFixedAmount(incoming.estimatedEarnings || incoming.laborShare || incoming.basePrice)}
                       </span>
                     </div>
                   </div>
@@ -534,7 +541,7 @@ export function BroadcastPopup() {
                           <div>
                             <p className="font-bold text-sm text-slate-900">{svc.name}</p>
                             <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                              <span>₹{svc.pricePerHour}/hr</span>
+                              <span>₹{formatFixedAmount(svc.pricePerHour)}/hr</span>
                               <span>•</span>
                               <span className="font-bold text-teal-700">
                                 ~{svc.formattedDuration || formatDuration(svc.totalDurationMins || ((svc.estimatedDurationMins || 45) * (svc.quantity || 1)))}
@@ -549,7 +556,7 @@ export function BroadcastPopup() {
                           <div className="flex items-center gap-2">
                             <div className="text-right">
                               <p className="text-[10px] text-slate-400">You earn</p>
-                              <p className="font-extrabold text-blue-700 text-base">₹{svc.estimatedEarnings}</p>
+                              <p className="font-extrabold text-blue-700 text-base">₹{formatFixedAmount(svc.estimatedEarnings)}</p>
                             </div>
                             <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition ${
                               isSelected ? 'border-brand bg-brand' : 'border-slate-300'
@@ -573,8 +580,8 @@ export function BroadcastPopup() {
                   </span>
                   <span className="text-lg font-extrabold text-blue-700">
                     {requiresSelection
-                      ? selectedService ? `₹${selectedService.estimatedEarnings}` : '—'
-                      : `₹${incoming.estimatedEarnings || incoming.laborShare || incoming.basePrice}`
+                      ? selectedService ? `₹${formatFixedAmount(selectedService.estimatedEarnings)}` : '—'
+                      : `₹${formatFixedAmount(incoming.estimatedEarnings || incoming.laborShare || incoming.basePrice)}`
                     }
                   </span>
                 </div>
