@@ -81,14 +81,21 @@ export const getReviews = asyncHandler(async (req, res) => {
 
 export const getAllReviews = asyncHandler(async (req, res) => {
   const reviews = await Review.find({})
-    .populate('reviewerId', 'name fullName email phone profileImageUrl')
-    .populate('revieweeId', 'name fullName email phone profileImageUrl')
+    .populate('reviewerId', 'name fullName email phone profileImageUrl role')
+    .populate('revieweeId', 'name fullName email phone profileImageUrl role labourProfile')
     .populate({
       path: 'bookingId',
-      select: 'type scheduledAt timeSlot status',
+      select: 'type scheduledAt timeSlot status serviceId subcategoryId subServiceName packageBooking multiServiceBooking userId laborId totalAmount address',
+      populate: [
+        { path: 'serviceId', select: 'name basePrice' },
+        { path: 'subcategoryId', select: 'name' },
+        { path: 'userId', select: 'name fullName email phone' },
+        { path: 'laborId', select: 'name fullName email phone' },
+      ],
     })
     .sort({ createdAt: -1 })
-    
+    .lean()
+
   return sendSuccess(res, { data: { reviews, totalReviews: reviews.length } })
 })
 
