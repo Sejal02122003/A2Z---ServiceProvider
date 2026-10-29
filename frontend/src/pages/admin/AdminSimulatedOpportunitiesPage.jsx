@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 import { motion, useReducedMotion, AnimatePresence } from 'framer-motion'
 import {
   Zap,
@@ -93,6 +93,9 @@ export function AdminSimulatedOpportunitiesPage() {
   const [submitting, setSubmitting] = useState(false)
   const [formCategory, setFormCategory] = useState('')
   const [formCategoryId, setFormCategoryId] = useState('')
+  const [selectedServices, setSelectedServices] = useState([])
+  const [serviceSearch, setServiceSearch] = useState('')
+  const [customServiceName, setCustomServiceName] = useState('')
   const [formServiceType, setFormServiceType] = useState('')
   const [selectedZoneIds, setSelectedZoneIds] = useState([])
   const [isAllZones, setIsAllZones] = useState(true)
@@ -161,10 +164,102 @@ export function AdminSimulatedOpportunitiesPage() {
     }
   }
 
+  const availableServices = useMemo(() => {
+    if (!formCategoryId || formCategoryId === 'custom') return []
+    const cat = categoryTree.find((c) => String(c._id) === String(formCategoryId))
+    if (!cat || !Array.isArray(cat.subcategories)) return []
+
+    const list = []
+    for (const sc of cat.subcategories) {
+      if (Array.isArray(sc.services)) {
+        for (const s of sc.services) {
+          list.push({
+            serviceId: s._id,
+            name: s.name,
+            subcategoryId: sc._id,
+            subcategoryName: sc.name,
+            basePrice: s.basePrice || s.pricePerUnit || s.hourlyPrice || 0,
+          })
+        }
+      }
+    }
+    return list
+  }, [categoryTree, formCategoryId])
+
+  const filteredServices = useMemo(() => {
+    if (!serviceSearch.trim()) return availableServices
+    const q = serviceSearch.toLowerCase()
+    return availableServices.filter(
+      (s) => s.name.toLowerCase().includes(q) || (s.subcategoryName && s.subcategoryName.toLowerCase().includes(q))
+    )
+  }, [availableServices, serviceSearch])
+
+  const toggleService = (svc) => {
+    const exists = selectedServices.some(
+      (s) => (s.serviceId && s.serviceId === svc.serviceId) || s.name.toLowerCase() === svc.name.toLowerCase()
+    )
+    let next
+    if (exists) {
+      next = selectedServices.filter(
+        (s) => (s.serviceId ? s.serviceId !== svc.serviceId : s.name.toLowerCase() !== svc.name.toLowerCase())
+      )
+    } else {
+      next = [...selectedServices, svc]
+    }
+    setSelectedServices(next)
+    const combinedNames = next.map((s) => s.name).join(', ')
+    setFormServiceType(combinedNames)
+
+    const totalBasePrice = next.reduce((sum, s) => sum + (Number(s.basePrice) || 0), 0)
+    if (totalBasePrice > 0) {
+      setFormAmount(String(totalBasePrice))
+    }
+  }
+
+  const addCustomService = () => {
+    const trimmed = customServiceName.trim()
+    if (!trimmed) return
+    const exists = selectedServices.some((s) => s.name.toLowerCase() === trimmed.toLowerCase())
+    if (!exists) {
+      const newService = { name: trimmed, serviceId: null, basePrice: 0 }
+      const next = [...selectedServices, newService]
+      setSelectedServices(next)
+      setFormServiceType(next.map((s) => s.name).join(', '))
+    }
+    setCustomServiceName('')
+  }
+
+  const removeService = (svcToRemove) => {
+    const next = selectedServices.filter(
+      (s) => (s.serviceId ? s.serviceId !== svcToRemove.serviceId : s.name.toLowerCase() !== svcToRemove.name.toLowerCase())
+    )
+    setSelectedServices(next)
+    setFormServiceType(next.map((s) => s.name).join(', '))
+    const totalBasePrice = next.reduce((sum, s) => sum + (Number(s.basePrice) || 0), 0)
+    if (totalBasePrice > 0) {
+      setFormAmount(String(totalBasePrice))
+    }
+  }
+
+  const selectAllCategoryServices = () => {
+    setSelectedServices(availableServices)
+    setFormServiceType(availableServices.map((s) => s.name).join(', '))
+    const totalBasePrice = availableServices.reduce((sum, s) => sum + (Number(s.basePrice) || 0), 0)
+    if (totalBasePrice > 0) {
+      setFormAmount(String(totalBasePrice))
+    }
+  }
+
+  const clearAllSelectedServices = () => {
+    setSelectedServices([])
+    setFormServiceType('')
+  }
+
   const handleCreateSubmit = async (e) => {
     e.preventDefault()
-    if (!formServiceType || !formAmount) {
-      showToast('Please provide service type and estimated amount', 'error')
+    const resolvedServiceType = formServiceType.trim() || selectedServices.map((s) => s.name).join(', ')
+    if (!resolvedServiceType || !formAmount) {
+      showToast('Please select or specify at least one service and enter an estimated amount', 'error')
       return
     }
 
@@ -172,8 +267,13 @@ export function AdminSimulatedOpportunitiesPage() {
     try {
       const res = await simulatedOpportunitiesApi.createOpportunity({
         serviceCategory: formCategory || 'General Service',
-        categoryId: formCategoryId || undefined,
-        serviceType: formServiceType,
+        categoryId: formCategoryId === 'custom' ? undefined : formCategoryId || undefined,
+        serviceType: resolvedServiceType,
+        services: selectedServices.map((s) => ({
+          serviceId: s.serviceId || undefined,
+          name: s.name,
+          basePrice: Number(s.basePrice || 0) || undefined,
+        })),
         isAllZones,
         zoneIds: isAllZones ? [] : selectedZoneIds,
         location: { address: formLocation },
@@ -187,7 +287,10 @@ export function AdminSimulatedOpportunitiesPage() {
       showToast(res.message || 'Simulated opportunity sent successfully!')
       setShowCreateModal(false)
       // Reset form
+      setSelectedServices([])
       setFormServiceType('')
+      setServiceSearch('')
+      setCustomServiceName('')
       setFormAmount('799')
       loadData()
     } catch (err) {
@@ -350,6 +453,11 @@ export function AdminSimulatedOpportunitiesPage() {
                         <h4 className="text-sm font-extrabold text-slate-900 truncate">
                           {item.serviceType}
                         </h4>
+                        {Array.isArray(item.services) && item.services.length > 1 && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+                            {item.services.length} services
+                          </span>
+                        )}
                         <span className="text-xs font-semibold text-slate-500">
                           ({item.serviceCategory})
                         </span>
@@ -488,6 +596,9 @@ export function AdminSimulatedOpportunitiesPage() {
                           onClick={() => {
                             setFormCategoryId(String(c._id))
                             setFormCategory(c.name)
+                            setSelectedServices([])
+                            setFormServiceType('')
+                            setServiceSearch('')
                           }}
                           className={`p-2.5 rounded-xl text-xs font-bold text-left transition flex items-center justify-between border ${
                             isSelected
@@ -511,6 +622,9 @@ export function AdminSimulatedOpportunitiesPage() {
                       onClick={() => {
                         setFormCategoryId('custom')
                         setFormCategory('')
+                        setSelectedServices([])
+                        setFormServiceType('')
+                        setServiceSearch('')
                       }}
                       className={`p-2.5 rounded-xl text-xs font-bold text-left transition flex items-center justify-between border ${
                         formCategoryId === 'custom'
@@ -538,10 +652,173 @@ export function AdminSimulatedOpportunitiesPage() {
                   )}
                 </div>
 
-                {/* Service Type / Title */}
+                {/* Multi-Service Selection Section */}
+                <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-brand" />
+                      Select Services (Multiple Selection) *
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {availableServices.length > 0 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={selectAllCategoryServices}
+                            className="text-[11px] font-bold text-brand hover:underline"
+                          >
+                            Select All
+                          </button>
+                          <span className="text-slate-300">•</span>
+                        </>
+                      )}
+                      {selectedServices.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={clearAllSelectedServices}
+                          className="text-[11px] font-bold text-rose-600 hover:underline"
+                        >
+                          Clear
+                        </button>
+                      )}
+                      <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-extrabold text-brand">
+                        {selectedServices.length} Selected
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Selected Services Tags */}
+                  {selectedServices.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-white border border-slate-200/80">
+                      {selectedServices.map((svc, idx) => (
+                        <span
+                          key={svc.serviceId || svc.name || idx}
+                          className="inline-flex items-center gap-1 rounded-lg bg-brand/10 text-brand px-2.5 py-1 text-xs font-bold ring-1 ring-brand/20 animate-fadeIn"
+                        >
+                          <span>{svc.name}</span>
+                          {svc.basePrice > 0 && (
+                            <span className="text-[10px] text-brand/80 font-normal">
+                              (₹{svc.basePrice})
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeService(svc)}
+                            className="ml-0.5 rounded-full p-0.5 hover:bg-brand/20 text-brand"
+                            aria-label={`Remove ${svc.name}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Available Services Grid from Category */}
+                  {availableServices.length > 0 ? (
+                    <div className="space-y-2">
+                      {/* Search Services Filter */}
+                      {availableServices.length > 4 && (
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Filter services in this category..."
+                            value={serviceSearch}
+                            onChange={(e) => setServiceSearch(e.target.value)}
+                            className="w-full rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-xs font-medium text-slate-800 outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
+                          />
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto p-1.5 rounded-xl bg-white border border-slate-200/80">
+                        {filteredServices.length === 0 ? (
+                          <p className="col-span-full py-4 text-center text-xs text-slate-400">
+                            No services match &ldquo;{serviceSearch}&rdquo;
+                          </p>
+                        ) : (
+                          filteredServices.map((svc) => {
+                            const isSelected = selectedServices.some(
+                              (s) => (s.serviceId && s.serviceId === svc.serviceId) || s.name.toLowerCase() === svc.name.toLowerCase()
+                            )
+                            return (
+                              <button
+                                key={svc.serviceId || svc.name}
+                                type="button"
+                                onClick={() => toggleService(svc)}
+                                className={`flex items-center justify-between p-2 rounded-lg text-xs font-bold text-left transition border ${
+                                  isSelected
+                                    ? 'bg-brand/10 border-brand text-brand shadow-2xs'
+                                    : 'bg-slate-50/70 border-slate-200/70 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                                }`}
+                              >
+                                <span className="truncate pr-1 flex-1">{svc.name}</span>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {svc.basePrice > 0 && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200/70 text-slate-600 font-semibold">
+                                      ₹{svc.basePrice}
+                                    </span>
+                                  )}
+                                  <div
+                                    className={`h-4 w-4 rounded flex items-center justify-center border transition ${
+                                      isSelected
+                                        ? 'bg-brand border-brand text-white'
+                                        : 'border-slate-300 bg-white'
+                                    }`}
+                                  >
+                                    {isSelected && <Check className="h-3 w-3" />}
+                                  </div>
+                                </div>
+                              </button>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-2 text-center text-xs text-slate-500">
+                      {formCategoryId === 'custom'
+                        ? 'Using custom category. Add your services below.'
+                        : 'No predefined services configured for this category. Add custom services below.'}
+                    </div>
+                  )}
+
+                  {/* Add Custom / Additional Service Input */}
+                  <div className="pt-1">
+                    <label className="text-[11px] font-bold text-slate-600 mb-1 block">
+                      + Add Custom or Additional Service
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="e.g. Master Bedroom Deep Cleaning"
+                        value={customServiceName}
+                        onChange={(e) => setCustomServiceName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            addCustomService()
+                          }
+                        }}
+                        className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
+                      />
+                      <button
+                        type="button"
+                        onClick={addCustomService}
+                        disabled={!customServiceName.trim()}
+                        className="rounded-xl bg-slate-800 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-900 disabled:opacity-40 transition"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Broadcast Service Title / Combined Preview */}
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-1 block">
-                    Service Name / Type *
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-1 flex items-center justify-between">
+                    <span>Broadcast Service Title / Display Text *</span>
+                    <span className="text-[11px] text-slate-400 font-normal lowercase">(auto-populated from services)</span>
                   </label>
                   <input
                     type="text"
@@ -551,6 +828,9 @@ export function AdminSimulatedOpportunitiesPage() {
                     onChange={(e) => setFormServiceType(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10"
                   />
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    This exact text will be displayed to service providers in the alert popup.
+                  </p>
                 </div>
 
                 {/* Operational Zone Selection (All Zones & Multi-Zone Support) */}
@@ -933,10 +1213,34 @@ export function AdminSimulatedOpportunitiesPage() {
               {/* Scrollable Body */}
               <div className="flex-1 min-h-0 overflow-y-auto p-6 pt-4 space-y-4 overscroll-contain">
                 <div className="rounded-2xl bg-slate-50 p-4 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 font-medium">Service:</span>
-                    <span className="font-bold text-slate-900">{detailItem.serviceType} ({detailItem.serviceCategory})</span>
+                  <div className="flex justify-between items-start">
+                    <span className="text-slate-500 font-medium">
+                      {detailItem.services?.length > 1 ? 'Services:' : 'Service:'}
+                    </span>
+                    <div className="text-right">
+                      <span className="font-bold text-slate-900">{detailItem.serviceType}</span>
+                      <p className="text-xs text-slate-500 font-medium">{detailItem.serviceCategory}</p>
+                    </div>
                   </div>
+                  {detailItem.services?.length > 0 && (
+                    <div className="pt-2 border-t border-slate-200/60">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                        Included Services ({detailItem.services.length})
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {detailItem.services.map((s, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-800"
+                          >
+                            <Check className="h-3 w-3 text-emerald-600" />
+                            {s.name || s}
+                            {s.basePrice ? <span className="text-slate-400 font-normal">₹{s.basePrice}</span> : null}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-slate-500 font-medium">Estimated Amount:</span>
                     <span className="font-bold text-blue-700">{formatInr(detailItem.estimatedAmount)}</span>

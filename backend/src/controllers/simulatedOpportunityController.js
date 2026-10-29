@@ -63,6 +63,7 @@ export const createSimulatedOpportunity = asyncHandler(async (req, res) => {
   const {
     serviceCategory,
     serviceType,
+    services = [],
     categoryId,
     subcategoryId,
     zoneIds = [],
@@ -161,6 +162,13 @@ export const createSimulatedOpportunity = asyncHandler(async (req, res) => {
     isSimulated: true,
     serviceCategory,
     serviceType,
+    services: Array.isArray(services)
+      ? services.map((s) => ({
+          serviceId: s.serviceId || s._id || null,
+          name: typeof s === 'string' ? s : s.name || '',
+          basePrice: Number(s.basePrice || s.price || 0) || undefined,
+        }))
+      : [],
     categoryId: categoryId || null,
     subcategoryId: subcategoryId || null,
     isAllZones: resolvedIsAllZones,

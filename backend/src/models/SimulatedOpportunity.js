@@ -45,6 +45,21 @@ const simulatedOpportunitySchema = new mongoose.Schema(
       trim: true,
       required: true,
     },
+    services: [
+      {
+        serviceId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'LabourService',
+        },
+        name: {
+          type: String,
+          trim: true,
+        },
+        basePrice: {
+          type: Number,
+        },
+      },
+    ],
     categoryId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'LabourCategory',
