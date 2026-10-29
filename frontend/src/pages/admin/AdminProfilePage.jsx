@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { User, Lock, Loader2, CheckCircle } from 'lucide-react'
+import { User, Lock, Loader2, CheckCircle, Eye, EyeOff } from 'lucide-react'
 import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
 import { getAdminProfile, updateAdminProfile, changeAdminPassword } from '../../api/adminProfileApi.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
@@ -7,6 +7,7 @@ import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 export function AdminProfilePage() {
   const [profile, setProfile] = useState({ fullName: '', email: '' })
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [showPasswords, setShowPasswords] = useState({ current: false, new: false, confirm: false })
   const [loading, setLoading] = useState(true)
   
   const [profileSaving, setProfileSaving] = useState(false)
@@ -170,40 +171,70 @@ export function AdminProfilePage() {
           <form onSubmit={handlePasswordUpdate} className="space-y-4 relative z-10">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
-              <input
-                type="password"
-                required
-                value={passwords.currentPassword}
-                onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none transition-all"
-                placeholder="••••••••"
-              />
+              <div className="relative">
+                <input
+                  type={showPasswords.current ? 'text' : 'password'}
+                  required
+                  value={passwords.currentPassword}
+                  onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })}
+                  className="w-full px-4 py-2 pr-11 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none transition-all"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none p-1 transition-colors"
+                  aria-label={showPasswords.current ? 'Hide current password' : 'Show current password'}
+                >
+                  {showPasswords.current ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={passwords.newPassword}
-                onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none transition-all"
-                placeholder="••••••••"
-              />
+              <div className="relative">
+                <input
+                  type={showPasswords.new ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  value={passwords.newPassword}
+                  onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
+                  className="w-full px-4 py-2 pr-11 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none transition-all"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none p-1 transition-colors"
+                  aria-label={showPasswords.new ? 'Hide new password' : 'Show new password'}
+                >
+                  {showPasswords.new ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={passwords.confirmPassword}
-                onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none transition-all"
-                placeholder="••••••••"
-              />
+              <div className="relative">
+                <input
+                  type={showPasswords.confirm ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  value={passwords.confirmPassword}
+                  onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })}
+                  className="w-full px-4 py-2 pr-11 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none transition-all"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none p-1 transition-colors"
+                  aria-label={showPasswords.confirm ? 'Hide confirm password' : 'Show confirm password'}
+                >
+                  {showPasswords.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             
             <div className="pt-2">
