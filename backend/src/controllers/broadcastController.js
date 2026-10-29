@@ -3,6 +3,7 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { KYC_STATUS } from '../constants/roles.js'
 import { BROADCAST_TIMEOUT_MS } from '../services/broadcastService.js'
+import { getLabourStats } from '../services/labourStatsService.js'
 
 function formatDurationHuman(mins) {
   const m = Math.max(1, Math.round(Number(mins) || 45))
@@ -379,7 +380,12 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
 
   // Notify customer and expire broadcast for other partners if fully accepted
   import('../socket.js')
-    .then(({ emitToUser, getIo }) => {
+    .then(async ({ emitToUser, getIo }) => {
+      const stats = await getLabourStats(labour._id)
+      const partnerRating = stats.rating || labour.labourProfile?.rating || 4.8
+      const partnerTotalReviews = stats.totalReviews || 0
+      const partnerCompletedBookings = stats.completedBookingsCount || 0
+
       // Immediate direct socket emit to customer so UI reacts instantly
       emitToUser(booking.userId, 'BOOKING_ACCEPTED', {
         bookingId: booking._id,
@@ -390,14 +396,18 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
           name: labour.fullName,
           phone: labour.phone,
           profileImageUrl: labour.profileImageUrl,
-          rating: labour.labourProfile?.rating,
+          rating: partnerRating,
+          totalReviews: partnerTotalReviews,
+          completedBookingsCount: partnerCompletedBookings,
           experienceYears: labour.labourProfile?.experienceYears,
           serviceName: assignedServiceName || 'Service',
         },
         partnerName: labour.fullName,
         partnerPhone: labour.phone,
         partnerAvatar: labour.profileImageUrl,
-        partnerRating: labour.labourProfile?.rating,
+        partnerRating,
+        partnerTotalReviews,
+        partnerCompletedBookings,
         partnerExperience: labour.labourProfile?.experienceYears,
         serviceName: assignedServiceName || 'Service',
         startOtp: newAssignment.startOtp,

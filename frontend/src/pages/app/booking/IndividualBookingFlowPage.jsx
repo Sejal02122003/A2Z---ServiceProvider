@@ -418,6 +418,8 @@ export function IndividualBookingFlowPage() {
           phone: bookingEvent.data?.partnerPhone,
           profileImageUrl: bookingEvent.data?.partnerAvatar,
           rating: bookingEvent.data?.partnerRating,
+          totalReviews: bookingEvent.data?.partnerTotalReviews,
+          completedBookingsCount: bookingEvent.data?.partnerCompletedBookings,
           experienceYears: bookingEvent.data?.partnerExperience,
         }
         return {
@@ -1091,6 +1093,8 @@ export function IndividualBookingFlowPage() {
     phone: acceptedPartnerEvent.partnerPhone,
     profileImageUrl: acceptedPartnerEvent.partnerAvatar,
     rating: acceptedPartnerEvent.partnerRating,
+    totalReviews: acceptedPartnerEvent.partnerTotalReviews,
+    completedBookingsCount: acceptedPartnerEvent.partnerCompletedBookings,
     experienceYears: acceptedPartnerEvent.partnerExperience,
   } : null)
 
@@ -1407,6 +1411,30 @@ export function IndividualBookingFlowPage() {
                       </div>
                       <p className="text-xs font-semibold text-emerald-700">{workerItem?.phone || 'Contact via app'}</p>
                       <p className="text-[11px] text-slate-400 mt-0.5">{assignment.serviceName || draft.categoryName}</p>
+
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                        <div className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200/60">
+                          <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-500" />
+                          <span>
+                            {workerItem?.rating != null
+                              ? Number(workerItem.rating).toFixed(1)
+                              : (workerItem?.labourProfile?.rating ? Number(workerItem.labourProfile.rating).toFixed(1) : '5.0')}
+                          </span>
+                          {Number(workerItem?.totalReviews || 0) > 0 ? (
+                            <span className="text-[9px] text-amber-600/80">({workerItem.totalReviews})</span>
+                          ) : (
+                            <span className="text-[9px] text-amber-600/80">(New)</span>
+                          )}
+                        </div>
+                        <div className="inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 border border-blue-200/60">
+                          <CheckCircle2 className="h-2.5 w-2.5 text-blue-600" />
+                          <span>
+                            {Number(workerItem?.completedBookingsCount || 0) > 0
+                              ? `${workerItem.completedBookingsCount} Done`
+                              : 'New Partner'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                     {workerItem?.phone && (
                       <a
@@ -1481,17 +1509,32 @@ export function IndividualBookingFlowPage() {
                       <p className="text-xs font-medium text-slate-500 mt-0.5">
                         {draft.categoryName || booking?.category?.name || 'Requested Service'}
                       </p>
-                      {(worker?.rating || worker?.labourProfile?.rating) ? (
-                        <div className="mt-1 flex items-center gap-1.5 text-xs font-bold text-amber-500">
-                          <span>⭐ {worker.rating || worker.labourProfile?.rating}</span>
-                          <span className="text-[10px] text-slate-400 font-normal">Rating</span>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                        <div className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700 border border-amber-200/70">
+                          <Star className="h-3 w-3 fill-amber-400 text-amber-500" />
+                          <span>
+                            {worker?.rating != null
+                              ? Number(worker.rating).toFixed(1)
+                              : (worker?.labourProfile?.rating ? Number(worker.labourProfile.rating).toFixed(1) : '5.0')}
+                          </span>
+                          {Number(worker?.totalReviews || 0) > 0 ? (
+                            <span className="text-[10px] font-semibold text-amber-600/80">
+                              ({worker.totalReviews} review{worker.totalReviews > 1 ? 's' : ''})
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-semibold text-amber-600/80">(New)</span>
+                          )}
                         </div>
-                      ) : (
-                        <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                          <span>Verified & Background Checked</span>
+
+                        <div className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700 border border-blue-200/70">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" />
+                          <span>
+                            {Number(worker?.completedBookingsCount || 0) > 0
+                              ? `${worker.completedBookingsCount} Job${worker.completedBookingsCount > 1 ? 's' : ''} Done`
+                              : 'New Partner'}
+                          </span>
                         </div>
-                      )}
+                      </div>
                     </div>
                   </div>
 

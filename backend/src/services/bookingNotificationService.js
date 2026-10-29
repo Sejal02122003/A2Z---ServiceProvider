@@ -2,6 +2,7 @@ import { InAppNotification, NOTIFICATION_TYPES, DELIVERY_STATUS } from '../model
 import { LabourService } from '../models/LabourService.js'
 import { User } from '../models/User.js'
 import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
+import { getLabourStats } from './labourStatsService.js'
 
 /**
  * Format a human-readable booking date in IST
@@ -71,7 +72,10 @@ export async function sendBookingAcceptedNotification({ booking, partner, assign
     const partnerName = partnerDoc?.fullName || partnerDoc?.name || 'Service Partner'
     const partnerPhone = partnerDoc?.phone || ''
     const partnerAvatar = partnerDoc?.profileImageUrl || ''
-    const partnerRating = partnerDoc?.labourProfile?.rating || partnerDoc?.rating || 4.8
+    const stats = await getLabourStats(partnerId)
+    const partnerRating = stats.rating || partnerDoc?.labourProfile?.rating || partnerDoc?.rating || 4.8
+    const partnerTotalReviews = stats.totalReviews || 0
+    const partnerCompletedBookings = stats.completedBookingsCount || 0
     const partnerExperience = partnerDoc?.labourProfile?.experienceYears || 0
 
     const startOtp = assignment?.startOtp || booking.assignments?.[0]?.startOtp || booking.startOtp || ''
@@ -108,6 +112,8 @@ export async function sendBookingAcceptedNotification({ booking, partner, assign
           phone: partnerPhone,
           profileImageUrl: partnerAvatar,
           rating: partnerRating,
+          totalReviews: partnerTotalReviews,
+          completedBookingsCount: partnerCompletedBookings,
           experienceYears: partnerExperience,
           serviceName,
         },
@@ -115,6 +121,8 @@ export async function sendBookingAcceptedNotification({ booking, partner, assign
         partnerPhone,
         partnerAvatar,
         partnerRating,
+        partnerTotalReviews,
+        partnerCompletedBookings,
         partnerExperience,
         serviceName,
         startOtp,

@@ -17,6 +17,7 @@ import {
   processCustomerCancellation,
   checkCustomerBookingRestriction,
 } from '../services/bookingCancellationService.js'
+import { getMultipleLaboursStats } from '../services/labourStatsService.js'
 
 export function formatDurationHuman(mins) {
   const m = Math.max(1, Math.round(Number(mins) || 45))
@@ -1098,6 +1099,41 @@ export const getBookingStatus = asyncHandler(async (req, res) => {
     }
   }
 
+  // Collect all assigned labour IDs to enrich with real reviews and completed bookings stats
+  const labourIds = []
+  if (booking.laborId) labourIds.push(booking.laborId._id || booking.laborId)
+  if (booking.assignments) {
+    booking.assignments.forEach((a) => {
+      if (a.labourId) labourIds.push(a.labourId._id || a.labourId)
+    })
+  }
+  if (booking.multiServiceBooking?.items) {
+    booking.multiServiceBooking.items.forEach((item) => {
+      if (item.assignedLabourId) labourIds.push(item.assignedLabourId._id || item.assignedLabourId)
+    })
+  }
+
+  if (labourIds.length > 0) {
+    const statsMap = await getMultipleLaboursStats(labourIds)
+    const enrich = (target) => {
+      if (target && typeof target === 'object') {
+        const s = statsMap[String(target._id)]
+        if (s) {
+          target.rating = s.rating || target.labourProfile?.rating || target.rating || null
+          target.totalReviews = s.totalReviews || 0
+          target.completedBookingsCount = s.completedBookingsCount || 0
+        }
+      }
+    }
+    enrich(booking.laborId)
+    if (booking.assignments) {
+      booking.assignments.forEach((a) => enrich(a.labourId))
+    }
+    if (booking.multiServiceBooking?.items) {
+      booking.multiServiceBooking.items.forEach((item) => enrich(item.assignedLabourId))
+    }
+  }
+
   return sendSuccess(res, { data: { booking } })
 })
 
@@ -1173,6 +1209,34 @@ export const getMyBookings = asyncHandler(async (req, res) => {
       }
     }
   })
+
+  // Enrich bookings with labour stats
+  const allLabourIds = []
+  bookings.forEach((b) => {
+    if (b.laborId) allLabourIds.push(b.laborId._id || b.laborId)
+    if (b.assignments) {
+      b.assignments.forEach((a) => {
+        if (a.labourId) allLabourIds.push(a.labourId._id || a.labourId)
+      })
+    }
+  })
+  if (allLabourIds.length > 0) {
+    const statsMap = await getMultipleLaboursStats(allLabourIds)
+    const enrich = (target) => {
+      if (target && typeof target === 'object') {
+        const s = statsMap[String(target._id)]
+        if (s) {
+          target.rating = s.rating || target.labourProfile?.rating || target.rating || null
+          target.totalReviews = s.totalReviews || 0
+          target.completedBookingsCount = s.completedBookingsCount || 0
+        }
+      }
+    }
+    bookings.forEach((b) => {
+      enrich(b.laborId)
+      if (b.assignments) b.assignments.forEach((a) => enrich(a.labourId))
+    })
+  }
 
   return sendSuccess(res, { data: { bookings } })
 })

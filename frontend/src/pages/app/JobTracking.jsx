@@ -108,6 +108,8 @@ export function JobTracking() {
           phone: data.partnerPhone,
           profileImageUrl: data.partnerAvatar,
           rating: data.partnerRating,
+          totalReviews: data.partnerTotalReviews,
+          completedBookingsCount: data.partnerCompletedBookings,
           experienceYears: data.partnerExperience,
         }
         setBooking((prev) => prev ? {
@@ -445,18 +447,32 @@ export function JobTracking() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-lg font-black text-slate-900 truncate">{labor.fullName || 'Service Provider'}</p>
-                <p className="text-xs font-medium text-slate-500 mt-0.5">Verified Professional</p>
-                {(labor.rating || labor.labourProfile?.rating) ? (
-                  <div className="mt-1 flex items-center gap-1.5 text-xs font-bold text-amber-500">
-                    <span>⭐ {labor.rating || labor.labourProfile?.rating}</span>
-                    <span className="text-[10px] text-slate-400 font-normal">Rating</span>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <div className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700 border border-amber-200/70">
+                    <Star className="h-3 w-3 fill-amber-400 text-amber-500" />
+                    <span>
+                      {labor.rating != null
+                        ? Number(labor.rating).toFixed(1)
+                        : (labor.labourProfile?.rating ? Number(labor.labourProfile.rating).toFixed(1) : '5.0')}
+                    </span>
+                    {Number(labor.totalReviews || 0) > 0 ? (
+                      <span className="text-[10px] font-semibold text-amber-600/80">
+                        ({labor.totalReviews} review{labor.totalReviews > 1 ? 's' : ''})
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-amber-600/80">(New)</span>
+                    )}
                   </div>
-                ) : (
-                  <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                    <span>Verified & Background Checked</span>
+
+                  <div className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700 border border-blue-200/70">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" />
+                    <span>
+                      {Number(labor.completedBookingsCount || 0) > 0
+                        ? `${labor.completedBookingsCount} Job${labor.completedBookingsCount > 1 ? 's' : ''} Done`
+                        : 'New Partner'}
+                    </span>
                   </div>
-                )}
+                </div>
               </div>
             </div>
 
