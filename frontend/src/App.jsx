@@ -35,7 +35,6 @@ import { AdminZonesPage } from './pages/admin/AdminZonesPage.jsx'
 import { AdminPlatformFeePage } from './pages/admin/AdminPlatformFeePage.jsx'
 import { AdminCommissionFeePage } from './pages/admin/AdminCommissionFeePage.jsx'
 import { AdminLabourWalletPage } from './pages/admin/AdminLabourWalletPage.jsx'
-import { AdminCashManagementPage } from './pages/admin/AdminCashManagementPage.jsx'
 import { AdminReviewsRatingsPage } from './pages/admin/AdminReviewsRatingsPage.jsx'
 import { AdminLabourSubscriptionsPage } from './pages/admin/AdminLabourSubscriptionsPage.jsx'
 import { AdminFreeTrialPage } from './pages/admin/AdminFreeTrialPage.jsx'
@@ -162,7 +161,7 @@ function App() {
             <Route path="platform-fee" element={<AdminPlatformFeePage />} />
             <Route path="commission-fee" element={<AdminCommissionFeePage />} />
             <Route path="labour-wallet" element={<AdminLabourWalletPage />} />
-            <Route path="cash-management" element={<AdminCashManagementPage />} />
+            <Route path="cash-management" element={<Navigate to="/admin/labour-wallet" replace />} />
             <Route path="reviews" element={<AdminReviewsRatingsPage />} />
             <Route path="labour-subscriptions" element={<AdminLabourSubscriptionsPage />} />
             <Route path="free-trials" element={<AdminFreeTrialPage />} />

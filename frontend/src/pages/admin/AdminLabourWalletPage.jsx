@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { adminBookingsApi } from '../../api/adminBookingsApi.js'
 import { adminWalletsApi } from '../../api/adminWalletsApi.js'
+import { adminSettingsApi } from '../../api/adminSettingsApi.js'
 import { walletsApi } from '../../api/walletsApi.js'
 
 export function AdminLabourWalletPage() {
@@ -54,6 +55,7 @@ export function AdminLabourWalletPage() {
   const [settings, setSettings] = useState({
     enabled: true,
     minimumLabourWalletBalance: '',
+    labourCashLimit: 500,
     welcomeBonusAmount: 100,
     walletDiscountPercentage: 20,
     minimumBookingAmount: 0,
@@ -85,11 +87,12 @@ export function AdminLabourWalletPage() {
   const fetchOverviewData = async () => {
     setLoading(true)
     try {
-      const [bookingsRes, wRes, statsRes, settingsRes] = await Promise.all([
+      const [bookingsRes, wRes, statsRes, settingsRes, sysSettingsRes] = await Promise.all([
         adminBookingsApi.getAllBookings({ limit: 5000 }).catch(() => ({})),
         adminWalletsApi.getAllWithdrawals().catch(() => ({})),
         adminWalletsApi.getLabourWalletStats().catch(() => ({})),
         adminWalletsApi.getWalletSettings().catch(() => ({})),
+        adminSettingsApi.getSettings().catch(() => ({})),
       ])
 
       const allB = bookingsRes?.data?.bookings || bookingsRes?.bookings || bookingsRes || []
@@ -102,11 +105,13 @@ export function AdminLabourWalletPage() {
         setStats(statsRes.data.stats)
       }
 
+      const sysSettings = sysSettingsRes?.data?.settings || {}
       if (settingsRes?.data?.settings) {
         const s = settingsRes.data.settings
         setSettings({
           ...s,
           minimumLabourWalletBalance: s.minimumLabourWalletBalance === 0 ? '' : (s.minimumLabourWalletBalance ?? ''),
+          labourCashLimit: sysSettings.labourCashLimit ?? s.labourCashLimit ?? 500,
         })
       }
     } catch (err) {
@@ -186,13 +191,18 @@ export function AdminLabourWalletPage() {
     }
 
     try {
-      await adminWalletsApi.updateWalletSettings({
-        enabled: settings.enabled,
-        minimumLabourWalletBalance: minBalance,
-        welcomeBonusAmount: Number(settings.welcomeBonusAmount || 0),
-        walletDiscountPercentage: Number(settings.walletDiscountPercentage || 0),
-      })
-      setSettingsMsg({ type: 'success', text: 'Wallet settings saved successfully' })
+      await Promise.all([
+        adminWalletsApi.updateWalletSettings({
+          enabled: settings.enabled,
+          minimumLabourWalletBalance: minBalance,
+          welcomeBonusAmount: Number(settings.welcomeBonusAmount || 0),
+          walletDiscountPercentage: Number(settings.walletDiscountPercentage || 0),
+        }),
+        adminSettingsApi.updateLabourCashLimit({
+          labourCashLimit: Number(settings.labourCashLimit || 0),
+        }),
+      ])
+      setSettingsMsg({ type: 'success', text: 'Wallet settings and cash limit saved successfully' })
       fetchOverviewData()
     } catch (err) {
       setSettingsMsg({ type: 'error', text: err.message || 'Failed to update settings' })
@@ -899,6 +909,29 @@ export function AdminLabourWalletPage() {
                   value={settings.minimumLabourWalletBalance ?? ''}
                   onChange={(e) =>
                     setSettings({ ...settings, minimumLabourWalletBalance: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-8 pr-4 text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Max Cash Dues / Cash Limit Input */}
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                Max Allowed Cash Dues / Cash Limit (₹)
+              </label>
+              <p className="text-xs text-slate-400 mb-2">
+                When a service provider collects cash from customers, admin dues are accumulated. If their unpaid dues exceed this limit, they cannot accept new bookings until dues are cleared.
+              </p>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400">₹</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="500"
+                  value={settings.labourCashLimit ?? ''}
+                  onChange={(e) =>
+                    setSettings({ ...settings, labourCashLimit: e.target.value })
                   }
                   className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-8 pr-4 text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
                 />
