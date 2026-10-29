@@ -126,13 +126,13 @@ export function PackageDetailsPage() {
       serviceDate: currentDraft.serviceDate || today,
       timeSlot: currentDraft.timeSlot || (bookingMode === 'scheduled' ? timeStr : ''),
     })
-    navigate(`/app/booking/flow?step=details&packageId=${pkg._id}`)
+    navigate(`/user/booking/flow?step=details&packageId=${pkg._id}`)
   }, [pkg, navigate])
 
   if (loading) {
     return (
       <div className="space-y-4 pb-12">
-        <AppStackScreenHeader title="Package Details" backTo="/app/packages" />
+        <AppStackScreenHeader title="Package Details" backTo="/user/packages" />
         <div className="flex flex-col items-center justify-center py-24 space-y-3">
           <Loader2 className="h-8 w-8 animate-spin text-brand" />
           <p className="text-xs font-semibold text-slate-500">Loading package details...</p>
@@ -144,7 +144,7 @@ export function PackageDetailsPage() {
   if (error || !pkg) {
     return (
       <div className="space-y-4 pb-12">
-        <AppStackScreenHeader title="Package Details" backTo="/app/packages" />
+        <AppStackScreenHeader title="Package Details" backTo="/user/packages" />
         <GlassPanel className="p-8 text-center space-y-3">
           <AlertCircle className="mx-auto h-10 w-10 text-rose-500" />
           <h3 className="text-base font-extrabold text-slate-800">
@@ -155,7 +155,7 @@ export function PackageDetailsPage() {
           </p>
           <button
             type="button"
-            onClick={() => navigate('/app/packages')}
+            onClick={() => navigate('/user/packages')}
             className="rounded-xl bg-brand px-4 py-2 text-xs font-bold text-white shadow hover:opacity-95"
           >
             Explore Other Packages
@@ -167,7 +167,7 @@ export function PackageDetailsPage() {
 
   return (
     <div className="space-y-4 pb-28">
-      <AppStackScreenHeader title={pkg.name} backTo="/app/packages" />
+      <AppStackScreenHeader title={pkg.name} backTo="/user/packages" />
 
       {/* Main Image Gallery */}
       <div className="relative overflow-hidden rounded-2xl bg-slate-900 shadow-md">

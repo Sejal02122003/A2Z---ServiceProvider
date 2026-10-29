@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider } from './context/AuthProvider.jsx'
 import { BrandingProvider } from './context/BrandingContext.jsx'
 import { BookingCartProvider } from './context/BookingCartContext.jsx'
@@ -60,7 +60,16 @@ import { ErrorBoundary } from './components/ErrorBoundary.jsx'
 import { useEffect } from 'react'
 import { APP_B2C_ROLES } from './constants/panelRoles.js'
 import { USER_ROLES } from './constants/userRoles.js'
+import { useAuth } from './hooks/useAuth.js'
 import { initializePushNotifications, setupForegroundNotificationHandler } from './services/pushNotificationService.js'
+
+function AppLegacyRedirect() {
+  const { user } = useAuth()
+  const location = useLocation()
+  const targetPrefix = user?.role === USER_ROLES.LABOUR ? '/serviceprovider' : '/user'
+  const newPath = location.pathname.replace(/^\/app/, targetPrefix) + location.search + location.hash
+  return <Navigate to={newPath} replace />
+}
 
 function App() {
   useEffect(() => {
@@ -82,10 +91,26 @@ function App() {
           <Route path="/auth" element={<Navigate to="/users/auth" replace />} />
           <Route path="/users/auth" element={<AuthEntryPage authGroup="users" />} />
           <Route path="/labours/auth" element={<AuthEntryPage authGroup="labours" />} />
+
+          {/* User App (Customer / Guest / Contractor) */}
           <Route
-            path="/app"
+            path="/user"
             element={
-              <ProtectedRoute roles={APP_B2C_ROLES} allowGuest>
+              <ProtectedRoute roles={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR]} allowGuest>
+                <ErrorBoundary>
+                  <AppShell />
+                </ErrorBoundary>
+              </ProtectedRoute>
+            }
+          >
+            {appShellChildRoutes}
+          </Route>
+
+          {/* Service Provider App (Labour) */}
+          <Route
+            path="/serviceprovider"
+            element={
+              <ProtectedRoute roles={[USER_ROLES.LABOUR]}>
                 <ErrorBoundary>
                   <AppShell />
                 </ErrorBoundary>
@@ -95,7 +120,7 @@ function App() {
             {appShellChildRoutes}
           </Route>
           <Route
-            path="/app/work-categories"
+            path="/serviceprovider/work-categories"
             element={
               <ProtectedRoute roles={[USER_ROLES.LABOUR]}>
                 <ErrorBoundary>
@@ -104,6 +129,10 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Legacy /app Redirects */}
+          <Route path="/app/*" element={<AppLegacyRedirect />} />
+          <Route path="/app" element={<AppLegacyRedirect />} />
 
           <Route
             path="/admin/login"

@@ -201,13 +201,13 @@ export function JobTracking() {
   const handleReviewClose = useCallback(() => {
     setShowReview(false)
     dispatch(clearActiveBooking())
-    navigate('/app/my-bookings', { replace: true })
+    navigate('/user/my-bookings', { replace: true })
   }, [dispatch, navigate])
 
   if (loading) {
     return (
       <div className="space-y-4">
-        <AppStackScreenHeader title="Tracking" backTo="/app" />
+        <AppStackScreenHeader title="Tracking" backTo="/user" />
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-brand" />
         </div>
@@ -218,7 +218,7 @@ export function JobTracking() {
   if (error || !booking) {
     return (
       <div className="space-y-4">
-        <AppStackScreenHeader title="Tracking" backTo="/app" />
+        <AppStackScreenHeader title="Tracking" backTo="/user" />
         <GlassPanel className="p-6 text-center">
           <p className="text-sm font-semibold text-rose-700">{error || 'Booking not found'}</p>
         </GlassPanel>
@@ -232,7 +232,7 @@ export function JobTracking() {
 
     return (
       <div className="space-y-4 font-sans pb-12">
-        <AppStackScreenHeader title="Job Status" backTo="/app/my-bookings" />
+        <AppStackScreenHeader title="Job Status" backTo="/user/my-bookings" />
         <GlassPanel className="p-6 text-center space-y-4">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 shadow-sm border border-rose-200">
             <span className="text-2xl font-black text-rose-600">✕</span>
@@ -278,14 +278,14 @@ export function JobTracking() {
           <div className="pt-2 flex flex-col gap-2">
             <button
               type="button"
-              onClick={() => navigate('/app/my-bookings')}
+              onClick={() => navigate('/user/my-bookings')}
               className="w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition"
             >
               View My Bookings
             </button>
             <button
               type="button"
-              onClick={() => navigate('/app')}
+              onClick={() => navigate('/user')}
               className="w-full rounded-xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition"
             >
               Book Another Service
@@ -303,7 +303,7 @@ export function JobTracking() {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 font-sans pb-24">
-      <AppStackScreenHeader title="Job Tracking" backTo="/app" />
+      <AppStackScreenHeader title="Job Tracking" backTo="/user" />
 
       {/* Celebratory Accepted Banner */}
       {['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED'].includes(booking.status) && (
@@ -768,7 +768,7 @@ export function JobTracking() {
         onClose={() => setShowCancelModal(false)}
         onSuccess={() => {
           setShowCancelModal(false)
-          navigate('/app', { replace: true })
+          navigate('/user', { replace: true })
         }}
       />
 

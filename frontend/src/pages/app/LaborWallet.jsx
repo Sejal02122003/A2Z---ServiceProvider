@@ -254,7 +254,7 @@ export function LaborWallet() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <AppStackScreenHeader title="Service Provider Wallet" backTo="/app" />
+        <AppStackScreenHeader title="Service Provider Wallet" backTo="/serviceprovider" />
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-brand" />
         </div>
@@ -265,7 +265,7 @@ export function LaborWallet() {
   if (error) {
     return (
       <div className="space-y-4">
-        <AppStackScreenHeader title="Service Provider Wallet" backTo="/app" />
+        <AppStackScreenHeader title="Service Provider Wallet" backTo="/serviceprovider" />
         <GlassPanel className="p-6 text-center">
           <p className="text-sm font-semibold text-rose-700">{error}</p>
         </GlassPanel>
@@ -282,7 +282,7 @@ export function LaborWallet() {
 
   return (
     <div className="space-y-4 pb-8">
-      <AppStackScreenHeader title="Service Provider Wallet" backTo="/app" />
+      <AppStackScreenHeader title="Service Provider Wallet" backTo="/serviceprovider" />
 
       {/* Main Available Balance Hero Card */}
       <motion.div
@@ -416,7 +416,7 @@ export function LaborWallet() {
 
       {/* Penalties & Disputes Shortcut */}
       <Link
-        to="/app/labour/penalties"
+        to="/serviceprovider/penalties"
         className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 transition-all hover:border-slate-300 hover:shadow-sm"
       >
         <div className="flex items-center gap-3">

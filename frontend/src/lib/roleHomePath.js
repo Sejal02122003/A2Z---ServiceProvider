@@ -6,8 +6,10 @@ export function getRoleHomePath(role) {
     case USER_ROLES.ADMIN:
       return '/admin'
     case USER_ROLES.LABOUR:
+      return '/serviceprovider'
     case USER_ROLES.CUSTOMER:
+    case USER_ROLES.CONTRACTOR:
     default:
-      return '/app'
+      return '/user'
   }
 }

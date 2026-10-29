@@ -210,7 +210,7 @@ export function BroadcastPopup() {
       if (timerRef.current) clearInterval(timerRef.current)
       const bookingId = incoming.bookingId
       setIncoming(null)
-      navigate(`/app/active-job/${bookingId}`)
+      navigate(`/serviceprovider/active-job/${bookingId}`)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to accept')
       setResponding(false)
@@ -643,7 +643,7 @@ export function BroadcastPopup() {
                       type="button"
                       onClick={() => {
                         setIncoming(null)
-                        navigate('/app/labor-wallet')
+                        navigate('/serviceprovider/wallet')
                       }}
                       className="mt-1 block text-xs font-extrabold text-brand underline"
                     >
@@ -655,7 +655,7 @@ export function BroadcastPopup() {
                       type="button"
                       onClick={() => {
                         setIncoming(null)
-                        navigate('/app/subscriptions')
+                        navigate('/serviceprovider/subscriptions')
                       }}
                       className="mt-1 block text-xs font-extrabold text-brand underline"
                     >
@@ -667,7 +667,7 @@ export function BroadcastPopup() {
                       type="button"
                       onClick={() => {
                         setIncoming(null)
-                        navigate('/app/kyc')
+                        navigate('/serviceprovider/kyc')
                       }}
                       className="mt-1 block text-xs font-extrabold text-brand underline"
                     >

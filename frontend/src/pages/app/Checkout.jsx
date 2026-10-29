@@ -292,7 +292,7 @@ export function Checkout() {
       if (!booking) throw new Error('Booking creation failed')
 
       if (paymentMethod === 'CASH') {
-        navigate(`/app/tracking/${booking._id}`, { replace: true })
+        navigate(`/user/tracking/${booking._id}`, { replace: true })
         return
       }
 
@@ -327,7 +327,7 @@ export function Checkout() {
               razorpayPaymentId: response.razorpay_payment_id,
               razorpaySignature: response.razorpay_signature,
             })
-            navigate(`/app/tracking/${booking._id}`, { replace: true })
+            navigate(`/user/tracking/${booking._id}`, { replace: true })
           } catch (err) {
             setSubmitError('Payment verification failed. Contact support.')
             setSubmitting(false)

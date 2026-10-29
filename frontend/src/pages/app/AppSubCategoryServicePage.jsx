@@ -188,7 +188,7 @@ export function AppSubCategoryServicePage() {
           <h2 className="text-base font-bold text-slate-800">Category Not Found</h2>
           <p className="text-xs text-slate-500 mt-1 mb-4">The requested service category is currently not available.</p>
           <button
-            onClick={() => navigate('/app', { replace: true })}
+            onClick={() => navigate('/user', { replace: true })}
             className="w-full rounded-xl bg-brand py-2.5 text-xs font-bold text-white shadow transition hover:bg-brand/90"
           >
             Back to Home

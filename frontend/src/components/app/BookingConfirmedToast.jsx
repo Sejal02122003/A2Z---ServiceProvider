@@ -178,7 +178,7 @@ export function BookingConfirmedToast() {
               type="button"
               onClick={() => {
                 handleDismiss()
-                navigate(`/app/tracking/${bookingId}`)
+                navigate(`/user/tracking/${bookingId}`)
               }}
               className="flex items-center justify-center gap-1.5 rounded-2xl bg-emerald-600 px-3 py-2.5 text-xs font-black text-white shadow-md shadow-emerald-600/30 transition hover:bg-emerald-700 active:scale-95"
             >

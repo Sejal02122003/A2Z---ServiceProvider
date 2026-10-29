@@ -115,7 +115,7 @@ export function LabourNotificationsPage() {
       read: sn.read,
       category: 'updates',
       time: sn.createdAt ? new Date(sn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
-      href: sn.bookingId?._id || sn.bookingId ? `/app/active-job/${sn.bookingId?._id || sn.bookingId}` : undefined,
+      href: sn.bookingId?._id || sn.bookingId ? `/serviceprovider/active-job/${sn.bookingId?._id || sn.bookingId}` : undefined,
       isServer: true,
     }))
     return [...serverItems, ...feed.items]
@@ -165,7 +165,7 @@ export function LabourNotificationsPage() {
   const handleAccept = (offerId) => {
     if (!kycOk) {
       showToast('Complete KYC before accepting jobs.')
-      navigate('/app/kyc')
+      navigate('/serviceprovider/kyc')
       return
     }
     setConfirmOfferId(offerId)
@@ -210,7 +210,7 @@ export function LabourNotificationsPage() {
         <div className="relative flex items-start gap-3">
           <button
             type="button"
-            onClick={() => navigate('/app')}
+            onClick={() => navigate('/serviceprovider')}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/10 backdrop-blur-sm transition hover:bg-white/20"
             aria-label="Back to home"
           >
@@ -408,7 +408,7 @@ export function LabourNotificationsPage() {
             Demo alerts on this device. Production will push real-time job offers and admin messages.
           </p>
           <Link
-            to="/app/jobs"
+            to="/serviceprovider/jobs"
             className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-brand underline-offset-4 hover:underline"
           >
             Open full jobs list

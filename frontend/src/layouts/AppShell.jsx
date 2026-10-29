@@ -64,14 +64,14 @@ export function AppShell() {
 
   const { headerTagline, bottomNav, drawerNav } = useMemo(() => getAppNavigation(user?.role), [user?.role])
 
-  const isIndividualAppHome = (user?.role === USER_ROLES.CUSTOMER || user?.role === USER_ROLES.CONTRACTOR) && pathname === '/app'
-  const isLabourAppHome = user?.role === USER_ROLES.LABOUR && pathname === '/app'
-  const isNotifications = pathname === '/app/notifications'
-  const isLabourNotifications = user?.role === USER_ROLES.LABOUR && pathname === '/app/notifications'
-  const isLabourJobs = user?.role === USER_ROLES.LABOUR && pathname === '/app/jobs'
-  const isLabourEarnings = user?.role === USER_ROLES.LABOUR && pathname === '/app/earnings'
-  const isLabourKyc = user?.role === USER_ROLES.LABOUR && pathname === '/app/kyc'
-  const hideShellHeader = pathname !== '/app' || isLabourAppHome
+  const isIndividualAppHome = (user?.role === USER_ROLES.CUSTOMER || user?.role === USER_ROLES.CONTRACTOR) && (pathname === '/user' || pathname === '/app')
+  const isLabourAppHome = user?.role === USER_ROLES.LABOUR && (pathname === '/serviceprovider' || pathname === '/app')
+  const isNotifications = pathname.endsWith('/notifications')
+  const isLabourNotifications = user?.role === USER_ROLES.LABOUR && pathname.endsWith('/notifications')
+  const isLabourJobs = user?.role === USER_ROLES.LABOUR && pathname.endsWith('/jobs')
+  const isLabourEarnings = user?.role === USER_ROLES.LABOUR && pathname.endsWith('/earnings')
+  const isLabourKyc = user?.role === USER_ROLES.LABOUR && pathname.endsWith('/kyc')
+  const hideShellHeader = (pathname !== '/user' && pathname !== '/serviceprovider' && pathname !== '/app') || isLabourAppHome
   const title = getAppShellTitle(pathname)
   const drawerInitials = adminInitials(user)
   const profileImageUrl = user?.profileImageUrl?.trim()
@@ -409,7 +409,7 @@ export function AppShell() {
                   </div>
                 </button>
                 <Link
-                  to="/app/notifications"
+                  to={user?.role === USER_ROLES.LABOUR ? '/serviceprovider/notifications' : '/user/notifications'}
                   className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition active:scale-95 hover:bg-white/25"
                   aria-label="Notifications"
                 >
@@ -421,7 +421,7 @@ export function AppShell() {
                   )}
                 </Link>
                 <Link
-                  to="/app/profile"
+                  to={user?.role === USER_ROLES.LABOUR ? '/serviceprovider/profile' : '/user/profile'}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition active:scale-95 hover:bg-white/25 overflow-hidden"
                   aria-label="Open profile"
                 >
@@ -466,9 +466,9 @@ export function AppShell() {
 
         <main
           className={`relative z-10 flex-1 ${
-            pathname.startsWith('/app/partner-onboarding') ||
-            pathname.startsWith('/app/onboarding') ||
-            pathname.startsWith('/app/sub-category')
+            pathname.includes('/partner-onboarding') ||
+            pathname.includes('/onboarding') ||
+            pathname.includes('/sub-category')
               ? `p-0 ${cartCount > 0 ? 'pb-36' : 'pb-28'}`
               : `px-4 ${cartCount > 0 ? 'pb-48' : 'pb-32'} ${hideShellHeader
                   ? 'pt-[max(0.5rem,env(safe-area-inset-top,0px))]'
@@ -482,14 +482,14 @@ export function AppShell() {
         </main>
       </div>
 
-      {!pathname.startsWith('/app/partner-onboarding') &&
-      !pathname.startsWith('/app/onboarding') &&
-      !pathname.startsWith('/app/booking/flow') &&
-      !pathname.startsWith('/app/active-job') &&
-      !pathname.startsWith('/app/sub-category') &&
-      !pathname.startsWith('/app/cart') &&
-      !pathname.startsWith('/app/booking/cart') &&
-      !(pathname.startsWith('/app/packages/') && pathname !== '/app/packages') ? (
+      {!pathname.includes('/partner-onboarding') &&
+      !pathname.includes('/onboarding') &&
+      !pathname.includes('/booking/flow') &&
+      !pathname.includes('/active-job') &&
+      !pathname.includes('/sub-category') &&
+      !pathname.includes('/cart') &&
+      !pathname.includes('/booking/cart') &&
+      !(pathname.includes('/packages/') && !pathname.endsWith('/packages')) ? (
         <AppBottomNav items={bottomNav} />
       ) : null}
 

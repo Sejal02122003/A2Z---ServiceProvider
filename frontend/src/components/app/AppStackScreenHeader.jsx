@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { ArrowLeft, Menu } from 'lucide-react'
 
 function openAppDrawer() {
@@ -8,7 +8,11 @@ function openAppDrawer() {
 /**
  * Standard header for full-screen app routes without AppShell chrome (bookings, search, etc.).
  */
-export function AppStackScreenHeader({ title, backTo = '/app', onBack, className = '' }) {
+export function AppStackScreenHeader({ title, backTo, onBack, className = '' }) {
+  const { pathname } = useLocation()
+  const defaultHome = pathname.startsWith('/serviceprovider') ? '/serviceprovider' : '/user'
+  const resolvedBackTo = (!backTo || backTo === '/app') ? defaultHome : backTo
+
   return (
     <div className={`mb-4 mt-[max(0.75rem,env(safe-area-inset-top))] rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm sticky top-[max(0.75rem,env(safe-area-inset-top))] z-40 ${className}`}>
       <div className="flex items-center gap-3.5">
@@ -23,7 +27,7 @@ export function AppStackScreenHeader({ title, backTo = '/app', onBack, className
           </button>
         ) : (
           <Link
-            to={backTo}
+            to={resolvedBackTo}
             className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[14px] border border-slate-200 text-slate-700 shadow-sm transition-colors hover:bg-slate-50 active:scale-95"
             aria-label="Go back"
           >

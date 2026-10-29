@@ -128,11 +128,11 @@ export function IndividualHomeScreen({ user }) {
   }, [quickBookTypeOpen, quickBookModeOpen])
 
   const goSearch = useCallback(() => {
-    navigate('/app/search')
+    navigate('/user/search')
   }, [navigate])
 
   const handleQuickBookCategory = useCallback((cat) => {
-    navigate(`/app/sub-category/${cat._id}`, { state: { cat } })
+    navigate(`/user/sub-category/${cat._id}`, { state: { cat } })
   }, [navigate])
 
   const handleQuickBookMode = useCallback(
@@ -143,7 +143,7 @@ export function IndividualHomeScreen({ user }) {
         setQuickBookCategory(null)
         if (cat) {
           navigate(
-            `/app/discover/labours?categoryId=${encodeURIComponent(cat._id)}&groupId=${encodeURIComponent(cat.groupId || '')}&promptMode=1`,
+            `/user/search?categoryId=${encodeURIComponent(cat._id)}&groupId=${encodeURIComponent(cat.groupId || '')}&promptMode=1`,
           )
         }
       } else if (mode === 'smart') {
@@ -317,7 +317,7 @@ export function IndividualHomeScreen({ user }) {
           groups={tradeGroups}
           loading={groupsLoading}
           selectedGroupId={selectedGroupId}
-          onSelectGroup={(id) => navigate(id ? `/app/search?groupId=${id}` : '/app/search')}
+          onSelectGroup={(id) => navigate(id ? `/user/search?groupId=${id}` : '/user/search')}
           onBrand
         />
       </div>
@@ -367,7 +367,7 @@ export function IndividualHomeScreen({ user }) {
           tradeGroups={tradeGroups}
           loading={groupsLoading}
           onQuickBook={handleQuickBookCategory}
-          onSelectGroup={(id) => navigate(id ? `/app/search?groupId=${id}` : '/app/search')}
+          onSelectGroup={(id) => navigate(id ? `/user/search?groupId=${id}` : '/user/search')}
         />
       </section>
 

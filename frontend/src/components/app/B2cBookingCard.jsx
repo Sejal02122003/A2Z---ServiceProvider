@@ -65,7 +65,7 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
       })
       setExtraHours(prev => ({ ...prev, [targetLabourId]: 0 }))
       if (status === 'COMPLETED' && !isPaid) {
-        navigate(`/app/booking/flow?bookingId=${booking._id}&step=billing`)
+        navigate(`/user/booking/flow?bookingId=${booking._id}&step=billing`)
       } else {
         setSuccessModalOpen(true)
       }
@@ -84,11 +84,11 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
       onClick={() => {
         if (isActive) {
           if (isLabour) {
-            navigate(`/app/active-job/${booking._id}`)
+            navigate(`/serviceprovider/active-job/${booking._id}`)
           } else if (status === 'COMPLETED' && !isPaid) {
-             navigate(`/app/booking/flow?bookingId=${booking._id}&step=billing`)
+             navigate(`/user/booking/flow?bookingId=${booking._id}&step=billing`)
           } else {
-             navigate(`/app/tracking/${booking._id}`)
+             navigate(`/user/tracking/${booking._id}`)
           }
         }
       }}

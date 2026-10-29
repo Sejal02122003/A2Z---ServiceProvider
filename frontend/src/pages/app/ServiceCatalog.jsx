@@ -49,13 +49,13 @@ export function ServiceCatalog() {
   }, [])
 
   const handleSubcategorySelect = useCallback((subcategory, category, group) => {
-    navigate(`/app/sub-category/${subcategory._id}`, { state: { cat: subcategory } })
+    navigate(`/user/sub-category/${subcategory._id}`, { state: { cat: subcategory } })
   }, [navigate])
 
   if (loading) {
     return (
       <div className="space-y-4">
-        <AppStackScreenHeader title="Services" backTo="/app" />
+        <AppStackScreenHeader title="Services" backTo="/user" />
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-brand" />
         </div>
@@ -66,7 +66,7 @@ export function ServiceCatalog() {
   if (error) {
     return (
       <div className="space-y-4">
-        <AppStackScreenHeader title="Services" backTo="/app" />
+        <AppStackScreenHeader title="Services" backTo="/user" />
         <GlassPanel className="p-6 text-center">
           <p className="text-sm font-semibold text-rose-700">{error}</p>
         </GlassPanel>
@@ -76,11 +76,11 @@ export function ServiceCatalog() {
 
   return (
     <div className="space-y-4 pb-8">
-      <AppStackScreenHeader title="Book a Service" backTo="/app" />
+      <AppStackScreenHeader title="Book a Service" backTo="/user" />
 
       {/* Service Packages Banner */}
       <div
-        onClick={() => navigate('/app/packages')}
+        onClick={() => navigate('/user/packages')}
         className="group relative cursor-pointer overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 p-4 text-white shadow-md hover:shadow-lg transition-all"
       >
         <div className="flex items-center justify-between">

@@ -560,7 +560,7 @@ export async function processDueReminders() {
           bookingId: String(reminder.bookingId),
           reminderType: reminder.reminderType,
           appointmentTime: String(reminder.appointmentTime),
-          link: `/app/active-job/${reminder.bookingId}`,
+          link: `/serviceprovider/active-job/${reminder.bookingId}`,
         },
       }
 

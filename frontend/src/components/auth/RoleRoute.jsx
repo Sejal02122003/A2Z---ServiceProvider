@@ -2,6 +2,7 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth.js'
 import { AppRouteLoader } from '../app/AppRouteLoader.jsx'
 import { USER_ROLES } from '../../constants/userRoles.js'
+import { getRoleHomePath } from '../../lib/roleHomePath.js'
 
 /**
  * Restricts a route to specific `user.role` values (matches backend User.role enum).
@@ -25,7 +26,7 @@ export function RoleRoute({ allow, allowGuest, children }) {
   }
 
   if (!allow?.length || !user?.role || !allow.includes(user.role)) {
-    return <Navigate to="/app" replace />
+    return <Navigate to={getRoleHomePath(user?.role)} replace />
   }
   
   return children

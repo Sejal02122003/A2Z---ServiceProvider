@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { AlertCircle, CheckCircle2, ChevronRight, HelpCircle, Loader2, ShieldAlert, X } from 'lucide-react'
 import { bookingsApi } from '../../../api/bookingsApi.js'
 import { ApiError } from '../../../api/http.js'
+import { useAuth } from '../../../hooks/useAuth.js'
+import { getRoleHomePath } from '../../../lib/roleHomePath.js'
 
 const STANDARD_REASONS = [
   'Booked by mistake',
@@ -25,6 +27,7 @@ const STANDARD_REASONS = [
  */
 export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [loadingEligibility, setLoadingEligibility] = useState(true)
   const [eligibility, setEligibility] = useState(null)
   const [selectedReason, setSelectedReason] = useState('')
@@ -254,7 +257,7 @@ export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
                     type="button"
                     onClick={() => {
                       if (onClose) onClose()
-                      navigate('/app', { replace: true })
+                      navigate(getRoleHomePath(user?.role), { replace: true })
                     }}
                     className="w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition"
                   >

@@ -57,7 +57,7 @@ export function IndividualHomePackagesSection() {
         </div>
         <button
           type="button"
-          onClick={() => navigate('/app/packages')}
+          onClick={() => navigate('/user/packages')}
           className="flex items-center gap-1 text-xs font-bold text-brand hover:underline"
         >
           <span>See all</span>
@@ -86,7 +86,7 @@ export function IndividualHomePackagesSection() {
               return (
                 <div
                   key={pkg._id}
-                  onClick={() => navigate(`/app/packages/${pkg.slug || pkg._id}`)}
+                  onClick={() => navigate(`/user/packages/${pkg.slug || pkg._id}`)}
                   className="group relative flex w-64 shrink-0 cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs hover:shadow-md transition-all active:scale-[0.99]"
                 >
                   <div>

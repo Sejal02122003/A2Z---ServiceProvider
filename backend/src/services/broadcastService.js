@@ -619,7 +619,7 @@ export async function startBroadcastCycle(bookingId) {
                 scheduledAt: booking.scheduledAt,
                 timeSlot: booking.timeSlot,
                 earnings: bestEarning,
-                link: `/app/home`,
+                link: `/serviceprovider`,
               }
             }).then((inAppRecord) => {
               import('../socket.js').then(({ emitToUser }) => {
@@ -716,7 +716,7 @@ export async function startBroadcastCycle(bookingId) {
                 scheduledAt: booking.scheduledAt,
                 timeSlot: booking.timeSlot,
                 earnings: singleShare,
-                link: `/app/home`,
+                link: `/serviceprovider`,
               }
             }).then((inAppRecord) => {
               import('../socket.js').then(({ emitToUser }) => {

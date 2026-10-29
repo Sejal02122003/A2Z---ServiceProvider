@@ -16,7 +16,7 @@ export function PartnerOnboardingPage() {
             if (window.history.length > 2) {
               navigate(-1)
             } else {
-              navigate('/app')
+              navigate('/serviceprovider')
             }
           }}
           className="flex items-center gap-1.5 rounded-full p-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition"
@@ -33,7 +33,7 @@ export function PartnerOnboardingPage() {
 
         <button
           type="button"
-          onClick={() => navigate('/app/support')}
+          onClick={() => navigate('/serviceprovider/support')}
           className="flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-200 transition"
         >
           <Headphones className="h-3.5 w-3.5 text-brand" />
@@ -43,7 +43,7 @@ export function PartnerOnboardingPage() {
 
       {/* Main Content Area */}
       <div className="mx-auto max-w-xl px-3.5 pt-4 sm:px-4">
-        <PartnerOnboardingStepper onFinish={() => navigate('/app/jobs', { replace: true })} />
+        <PartnerOnboardingStepper onFinish={() => navigate('/serviceprovider/jobs', { replace: true })} />
       </div>
     </div>
   )

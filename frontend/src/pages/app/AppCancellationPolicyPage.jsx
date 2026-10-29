@@ -36,7 +36,7 @@ export function AppCancellationPolicyPage() {
 
   return (
     <div className="mx-auto max-w-3xl pt-2 pb-12 space-y-4">
-      <AppStackScreenHeader title="Cancellation Policy" backTo="/app" />
+      <AppStackScreenHeader title="Cancellation Policy" />
       <div className="mb-2 px-1">
         <p className="text-sm font-medium text-slate-500">
           Rules and regulations regarding booking cancellations.

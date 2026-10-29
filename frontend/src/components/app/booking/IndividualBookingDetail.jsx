@@ -90,7 +90,7 @@ export function IndividualBookingDetail({ booking, onRebook, onBack, onAdvancePi
         <button type="button" className={BTN_SECONDARY} onClick={onBack}>
           Back to list
         </button>
-        <Link to="/app/support" className="py-2 text-center text-xs font-semibold text-brand">
+        <Link to="/user/support" className="py-2 text-center text-xs font-semibold text-brand">
           Need help?
         </Link>
       </div>

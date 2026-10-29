@@ -405,7 +405,7 @@ export function LabourCategorySetup({ variant = 'app', onComplete }) {
             </button>
           ) : showBack ? (
             <Link
-              to="/app"
+              to="/serviceprovider"
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200/90 bg-white text-slate-800 shadow-xs transition hover:border-brand/35"
               aria-label="Back to app"
             >

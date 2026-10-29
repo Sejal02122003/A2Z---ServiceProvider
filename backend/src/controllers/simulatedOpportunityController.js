@@ -241,7 +241,7 @@ export const createSimulatedOpportunity = asyncHandler(async (req, res) => {
           opportunityId: String(opportunity._id),
           serviceType: String(serviceType),
           estimatedAmount: String(numAmount),
-          click_action: '/app/labour',
+          click_action: '/serviceprovider',
         },
       }).catch((err) => console.error(`[Push Notification Error for ${vendorId}]`, err?.message))
     } catch (err) {

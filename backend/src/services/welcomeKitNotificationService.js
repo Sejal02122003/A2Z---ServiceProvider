@@ -36,7 +36,7 @@ async function dispatchSafeNotification({ userId, title, body, type = NOTIFICATI
         data: {
           type,
           ...metadata,
-          click_action: '/app/welcome-kit',
+          click_action: '/serviceprovider/partner-onboarding',
         },
       })
     } catch (pushErr) {

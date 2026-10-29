@@ -3136,7 +3136,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                                   type="button"
                                   onClick={() => {
                                     if (onFinish) onFinish()
-                                    else navigate('/app/jobs')
+                                    else navigate('/serviceprovider/jobs')
                                   }}
                                   className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/25 hover:brightness-105 transition cursor-pointer"
                                 >

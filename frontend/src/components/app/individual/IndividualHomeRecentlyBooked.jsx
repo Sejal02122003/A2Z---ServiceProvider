@@ -26,7 +26,7 @@ export function IndividualHomeRecentlyBooked({ bookings, loading, formatDay }) {
     <section className="mb-6" aria-label="Recently booked">
       <div className="lc-home-section-head">
         <h3>Ongoing bookings</h3>
-        <Link to="/app/bookings" className="lc-home-view-all">
+        <Link to="/user/bookings" className="lc-home-view-all">
           View all &gt;
         </Link>
       </div>
@@ -57,7 +57,7 @@ export function IndividualHomeRecentlyBooked({ bookings, loading, formatDay }) {
           return (
             <Link
               key={b._id}
-              to={`/app/tracking/${b._id}`}
+              to={`/user/tracking/${b._id}`}
               className="flex w-[280px] shrink-0 snap-start items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm transition hover:border-brand/30 hover:shadow-md"
             >
               <img src={img} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" loading="lazy" />

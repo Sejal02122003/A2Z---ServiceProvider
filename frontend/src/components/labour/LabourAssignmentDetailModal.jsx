@@ -703,7 +703,7 @@ export function LabourAssignmentDetailModal({ open, onClose, job, rawJob, assign
                       onClick={() => {
                         setShowPaymentWaiting(false)
                         onClose()
-                        navigate('/app/earnings')
+                        navigate('/serviceprovider/earnings')
                       }}
                       className="w-full rounded-2xl bg-brand py-4 text-[15px] font-bold text-white shadow-lg shadow-brand/20 transition-all hover:bg-brand/90 hover:shadow-xl active:scale-[0.98]"
                     >

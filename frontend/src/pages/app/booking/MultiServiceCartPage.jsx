@@ -177,7 +177,7 @@ export function MultiServiceCartPage() {
 
     // Require authentication
     if (!realUser?._id) {
-      navigate('/users/auth?redirect=/app/cart')
+      navigate('/users/auth?redirect=/user/cart')
       return
     }
 
@@ -249,13 +249,13 @@ export function MultiServiceCartPage() {
                   console.error('Payment verification error:', verifyErr)
                 } finally {
                   clearCart()
-                  navigate(`/app/tracking/${createdBooking._id}`)
+                  navigate(`/user/tracking/${createdBooking._id}`)
                 }
               },
               modal: {
                 ondismiss: () => {
                   clearCart()
-                  navigate(`/app/tracking/${createdBooking._id}`)
+                  navigate(`/user/tracking/${createdBooking._id}`)
                 },
               },
               theme: { color: '#015F6C' },
@@ -324,14 +324,14 @@ export function MultiServiceCartPage() {
           <div className="pt-2 flex flex-col gap-2.5">
             <button
               type="button"
-              onClick={() => navigate(`/app/tracking/${bookingSuccessData._id}`)}
+              onClick={() => navigate(`/user/tracking/${bookingSuccessData._id}`)}
               className="w-full rounded-2xl bg-brand py-3 text-sm font-black uppercase tracking-wider text-white shadow-md shadow-brand/25 transition active:scale-98 hover:bg-brand/90"
             >
               Track Live Booking
             </button>
             <button
               type="button"
-              onClick={() => navigate('/app')}
+              onClick={() => navigate('/user')}
               className="w-full rounded-2xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
             >
               Back to Home
@@ -369,7 +369,7 @@ export function MultiServiceCartPage() {
           </p>
           <button
             type="button"
-            onClick={() => navigate('/app')}
+            onClick={() => navigate('/user')}
             className="mt-6 rounded-2xl bg-brand px-6 py-3 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-brand/25 transition active:scale-95 hover:bg-brand/90"
           >
             Explore Services
@@ -421,7 +421,7 @@ export function MultiServiceCartPage() {
             </h2>
             <button
               type="button"
-              onClick={() => navigate('/app')}
+              onClick={() => navigate('/user')}
               className="text-xs font-bold text-brand hover:underline flex items-center gap-0.5"
             >
               <span>+ Add more services</span>
@@ -702,7 +702,7 @@ export function MultiServiceCartPage() {
             </div>
             <button
               type="button"
-              onClick={() => navigate('/app/wallet')}
+              onClick={() => navigate('/user/wallet')}
               className="text-xs font-bold text-brand hover:underline px-2 py-1"
             >
               View Wallet

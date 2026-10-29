@@ -1,7 +1,7 @@
 /** Canonical booking flow route — always navigate with full path + query (never `setSearchParams` alone). */
-export const BOOKING_FLOW_PATH = '/app/booking/flow'
+export const BOOKING_FLOW_PATH = '/user/booking/flow'
 
-/** Query keys owned by the booking flow — must not appear on `/app` or other routes. */
+/** Query keys owned by the booking flow — must not appear on `/user` or other routes. */
 export const BOOKING_FLOW_QUERY_KEYS = ['step', 'categoryId', 'groupId', 'packageId', 'ref']
 
 /**
@@ -19,7 +19,7 @@ export function buildBookingFlowPath(step, extra = {}) {
 }
 
 /** Home tab / menu — strips booking query params. */
-export const APP_HOME_PATH = '/app'
+export const APP_HOME_PATH = '/user'
 
 /** React Router location for Home — explicit empty search avoids leaking `?step=`. */
 export const APP_HOME_LOCATION = { pathname: APP_HOME_PATH, search: '', hash: '' }

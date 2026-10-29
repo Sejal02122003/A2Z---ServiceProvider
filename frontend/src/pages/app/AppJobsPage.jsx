@@ -339,7 +339,7 @@ export function AppJobsPage() {
 
       <section className="grid grid-cols-1 gap-2 pt-1" aria-label="Quick links">
         <Link
-          to="/app/earnings"
+          to="/serviceprovider/earnings"
           className="group flex items-center gap-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-sm ring-1 ring-slate-100/90 transition hover:border-brand/30 hover:shadow-md"
         >
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600/10 text-blue-700 transition group-hover:bg-blue-600 group-hover:text-white">

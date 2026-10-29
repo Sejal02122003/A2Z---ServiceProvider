@@ -32,7 +32,7 @@ export function LabourAttendanceProjectView({ bundles }) {
           subtitle="Accept a job on Jobs, then check in on Today with that project selected."
         />
         <p className="text-center">
-          <Link to="/app/jobs" className="text-sm font-bold text-brand underline-offset-4 hover:underline">
+          <Link to="/serviceprovider/jobs" className="text-sm font-bold text-brand underline-offset-4 hover:underline">
             View my jobs
           </Link>
         </p>

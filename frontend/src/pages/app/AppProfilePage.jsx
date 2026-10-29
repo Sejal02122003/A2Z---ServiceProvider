@@ -471,29 +471,31 @@ export function AppProfilePage() {
     }
   }, [logout, navigate, user?.role])
 
+  const isLabour = user?.role === USER_ROLES.LABOUR
+  const homePath = isLabour ? '/serviceprovider' : '/user'
   const quickLinks = []
-  quickLinks.push({ to: '/app', icon: Home, label: 'Home' })
-  if (user?.role === USER_ROLES.LABOUR) {
-    quickLinks.push({ to: '/app/wallet', icon: Wallet, label: 'My Wallet & Recharge' })
-    quickLinks.push({ to: '/app/jobs', icon: HardHat, label: 'Jobs & assignments' })
-    quickLinks.push({ to: '/app/my-bookings', icon: CalendarClock, label: 'My Bookings (Direct)' })
-    quickLinks.push({ to: '/app/kyc', icon: Fingerprint, label: 'Aadhaar KYC' })
-    quickLinks.push({ to: '/app/earnings', icon: Sparkles, label: 'Earnings & payouts' })
+  quickLinks.push({ to: homePath, icon: Home, label: 'Home' })
+  if (isLabour) {
+    quickLinks.push({ to: '/serviceprovider/wallet', icon: Wallet, label: 'My Wallet & Recharge' })
+    quickLinks.push({ to: '/serviceprovider/jobs', icon: HardHat, label: 'Jobs & assignments' })
+    quickLinks.push({ to: '/serviceprovider/my-bookings', icon: CalendarClock, label: 'My Bookings (Direct)' })
+    quickLinks.push({ to: '/serviceprovider/kyc', icon: Fingerprint, label: 'Aadhaar KYC' })
+    quickLinks.push({ to: '/serviceprovider/earnings', icon: Sparkles, label: 'Earnings & payouts' })
   } else {
     quickLinks.push({
-      to: '/app/my-bookings',
+      to: '/user/my-bookings',
       icon: CalendarClock,
       label: user?.role === USER_ROLES.CONTRACTOR ? 'Bookings & requests' : 'Bookings',
     })
-    quickLinks.push({ to: '/app/wallet', icon: Wallet, label: 'My Wallet' })
+    quickLinks.push({ to: '/user/wallet', icon: Wallet, label: 'My Wallet' })
   }
   if (user?.role === USER_ROLES.CONTRACTOR) {
-    quickLinks.push({ to: '/app/billing', icon: FileText, label: 'Billing & contracts' })
+    quickLinks.push({ to: '/user/billing', icon: FileText, label: 'Billing & contracts' })
   }
   if (user?.role === USER_ROLES.CONTRACTOR) {
-    quickLinks.push({ to: '/app/workforce', icon: ClipboardList, label: 'Workforce' })
+    quickLinks.push({ to: '/user/workforce', icon: ClipboardList, label: 'Workforce' })
   }
-  quickLinks.push({ to: '/app/support', icon: LifeBuoy, label: 'Support' })
+  quickLinks.push({ to: `${homePath}/support`, icon: LifeBuoy, label: 'Support' })
 
   return (
     <motion.div
@@ -504,7 +506,7 @@ export function AppProfilePage() {
       <div className="mb-4 rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
         <div className="flex items-center gap-3.5">
           <button 
-            onClick={() => navigate('/app')}
+            onClick={() => navigate(homePath)}
             className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[14px] border border-slate-200 text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
           >
             <Menu className="h-5 w-5" />
@@ -628,7 +630,7 @@ export function AppProfilePage() {
 
       {user?.role === USER_ROLES.LABOUR ? (
         <Link
-          to="/app/partner-onboarding"
+          to="/serviceprovider/partner-onboarding"
           className="flex items-center justify-between gap-3 rounded-2xl border border-brand/30 bg-gradient-to-r from-brand/10 via-white to-blue-50/50 p-4 shadow-sm transition hover:border-brand/50 active:scale-[0.99]"
         >
           <span className="flex items-center gap-3">
@@ -650,7 +652,7 @@ export function AppProfilePage() {
 
       {user?.role === USER_ROLES.LABOUR ? (
         <Link
-          to="/app/kyc"
+          to="/serviceprovider/kyc"
           className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3.5 shadow-sm transition active:scale-[0.99] ${
             labourKyc === KYC_STATUS.VERIFIED
               ? 'border-blue-200/80 bg-blue-50/80'
@@ -680,7 +682,7 @@ export function AppProfilePage() {
 
       {user?.role === USER_ROLES.LABOUR || user?.role === USER_ROLES.CONTRACTOR ? (
         <Link
-          to="/app/trial"
+          to={user?.role === USER_ROLES.LABOUR ? "/serviceprovider/trial" : "/user/trial"}
           className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200/80 bg-amber-50/70 px-4 py-3.5 shadow-sm transition active:scale-[0.99]"
         >
           <span className="flex items-center gap-2.5">
@@ -721,7 +723,7 @@ export function AppProfilePage() {
 
       {user?.role === USER_ROLES.CONTRACTOR ? (
         <Link
-          to="/app/kyc"
+          to="/user/kyc"
           className="flex items-center justify-between gap-3 rounded-2xl border px-4 py-3.5 shadow-sm transition active:scale-[0.99] border-amber-200/80 bg-amber-50/70"
         >
           <span className="flex items-center gap-2.5">
@@ -1090,7 +1092,7 @@ export function AppProfilePage() {
                 ))}
               </div>
               <Link
-                to="/app/work-categories"
+                to="/serviceprovider/work-categories"
                 className="mt-4 flex items-center justify-center gap-1 rounded-xl border border-brand/25 bg-brand/8 py-2.5 text-sm font-bold text-brand transition hover:bg-brand/12"
               >
                 Update work types
@@ -1102,7 +1104,7 @@ export function AppProfilePage() {
               <p className="text-sm font-semibold text-slate-800">Choose your trades</p>
               <p className="mt-1 text-xs text-slate-600">Pick categories so we can match you to the right jobs.</p>
               <Link
-                to="/app/work-categories"
+                to="/serviceprovider/work-categories"
                 className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-brand"
               >
                 <Wrench className="h-4 w-4" aria-hidden />

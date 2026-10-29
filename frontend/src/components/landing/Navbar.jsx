@@ -8,6 +8,7 @@ import { SITE } from '../../data/landingContent'
 import { useAuth } from '../../hooks/useAuth.js'
 import { USER_ROLES } from '../../constants/userRoles.js'
 import { writeBootRole } from '../../lib/bootPersona.js'
+import { getRoleHomePath } from '../../lib/roleHomePath.js'
 
 const links = [
   { href: '#problem', label: 'Why A2Z' },
@@ -28,17 +29,17 @@ export function Navbar() {
   const handleHireLabour = (e) => {
     if (e && e.preventDefault) e.preventDefault()
     if (user) {
-      navigate('/app')
+      navigate(getRoleHomePath(user.role))
       return
     }
     writeBootRole(USER_ROLES.CUSTOMER)
-    navigate('/app')
+    navigate('/user')
   }
 
   const handleRegisterLabour = (e) => {
     if (e && e.preventDefault) e.preventDefault()
     if (user) {
-      navigate('/app')
+      navigate(getRoleHomePath(user.role))
       return
     }
     navigate('/labours/auth')
@@ -96,7 +97,7 @@ export function Navbar() {
         <div className="hidden items-center gap-2 lg:flex">
           {user ? (
             <Link
-              to="/app"
+              to={getRoleHomePath(user.role)}
               className="rounded-xl px-3.5 py-2 text-sm font-bold text-white bg-brand shadow-sm hover:bg-brand/90 transition"
             >
               Open App
@@ -109,10 +110,10 @@ export function Navbar() {
               Sign in
             </Link>
           )}
-          <ButtonLink href="/app" variant="secondary" className="!py-2.5 !text-xs" onClick={handleRegisterLabour}>
+          <ButtonLink href="/serviceprovider" variant="secondary" className="!py-2.5 !text-xs" onClick={handleRegisterLabour}>
             Register as Service Provider
           </ButtonLink>
-          <ButtonLink href="/app" variant="primary" className="!py-2.5 !text-xs" onClick={handleHireLabour}>
+          <ButtonLink href="/user" variant="primary" className="!py-2.5 !text-xs" onClick={handleHireLabour}>
             Book Service
           </ButtonLink>
         </div>
@@ -156,7 +157,7 @@ export function Navbar() {
               <div className="mt-3 flex flex-col gap-2">
                 {user ? (
                   <Link
-                    to="/app"
+                    to={getRoleHomePath(user.role)}
                     className="rounded-2xl bg-brand py-3 text-center text-sm font-bold text-white shadow-sm"
                     onClick={() => setOpen(false)}
                   >
@@ -171,10 +172,10 @@ export function Navbar() {
                     Sign in / Register
                   </Link>
                 )}
-                <ButtonLink href="/app" variant="primary" onClick={(e) => { setOpen(false); handleHireLabour(e); }}>
+                <ButtonLink href="/user" variant="primary" onClick={(e) => { setOpen(false); handleHireLabour(e); }}>
                   Book Service
                 </ButtonLink>
-                <ButtonLink href="/app" variant="secondary" onClick={(e) => { setOpen(false); handleRegisterLabour(e); }}>
+                <ButtonLink href="/serviceprovider" variant="secondary" onClick={(e) => { setOpen(false); handleRegisterLabour(e); }}>
                   Register as Service Provider
                 </ButtonLink>
               </div>

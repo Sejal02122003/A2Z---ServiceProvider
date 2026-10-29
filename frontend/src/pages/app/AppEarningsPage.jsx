@@ -324,7 +324,7 @@ export function AppEarningsPage() {
           <div className="relative p-5 sm:p-6">
             <div className="flex items-start gap-3">
               <Link
-                to="/app"
+                to="/serviceprovider"
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/10 backdrop-blur-sm transition hover:bg-white/20"
                 aria-label="Back to home"
               >

@@ -158,7 +158,7 @@ export function CustomerNotificationsPage() {
     // Target navigation to exact booking tracking screen
     const bookingId = notif.bookingId?._id || notif.bookingId
     if (bookingId) {
-      navigate(`/app/tracking/${bookingId}`)
+      navigate(`/user/tracking/${bookingId}`)
     } else if (notif.metadata?.link) {
       navigate(notif.metadata.link)
     }
@@ -174,7 +174,7 @@ export function CustomerNotificationsPage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate('/app')}
+            onClick={() => navigate('/user')}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 transition active:scale-95"
             aria-label="Back to home"
           >

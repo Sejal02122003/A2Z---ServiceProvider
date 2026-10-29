@@ -10,6 +10,7 @@ import { ConstructionIllustration } from './ConstructionIllustration'
 import { useAuth } from '../../hooks/useAuth.js'
 import { USER_ROLES } from '../../constants/userRoles.js'
 import { writeBootRole } from '../../lib/bootPersona.js'
+import { getRoleHomePath } from '../../lib/roleHomePath.js'
 
 export function Hero() {
   const navigate = useNavigate()
@@ -19,17 +20,17 @@ export function Hero() {
   const handleHireLabour = (e) => {
     if (e && e.preventDefault) e.preventDefault()
     if (user) {
-      navigate('/app')
+      navigate(getRoleHomePath(user.role))
       return
     }
     writeBootRole(USER_ROLES.CUSTOMER)
-    navigate('/app')
+    navigate('/user')
   }
 
   const handleRegisterLabour = (e) => {
     if (e && e.preventDefault) e.preventDefault()
     if (user) {
-      navigate('/app')
+      navigate(getRoleHomePath(user.role))
       return
     }
     navigate('/labours/auth')
@@ -86,11 +87,11 @@ export function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.18 }}
           >
-            <ButtonLink href="/app" variant="primary" className="group" onClick={handleHireLabour}>
+            <ButtonLink href="/user" variant="primary" className="group" onClick={handleHireLabour}>
               Book Service
               <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" aria-hidden />
             </ButtonLink>
-            <ButtonLink href="/app" variant="secondary" onClick={handleRegisterLabour}>
+            <ButtonLink href="/serviceprovider" variant="secondary" onClick={handleRegisterLabour}>
               Register as Service Provider
             </ButtonLink>
           </motion.div>

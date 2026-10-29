@@ -17,7 +17,7 @@ export function IndividualHomeBookingStrip({ bookings, loading, formatDay }) {
       <div className="flex items-center justify-between gap-2 px-0.5">
         <h3 className="text-lg font-bold tracking-tight text-slate-900">Recent bookings</h3>
         <Link
-          to="/app/bookings"
+          to="/user/bookings"
           className="text-xs font-bold text-brand"
         >
           View all
@@ -34,7 +34,7 @@ export function IndividualHomeBookingStrip({ bookings, loading, formatDay }) {
           return (
             <Link
               key={b.id || b.ref}
-              to={`/app/bookings?ref=${encodeURIComponent(b.ref || '')}`}
+              to={`/user/bookings?ref=${encodeURIComponent(b.ref || '')}`}
               className="flex min-w-[16rem] shrink-0 snap-start items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm transition hover:border-brand/25 active:scale-[0.99]"
             >
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-muted text-brand">

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { AlertCircle, Clock, ShieldCheck } from 'lucide-react'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { useAuth } from '../../hooks/useAuth.js'
@@ -17,21 +17,24 @@ function LabourGate({ user }) {
 
 export function AppHomePage() {
   const { user, loading, token } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
 
   if (loading || (token && !user)) {
     return <AppRouteLoader />
   }
 
-  if (user?.role === USER_ROLES.LABOUR) {
+  // If visiting /serviceprovider or logged in as labour on serviceprovider route
+  if (user?.role === USER_ROLES.LABOUR || location.pathname.startsWith('/serviceprovider')) {
     const kitReceived = Boolean(
-      user.welcomeKit?.isReceived ||
-      user.welcomeKit?.status === 'DELIVERED' ||
-      (user.welcomeKit?.uniformIssued && user.welcomeKit?.idCardIssued && user.welcomeKit?.bagIssued)
+      user?.welcomeKit?.isReceived ||
+      user?.welcomeKit?.status === 'DELIVERED' ||
+      (user?.welcomeKit?.uniformIssued && user?.welcomeKit?.idCardIssued && user?.welcomeKit?.bagIssued)
     )
     const labourCategories = user?.labourProfile?.categoryIds
     const hasCategories = Array.isArray(labourCategories) && labourCategories.length > 0
     if (!kitReceived || !hasCategories) {
-      return <Navigate to="/app/partner-onboarding" replace />
+      return <Navigate to="/serviceprovider/partner-onboarding" replace />
     }
     return <LabourGate user={user} />
   }
@@ -75,7 +78,7 @@ export function AppHomePage() {
           </p>
           
           <button
-            onClick={() => window.location.href = '/app/profile'}
+            onClick={() => navigate('/user/profile')}
             className="inline-flex w-full items-center justify-center rounded-xl bg-brand px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600 active:scale-[0.98]"
           >
             Go to Profile
@@ -83,10 +86,6 @@ export function AppHomePage() {
         </GlassPanel>
       </div>
     )
-  }
-
-  if (user.role === USER_ROLES.LABOUR) {
-    return <LabourGate user={user} />
   }
 
   return <Navigate to={getRoleHomePath(user.role)} replace />

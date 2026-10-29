@@ -61,7 +61,7 @@ function AppRoleNotificationsWrapper() {
 export const appShellChildRoutes = (
   <>
     <Route index element={<AppHomePage />} />
-    <Route path="discover/labours" element={<Navigate to="/app" replace />} />
+    <Route path="discover/labours" element={<Navigate to="" replace />} />
     <Route
       path="booking/flow"
       

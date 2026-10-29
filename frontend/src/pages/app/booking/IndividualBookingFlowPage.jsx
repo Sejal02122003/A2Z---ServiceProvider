@@ -197,7 +197,7 @@ export function IndividualBookingFlowPage() {
     } else {
       setReviewOpen(false)
       clearBookingDraft()
-      navigate('/app', { replace: true })
+      navigate('/user', { replace: true })
     }
   }, [reviewQueue, currentReviewIndex, navigate, clearBookingDraft])
 
@@ -480,7 +480,7 @@ export function IndividualBookingFlowPage() {
     } else if (bookingEvent.type === 'BOOKING_CANCELLED') {
       setActiveBooking(prev => prev ? { ...prev, status: 'CANCELLED', ...bookingEvent.data } : null)
       clearBookingDraft()
-      navigate('/app', { replace: true })
+      navigate('/user', { replace: true })
     }
   }, [bookingEvent, activeBookingId, goStep, realUser, navigate, playAcceptedChime, handleOpenReview, clearBookingDraft, step])
 
@@ -527,7 +527,7 @@ export function IndividualBookingFlowPage() {
   useEffect(() => {
     if (activeBooking?.status === 'CANCELLED' && step === 'active') {
       clearBookingDraft()
-      navigate('/app', { replace: true })
+      navigate('/user', { replace: true })
     }
   }, [activeBooking?.status, step, navigate, clearBookingDraft])
 
@@ -616,7 +616,7 @@ export function IndividualBookingFlowPage() {
     if (step === 'active' || step === 'payment' || step === 'billing') return // allow active flows without a draft
     if (!draft.categoryId && !categoryIdParam && !draft.packageId && !packageIdParam) {
       // If they somehow enter without a category or package, they need to pick one.
-      navigate('/app/search', { replace: true })
+      navigate('/user/search', { replace: true })
     }
   }, [categoryIdParam, draft.categoryId, draft.packageId, packageIdParam, navigate, location.pathname, step])
 
@@ -1049,7 +1049,7 @@ export function IndividualBookingFlowPage() {
   if (step === 'scheduled_success') {
     return (
       <div className="space-y-4 pb-8">
-        <AppStackScreenHeader title="Booking confirmed" onBack={() => navigate('/app/my-bookings')} />
+        <AppStackScreenHeader title="Booking confirmed" onBack={() => navigate('/user/my-bookings')} />
         <GlassPanel className="p-6 text-center">
           <CheckCircle2 className="mx-auto h-16 w-16 text-blue-600" aria-hidden />
           <p className="mt-4 text-lg font-black text-slate-900">Your job is scheduled!</p>
@@ -1073,10 +1073,10 @@ export function IndividualBookingFlowPage() {
             </div>
           </div>
           <motion.div className="mt-6 flex flex-col gap-2">
-            <BookingPrimaryButton type="button" onClick={() => { window.scrollTo(0, 0); clearBookingDraft(); navigate('/app/my-bookings', { replace: true }) }}>
+            <BookingPrimaryButton type="button" onClick={() => { window.scrollTo(0, 0); clearBookingDraft(); navigate('/user/my-bookings', { replace: true }) }}>
               View my bookings
             </BookingPrimaryButton>
-            <AppButton type="button" variant="secondary" onClick={() => { window.scrollTo(0, 0); clearBookingDraft(); navigate('/app', { replace: true }) }}>
+            <AppButton type="button" variant="secondary" onClick={() => { window.scrollTo(0, 0); clearBookingDraft(); navigate('/user', { replace: true }) }}>
               Back to home
             </AppButton>
           </motion.div>
@@ -1190,7 +1190,7 @@ export function IndividualBookingFlowPage() {
           onSuccess={() => {
             clearBookingDraft()
             setCancelModalOpen(false)
-            navigate('/app', { replace: true })
+            navigate('/user', { replace: true })
           }}
         />
       </div>
@@ -1200,7 +1200,7 @@ export function IndividualBookingFlowPage() {
   if (noMatch) {
     return (
       <div className="space-y-4 pb-8">
-        <AppStackScreenHeader title="No match" onBack={() => { window.scrollTo(0, 0); navigate('/app') }} />
+        <AppStackScreenHeader title="No match" onBack={() => { window.scrollTo(0, 0); navigate('/user') }} />
         <GlassPanel className="p-6 text-center">
           <AlertCircle className="mx-auto h-10 w-10 text-amber-500" aria-hidden />
           <p className="mt-3 text-sm font-bold text-slate-900">Service providers are currently not available</p>
@@ -1209,7 +1209,7 @@ export function IndividualBookingFlowPage() {
             <BookingPrimaryButton type="button" onClick={() => { setNoMatch(false); confirmBooking() }}>
               Retry search
             </BookingPrimaryButton>
-            <AppButton type="button" variant="secondary" onClick={() => { window.scrollTo(0, 0); navigate('/app') }}>
+            <AppButton type="button" variant="secondary" onClick={() => { window.scrollTo(0, 0); navigate('/user') }}>
               Cancel
             </AppButton>
           </motion.div>
@@ -1237,7 +1237,7 @@ export function IndividualBookingFlowPage() {
               ? 'Booking Accepted'
               : 'Finding Service Provider'
           }
-          onBack={() => (step === 'payment' ? goStep(booking?.status === 'COMPLETED' ? 'billing' : 'active') : navigate('/app/my-bookings', { replace: true }))}
+          onBack={() => (step === 'payment' ? goStep(booking?.status === 'COMPLETED' ? 'billing' : 'active') : navigate('/user/my-bookings', { replace: true }))}
         />
         <BookingServiceHighlight
           categoryName={draft.categoryName || booking?.category?.name || 'Service'}
@@ -1258,14 +1258,14 @@ export function IndividualBookingFlowPage() {
             <div className="pt-2 flex flex-col gap-2">
               <button
                 type="button"
-                onClick={() => navigate('/app/my-bookings')}
+                onClick={() => navigate('/user/my-bookings')}
                 className="w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition"
               >
                 View My Bookings
               </button>
               <button
                 type="button"
-                onClick={() => navigate('/app')}
+                onClick={() => navigate('/user')}
                 className="w-full rounded-xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition"
               >
                 Book a Service
@@ -1314,7 +1314,7 @@ export function IndividualBookingFlowPage() {
             <div className="pt-2 flex flex-col gap-2">
               <button
                 type="button"
-                onClick={() => navigate('/app/my-bookings')}
+                onClick={() => navigate('/user/my-bookings')}
                 className="w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition"
               >
                 View My Bookings
@@ -1323,7 +1323,7 @@ export function IndividualBookingFlowPage() {
                 type="button"
                 onClick={() => {
                   clearBookingDraft()
-                  navigate('/app')
+                  navigate('/user')
                 }}
                 className="w-full rounded-xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition"
               >
@@ -1843,7 +1843,7 @@ export function IndividualBookingFlowPage() {
                   }
                 }
                 clearBookingDraft()
-                navigate(`/app/my-bookings`)
+                navigate(`/user/my-bookings`)
               }}
             >
               <CheckCircle2 className="h-4 w-4" aria-hidden />
@@ -1905,7 +1905,7 @@ export function IndividualBookingFlowPage() {
           onSuccess={() => {
             clearBookingDraft()
             setCancelModalOpen(false)
-            navigate('/app', { replace: true })
+            navigate('/user', { replace: true })
           }}
         />
 
@@ -2004,7 +2004,7 @@ export function IndividualBookingFlowPage() {
           if (step === 'type') leaveFlow()
           else if (step === 'details') {
             if (draft.entryPoint === 'category') navigate(-1)
-            else if (draft.isPackage || draft.packageId || packageIdParam) navigate('/app/packages')
+            else if (draft.isPackage || draft.packageId || packageIdParam) navigate('/user/packages')
             else goStep('type')
           }
           else goStep('details')
@@ -2622,7 +2622,7 @@ export function IndividualBookingFlowPage() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => navigate('/app/wallet')}
+                          onClick={() => navigate('/user/wallet')}
                           className="text-xs font-bold text-brand hover:underline px-2 py-1"
                         >
                           View Wallet

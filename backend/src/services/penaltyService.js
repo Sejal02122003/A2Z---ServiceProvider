@@ -692,7 +692,7 @@ async function sendPenaltyNotification(penalty, eventType) {
         type: 'PENALTY_ALERT',
         penaltyId: String(penalty._id),
         bookingId: String(penalty.bookingId),
-        click_action: '/app/labour/penalties',
+        click_action: '/serviceprovider/penalties',
       },
     }).catch((err) => console.warn('[Penalty Push Notification Warning]', err?.message))
   } catch (err) {

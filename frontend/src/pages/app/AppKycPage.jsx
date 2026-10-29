@@ -240,18 +240,18 @@ export function AppKycPage() {
           </p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             {isContractor ? (
-              <AppPrimaryButton as={Link} to="/app" className="py-2.5 text-xs">
+              <AppPrimaryButton as={Link} to="/user" className="py-2.5 text-xs">
                 <Home className="h-3.5 w-3.5" aria-hidden />
                 Home
               </AppPrimaryButton>
             ) : (
-              <AppPrimaryButton as={Link} to="/app/jobs" className="py-2.5 text-xs">
+              <AppPrimaryButton as={Link} to="/serviceprovider/jobs" className="py-2.5 text-xs">
                 <Briefcase className="h-3.5 w-3.5" aria-hidden />
                 My jobs
               </AppPrimaryButton>
             )}
             <Link
-              to="/app/profile"
+              to={isContractor ? "/user/profile" : "/serviceprovider/profile"}
               className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-800"
             >
               Profile
@@ -418,7 +418,7 @@ export function AppKycPage() {
       <div className={isContractor ? "grid grid-cols-1 gap-2" : "grid grid-cols-2 gap-2"}>
         {!isContractor && (
           <Link
-            to="/app/work-categories"
+            to="/serviceprovider/work-categories"
             className="flex items-center gap-2 rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm ring-1 ring-slate-100 transition hover:border-brand/30"
           >
             <Wrench className="h-5 w-5 text-brand" aria-hidden />
@@ -426,7 +426,7 @@ export function AppKycPage() {
           </Link>
         )}
         <Link
-          to="/app/profile"
+          to={isContractor ? "/user/profile" : "/serviceprovider/profile"}
           className="flex items-center gap-2 rounded-2xl border border-slate-200/90 bg-white p-3 shadow-sm ring-1 ring-slate-100 transition hover:border-brand/30"
         >
           <ArrowRight className="h-5 w-5 text-slate-400" aria-hidden />

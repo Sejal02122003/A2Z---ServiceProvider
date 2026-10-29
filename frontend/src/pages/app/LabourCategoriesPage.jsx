@@ -10,7 +10,7 @@ export function LabourCategoriesPage() {
     <>
       <AppAmbientBackground />
       <MobileShell transparent className="pb-0">
-        <LabourCategorySetup variant="app" onComplete={() => navigate('/app', { replace: true })} />
+        <LabourCategorySetup variant="app" onComplete={() => navigate('/serviceprovider', { replace: true })} />
       </MobileShell>
     </>
   )

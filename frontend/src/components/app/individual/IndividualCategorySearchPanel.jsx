@@ -140,7 +140,7 @@ export function IndividualCategorySearchPanel({ tradeGroups, groupsLoading }) {
   )
 
   const pickCategory = (cat) => {
-    navigate(`/app/sub-category/${cat._id}`, { state: { cat } })
+    navigate(`/user/sub-category/${cat._id}`, { state: { cat } })
   }
 
   const continueToBooking = useCallback(() => {

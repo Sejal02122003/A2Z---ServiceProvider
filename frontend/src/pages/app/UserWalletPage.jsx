@@ -182,7 +182,7 @@ export default function UserWalletPage() {
               <ShieldCheck className="w-4 h-4 text-emerald-400" /> 100% Safe & Secure
             </span>
             <button
-              onClick={() => navigate('/app/home')}
+              onClick={() => navigate('/user')}
               className="text-amber-300 hover:text-amber-200 font-semibold flex items-center gap-1 group transition-all"
             >
               Book a Service <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />

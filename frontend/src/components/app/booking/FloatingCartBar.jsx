@@ -14,21 +14,21 @@ export function FloatingCartBar() {
 
   // Hide on cart review and checkout screens to avoid blocking action buttons
   const isCartPage =
-    pathname === '/app/cart' ||
-    pathname === '/app/booking/cart' ||
-    pathname === '/app/checkout'
+    pathname.includes('/cart') ||
+    pathname.includes('/booking/cart') ||
+    pathname.includes('/checkout')
 
   if (isCartPage) return null
 
   // Check if AppBottomNav is currently displayed on this page
   const hasBottomNav =
-    !pathname.startsWith('/app/partner-onboarding') &&
-    !pathname.startsWith('/app/onboarding') &&
-    !pathname.startsWith('/app/booking/flow') &&
-    !pathname.startsWith('/app/active-job') &&
-    !pathname.startsWith('/app/sub-category') &&
-    !pathname.startsWith('/app/cart') &&
-    !pathname.startsWith('/app/booking/cart')
+    !pathname.includes('/partner-onboarding') &&
+    !pathname.includes('/onboarding') &&
+    !pathname.includes('/booking/flow') &&
+    !pathname.includes('/active-job') &&
+    !pathname.includes('/sub-category') &&
+    !pathname.includes('/cart') &&
+    !pathname.includes('/booking/cart')
 
   return createPortal(
     <AnimatePresence>
@@ -66,7 +66,7 @@ export function FloatingCartBar() {
             <div className="flex items-center gap-2.5 shrink-0">
               <button
                 type="button"
-                onClick={() => navigate('/app/cart')}
+                onClick={() => navigate('/user/cart')}
                 className="rounded-full bg-[#015F6C] hover:bg-[#014b55] active:scale-95 transition text-white px-4 py-2 text-xs sm:text-sm font-bold flex items-center gap-1 shadow-sm shadow-[#015F6C]/25 cursor-pointer"
               >
                 <span className="font-mono font-bold tracking-tight">

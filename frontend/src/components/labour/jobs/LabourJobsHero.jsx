@@ -28,7 +28,7 @@ export function LabourJobsHero({ offersCount, activeCount, kycOk }) {
         <div className="relative p-4 sm:p-5">
           <div className="flex items-start gap-3">
             <Link
-              to="/app"
+              to="/serviceprovider"
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20"
               aria-label="Back to home"
             >
@@ -59,7 +59,7 @@ export function LabourJobsHero({ offersCount, activeCount, kycOk }) {
 
           {!kycOk ? (
             <Link
-              to="/app/kyc"
+              to="/serviceprovider/kyc"
               className="mt-3 flex items-center justify-between gap-2 rounded-2xl border border-amber-300/40 bg-amber-500/20 px-3 py-2.5 text-xs font-bold text-amber-50 transition hover:bg-amber-500/28"
             >
               <span className="flex items-center gap-2">

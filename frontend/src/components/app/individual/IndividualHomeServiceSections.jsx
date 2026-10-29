@@ -192,7 +192,7 @@ function ListLayout({ categories, onQuickBook }) {
       <div className="flex justify-end pr-1 pt-1">
         <button
           type="button"
-          onClick={() => navigate('/app/search')}
+          onClick={() => navigate('/user/search')}
           className="text-xs font-bold text-brand transition hover:underline"
         >
           See more

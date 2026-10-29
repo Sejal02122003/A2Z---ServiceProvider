@@ -35,7 +35,7 @@ export function AppPrivacyPolicyPage() {
 
   return (
     <div className="mx-auto max-w-3xl pt-2 pb-12 space-y-4">
-      <AppStackScreenHeader title="Privacy Policy" backTo="/app" />
+      <AppStackScreenHeader title="Privacy Policy" />
       <div className="mb-2 px-1">
         <p className="text-sm font-medium text-slate-500">
           Information regarding how we handle your data.

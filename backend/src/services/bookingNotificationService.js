@@ -162,7 +162,7 @@ export async function sendBookingAcceptedNotification({ booking, partner, assign
           date: booking.date,
           timeSlot: booking.timeSlot,
           bookingType: booking.type,
-          link: `/app/tracking/${booking._id}`,
+          link: `/user/tracking/${booking._id}`,
         },
       })
 
@@ -194,7 +194,7 @@ export async function sendBookingAcceptedNotification({ booking, partner, assign
         partnerAvatar: String(partnerAvatar || ''),
         serviceName: String(serviceName || ''),
         startOtp: String(startOtp || ''),
-        link: `/app/tracking/${booking._id}`,
+        link: `/user/tracking/${booking._id}`,
         scheduledAt: String(booking.scheduledAt || ''),
       },
     }
@@ -270,7 +270,7 @@ export async function processPendingNotifications() {
         data: {
           type: notif.type,
           bookingId: String(notif.bookingId || ''),
-          link: notif.metadata?.link || `/app/tracking/${notif.bookingId}`,
+          link: notif.metadata?.link || `/user/tracking/${notif.bookingId}`,
         },
       }
 

@@ -114,7 +114,7 @@ export function ActiveJob() {
 
   const redirectToHomeOnCancellation = useCallback((reason) => {
     const finalReason = reason || 'This booking was cancelled by the customer.'
-    navigate('/app', {
+    navigate('/serviceprovider', {
       replace: true,
       state: {
         cancelledBookingId: bookingId,
@@ -419,7 +419,7 @@ export function ActiveJob() {
             status: 'CANCELLED',
             reason: 'Required materials out of stock in warehouse',
           })
-          navigate('/app/my-bookings', { replace: true })
+          navigate('/serviceprovider/jobs', { replace: true })
         } catch (err) {
           setUpdateError(err instanceof ApiError ? err.message : 'Failed to cancel')
           setUpdating(false)
@@ -447,7 +447,7 @@ export function ActiveJob() {
           'Booking cancelled successfully with ₹0 penalty (Standard >2h notice). The booking will be re-broadcast to nearby service providers.'
         )
       }
-      navigate('/app/my-bookings', { replace: true })
+      navigate('/serviceprovider/jobs', { replace: true })
     },
     [navigate]
   )
@@ -476,7 +476,7 @@ export function ActiveJob() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <AppStackScreenHeader title="Active Job" backTo="/app" />
+        <AppStackScreenHeader title="Active Job" backTo="/serviceprovider" />
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-brand" />
         </div>
@@ -487,7 +487,7 @@ export function ActiveJob() {
   if (error || !booking) {
     return (
       <div className="space-y-4">
-        <AppStackScreenHeader title="Active Job" backTo="/app" />
+        <AppStackScreenHeader title="Active Job" backTo="/serviceprovider" />
         <GlassPanel className="p-6 text-center">
           <p className="text-sm font-semibold text-rose-700">{error || 'Job not found'}</p>
         </GlassPanel>
@@ -498,7 +498,7 @@ export function ActiveJob() {
   if (isBookingCancelledForLabour(booking, user)) {
     return (
       <div className="space-y-4">
-        <AppStackScreenHeader title="Booking Cancelled" backTo="/app" />
+        <AppStackScreenHeader title="Booking Cancelled" backTo="/serviceprovider" />
         <GlassPanel className="p-8 text-center space-y-4 bg-rose-50/70 border-rose-200">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-rose-100 text-rose-600">
             <X className="h-8 w-8" />
@@ -561,7 +561,7 @@ export function ActiveJob() {
 
   return (
     <div className="space-y-4 pb-8">
-      <AppStackScreenHeader title="Active Job" backTo="/app" />
+      <AppStackScreenHeader title="Active Job" backTo="/serviceprovider" />
 
       {/* Status Header */}
       <GlassPanel className={`border-brand/20 px-4 py-4 text-center ${isCompleted ? 'bg-blue-50' : isCancelled ? 'bg-rose-50' : 'bg-brand/5'}`}>
@@ -1369,7 +1369,7 @@ export function ActiveJob() {
                   type="button"
                   onClick={() => {
                     setShowPaymentWaiting(false)
-                    navigate('/app/earnings', { replace: true })
+                    navigate('/serviceprovider/earnings', { replace: true })
                   }}
                   className="w-full rounded-xl bg-brand py-3 text-sm font-bold text-white transition hover:bg-brand/90 active:scale-95"
                 >
@@ -1402,7 +1402,7 @@ export function ActiveJob() {
                   type="button"
                   onClick={() => {
                     setShowPaymentWaiting(false)
-                    navigate('/app/my-bookings', { replace: true })
+                    navigate('/serviceprovider/jobs', { replace: true })
                   }}
                   className="w-full rounded-xl bg-slate-100 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-200 active:scale-95"
                 >

@@ -74,7 +74,7 @@ export function MyBookings() {
       <div className="mb-4 rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
         <div className="flex items-center gap-3.5">
           <button 
-            onClick={() => navigate('/app')}
+            onClick={() => navigate(user?.role === USER_ROLES.LABOUR ? '/serviceprovider' : '/user')}
             className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[14px] border border-slate-200 text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
           >
             <Menu className="h-5 w-5" />

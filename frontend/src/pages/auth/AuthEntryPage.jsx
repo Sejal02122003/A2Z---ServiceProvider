@@ -99,10 +99,10 @@ export function AuthEntryPage({ authGroup = 'users' }) {
         const categories = user.labourProfile?.categoryIds
         const hasCategories = Array.isArray(categories) && categories.length > 0
         if (!kitReceived || !hasCategories) {
-          navigate('/app/partner-onboarding', { replace: true })
+          navigate('/serviceprovider/partner-onboarding', { replace: true })
           return
         }
-        navigate('/app', { replace: true })
+        navigate('/serviceprovider', { replace: true })
         return
       }
       navigate(getRoleHomePath(user.role), { replace: true })
@@ -337,16 +337,16 @@ export function AuthEntryPage({ authGroup = 'users' }) {
           (signedInUser.welcomeKit?.uniformIssued && signedInUser.welcomeKit?.idCardIssued && signedInUser.welcomeKit?.bagIssued)
         )
         if (!kitReceived) {
-          navigate('/app/partner-onboarding', { replace: true })
+          navigate('/serviceprovider/partner-onboarding', { replace: true })
           return
         }
-        navigate('/app', { replace: true })
+        navigate('/serviceprovider', { replace: true })
         return
       }
 
       let returnPath = location.state?.from || getRoleHomePath(signedInUser.role)
       if (mode === 'register' && (signedInUser.role === USER_ROLES.CUSTOMER || signedInUser.role === USER_ROLES.CONTRACTOR)) {
-        returnPath = '/app/profile'
+        returnPath = '/user/profile'
       }
       navigate(returnPath, { replace: true, state: { welcomeBonus: signedInUser.welcomeBonus } })
     } catch (e) {
@@ -362,7 +362,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
               user.welcomeKit?.status === 'DELIVERED' ||
               (user.welcomeKit?.uniformIssued && user.welcomeKit?.idCardIssued && user.welcomeKit?.bagIssued)
             )
-            const returnPath = !kitReceived ? '/app/partner-onboarding' : '/app'
+            const returnPath = !kitReceived ? '/serviceprovider/partner-onboarding' : '/serviceprovider'
             navigate(returnPath, { replace: true })
             return
           }

@@ -66,7 +66,7 @@ export function AppBillingPage() {
   return (
     <>
       <div className="space-y-4 pb-8 hide-on-print pt-2">
-        <AppStackScreenHeader title="Invoice & Billing" backTo="/app" />
+        <AppStackScreenHeader title="Invoice & Billing" />
 
         {loading ? (
           <div className="flex items-center justify-center py-16">

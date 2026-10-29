@@ -104,14 +104,14 @@ function formatPunchTime(iso) {
 }
 
 const QUICK_ACTIONS = [
-  { to: '/app/wallet', label: 'My Wallet', icon: Wallet, bg: 'from-emerald-500/15 to-emerald-50', iconTone: 'text-emerald-800' },
-  { to: '/app/rewards', label: 'Rewards', icon: Award, bg: 'from-amber-500/15 to-amber-50', iconTone: 'text-amber-700' },
-  { to: '/app/subscription', label: 'Subscription', icon: Crown, bg: 'from-amber-500/15 to-amber-50', iconTone: 'text-amber-700' },
-  { to: '/app/earnings', label: 'Earnings', icon: IndianRupee, bg: 'from-blue-600/15 to-blue-50', iconTone: 'text-blue-700' },
-  { to: '/app/jobs', label: 'My jobs', icon: HardHat, bg: 'from-emerald-500/15 to-emerald-50', iconTone: 'text-emerald-800' },
-  { to: '/app/materials', label: 'Materials', icon: Package, bg: 'from-teal-500/15 to-teal-50', iconTone: 'text-teal-700' },
-  { to: '/app/work-categories', label: 'Skills', icon: Wrench, bg: 'from-orange-500/15 to-orange-50', iconTone: 'text-orange-800' },
-  { to: '/app/support', label: 'Support', icon: LifeBuoy, bg: 'from-rose-500/15 to-rose-50', iconTone: 'text-rose-700' },
+  { to: '/serviceprovider/wallet', label: 'My Wallet', icon: Wallet, bg: 'from-emerald-500/15 to-emerald-50', iconTone: 'text-emerald-800' },
+  { to: '/serviceprovider/rewards', label: 'Rewards', icon: Award, bg: 'from-amber-500/15 to-amber-50', iconTone: 'text-amber-700' },
+  { to: '/serviceprovider/subscription', label: 'Subscription', icon: Crown, bg: 'from-amber-500/15 to-amber-50', iconTone: 'text-amber-700' },
+  { to: '/serviceprovider/earnings', label: 'Earnings', icon: IndianRupee, bg: 'from-blue-600/15 to-blue-50', iconTone: 'text-blue-700' },
+  { to: '/serviceprovider/jobs', label: 'My jobs', icon: HardHat, bg: 'from-emerald-500/15 to-emerald-50', iconTone: 'text-emerald-800' },
+  { to: '/serviceprovider/materials', label: 'Materials', icon: Package, bg: 'from-teal-500/15 to-teal-50', iconTone: 'text-teal-700' },
+  { to: '/serviceprovider/work-categories', label: 'Skills', icon: Wrench, bg: 'from-orange-500/15 to-orange-50', iconTone: 'text-orange-800' },
+  { to: '/serviceprovider/support', label: 'Support', icon: LifeBuoy, bg: 'from-rose-500/15 to-rose-50', iconTone: 'text-rose-700' },
 ]
 
 const STATUS_TONE = {
@@ -401,7 +401,7 @@ export function LabourHomeScreen({ user }) {
   const handleAcceptOffer = async (offerId) => {
     if (!kycOk) {
       showToast('Complete Aadhaar KYC before accepting jobs.')
-      navigate('/app/kyc')
+      navigate('/serviceprovider/kyc')
       return
     }
     try {
@@ -500,7 +500,7 @@ export function LabourHomeScreen({ user }) {
 
               <div className="flex items-center gap-2 sm:gap-3">
                 <Link
-                  to="/app/wallet"
+                  to="/serviceprovider/wallet"
                   className="relative flex h-11 items-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/20 px-3 text-white backdrop-blur-sm transition hover:bg-emerald-500/30 active:scale-95"
                   aria-label="Open Wallet"
                 >
@@ -510,7 +510,7 @@ export function LabourHomeScreen({ user }) {
 
                 <button
                   type="button"
-                  onClick={() => navigate('/app/notifications')}
+                  onClick={() => navigate('/serviceprovider/notifications')}
                   className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20"
                   aria-label={
                     notifications.unreadCount > 0
@@ -527,7 +527,7 @@ export function LabourHomeScreen({ user }) {
                 </button>
 
                 <Link
-                  to="/app/profile"
+                  to="/serviceprovider/profile"
                   className="relative shrink-0 rounded-xl p-0.5 ring-2 ring-white/40 transition hover:ring-white/70"
                   aria-label="Open profile"
                 >
@@ -571,7 +571,7 @@ export function LabourHomeScreen({ user }) {
                     </span>
                   ) : (
                     <Link
-                      to="/app/kyc"
+                      to="/serviceprovider/kyc"
                       className="inline-flex items-center gap-0.5 rounded-full border border-amber-300/50 bg-amber-500/25 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-50"
                     >
                       KYC
@@ -600,7 +600,7 @@ export function LabourHomeScreen({ user }) {
                   )}
                 </div>
                 <Link
-                  to="/app/earnings"
+                  to="/serviceprovider/earnings"
                   className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl bg-linear-to-r from-brand-bright to-brand py-2 text-[10px] font-black text-white shadow-md shadow-brand/30 transition hover:brightness-110 active:scale-[0.98]"
                 >
                   <Wallet className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -654,7 +654,7 @@ export function LabourHomeScreen({ user }) {
               </div>
               <button
                 type="button"
-                onClick={() => navigate('/app/partner-onboarding')}
+                onClick={() => navigate('/serviceprovider/partner-onboarding')}
                 className="shrink-0 flex items-center gap-1 rounded-xl bg-amber-400 px-3 py-2 text-xs font-bold text-slate-950 shadow-md shadow-amber-400/20 transition hover:bg-amber-300 active:scale-95"
               >
                 <span>View Steps</span>
@@ -944,7 +944,7 @@ export function LabourHomeScreen({ user }) {
               <HardHat className="mx-auto mt-6 h-8 w-8 text-slate-300" aria-hidden />
               <p className="mt-2 text-sm font-bold text-slate-800">No assignment for today</p>
               <p className="mt-1 text-xs text-slate-500">Check new job alerts below or open My Jobs.</p>
-              <AppPrimaryButton as={Link} to="/app/jobs" className="mx-auto mt-4 w-full max-w-xs py-3 text-sm">
+              <AppPrimaryButton as={Link} to="/serviceprovider/jobs" className="mx-auto mt-4 w-full max-w-xs py-3 text-sm">
                 Browse jobs
               </AppPrimaryButton>
             </GlassPanel>
@@ -978,7 +978,7 @@ export function LabourHomeScreen({ user }) {
           aria-label="Subscription plans"
         >
           <Link
-            to="/app/subscription"
+            to="/serviceprovider/subscription"
             className="group relative flex items-center justify-between overflow-hidden rounded-2xl border border-[#01C7D0]/30 bg-gradient-to-r from-[#012227] via-[#014852] to-[#015F6C] p-3.5 text-white shadow-lg shadow-[#012227]/25 transition hover:brightness-110 active:scale-[0.99]"
           >
             <div className="flex items-center gap-3">
@@ -1026,7 +1026,7 @@ export function LabourHomeScreen({ user }) {
               ].map((cell) => (
                 <Link
                   key={cell.label}
-                  to="/app/earnings"
+                  to="/serviceprovider/earnings"
                   className="rounded-xl border border-slate-200/80 bg-slate-50/80 px-2 py-2 text-center transition hover:border-brand/30 hover:bg-brand/5"
                 >
                   <p className="text-[9px] font-bold uppercase text-slate-500">{cell.label}</p>
@@ -1220,7 +1220,7 @@ export function LabourHomeScreen({ user }) {
               )}
             </div>
             <Link
-              to="/app/work-categories"
+              to="/serviceprovider/work-categories"
               className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-brand underline-offset-4 hover:underline"
             >
               Update skills
@@ -1260,7 +1260,7 @@ export function LabourHomeScreen({ user }) {
               <span className="text-xs font-extrabold text-slate-950">WhatsApp</span>
             </a>
           </div>
-          <AppSecondaryButton as={Link} to="/app/support" className="mt-3 w-full py-3">
+          <AppSecondaryButton as={Link} to="/serviceprovider/support" className="mt-3 w-full py-3">
             <Headphones className="h-4 w-4 text-brand" aria-hidden />
             Open support centre
           </AppSecondaryButton>
@@ -1340,7 +1340,7 @@ export function LabourHomeScreen({ user }) {
         }}
         user={user}
         trialData={trialData}
-        onViewTrialDetails={() => navigate('/app/trial-status')}
+        onViewTrialDetails={() => navigate('/serviceprovider/trial-status')}
       />
 
       <ServiceProviderIdCardModal

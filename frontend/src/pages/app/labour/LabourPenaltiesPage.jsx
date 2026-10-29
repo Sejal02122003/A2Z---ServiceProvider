@@ -98,7 +98,7 @@ export function LabourPenaltiesPage() {
         <div className="mx-auto flex max-w-lg items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate('/app/wallet')}
+            onClick={() => navigate('/serviceprovider/wallet')}
             className="p-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100"
           >
             <ChevronLeft className="h-5 w-5" />

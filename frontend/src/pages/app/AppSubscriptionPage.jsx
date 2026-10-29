@@ -16,6 +16,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { userSubscriptionApi } from '../../api/userSubscriptionApi'
 import { useSelector } from 'react-redux'
+import { getRoleHomePath } from '../../lib/roleHomePath'
 
 function Toast({ message, variant = 'success' }) {
   if (!message) return null
@@ -160,7 +161,7 @@ export function AppSubscriptionPage() {
             })
             setShowSuccessPopup(true)
             setTimeout(() => {
-              navigate('/app', { replace: true })
+              navigate(getRoleHomePath(user?.role), { replace: true })
             }, 3000)
           } catch {
             showToast('Payment verification failed. Contact support.', 'error')
@@ -219,7 +220,7 @@ export function AppSubscriptionPage() {
                 Your daily marketplace access has been successfully activated. You are now ready to receive job opportunities.
               </p>
               <button
-                onClick={() => navigate('/app', { replace: true })}
+                onClick={() => navigate(getRoleHomePath(user?.role), { replace: true })}
                 className="w-full rounded-xl bg-gradient-to-r from-brand to-blue-800 py-3.5 text-sm font-bold text-white shadow-lg transition hover:from-brand/90"
               >
                 Continue to Dashboard

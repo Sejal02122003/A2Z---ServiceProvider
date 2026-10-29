@@ -68,7 +68,7 @@ export function IndividualHomeownerBookings() {
     const type = searchParams.get('type')
     if (type !== 'instant' && type !== 'scheduled') return
     writeBookingDraft({ bookingType: type, entryPoint: 'search', matchMode: 'smart' })
-    navigate('/app/search', { replace: true })
+    navigate('/user/search', { replace: true })
   }, [searchParams, navigate])
 
   const clearDetailRef = useCallback(() => {
@@ -155,9 +155,9 @@ export function IndividualHomeownerBookings() {
 
   return (
     <div className="space-y-4 pb-4">
-      <AppStackScreenHeader title="My bookings" backTo="/app" />
+      <AppStackScreenHeader title="My bookings" backTo="/user" />
 
-      <button type="button" className={BTN_PRIMARY} onClick={() => navigate('/app/search')}>
+      <button type="button" className={BTN_PRIMARY} onClick={() => navigate('/user/search')}>
         <Plus className="h-4 w-4" aria-hidden />
         New booking
       </button>

@@ -7,7 +7,7 @@ export function BuildMartProductCard({ product, index = 0 }) {
   const reduce = useReducedMotion()
   const primaryVariant = product.variants?.[0]
   const { pathname } = useLocation()
-  const basePath = pathname.includes('/contractor/mart') ? '/contractor/mart' : '/app/buildmart'
+  const basePath = pathname.includes('/contractor/mart') ? '/contractor/mart' : '/user/buildmart'
 
   return (
     <motion.article

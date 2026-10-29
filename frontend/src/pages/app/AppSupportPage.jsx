@@ -110,12 +110,12 @@ function supportIntro(role) {
   }
 }
 
-function SupportScreenHeader({ title, subtitle }) {
+function SupportScreenHeader({ title, subtitle, homePath = '/user' }) {
   return (
     <div className="pb-1">
       <div className="flex items-start gap-2 sm:gap-3">
         <Link
-          to="/app"
+          to={homePath}
           className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200/90 bg-white text-slate-800 shadow-sm transition hover:border-brand/35 hover:text-brand"
           aria-label="Back to home"
         >
@@ -305,23 +305,24 @@ export function AppSupportPage() {
           ? ClipboardList
           : Sparkles
 
+  const isLabour = role === USER_ROLES.LABOUR
+  const homePath = isLabour ? '/serviceprovider' : '/user'
+
   const quickLinks = useMemo(() => {
     const links = []
-    if (role === USER_ROLES.LABOUR) {
-      links.push({ to: '/app/jobs', icon: HardHat, label: 'Jobs & assignments' })
-      links.push({ to: '/app/earnings', icon: Banknote, label: 'Earnings & payouts' })
+    if (isLabour) {
+      links.push({ to: '/serviceprovider/jobs', icon: HardHat, label: 'Jobs & assignments' })
+      links.push({ to: '/serviceprovider/earnings', icon: Banknote, label: 'Earnings & payouts' })
     } else {
-      links.push({ to: '/app/bookings', icon: CalendarClock, label: 'Bookings & requests' })
+      links.push({ to: '/user/my-bookings', icon: CalendarClock, label: 'Bookings & requests' })
     }
     if (role === USER_ROLES.CONTRACTOR) {
-      links.push({ to: '/app/billing', icon: Banknote, label: 'Billing & contracts' })
+      links.push({ to: '/user/billing', icon: Banknote, label: 'Billing & contracts' })
+      links.push({ to: '/user/workforce', icon: ClipboardList, label: 'Workforce' })
     }
-    if (role === USER_ROLES.CONTRACTOR) {
-      links.push({ to: '/app/workforce', icon: ClipboardList, label: 'Workforce' })
-    }
-    links.push({ to: '/app/profile', icon: FileText, label: 'Profile & account' })
+    links.push({ to: `${homePath}/profile`, icon: FileText, label: 'Profile & account' })
     return links
-  }, [role])
+  }, [role, isLabour, homePath])
 
   return (
     <motion.div
@@ -329,7 +330,7 @@ export function AppSupportPage() {
       initial={reduce ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
     >
-      <SupportScreenHeader title={intro.title} subtitle={intro.subtitle} />
+      <SupportScreenHeader title={intro.title} subtitle={intro.subtitle} homePath={homePath} />
 
       <motion.section
         initial={reduce ? false : { opacity: 0, y: 10 }}

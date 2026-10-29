@@ -136,7 +136,7 @@ export function buildLabourNotifications(user, jobs = loadJobDemoState(), earnin
       body: `You are on ${a.title || a.site}. Mark attendance daily for correct pay.`,
       createdAt: now,
       priority: 'normal',
-      href: '/app/jobs',
+      href: '/serviceprovider/jobs',
       ctaLabel: 'View assignment',
     })
   }
@@ -150,7 +150,7 @@ export function buildLabourNotifications(user, jobs = loadJobDemoState(), earnin
       body: 'Upload Aadhaar details to unlock job accept and admin assignments.',
       createdAt: now,
       priority: 'high',
-      href: '/app/kyc',
+      href: '/serviceprovider/kyc',
       ctaLabel: 'Complete KYC',
     })
   } else if (kyc === KYC_STATUS.PENDING && kycSubmitted && !dismissed.has('kyc:review')) {
@@ -162,7 +162,7 @@ export function buildLabourNotifications(user, jobs = loadJobDemoState(), earnin
       body: 'Admin is verifying your documents. You will get job offers after approval.',
       createdAt: now,
       priority: 'normal',
-      href: '/app/kyc',
+      href: '/serviceprovider/kyc',
       ctaLabel: 'View status',
     })
   } else if (kyc === KYC_STATUS.FAILED && !dismissed.has('kyc:failed')) {
@@ -174,7 +174,7 @@ export function buildLabourNotifications(user, jobs = loadJobDemoState(), earnin
       body: 'Fix your Aadhaar photos or details so you can accept new jobs.',
       createdAt: now,
       priority: 'high',
-      href: '/app/kyc',
+      href: '/serviceprovider/kyc',
       ctaLabel: 'Fix KYC',
     })
   } else if (kyc === KYC_STATUS.VERIFIED && !dismissed.has('kyc:verified')) {
@@ -186,7 +186,7 @@ export function buildLabourNotifications(user, jobs = loadJobDemoState(), earnin
       body: 'You are cleared for assignments. Keep your work area and attendance up to date.',
       createdAt: now,
       priority: 'low',
-      href: '/app/profile',
+      href: '/serviceprovider/profile',
       ctaLabel: 'View profile',
     })
   }
@@ -200,7 +200,7 @@ export function buildLabourNotifications(user, jobs = loadJobDemoState(), earnin
       body: 'Add your location before check-in so supervisors know where you are working.',
       createdAt: now,
       priority: 'high',
-      href: '/app',
+      href: '/serviceprovider',
       ctaLabel: 'Set on home',
     })
   }
@@ -216,7 +216,7 @@ export function buildLabourNotifications(user, jobs = loadJobDemoState(), earnin
       body: `You have ${available > 0 ? 'balance ready to withdraw' : 'earnings pending'} on this device.`,
       createdAt: now,
       priority: 'normal',
-      href: '/app/earnings',
+      href: '/serviceprovider/earnings',
       ctaLabel: 'View earnings',
     })
   }
