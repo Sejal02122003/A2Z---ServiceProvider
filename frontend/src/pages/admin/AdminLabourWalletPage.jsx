@@ -53,7 +53,7 @@ export function AdminLabourWalletPage() {
   // Settings State
   const [settings, setSettings] = useState({
     enabled: true,
-    minimumLabourWalletBalance: 0,
+    minimumLabourWalletBalance: '',
     welcomeBonusAmount: 100,
     walletDiscountPercentage: 20,
     minimumBookingAmount: 0,
@@ -103,7 +103,11 @@ export function AdminLabourWalletPage() {
       }
 
       if (settingsRes?.data?.settings) {
-        setSettings(settingsRes.data.settings)
+        const s = settingsRes.data.settings
+        setSettings({
+          ...s,
+          minimumLabourWalletBalance: s.minimumLabourWalletBalance === 0 ? '' : (s.minimumLabourWalletBalance ?? ''),
+        })
       }
     } catch (err) {
       console.error('Failed to fetch admin wallet overview:', err)
@@ -171,7 +175,10 @@ export function AdminLabourWalletPage() {
     setSavingSettings(true)
     setSettingsMsg({ type: '', text: '' })
 
-    const minBalance = Number(settings.minimumLabourWalletBalance)
+    const minBalance =
+      settings.minimumLabourWalletBalance === '' || settings.minimumLabourWalletBalance === undefined
+        ? 0
+        : Number(settings.minimumLabourWalletBalance)
     if (isNaN(minBalance) || minBalance < 0) {
       setSettingsMsg({ type: 'error', text: 'Minimum balance must not be negative' })
       setSavingSettings(false)
@@ -888,7 +895,8 @@ export function AdminLabourWalletPage() {
                 <input
                   type="number"
                   min="0"
-                  value={settings.minimumLabourWalletBalance || 0}
+                  placeholder="0"
+                  value={settings.minimumLabourWalletBalance ?? ''}
                   onChange={(e) =>
                     setSettings({ ...settings, minimumLabourWalletBalance: e.target.value })
                   }
