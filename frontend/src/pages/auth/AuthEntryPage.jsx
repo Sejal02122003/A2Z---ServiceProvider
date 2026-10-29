@@ -11,6 +11,8 @@ import {
   ShieldCheck,
   Sparkles,
   User,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { MobileShell } from '../../layouts/MobileShell.jsx'
 import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
@@ -112,11 +114,13 @@ export function AuthEntryPage({ authGroup = 'users' }) {
   const allowedRoles = authGroup === 'labours' ? [USER_ROLES.LABOUR] : [USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR]
   const [role, setRole] = useState(location.state?.defaultRole && allowedRoles.includes(location.state.defaultRole) ? location.state.defaultRole : allowedRoles[0])
   const [phone, setPhone] = useState('')
+  const [showPhone, setShowPhone] = useState(true)
   const [fullName, setFullName] = useState('')
   const [companyName, setCompanyName] = useState('')
   const [businessName, setBusinessName] = useState('')
   const [gstNumber, setGstNumber] = useState('')
   const [otpCells, setOtpCells] = useState(() => Array(6).fill(''))
+  const [showOtp, setShowOtp] = useState(true)
   const [challengeId, setChallengeId] = useState(null)
   const [busy, setBusy] = useState(false)
   const [banner, setBanner] = useState(null)
@@ -537,7 +541,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
                     </span>
                     <input
                       id="auth-phone"
-                      type="tel"
+                      type={showPhone ? 'tel' : 'password'}
                       inputMode="numeric"
                       autoComplete="tel-national"
                       maxLength={10}
@@ -552,6 +556,15 @@ export function AuthEntryPage({ authGroup = 'users' }) {
                         if (!/^\d$/.test(e.key)) e.preventDefault()
                       }}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPhone((s) => !s)}
+                      className="flex items-center pr-4 pl-2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                      aria-label={showPhone ? 'Hide mobile number' : 'Show mobile number'}
+                      title={showPhone ? 'Hide mobile number' : 'Show mobile number'}
+                    >
+                      {showPhone ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
                   </div>
                 </AuthField>
 
@@ -617,10 +630,22 @@ export function AuthEntryPage({ authGroup = 'users' }) {
               className="space-y-4"
             >
               <GlassPanel className="border-slate-200/90 p-4 ring-1 ring-slate-100/90">
-                <p className="text-sm text-slate-600">
-                  Code sent to{' '}
-                  <span className="font-bold tabular-nums text-slate-900">+91 {phone}</span>
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-slate-600">
+                    Code sent to{' '}
+                    <span className="font-bold tabular-nums text-slate-900">+91 {phone}</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowOtp((prev) => !prev)}
+                    className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-900 transition-colors shadow-2xs"
+                    aria-label={showOtp ? 'Hide OTP digits' : 'Show OTP digits'}
+                    title={showOtp ? 'Hide OTP' : 'Show OTP'}
+                  >
+                    {showOtp ? <EyeOff className="h-3.5 w-3.5 text-slate-500" /> : <Eye className="h-3.5 w-3.5 text-slate-500" />}
+                    <span>{showOtp ? 'Hide' : 'Show'}</span>
+                  </button>
+                </div>
                 <p className="mt-4 mb-3 text-[11px] font-bold uppercase tracking-wide text-slate-500">Enter OTP</p>
                 <div className="flex gap-2" onPaste={handleOtpPaste}>
                   {otpCells.map((digit, i) => (
@@ -629,7 +654,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
                       ref={(el) => {
                         otpInputRefs.current[i] = el
                       }}
-                      type="text"
+                      type={showOtp ? 'text' : 'password'}
                       inputMode="numeric"
                       autoComplete={i === 0 ? 'one-time-code' : 'off'}
                       maxLength={1}
