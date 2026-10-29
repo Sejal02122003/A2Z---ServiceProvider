@@ -47,8 +47,12 @@ export function AppSubCategoryServicePage() {
       walletsApi
         .getMyUserWallet()
         .then((res) => {
-          if (isMounted && res?.data?.wallet) {
-            setUserWallet(res.data.wallet)
+          if (isMounted) {
+            const w = res?.data?.wallet || res?.data
+            if (w) {
+              const bal = Number(w.balance ?? w.selfBalance ?? 0)
+              setUserWallet({ ...w, balance: bal })
+            }
           }
         })
         .catch(() => {})

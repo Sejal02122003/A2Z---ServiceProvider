@@ -385,7 +385,7 @@ export async function calculateWalletDiscount(userId, eligibleBillAmount) {
       }
     }
     if (wallet) {
-      walletBalance = wallet.balance !== undefined ? wallet.balance : (wallet.selfBalance || 0)
+      walletBalance = Math.max(Number(wallet.balance || 0), Number(wallet.selfBalance || 0))
     }
   }
 

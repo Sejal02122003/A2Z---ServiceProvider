@@ -298,6 +298,15 @@ export const loginVerify = asyncHandler(async (req, res) => {
   await user.save()
   await deleteOtpChallengeDoc(otp.doc)
 
+  if (user.role === USER_ROLES.CUSTOMER) {
+    try {
+      const { ensureWelcomeBonus } = await import('../services/userWalletService.js')
+      await ensureWelcomeBonus(user._id)
+    } catch (e) {
+      console.error('[AUTH_ERROR] Error checking welcome bonus in loginVerify:', e)
+    }
+  }
+
   const token = signAccessToken(user)
   return sendSuccess(res, {
     message: 'Login successful',

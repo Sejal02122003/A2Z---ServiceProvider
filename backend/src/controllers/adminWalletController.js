@@ -305,7 +305,7 @@ export const getAdminUserWallets = asyncHandler(async (req, res) => {
   const results = users.map((u) => {
     const w = walletMap.get(String(u._id))
     const s = userStats[String(u._id)] || { credits: 0, debits: 0 }
-    const currentBalance = w ? (w.balance !== undefined ? w.balance : (w.selfBalance || 0)) : 0
+    const currentBalance = w ? Math.max(Number(w.balance || 0), Number(w.selfBalance || 0)) : 0
     return {
       _id: u._id,
       fullName: u.fullName || '—',
@@ -345,7 +345,7 @@ export const getAdminUserWalletDetails = asyncHandler(async (req, res) => {
   }
 
   const wallet = await Wallet.findOne({ userId }).lean()
-  const currentBalance = wallet ? (wallet.balance !== undefined ? wallet.balance : (wallet.selfBalance || 0)) : 0
+  const currentBalance = wallet ? Math.max(Number(wallet.balance || 0), Number(wallet.selfBalance || 0)) : 0
 
   const transactions = await WalletTransaction.find({
     $or: [{ userId }, { walletId: wallet?._id }],

@@ -16,10 +16,29 @@ import {
 export const getMyUserWallet = asyncHandler(async (req, res) => {
   const userId = req.user._id
 
+  // Auto-check and credit welcome bonus for eligible customer accounts
+  try {
+    await ensureWelcomeBonus(userId)
+  } catch (bonusErr) {
+    console.error('[WALLET] Auto welcome bonus error in getMyUserWallet:', bonusErr)
+  }
+
   const wallet = await getOrCreateUserWallet(userId)
   const settings = await getWalletSettings()
 
-  const currentBalance = wallet.balance !== undefined ? wallet.balance : (wallet.selfBalance || 0)
+  const balNum = Number(wallet.balance || 0)
+  const selfBalNum = Number(wallet.selfBalance || 0)
+  const currentBalance = Math.max(balNum, selfBalNum)
+
+  // Synchronize both balance fields in the document if they differed
+  if (wallet.balance !== currentBalance || wallet.selfBalance !== currentBalance) {
+    await Wallet.updateOne(
+      { _id: wallet._id },
+      { $set: { balance: currentBalance, selfBalance: currentBalance } }
+    ).catch(() => {})
+    wallet.balance = currentBalance
+    wallet.selfBalance = currentBalance
+  }
 
   // Aggregate stats
   const stats = await WalletTransaction.aggregate([
@@ -40,17 +59,21 @@ export const getMyUserWallet = asyncHandler(async (req, res) => {
     if (s._id === 'DEBIT') totalDebits = s.total
   })
 
+  const walletData = {
+    _id: wallet._id,
+    userId: wallet.userId,
+    balance: currentBalance,
+    selfBalance: currentBalance,
+    currency: wallet.currency || 'INR',
+    welcomeBonusCredited: Boolean(wallet.welcomeBonusCredited),
+    totalCredits,
+    totalDebits,
+  }
+
   return sendSuccess(res, {
     data: {
-      wallet: {
-        _id: wallet._id,
-        userId: wallet.userId,
-        balance: currentBalance,
-        currency: wallet.currency || 'INR',
-        welcomeBonusCredited: Boolean(wallet.welcomeBonusCredited),
-        totalCredits,
-        totalDebits,
-      },
+      ...walletData,
+      wallet: walletData,
       settings: {
         enabled: settings.enabled,
         welcomeBonusAmount: settings.welcomeBonusAmount,

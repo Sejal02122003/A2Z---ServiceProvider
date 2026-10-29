@@ -40,7 +40,16 @@ export default function UserWalletPage() {
       ]);
 
       if (walletRes?.success && walletRes?.data) {
-        setWallet(walletRes.data);
+        const walletData = walletRes.data.wallet || walletRes.data;
+        const currentBal = Number(walletData.balance ?? walletData.selfBalance ?? walletRes.data.balance ?? walletRes.data.selfBalance ?? 0);
+        setWallet({
+          ...walletData,
+          balance: currentBal,
+          welcomeBonusCredited: Boolean(walletData.welcomeBonusCredited ?? walletRes.data.welcomeBonusCredited),
+        });
+        if (walletRes.data.settings) {
+          setSettings((prev) => ({ ...prev, ...walletRes.data.settings }));
+        }
       }
       if (txRes?.success && txRes?.data) {
         setTransactions(txRes.data.transactions || []);
@@ -151,7 +160,7 @@ export default function UserWalletPage() {
               <span className="text-xs uppercase tracking-wider font-semibold text-white/80">Available Balance</span>
             </div>
 
-            {wallet.welcomeBonusCredited && (
+            {(wallet.welcomeBonusCredited || wallet.wallet?.welcomeBonusCredited) && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-400/20 text-amber-300 border border-amber-400/30 backdrop-blur-md">
                 <Gift className="w-3.5 h-3.5" /> Bonus Claimed
               </span>
@@ -161,7 +170,7 @@ export default function UserWalletPage() {
           <div className="my-4">
             <div className="text-4xl md:text-5xl font-black tracking-tight text-white flex items-baseline gap-1">
               <span className="text-2xl md:text-3xl font-bold text-amber-400">₹</span>
-              {wallet.balance || 0}
+              {Number(wallet.balance ?? wallet.selfBalance ?? 0).toLocaleString('en-IN')}
             </div>
             <p className="text-xs text-white/70 mt-1 font-medium">
               Applicable up to {settings.walletDiscountPercentage}% on checkout
