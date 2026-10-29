@@ -244,7 +244,7 @@ export function AppSubCategoryServicePage() {
               {walletSettings?.enabled !== false && (
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200/60 shadow-2xs">
                   <Wallet className="h-3 w-3 text-emerald-600" />
-                  {walletSettings?.walletDiscountPercentage || 20}% Wallet Offers
+                  Save upto 50% with Wallet
                 </span>
               )}
             </div>
@@ -309,7 +309,7 @@ export function AppSubCategoryServicePage() {
                             <ServiceOfferBadge label={offer.offerBadge} variant="compact" />
                           )}
                           {hasWalletOffer && (
-                            <ServiceOfferBadge label={`${walletDiscountPct}% Wallet OFF`} variant="wallet" />
+                            <ServiceOfferBadge label="Save upto 50%" variant="wallet" />
                           )}
                           {Array.isArray(service.subServices) && service.subServices.length > 0 && (
                             <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-200/60">
@@ -392,7 +392,7 @@ export function AppSubCategoryServicePage() {
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <p className="text-xs font-bold text-emerald-950">
-                                    Wallet Offer: Save up to {walletDiscountPct}% OFF
+                                    Wallet Offer: Save upto 50%
                                   </p>
                                   <span className="rounded bg-emerald-100/90 text-emerald-800 text-[9px] font-black px-1.5 py-0.5 border border-emerald-300/60">
                                     A2Z Wallet
