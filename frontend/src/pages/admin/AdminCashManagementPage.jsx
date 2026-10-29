@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Landmark, AlertCircle, CheckCircle2, Search, Calendar } from 'lucide-react'
+import { Landmark, AlertCircle, CheckCircle2, Search, Calendar, RefreshCw, Loader2 } from 'lucide-react'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
 import { adminSettingsApi } from '../../api/adminSettingsApi.js'
 import { adminBookingsApi } from '../../api/adminBookingsApi.js'
+import { adminWalletsApi } from '../../api/adminWalletsApi.js'
 
 export function AdminCashManagementPage() {
   const [settings, setSettings] = useState(null)
@@ -13,6 +14,7 @@ export function AdminCashManagementPage() {
   const [saving, setSaving] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
+  const [deductingId, setDeductingId] = useState(null)
 
   // Bookings state
   const [bookings, setBookings] = useState([])
@@ -88,6 +90,23 @@ export function AdminCashManagementPage() {
       setErrorMsg('Failed to update limit')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleAutoDeduct = async (bookingId) => {
+    try {
+      setDeductingId(bookingId)
+      setErrorMsg('')
+      setSuccessMsg('')
+      const res = await adminWalletsApi.reconcileBookingSettlement(bookingId)
+      setSuccessMsg(res.message || 'Admin dues successfully deducted from Service Provider wallet!')
+      await fetchBookings()
+      setTimeout(() => setSuccessMsg(''), 4000)
+    } catch (err) {
+      console.error(err)
+      setErrorMsg(err.message || 'Failed to auto-deduct dues for this booking')
+    } finally {
+      setDeductingId(null)
     }
   }
 
@@ -231,6 +250,7 @@ export function AdminCashManagementPage() {
                         <th className="pb-3 font-semibold px-4 text-right">Total Cash</th>
                         <th className="pb-3 font-semibold px-4 text-right" title="Amount added to Service Provider's wallet liability">Admin Dues</th>
                         <th className="pb-3 font-semibold px-4 text-center">Settlement Status</th>
+                        <th className="pb-3 font-semibold px-4 text-center">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -281,6 +301,28 @@ export function AdminCashManagementPage() {
                               }`}>
                                 {booking.adminSettlementStatus === 'SETTLED' ? 'PAID' : 'UNPAID'}
                               </span>
+                            </td>
+                            <td className="py-4 px-4 align-top text-center">
+                              {booking.adminSettlementStatus === 'SETTLED' ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600">
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> Settled
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAutoDeduct(booking._id)}
+                                  disabled={deductingId === booking._id}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#015F6C] text-white text-xs font-bold hover:bg-[#014852] transition shadow-xs disabled:opacity-50"
+                                  title="Automatically deduct commission, platform fee and GST from provider's wallet"
+                                >
+                                  {deductingId === booking._id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <RefreshCw className="w-3.5 h-3.5" />
+                                  )}
+                                  Auto-Deduct
+                                </button>
+                              )}
                             </td>
                           </tr>
                         )

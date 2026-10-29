@@ -406,6 +406,42 @@ export async function rechargeLabourWallet({
     { session }
   )
 
+  // Auto-recover any outstanding admin dues from the newly recharged balance
+  let autoDeductedDues = 0
+  const outstandingDues = Math.max(0, Number(wallet.adminBalance || 0))
+  if (outstandingDues > 0 && wallet.selfBalance > 0) {
+    autoDeductedDues = Math.min(outstandingDues, wallet.selfBalance)
+    const balBeforeDues = wallet.selfBalance
+    wallet.adminBalance = Math.max(0, outstandingDues - autoDeductedDues)
+    wallet.selfBalance = Math.max(0, wallet.selfBalance - autoDeductedDues)
+    wallet.balance = wallet.selfBalance
+    await wallet.save({ session })
+
+    await WalletTransaction.create(
+      [
+        {
+          walletId: wallet._id,
+          userId: labourId,
+          labourId,
+          amount: autoDeductedDues,
+          type: 'DEBIT',
+          targetWallet: 'ADMIN',
+          context: 'CLEARANCE',
+          balanceBefore: balBeforeDues,
+          balanceAfter: wallet.selfBalance,
+          description: `Auto-deducted ₹${autoDeductedDues} to clear outstanding admin dues from wallet recharge`,
+          status: 'COMPLETED',
+        },
+      ],
+      { session }
+    )
+
+    let adminWallet = await AdminWallet.findOne().session(session)
+    if (!adminWallet) adminWallet = new AdminWallet()
+    adminWallet.totalCommissionsCollected += autoDeductedDues
+    await adminWallet.save({ session })
+  }
+
   return {
     success: true,
     wallet,

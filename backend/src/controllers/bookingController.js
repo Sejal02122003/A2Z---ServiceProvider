@@ -1350,8 +1350,13 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
     if (!wallet) wallet = new Wallet({ userId: booking.laborId })
 
     if (booking.paymentMethod === 'CASH') {
-      // NOTE: Admin dues for CASH bookings are now collected only when the customer explicitly clicks "Paid",
-      // and are processed inside confirmCashPayment to prevent charging the labourer before they collect the cash.
+      try {
+        const { settleCashBookingPayment } = await import('../services/labourWalletService.js')
+        const effectiveLabourId = booking.laborId || booking.acceptedLabourId || (booking.assignments && booking.assignments.find(a => a.labourId)?.labourId)
+        await settleCashBookingPayment({ bookingId: booking._id, labourId: effectiveLabourId })
+      } catch (settleErr) {
+        console.error('[Auto Cash Settlement on Job Complete Error]:', settleErr)
+      }
     } else if (booking.paymentMethod === 'ONLINE') {
       // ONLY payout if the customer has actually completed the online payment.
       // If they haven't paid yet, the paymentController will handle this payout later once they pay.
