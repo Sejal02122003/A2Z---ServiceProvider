@@ -3,9 +3,9 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { MapPin, Search, Navigation, UserCheck } from 'lucide-react'
 
 const MESSAGES = [
-  'Broadcasting request to nearby workers...',
+  'Broadcasting request to nearby service providers...',
   'Scanning your area...',
-  'Waiting for workers to accept...',
+  'Waiting for service providers to accept...',
   'Matching skills and pricing...',
 ]
 
@@ -66,7 +66,7 @@ export function BookingFindingScreen({ categoryLabel }) {
         />
       </div>
 
-      <h2 className="mt-10 text-2xl font-black tracking-tight text-slate-900">Scanning for workers</h2>
+      <h2 className="mt-10 text-2xl font-black tracking-tight text-slate-900">Scanning for service providers</h2>
       {categoryLabel ? (
         <p className="mt-2 text-xs font-bold text-brand bg-brand/10 px-4 py-1.5 rounded-full uppercase tracking-wider">{categoryLabel}</p>
       ) : null}

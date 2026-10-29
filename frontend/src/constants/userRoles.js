@@ -21,7 +21,7 @@ export const APP_ROLES = [
 
 export const ROLE_LABELS = {
   [USER_ROLES.CUSTOMER]: 'Customer',
-  [USER_ROLES.LABOUR]: 'Vendor / Service Partner',
+  [USER_ROLES.LABOUR]: 'Service Provider',
   [USER_ROLES.ADMIN]: 'Administrator',
 }
 

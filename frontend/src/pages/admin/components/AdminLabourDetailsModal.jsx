@@ -72,7 +72,7 @@ export function AdminLabourDetailsModal({ data, onClose }) {
               onClick={() => window.open(`tel:${labour.phone}`)}
               className="flex-1 rounded-xl bg-brand py-2.5 text-center text-sm font-bold text-white shadow-sm hover:bg-brand-dark transition"
             >
-              Call Labour
+              Call Service Provider
             </button>
             <button
               onClick={onClose}

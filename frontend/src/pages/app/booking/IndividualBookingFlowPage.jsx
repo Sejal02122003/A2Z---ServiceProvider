@@ -1060,7 +1060,7 @@ export function IndividualBookingFlowPage() {
             </div>
           )}
           <p className="mt-2 text-sm font-medium text-slate-600">
-            We have confirmed your requirement. A worker will be assigned to you before your scheduled time.
+            We have confirmed your requirement. A service provider will be assigned to you before your scheduled time.
           </p>
           <div className="mt-4 text-left rounded-xl bg-slate-50 border border-slate-100 p-4 space-y-2">
             <div className="flex justify-between text-sm">
@@ -1338,10 +1338,10 @@ export function IndividualBookingFlowPage() {
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-brand/10 text-brand mb-3">
               <Sparkles className="h-6 w-6 animate-pulse" />
             </div>
-            <p className="text-base font-extrabold text-slate-900">Searching for Available Workers</p>
+            <p className="text-base font-extrabold text-slate-900">Searching for Available Service Providers</p>
             <p className="mt-1 text-xs text-slate-500">
               {booking.type === 'SCHEDULED' 
-                ? 'Your scheduled booking is confirmed. A worker will be assigned before your service slot.' 
+                ? 'Your scheduled booking is confirmed. A service provider will be assigned before your service slot.' 
                 : 'Broadcasting your request to qualified nearby service providers...'}
             </p>
           </GlassPanel>
@@ -1400,13 +1400,13 @@ export function IndividualBookingFlowPage() {
                 <div key={workerItem?._id || idx} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex gap-3.5 items-center">
                     <img
-                      src={workerItem?.profileImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(workerItem?.fullName || `Worker ${idx + 1}`)}&background=059669&color=fff&size=128`}
+                      src={workerItem?.profileImageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(workerItem?.fullName || `Service Provider ${idx + 1}`)}&background=059669&color=fff&size=128`}
                       alt=""
                       className="h-14 w-14 rounded-2xl object-cover ring-2 ring-emerald-500/20"
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <p className="text-base font-black text-slate-900 truncate">{workerItem?.fullName || `Worker #${idx + 1}`}</p>
+                        <p className="text-base font-black text-slate-900 truncate">{workerItem?.fullName || `Service Provider #${idx + 1}`}</p>
                         <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
                       </div>
                       <p className="text-xs font-semibold text-emerald-700">{workerItem?.phone || 'Contact via app'}</p>
@@ -1642,7 +1642,7 @@ export function IndividualBookingFlowPage() {
                   <span>Cancel Booking</span>
                 </button>
                 <p className="text-center text-[11px] text-slate-400">
-                  Free cancellation available before worker is on the way
+                  Free cancellation available before service provider is on the way
                 </p>
               </div>
             )}
@@ -1962,7 +1962,7 @@ export function IndividualBookingFlowPage() {
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-2">Cash Payment</h3>
               <p className="text-sm text-slate-500 mb-6 leading-relaxed">
-                Please hand over <span className="font-bold text-slate-900">₹{activeBooking?.totalAmount?.toLocaleString('en-IN') || 0}</span> in cash to the worker. Click the button below once paid.
+                Please hand over <span className="font-bold text-slate-900">₹{activeBooking?.totalAmount?.toLocaleString('en-IN') || 0}</span> in cash to the service provider. Click the button below once paid.
               </p>
               <button
                 type="button"
@@ -2508,7 +2508,7 @@ export function IndividualBookingFlowPage() {
                         <span className="flex flex-col">
                           <span>{item.name || 'Service fee'}</span>
                           <span className="text-[11px] text-slate-500 font-medium">
-                            {`Hourly rate (${formatInr(item.hourlyRate)}/hr) × ${item.hours === 0.5 ? '30 min' : `${item.hours} hrs`}${item.quantity > 1 ? ` × ${item.quantity} workers` : ''}`}
+                            {`Hourly rate (${formatInr(item.hourlyRate)}/hr) × ${item.hours === 0.5 ? '30 min' : `${item.hours} hrs`}${item.quantity > 1 ? ` × ${item.quantity} service providers` : ''}`}
                           </span>
                         </span>
                         <span>{formatInr(item.subTotal)}</span>
@@ -2529,7 +2529,7 @@ export function IndividualBookingFlowPage() {
                             const hLabel = h === 0.5 ? '30 min' : `${h} hrs`
                             const effectiveSubTotal = Number(calculatedBill.subTotal || calculatedBill.basePrice || draft.servicePrice || 0);
                             const unitHourlyRate = (h * q) > 0 ? (effectiveSubTotal / (h * q)) : effectiveSubTotal;
-                            return `Hourly rate (${formatInr(unitHourlyRate)}/hr) × ${hLabel}${q > 1 ? ` × ${q} workers` : ''}`;
+                            return `Hourly rate (${formatInr(unitHourlyRate)}/hr) × ${hLabel}${q > 1 ? ` × ${q} service providers` : ''}`;
                           })()}
                         </span>
                       </span>

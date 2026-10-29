@@ -24,7 +24,7 @@ export const INDIVIDUAL_BOOKING_STORAGE_KEY = 'lc_homeowner_bookings_v1'
 export const INDIVIDUAL_BOOKING_WORKFLOW = [
   { id: 'submitted', label: 'Request raised', short: 'Submitted' },
   { id: 'review', label: 'Admin review', short: 'Review' },
-  { id: 'assigned', label: 'Labour assigned', short: 'Assigned' },
+  { id: 'assigned', label: 'Service Provider assigned', short: 'Assigned' },
   { id: 'work', label: 'Work on site', short: 'On site' },
   { id: 'payment', label: 'Payment processed', short: 'Payment' },
 ]
@@ -183,16 +183,16 @@ export function bookingStatusToUi(status) {
     return { label: 'Confirmed', variant: 'emerald', tone: 'bg-blue-50 text-blue-900 ring-blue-200/80' }
   }
   if (s === 'assigned') {
-    return { label: 'Workers assigned', variant: 'sky', tone: 'bg-sky-50 text-sky-900 ring-sky-200/80' }
+    return { label: 'Service Providers assigned', variant: 'sky', tone: 'bg-sky-50 text-sky-900 ring-sky-200/80' }
   }
   if (s === 'in_progress') {
     return { label: 'Work in progress', variant: 'brand', tone: 'bg-brand/10 text-brand ring-brand/25' }
   }
   if (s === 'searching') {
-    return { label: 'Finding labour', variant: 'sky', tone: 'bg-sky-50 text-sky-900 ring-sky-200/80' }
+    return { label: 'Finding service provider', variant: 'sky', tone: 'bg-sky-50 text-sky-900 ring-sky-200/80' }
   }
   if (s === 'accepted') {
-    return { label: 'Worker accepted', variant: 'emerald', tone: 'bg-blue-50 text-blue-900 ring-blue-200/80' }
+    return { label: 'Service Provider accepted', variant: 'emerald', tone: 'bg-blue-50 text-blue-900 ring-blue-200/80' }
   }
   if (s === 'cancelled') {
     return { label: 'Cancelled', variant: 'rose', tone: 'bg-rose-50 text-rose-900 ring-rose-200/80' }

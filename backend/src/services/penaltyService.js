@@ -200,7 +200,7 @@ export async function recordBounceIncident({ booking, vendorId, reason = '', can
     status: initialStatus,
     amount: penaltyAmount,
     incidentTime: new Date(),
-    reason: `Bounce Penalty: Job cancelled / abandoned after acceptance for booking #${shortCode} (${reason || 'Worker cancellation'})`,
+    reason: `Bounce Penalty: Job cancelled / abandoned after acceptance for booking #${shortCode} (${reason || 'Service provider cancellation'})`,
     evidence: {
       cancellationReason: reason,
       cancelledBy,

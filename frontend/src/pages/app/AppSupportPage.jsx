@@ -35,7 +35,7 @@ import { complaintsApi } from '../../api/complaintsApi.js'
 
 const TOPICS_BY_ROLE = {
   [USER_ROLES.CUSTOMER]: [
-    { id: 'booking', label: 'Booking & workers', desc: 'No-show, wrong trade, schedule' },
+    { id: 'booking', label: 'Booking & service providers', desc: 'No-show, wrong trade, schedule' },
     { id: 'pricing', label: 'Pricing & estimates', desc: 'Quotes, add-ons, transparency' },
     { id: 'site', label: 'Site & safety', desc: 'Access, PPE, unsafe conditions' },
     { id: 'payment', label: 'Payments', desc: 'Refunds, charges, receipts' },
@@ -91,9 +91,9 @@ function supportIntro(role) {
   }
   if (role === USER_ROLES.LABOUR) {
     return {
-      title: 'Worker support',
+      title: 'Service provider support',
       subtitle: 'Payouts, safety, and KYC help.',
-      body: 'Same standards as the dedicated Labour channel — we respond by severity.',
+      body: 'Same standards as the dedicated Service Provider channel — we respond by severity.',
     }
   }
   if (role === USER_ROLES.CONTRACTOR) {

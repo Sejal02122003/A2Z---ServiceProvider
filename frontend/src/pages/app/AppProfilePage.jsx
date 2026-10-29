@@ -1063,7 +1063,7 @@ export function AppProfilePage() {
           </h3>
           <p className="text-xs text-slate-500 mb-4">
             {user?.role === USER_ROLES.CUSTOMER
-              ? 'Switch to Contractor mode to book multiple workers and manage bulk projects.'
+              ? 'Switch to Contractor mode to book multiple service providers and manage bulk projects.'
               : 'Switch to Individual mode for regular home services and single bookings.'}
           </p>
           <AppButton type="button" variant="secondary" onClick={handleToggleRole} className="w-full">
@@ -1075,7 +1075,7 @@ export function AppProfilePage() {
 
       {user?.role === USER_ROLES.LABOUR ? (
         <GlassPanel className="border-slate-200/90 p-4 ring-1 ring-slate-100/90">
-          <AppSectionHeader title="Worker profile" className="mb-3" />
+          <AppSectionHeader title="Service Provider profile" className="mb-3" />
           {labourCategories?.length ? (
             <>
               <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">Work types</p>

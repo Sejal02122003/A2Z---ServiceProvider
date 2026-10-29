@@ -11,13 +11,13 @@ import { appSpring } from '../appMotion.js'
 const OPTIONS = [
   {
     id: 'manual',
-    label: 'Select labour manually',
-    desc: 'Pick one or more workers you like from the list',
+    label: 'Select service provider manually',
+    desc: 'Pick one or more service providers you like from the list',
     icon: UserRound,
   },
   {
     id: 'smart',
-    label: 'Best labour for you',
+    label: 'Best service provider for you',
     desc: 'Smart match based on rating, distance & availability',
     icon: Sparkles,
   },
@@ -83,7 +83,7 @@ export function BookingModeSheet({ open, onClose, value, onSelect, categoryLabel
                 })}
                 <p className="flex items-center justify-center gap-1.5 pt-1 text-[11px] text-slate-500">
                   <Users className="h-3.5 w-3.5" aria-hidden />
-                  Multi-worker booking supported
+                  Multiple service providers supported
                 </p>
               </motion.div>
             </AppBottomSheetPanel>

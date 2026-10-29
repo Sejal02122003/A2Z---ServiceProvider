@@ -772,7 +772,7 @@ export function AdminLabourWalletPage() {
             <div>
               <h3 className="font-bold text-slate-900">Service Provider Wallets Directory</h3>
               <p className="text-xs text-slate-500">
-                View individual worker balances, held charges, outstanding dues, and perform audited manual adjustments.
+                View individual service provider balances, held charges, outstanding dues, and perform audited manual adjustments.
               </p>
             </div>
 

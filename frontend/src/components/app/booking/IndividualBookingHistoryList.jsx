@@ -24,7 +24,7 @@ export function IndividualBookingHistoryList({ items, isDemo, onTrack, onRebook 
       {items.map((h) => {
         const st = bookingStatusToUi(h.status)
         const primary = (h.lines || [])[0]
-        const title = primary?.categoryName || 'Labour booking'
+        const title = primary?.categoryName || 'Service booking'
 
         return (
           <li

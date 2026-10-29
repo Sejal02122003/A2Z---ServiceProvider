@@ -110,10 +110,10 @@ export function Navbar() {
             </Link>
           )}
           <ButtonLink href="/app" variant="secondary" className="!py-2.5 !text-xs" onClick={handleRegisterLabour}>
-            Register as Labour
+            Register as Service Provider
           </ButtonLink>
           <ButtonLink href="/app" variant="primary" className="!py-2.5 !text-xs" onClick={handleHireLabour}>
-            Hire Labour
+            Book Service
           </ButtonLink>
         </div>
 
@@ -172,10 +172,10 @@ export function Navbar() {
                   </Link>
                 )}
                 <ButtonLink href="/app" variant="primary" onClick={(e) => { setOpen(false); handleHireLabour(e); }}>
-                  Hire Labour
+                  Book Service
                 </ButtonLink>
                 <ButtonLink href="/app" variant="secondary" onClick={(e) => { setOpen(false); handleRegisterLabour(e); }}>
-                  Register as Labour
+                  Register as Service Provider
                 </ButtonLink>
               </div>
             </Container>

@@ -225,7 +225,7 @@ function ContractorRequestsTab() {
                               onClick={() => toggleRow(r._id)}
                               className="text-brand font-bold text-xs hover:underline flex items-center gap-1"
                             >
-                              {hasAssignments ? `${assignments.length} Worker${assignments.length > 1 ? 's' : ''}` : 'View Requested Crew'}
+                              {hasAssignments ? `${assignments.length} Service Provider${assignments.length > 1 ? 's' : ''}` : 'View Requested Crew'}
                               <span className="text-[10px] ml-1">{isExpanded ? '▼' : '▶'}</span>
                             </button>
                           ) : (
@@ -273,7 +273,7 @@ function ContractorRequestsTab() {
                                       key={c._id}
                                       className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm"
                                     >
-                                      <p className="text-sm font-extrabold text-slate-900">{c.fullName || 'Worker'}</p>
+                                      <p className="text-sm font-extrabold text-slate-900">{c.fullName || 'Service Provider'}</p>
                                       <p className="text-[11px] font-medium text-slate-500 mt-1">{c.phone || 'No phone number'}</p>
                                       <p className="text-xs font-bold text-brand mt-1 bg-brand/5 inline-block px-2 py-0.5 rounded-md">{c.services?.[0]?.name || c.serviceName || c.category || 'Specialist Service Provider'}</p>
                                       <div className="mt-3 flex justify-between items-center border-t border-slate-50 pt-3">
@@ -298,8 +298,8 @@ function ContractorRequestsTab() {
                                       className="bg-white p-4 rounded-xl border border-slate-200 hover:border-brand/40 hover:shadow-md hover:-translate-y-0.5 cursor-pointer transition-all duration-300 group/card"
                                     >
                                       <p className="text-sm font-extrabold text-slate-900 group-hover/card:text-brand transition-colors">{a.labourId?.fullName || 'Pending Linking'}</p>
-                                      <p className="text-[11px] font-medium text-slate-500 mt-1">{a.labourId?.phone || 'Awaiting vendor to assign worker'}</p>
-                                      <p className="text-xs font-bold text-brand mt-1 bg-brand/5 inline-block px-2 py-0.5 rounded-md">{a.labourId?.services?.[0]?.name || a.labourId?.category || 'Worker'}</p>
+                                      <p className="text-[11px] font-medium text-slate-500 mt-1">{a.labourId?.phone || 'Awaiting vendor to assign service provider'}</p>
+                                      <p className="text-xs font-bold text-brand mt-1 bg-brand/5 inline-block px-2 py-0.5 rounded-md">{a.labourId?.services?.[0]?.name || a.labourId?.category || 'Service Provider'}</p>
                                       <div className="mt-3 flex justify-between items-end border-t border-slate-50 pt-3">
                                         <div className="flex flex-col gap-1 text-[11px]">
                                           <span className="font-semibold text-slate-600">Vendor Price: <span className="font-bold text-slate-800">₹{vendorFee.toLocaleString('en-IN')}</span></span>
@@ -392,7 +392,7 @@ function ContractorRequestsTab() {
                                 onClick={() => toggleRow(r._id)}
                                 className="text-brand font-bold text-sm hover:underline flex items-center gap-1"
                               >
-                                {hasAssignments ? `${assignments.length} Worker${assignments.length > 1 ? 's' : ''}` : 'View Requested Crew'}
+                                {hasAssignments ? `${assignments.length} Service Provider${assignments.length > 1 ? 's' : ''}` : 'View Requested Crew'}
                                 <span className="text-xs ml-1">{isExpanded ? '▼' : '▶'}</span>
                               </button>
                             ) : (
@@ -440,7 +440,7 @@ function ContractorRequestsTab() {
                                   key={c._id}
                                   className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm"
                                 >
-                                  <p className="text-sm font-extrabold text-slate-900">{c.fullName || 'Worker'}</p>
+                                  <p className="text-sm font-extrabold text-slate-900">{c.fullName || 'Service Provider'}</p>
                                   <p className="text-[11px] font-medium text-slate-500 mt-1">{c.phone || 'No phone number'}</p>
                                   <p className="text-xs font-bold text-brand mt-1 bg-brand/5 inline-block px-2 py-0.5 rounded-md">{c.services?.[0]?.name || c.serviceName || c.category || 'Specialist Service Provider'}</p>
                                   <div className="mt-3 flex justify-between items-center border-t border-slate-200/60 pt-3">
@@ -465,8 +465,8 @@ function ContractorRequestsTab() {
                                   className="bg-slate-50 p-4 rounded-xl border border-slate-200 hover:border-brand/40 hover:shadow-md hover:-translate-y-0.5 cursor-pointer transition-all duration-300 group/card"
                                 >
                                   <p className="text-sm font-extrabold text-slate-900 group-hover/card:text-brand transition-colors">{a.labourId?.fullName || 'Pending Linking'}</p>
-                                  <p className="text-[11px] font-medium text-slate-500 mt-1">{a.labourId?.phone || 'Awaiting vendor to assign worker'}</p>
-                                  <p className="text-xs font-bold text-brand mt-1 bg-brand/5 inline-block px-2 py-0.5 rounded-md">{a.labourId?.services?.[0]?.name || a.labourId?.category || 'Worker'}</p>
+                                  <p className="text-[11px] font-medium text-slate-500 mt-1">{a.labourId?.phone || 'Awaiting vendor to assign service provider'}</p>
+                                  <p className="text-xs font-bold text-brand mt-1 bg-brand/5 inline-block px-2 py-0.5 rounded-md">{a.labourId?.services?.[0]?.name || a.labourId?.category || 'Service Provider'}</p>
                                   <div className="mt-3 flex justify-between items-end border-t border-slate-200/60 pt-3">
                                     <div className="flex flex-col gap-1 text-[11px]">
                                       <span className="font-semibold text-slate-600">Vendor Price: <span className="font-bold text-slate-800">₹{vendorFee.toLocaleString('en-IN')}</span></span>
@@ -634,7 +634,7 @@ function BookingDetailsModal({ booking, onClose }) {
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="font-bold text-sm text-slate-900">{a.labourId?.fullName || 'Pending Linking'}</p>
-                            <p className="text-xs text-slate-600">{a.labourId?.phone || 'Awaiting Worker'}</p>
+                            <p className="text-xs text-slate-600">{a.labourId?.phone || 'Awaiting Service Provider'}</p>
                             <p className="text-xs text-slate-500 mt-0.5">
                               Service: <span className="font-semibold text-slate-700">{assignedServiceName}</span>
                               {a.pricePerHour > 0 && <span className="ml-1 text-slate-400">· ₹{Math.round(a.pricePerHour)}/hr</span>}

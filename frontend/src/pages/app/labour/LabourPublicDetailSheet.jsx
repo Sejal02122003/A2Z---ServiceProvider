@@ -22,7 +22,7 @@ export function LabourPublicDetailSheet({ labour, loading, onClose }) {
       <AppBottomSheetPanel titleId="labour-sheet-title">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 sm:px-5">
           <h2 id="labour-sheet-title" className="text-base font-bold text-slate-900">
-            Worker profile
+            Service Provider profile
           </h2>
           <button
             type="button"
@@ -114,7 +114,7 @@ export function LabourPublicDetailSheet({ labour, loading, onClose }) {
                     navigate(buildBookingFlowPath('type'))
                   }}
                 >
-                  Book this worker
+                  Book this service provider
                   <ArrowRight className="h-4 w-4" aria-hidden />
                 </AppButton>
                 <AppButton type="button" onClick={onClose} variant="secondary" className="sm:flex-1">

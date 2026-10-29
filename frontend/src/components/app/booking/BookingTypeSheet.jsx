@@ -14,7 +14,7 @@ const OPTIONS = [
   {
     id: 'instant',
     label: 'Instant booking',
-    desc: 'ASAP — we match available labour near you',
+    desc: 'ASAP — we match available service providers near you',
     icon: Zap,
     tone: 'from-amber-500/15 to-orange-50',
   },
@@ -98,7 +98,7 @@ export function BookingTypeSheet({ open, onClose, value, onSelect, categoryLabel
                 })}
                 <p className="flex items-center justify-center gap-1.5 pt-2 text-center text-[11px] font-medium text-slate-500">
                   <Sparkles className="h-3.5 w-3.5 text-brand" aria-hidden />
-                  Verified workers · clear pricing
+                  Verified service providers · clear pricing
                 </p>
               </motion.div>
             </AppBottomSheetPanel>

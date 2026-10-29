@@ -124,7 +124,7 @@ export function BookingReviewModal({ open, bookingId, workerName, revieweeId, on
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand">Rate your experience</p>
                     <h2 className="mt-0.5 text-lg font-black text-slate-900">
-                      {workerName ? `How was ${workerName}?` : 'How was your worker?'}
+                      {workerName ? `How was ${workerName}?` : 'How was your service provider?'}
                     </h2>
                   </div>
                   <button

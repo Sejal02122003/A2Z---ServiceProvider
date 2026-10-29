@@ -22,7 +22,7 @@ export const CONTRACTOR_WORKFLOW = [
 export const INDIVIDUAL_WORKFLOW = [
   { id: 'submitted', label: 'Request raised', statuses: [REQUEST_STATUS.PENDING_REVIEW] },
   { id: 'review', label: 'Admin review', statuses: [REQUEST_STATUS.CONFIRMED, REQUEST_STATUS.ALLOCATING] },
-  { id: 'assigned', label: 'Workers assigned', statuses: [REQUEST_STATUS.ASSIGNED] },
+  { id: 'assigned', label: 'Service Providers assigned', statuses: [REQUEST_STATUS.ASSIGNED] },
   { id: 'work', label: 'Work on site', statuses: [REQUEST_STATUS.IN_PROGRESS, REQUEST_STATUS.ATTENDANCE] },
   { id: 'payment', label: 'Payment processed', statuses: [REQUEST_STATUS.BILLING, REQUEST_STATUS.COMPLETED] },
 ]

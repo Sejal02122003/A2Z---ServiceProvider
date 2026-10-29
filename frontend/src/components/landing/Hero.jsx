@@ -65,7 +65,7 @@ export function Hero() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.55, delay: 0.05 }}
             >
-              Book Trusted Construction Labour{' '}
+              Book Trusted Service Providers{' '}
               <span className="bg-gradient-to-r from-brand via-cyan-500 to-teal-600 bg-clip-text text-transparent">
                 in Minutes
               </span>
@@ -87,11 +87,11 @@ export function Hero() {
             transition={{ duration: 0.55, delay: 0.18 }}
           >
             <ButtonLink href="/app" variant="primary" className="group" onClick={handleHireLabour}>
-              Hire Labour
+              Book Service
               <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" aria-hidden />
             </ButtonLink>
             <ButtonLink href="/app" variant="secondary" onClick={handleRegisterLabour}>
-              Register as Labour
+              Register as Service Provider
             </ButtonLink>
           </motion.div>
 
@@ -135,7 +135,7 @@ export function Hero() {
               </div>
               <div>
                 <p className="font-bold text-slate-900">12k+</p>
-                <p>verified workers</p>
+                <p>verified service providers</p>
               </div>
               <div>
                 <p className="font-bold text-slate-900">24/7</p>

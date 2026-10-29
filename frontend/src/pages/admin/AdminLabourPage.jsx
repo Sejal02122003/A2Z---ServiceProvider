@@ -1530,7 +1530,7 @@ export function AdminLabourPage() {
                               <FileText className="mx-auto h-8 w-8 text-slate-300 mb-1" />
                               <p className="text-xs font-semibold text-slate-600">No document photos uploaded yet</p>
                               <p className="text-[11px] text-slate-400 mt-0.5">
-                                Worker may have submitted video KYC instead.
+                                Service provider may have submitted video KYC instead.
                               </p>
                             </div>
                           )}
@@ -1568,7 +1568,7 @@ export function AdminLabourPage() {
                           <div className="rounded-xl border border-sky-100 bg-sky-50/60 p-3 text-xs text-sky-900 flex items-center gap-2.5">
                             <CheckCircle2 className="h-4 w-4 text-sky-600 shrink-0" />
                             <span>
-                              Worker submitted document photo proof for KYC verification (no separate video file).
+                              Service provider submitted document photo proof for KYC verification (no separate video file).
                             </span>
                           </div>
                         ) : null}
@@ -1608,7 +1608,7 @@ export function AdminLabourPage() {
                               rows={2}
                               value={reviewNote}
                               onChange={(e) => setReviewNote(e.target.value)}
-                              placeholder="e.g. Aadhaar details clear and verified, or Note for worker if rejecting"
+                              placeholder="e.g. Aadhaar details clear and verified, or Note for service provider if rejecting"
                               className="w-full rounded-xl border border-slate-200/90 bg-white px-3 py-2 text-xs font-medium text-slate-900 outline-none focus:ring-2 focus:ring-brand/35 focus:border-brand"
                             />
                           </div>

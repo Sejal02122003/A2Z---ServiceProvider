@@ -26,7 +26,7 @@ import { RescheduleBookingModal } from '../../components/app/booking/RescheduleB
 
 const BOOKING_STEPS = [
   { id: 'CREATED', label: 'Booking Created' },
-  { id: 'BROADCASTING', label: 'Searching for Workers' },
+  { id: 'BROADCASTING', label: 'Searching for Service Providers' },
   { id: 'ACCEPTED', label: 'Service Provider Accepted' },
   { id: 'EN_ROUTE', label: 'On the Way' },
   { id: 'STARTED', label: 'Work Started' },
@@ -337,7 +337,7 @@ export function JobTracking() {
         <p className="text-xs font-bold uppercase tracking-wider text-brand">Current Status</p>
         <p className="mt-1 text-lg font-extrabold text-slate-900">
           {booking.type === 'SCHEDULED' && booking.status === 'CREATED' 
-            ? 'Scheduled (Awaiting Worker)' 
+            ? 'Scheduled (Awaiting Service Provider)' 
             : BOOKING_STEPS[currentStepIndex]?.label || booking.status}
         </p>
       </GlassPanel>
@@ -708,13 +708,13 @@ export function JobTracking() {
                 </div>
               ))}
             </div>
-            <p className="mt-3 text-xs font-semibold text-slate-600 text-center">Share these with the workers to start the job.</p>
+            <p className="mt-3 text-xs font-semibold text-slate-600 text-center">Share these with the service providers to start the job.</p>
           </GlassPanel>
         ) : (
           <GlassPanel className="border-brand/20 bg-brand/5 p-4 text-center">
             <p className="text-xs font-bold uppercase tracking-wider text-brand">Start OTP</p>
             <p className="mt-2 text-3xl font-black tracking-[0.2em] text-slate-900">{displayStartOtp}</p>
-            <p className="mt-1 text-xs font-semibold text-slate-600">Share this with the worker to start the job.</p>
+            <p className="mt-1 text-xs font-semibold text-slate-600">Share this with the service provider to start the job.</p>
           </GlassPanel>
         )
       ) : (booking.status === 'STARTED' && displayCompletionOtp) ? (
@@ -729,13 +729,13 @@ export function JobTracking() {
                 </div>
               ))}
             </div>
-            <p className="mt-3 text-xs font-semibold text-slate-600 text-center">Share these with the workers when the job is completed.</p>
+            <p className="mt-3 text-xs font-semibold text-slate-600 text-center">Share these with the service providers when the job is completed.</p>
           </GlassPanel>
         ) : (
           <GlassPanel className="border-blue-600/20 bg-blue-50 p-4 text-center">
             <p className="text-xs font-bold uppercase tracking-wider text-blue-600">Completion OTP</p>
             <p className="mt-2 text-3xl font-black tracking-[0.2em] text-slate-900">{displayCompletionOtp}</p>
-            <p className="mt-1 text-xs font-semibold text-slate-600">Share this with the worker when the job is completed.</p>
+            <p className="mt-1 text-xs font-semibold text-slate-600">Share this with the service provider when the job is completed.</p>
           </GlassPanel>
         )
       ) : null}

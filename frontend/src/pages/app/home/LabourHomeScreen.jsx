@@ -560,7 +560,7 @@ export function LabourHomeScreen({ user }) {
                   {firstName ? `, ${firstName}` : ''} 👋
                 </p>
                 <h1 className="truncate text-lg font-extrabold tracking-tight sm:text-xl">
-                  {user?.fullName?.trim() || firstName || 'Worker'}
+                  {user?.fullName?.trim() || firstName || 'Service Provider'}
                 </h1>
                 <p className="truncate text-xs font-medium text-white/70">{primaryTrade}</p>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">

@@ -53,7 +53,7 @@ export function IndividualBookingDetail({ booking, onRebook, onBack, onAdvancePi
             </li>
           ))}
         </ul>
-        <p className="mt-2 text-xs text-slate-600">{workers} workers</p>
+        <p className="mt-2 text-xs text-slate-600">{workers} {workers > 1 ? 'service providers' : 'service provider'}</p>
 
         <p className="mt-3 flex items-start gap-2 text-xs text-slate-600">
           <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />

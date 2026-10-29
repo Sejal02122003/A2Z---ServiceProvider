@@ -31,10 +31,10 @@ export function FinalCTA() {
                 Same-day & emergency slots in select cities
               </div>
               <h2 id="cta-heading" className="text-3xl font-extrabold tracking-tight md:text-4xl">
-                Need labour urgently?
+                Need service providers urgently?
               </h2>
               <p className="max-w-xl text-sm leading-relaxed text-slate-600 md:text-base">
-                Post your requirement once—we match verified workers, share live status, and keep
+                Post your requirement once—we match verified service providers, share live status, and keep
                 payouts documented. Scaling contractors can talk to our team for custom SLAs.
               </p>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -52,7 +52,7 @@ export function FinalCTA() {
                 Book Now
               </ButtonLink>
               <ButtonLink href="/labours/auth" variant="secondary" className="!py-4 !text-base">
-                Become a Labour Partner
+                Become a Service Provider
               </ButtonLink>
             </div>
           </div>

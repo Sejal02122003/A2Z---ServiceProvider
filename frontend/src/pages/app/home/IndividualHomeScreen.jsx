@@ -217,7 +217,7 @@ export function IndividualHomeScreen({ user }) {
       setLabours(res.data?.items ?? [])
     } catch (e) {
       setLabours([])
-      setLaboursErr(e instanceof ApiError ? e.message : 'Could not load workers.')
+      setLaboursErr(e instanceof ApiError ? e.message : 'Could not load service providers.')
     } finally {
       setLaboursLoading(false)
     }

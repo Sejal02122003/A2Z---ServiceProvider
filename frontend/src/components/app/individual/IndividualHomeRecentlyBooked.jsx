@@ -33,7 +33,7 @@ export function IndividualHomeRecentlyBooked({ bookings, loading, formatDay }) {
 
       <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 scrollbar-none [&::-webkit-scrollbar]:hidden">
         {bookings.map((b) => {
-          const itemLabel = b.serviceId?.name || b.subcategoryId?.name || 'Labour booking'
+          const itemLabel = b.serviceId?.name || b.subcategoryId?.name || 'Service booking'
           const day = formatDay(b.scheduledAt || b.createdAt)
           const img = b.subcategoryId?._id
             ? getCategoryImageUrl({ _id: b.subcategoryId._id, name: itemLabel })
@@ -44,10 +44,10 @@ export function IndividualHomeRecentlyBooked({ bookings, loading, formatDay }) {
           let StatusIcon = Star
           
           if (b.status === 'BROADCASTING') {
-            statusLabel = 'Finding labour...'
+            statusLabel = 'Finding service provider...'
             statusColor = 'text-amber-500'
           } else if (b.status === 'ACCEPTED' || b.status === 'EN_ROUTE') {
-            statusLabel = 'Worker assigned'
+            statusLabel = 'Service provider assigned'
             statusColor = 'text-blue-600'
           } else if (b.status === 'STARTED') {
             statusLabel = 'Work in progress'

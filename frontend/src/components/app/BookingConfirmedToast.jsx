@@ -91,7 +91,7 @@ export function BookingConfirmedToast() {
               <div>
                 <h4 className="text-sm font-black tracking-tight leading-none">Booking Confirmed!</h4>
                 <p className="text-[11px] font-medium text-emerald-100 mt-0.5">
-                  {bookingType === 'INSTANT' ? 'Worker is on the way' : 'Worker confirmed for your slot'}
+                  {bookingType === 'INSTANT' ? 'Service provider is on the way' : 'Service provider confirmed for your slot'}
                 </p>
               </div>
             </div>

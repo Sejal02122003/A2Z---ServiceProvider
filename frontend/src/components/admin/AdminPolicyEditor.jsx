@@ -6,7 +6,7 @@ import { AppPillTabs } from '../app-ui/navigation/AppPillTabs.jsx'
 const TABS = [
   { id: 'customer', label: 'Customer' },
   { id: 'contractor', label: 'Contractor' },
-  { id: 'labour', label: 'Labour' },
+  { id: 'labour', label: 'Service Provider' },
 ]
 
 export function AdminPolicyEditor({ type, title }) {

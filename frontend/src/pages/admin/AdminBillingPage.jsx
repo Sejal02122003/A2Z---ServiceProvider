@@ -195,7 +195,7 @@ export function AdminBillingPage() {
                         <p className="text-sm text-gray-600">
                           {b.assignments?.length > 0 
                             ? b.assignments.map(a => a.labourId?.fullName).filter(Boolean).join(', ') 
-                            : (b.laborId?.fullName || (b.quantity > 1 ? `${b.quantity} Labours` : 'Unassigned'))
+                            : (b.laborId?.fullName || (b.quantity > 1 ? `${b.quantity} Service Providers` : 'Unassigned'))
                           }
                         </p>
                       </div>

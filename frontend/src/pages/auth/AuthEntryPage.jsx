@@ -425,15 +425,15 @@ export function AuthEntryPage({ authGroup = 'users' }) {
           {step === 'otp'
             ? 'Verify OTP'
             : mode === 'login'
-              ? (authGroup === 'labours' ? 'Welcome back Service Partners !' : 'Welcome back !')
-              : (authGroup === 'labours' ? 'Welcome Service Partners !' : 'Welcome !')}
+              ? (authGroup === 'labours' ? 'Welcome back Service Providers !' : 'Welcome back !')
+              : (authGroup === 'labours' ? 'Welcome Service Providers !' : 'Welcome !')}
         </h1>
         <p className="mt-1.5 text-sm font-medium text-slate-500">
           {step === 'otp'
             ? 'Secure verification'
             : mode === 'login'
               ? (authGroup === 'labours' ? 'Sign in to access your jobs & earnings' : 'Sign in to continue')
-              : (authGroup === 'labours' ? 'Join A2Z Service Partner Network' : 'Join A2Z today')}
+              : (authGroup === 'labours' ? 'Join A2Z Service Provider Network' : 'Join A2Z today')}
         </p>
       </div>
 

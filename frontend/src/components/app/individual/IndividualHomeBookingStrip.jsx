@@ -28,7 +28,7 @@ export function IndividualHomeBookingStrip({ bookings, loading, formatDay }) {
         {bookings.map((b) => {
           const st = bookingStatusToUi(b.status)
           const primaryLine = (b.lines || [])[0]
-          const itemLabel = primaryLine?.categoryName || 'Labour booking'
+          const itemLabel = primaryLine?.categoryName || 'Service booking'
           const day = formatDay(b.serviceDate)
 
           return (

@@ -171,7 +171,7 @@ function SubStatusBadge({ status }) {
 }
 
 function WorkerCell({ labour }) {
-  const name = labour?.fullName || 'Unknown Worker'
+  const name = labour?.fullName || 'Unknown Service Provider'
   const phone = labour?.phone ? `+91 ${labour.phone}` : '—'
   const initials =
     name
@@ -283,7 +283,7 @@ function RefundModal({ sub, onClose, onDone }) {
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-4">
           <div>
             <h3 className="text-base font-extrabold text-slate-900">Manage Refund Request</h3>
-            <p className="text-xs text-slate-500 font-medium">{sub.labour?.fullName || 'Worker'} • {sub.date}</p>
+            <p className="text-xs text-slate-500 font-medium">{sub.labour?.fullName || 'Service Provider'} • {sub.date}</p>
           </div>
           <button
             type="button"
@@ -365,7 +365,7 @@ function RefundModal({ sub, onClose, onDone }) {
 
           <div className="flex items-center justify-center gap-1.5 text-center text-xs text-slate-400">
             <Info className="h-3.5 w-3.5" />
-            <span>"Process" instantly refunds ₹{sub.amountPaid} to the worker's wallet.</span>
+            <span>"Process" instantly refunds ₹{sub.amountPaid} to the service provider's wallet.</span>
           </div>
         </div>
       </motion.div>
@@ -493,7 +493,7 @@ function SubscriptionPlanModal({ plan, onClose, onDone }) {
               onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
               className="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand"
             />
-            <span>Make this plan active and visible to workers</span>
+            <span>Make this plan active and visible to service providers</span>
           </label>
 
           <div className="flex gap-2.5 pt-3">
@@ -808,7 +808,7 @@ export function AdminLabourSubscriptionsPage() {
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Daily Subscription Window</p>
                 <p className="text-sm font-semibold text-slate-800">
-                  Workers can subscribe between {formatHour(settings.subscriptionStartHour)} and {formatHour(settings.subscriptionEndHour)} IST
+                  Service providers can subscribe between {formatHour(settings.subscriptionStartHour)} and {formatHour(settings.subscriptionEndHour)} IST
                 </p>
               </div>
             </div>
@@ -914,7 +914,7 @@ export function AdminLabourSubscriptionsPage() {
                 setSearch(e.target.value)
                 setPage(1)
               }}
-              placeholder="Search by worker name or phone..."
+              placeholder="Search by service provider name or phone..."
               className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-9 pr-8 text-xs sm:text-sm outline-none transition focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/15"
             />
             {search && (
@@ -1006,7 +1006,7 @@ export function AdminLabourSubscriptionsPage() {
               <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="border-b border-slate-200/80 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   <tr>
-                    <th className="px-5 py-3.5">Worker</th>
+                    <th className="px-5 py-3.5">Service Provider</th>
                     <th className="px-5 py-3.5">Plan</th>
                     <th className="px-5 py-3.5">Amount</th>
                     <th className="px-5 py-3.5">Performance</th>
@@ -1087,7 +1087,7 @@ export function AdminLabourSubscriptionsPage() {
               <table className="w-full min-w-[880px] text-left text-sm">
                 <thead className="border-b border-slate-200/80 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   <tr>
-                    <th className="px-5 py-3.5">Worker</th>
+                    <th className="px-5 py-3.5">Service Provider</th>
                     <th className="px-5 py-3.5">Plan</th>
                     <th className="px-5 py-3.5">Date / Progress</th>
                     <th className="px-5 py-3.5">Tx ID</th>
