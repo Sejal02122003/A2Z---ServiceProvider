@@ -135,7 +135,6 @@ export const ADMIN_NAV_SECTIONS = [
       { to: '/admin/commission-fee', label: 'Commission Fee', icon: HandCoins },
       { to: '/admin/labour-wallet', label: 'Service Provider Wallet', icon: Wallet },
       { to: '/admin/labour-subscriptions', label: 'Service Provider Subscriptions', icon: CalendarDays },
-      { to: '/admin/free-trials', label: 'Free Trials', icon: CalendarDays },
     ],
   },
   {
@@ -197,7 +196,6 @@ const ROUTE_TITLES = [
   { prefix: '/admin/labour-wallet', title: 'Service Provider Wallet' },
   { prefix: '/admin/billing', title: 'Payments & billing' },
   { prefix: '/admin/labour-subscriptions', title: 'Service Provider Subscriptions' },
-  { prefix: '/admin/free-trials', title: 'Free Trials' },
   { prefix: '/admin/reviews', title: 'Reviews & Ratings' },
   { prefix: '/admin/privacy-policy', title: 'Privacy Policy' },
   { prefix: '/admin/terms-conditions', title: 'Terms & Conditions' },

@@ -37,7 +37,6 @@ import { AdminCommissionFeePage } from './pages/admin/AdminCommissionFeePage.jsx
 import { AdminLabourWalletPage } from './pages/admin/AdminLabourWalletPage.jsx'
 import { AdminReviewsRatingsPage } from './pages/admin/AdminReviewsRatingsPage.jsx'
 import { AdminLabourSubscriptionsPage } from './pages/admin/AdminLabourSubscriptionsPage.jsx'
-import { AdminFreeTrialPage } from './pages/admin/AdminFreeTrialPage.jsx'
 import { AdminPrivacyPolicyPage } from './pages/admin/AdminPrivacyPolicyPage.jsx'
 import { AdminTermsConditionsPage } from './pages/admin/AdminTermsConditionsPage.jsx'
 import { AdminFAQsPage } from './pages/admin/AdminFAQsPage.jsx'
@@ -164,7 +163,7 @@ function App() {
             <Route path="cash-management" element={<Navigate to="/admin/labour-wallet" replace />} />
             <Route path="reviews" element={<AdminReviewsRatingsPage />} />
             <Route path="labour-subscriptions" element={<AdminLabourSubscriptionsPage />} />
-            <Route path="free-trials" element={<AdminFreeTrialPage />} />
+            <Route path="free-trials" element={<Navigate to="/admin/vendor-trials" replace />} />
             <Route path="vendor-trials" element={<AdminVendorTrialsPage />} />
             <Route path="vendor-trials/pending-confirmations" element={<AdminPendingConfirmationsPage />} />
             <Route path="vendor-trials/settings" element={<AdminTrialSettingsPage />} />
