@@ -338,7 +338,7 @@ export function IndividualHomeScreen({ user }) {
         </div>
 
         <IndividualHomeRecentlyBooked
-          bookings={recentBookings}
+          bookings={ongoingBookings}
           loading={bookingsLoading}
           formatDay={formatBookingDay}
         />

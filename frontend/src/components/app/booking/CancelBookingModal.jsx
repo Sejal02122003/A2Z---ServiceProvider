@@ -7,6 +7,7 @@ import { bookingsApi } from '../../../api/bookingsApi.js'
 import { ApiError } from '../../../api/http.js'
 import { useAuth } from '../../../hooks/useAuth.js'
 import { getRoleHomePath } from '../../../lib/roleHomePath.js'
+import { clearBookingDraft } from '../../../lib/individualBookingDraft.js'
 
 const STANDARD_REASONS = [
   'Booked by mistake',
@@ -107,6 +108,7 @@ export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
 
       setSuccessResult(cancellationData)
       setShowPolicyConfirmDialog(false)
+      clearBookingDraft()
 
       if (onSuccess) {
         onSuccess(updatedBooking, cancellationData)
@@ -256,6 +258,7 @@ export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
                   <button
                     type="button"
                     onClick={() => {
+                      clearBookingDraft()
                       if (onClose) onClose()
                       navigate(getRoleHomePath(user?.role), { replace: true })
                     }}

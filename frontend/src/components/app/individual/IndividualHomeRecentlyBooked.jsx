@@ -52,6 +52,12 @@ export function IndividualHomeRecentlyBooked({ bookings, loading, formatDay }) {
           } else if (b.status === 'STARTED') {
             statusLabel = 'Work in progress'
             statusColor = 'text-sky-500'
+          } else if (b.status === 'CANCELLED') {
+            statusLabel = 'Cancelled'
+            statusColor = 'text-rose-500'
+          } else if (b.status === 'COMPLETED') {
+            statusLabel = 'Completed'
+            statusColor = 'text-emerald-600'
           }
 
           return (

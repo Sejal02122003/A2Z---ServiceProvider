@@ -371,9 +371,7 @@ export function IndividualBookingFlowPage() {
                 const matchesCat = !categoryIdParam || String(b.category?._id || b.category) === categoryIdParam
                 return matchesCat && ['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED'].includes(s)
               }) ||
-              list.find((b) => ['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED'].includes((b.status || '').toUpperCase())) ||
-              list.find((b) => !categoryIdParam || String(b.category?._id || b.category) === categoryIdParam) ||
-              list[0]
+              list.find((b) => ['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED'].includes((b.status || '').toUpperCase()))
 
             if (active) {
               setActiveBookingId(active._id)
@@ -387,7 +385,10 @@ export function IndividualBookingFlowPage() {
         bookingsApi
           .getBookingStatus(activeBookingId)
           .then((res) => {
-            if (res.data?.booking) setActiveBooking(res.data.booking)
+            const b = res.data?.booking
+            if (b) {
+              setActiveBooking(b)
+            }
           })
           .catch((err) => console.error(err))
           .finally(() => setBookingLoading(false))
@@ -396,7 +397,10 @@ export function IndividualBookingFlowPage() {
       bookingsApi
         .getBookingStatus(activeBookingId)
         .then((res) => {
-          if (res.data?.booking) setActiveBooking(res.data.booking)
+          const b = res.data?.booking
+          if (b) {
+            setActiveBooking(b)
+          }
         })
         .catch((err) => console.error(err))
     }
@@ -480,9 +484,8 @@ export function IndividualBookingFlowPage() {
     } else if (bookingEvent.type === 'BOOKING_CANCELLED') {
       setActiveBooking(prev => prev ? { ...prev, status: 'CANCELLED', ...bookingEvent.data } : null)
       clearBookingDraft()
-      navigate('/user', { replace: true })
     }
-  }, [bookingEvent, activeBookingId, goStep, realUser, navigate, playAcceptedChime, handleOpenReview, clearBookingDraft, step])
+  }, [bookingEvent, activeBookingId, goStep, realUser, playAcceptedChime, handleOpenReview, clearBookingDraft, step])
 
   // Polling fallback to ensure instant transition when provider accepts
   useEffect(() => {
@@ -505,6 +508,12 @@ export function IndividualBookingFlowPage() {
 
           setActiveBooking(fetchedBooking)
           const s = (fetchedBooking.status || '').toUpperCase()
+
+          if (s === 'CANCELLED' || s === 'FAILED' || s === 'REJECTED') {
+            clearBookingDraft()
+            return
+          }
+
           const hasWorker = Boolean(
             (typeof fetchedBooking.laborId === 'object' && fetchedBooking.laborId?.fullName) ||
             (fetchedBooking.assignments && fetchedBooking.assignments.some(a => a.labourId && (a.labourId.fullName || a.labourId._id)))
@@ -522,14 +531,7 @@ export function IndividualBookingFlowPage() {
     }, 3000)
 
     return () => clearInterval(interval)
-  }, [realUser, activeBookingId, activeBooking, step, goStep, playAcceptedChime])
-
-  useEffect(() => {
-    if (activeBooking?.status === 'CANCELLED' && step === 'active') {
-      clearBookingDraft()
-      navigate('/user', { replace: true })
-    }
-  }, [activeBooking?.status, step, navigate, clearBookingDraft])
+  }, [realUser, activeBookingId, activeBooking?.status, step, goStep, playAcceptedChime])
 
   useEffect(() => {
     const cid = categoryIdParam
@@ -1106,9 +1108,11 @@ export function IndividualBookingFlowPage() {
     (typeof assignmentLabor === 'object' && assignmentLabor?._id ? assignmentLabor : null)
 
   const bookingStatus = (activeBooking?.status || acceptedPartnerEvent?.status || '').toUpperCase()
+  const isTerminal = ['CANCELLED', 'FAILED', 'REJECTED'].includes(bookingStatus)
   const isAccepted =
-    ['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED', 'COMPLETED'].includes(bookingStatus) ||
-    Boolean(worker?.fullName || (activeBooking?.assignments && activeBooking.assignments.length > 0))
+    !isTerminal &&
+    (['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED', 'COMPLETED'].includes(bookingStatus) ||
+      Boolean(worker?.fullName || (activeBooking?.assignments && activeBooking.assignments.length > 0)))
 
   const displayStartOtp =
     activeBooking?.assignments?.[0]?.startOtp ||
@@ -1127,6 +1131,31 @@ export function IndividualBookingFlowPage() {
   }, [step, isAccepted, goStep])
 
   if (step === 'searching' && !noMatch) {
+    const isCancelled = ['CANCELLED', 'FAILED', 'REJECTED'].includes((activeBooking?.status || '').toUpperCase())
+    if (isCancelled) {
+      return (
+        <div className="flex min-h-[60vh] flex-col items-center justify-center space-y-4 py-16 px-4 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 text-rose-600 shadow-sm">
+            <AlertCircle className="h-8 w-8" />
+          </div>
+          <h3 className="text-xl font-black text-slate-900">Booking Cancelled</h3>
+          <p className="text-xs font-medium text-slate-500 max-w-xs">
+            This service booking was cancelled. No service partner will be assigned.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              clearBookingDraft()
+              navigate('/user', { replace: true })
+            }}
+            className="mt-2 rounded-xl bg-slate-900 px-6 py-3 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition active:scale-95"
+          >
+            Return to Home
+          </button>
+        </div>
+      )
+    }
+
     if (isAccepted) {
       return (
         <div className="flex min-h-[50vh] flex-col items-center justify-center space-y-3 py-16 text-center">
@@ -1138,7 +1167,10 @@ export function IndividualBookingFlowPage() {
 
     return (
       <div className="pb-8">
-        <AppStackScreenHeader title="Matching service provider" onBack={() => goStep('summary')} />
+        <AppStackScreenHeader title="Matching service provider" onBack={() => {
+          clearBookingDraft()
+          navigate('/user', { replace: true })
+        }} />
         <BookingServiceHighlight categoryName={draft.categoryName} serviceName={realUser?.role === 'contractor' && contractorServiceNames ? contractorServiceNames : draft.serviceName} />
 
         <div className="px-4 mt-6">
@@ -1171,26 +1203,32 @@ export function IndividualBookingFlowPage() {
           onNoMatch={() => { }}
         />
 
-        {activeBooking && ['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED'].includes(activeBooking.status) && (
-          <div className="px-4 mt-2">
-            <button
-              type="button"
-              onClick={() => setCancelModalOpen(true)}
-              className="w-full rounded-2xl border border-rose-200 bg-rose-50/80 py-3.5 px-4 text-sm font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-300 transition shadow-sm flex items-center justify-center gap-2"
-            >
-              <span>Cancel Search</span>
-            </button>
-          </div>
-        )}
+        <div className="px-4 mt-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (activeBooking && activeBooking._id && !['CANCELLED', 'COMPLETED'].includes((activeBooking.status || '').toUpperCase())) {
+                setCancelModalOpen(true)
+              } else {
+                clearBookingDraft()
+                navigate('/user', { replace: true })
+              }
+            }}
+            className="w-full rounded-2xl border border-rose-200 bg-rose-50/80 py-3.5 px-4 text-sm font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-300 transition shadow-sm flex items-center justify-center gap-2 active:scale-95"
+          >
+            <span>Cancel Search</span>
+          </button>
+        </div>
 
         <CancelBookingModal
           open={cancelModalOpen}
           booking={activeBooking}
           onClose={() => setCancelModalOpen(false)}
-          onSuccess={() => {
+          onSuccess={(updatedBooking) => {
             clearBookingDraft()
-            setCancelModalOpen(false)
-            navigate('/user', { replace: true })
+            if (updatedBooking) {
+              setActiveBooking(updatedBooking)
+            }
           }}
         />
       </div>
@@ -1902,10 +1940,11 @@ export function IndividualBookingFlowPage() {
           open={cancelModalOpen}
           booking={activeBooking}
           onClose={() => setCancelModalOpen(false)}
-          onSuccess={() => {
+          onSuccess={(updatedBooking) => {
             clearBookingDraft()
-            setCancelModalOpen(false)
-            navigate('/user', { replace: true })
+            if (updatedBooking) {
+              setActiveBooking(updatedBooking)
+            }
           }}
         />
 
