@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, useReducedMotion, AnimatePresence } from 'framer-motion'
 import {
   AlertTriangle,
@@ -843,12 +844,14 @@ export function LaborWallet() {
       </section>
 
       {/* Top-up Modal */}
-      <AnimatePresence>
-        {showTopUpModal && (
-          <div 
-            onClick={() => setShowTopUpModal(false)}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md overflow-y-auto"
-          >
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <AnimatePresence>
+            {showTopUpModal && (
+              <div 
+                onClick={() => setShowTopUpModal(false)}
+                className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md overflow-y-auto"
+              >
             <motion.div
               onClick={(e) => e.stopPropagation()}
               initial={{ opacity: 0, scale: 0.92, y: 15 }}
@@ -969,7 +972,9 @@ export function LaborWallet() {
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+    )}
 
       {/* Provider UPI QR Payment Modal */}
       <ProviderQRPaymentModal

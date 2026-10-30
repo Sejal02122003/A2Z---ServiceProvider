@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   QrCode,
@@ -261,9 +262,9 @@ export function ProviderQRPaymentModal({
 
   if (!isOpen) return null
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
+  const modalContent = (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85dvh] sm:max-h-[90vh] animate-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white">
           <div className="flex items-center gap-2.5">
@@ -313,7 +314,7 @@ export function ProviderQRPaymentModal({
         )}
 
         {/* Modal Content */}
-        <div className="p-5 overflow-y-auto flex-1 space-y-4">
+        <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4 pb-8">
           {/* ========================================================================= */}
           {/* STEP 1: SCAN QR & TRANSFER                                               */}
           {/* ========================================================================= */}
@@ -444,14 +445,16 @@ export function ProviderQRPaymentModal({
                   )}
 
                   {/* Proceed to proof button */}
-                  <button
-                    type="button"
-                    onClick={handleProceedToProof}
-                    className="w-full py-3.5 px-4 rounded-2xl bg-[#015F6C] hover:bg-[#014d57] text-white font-black text-sm shadow-md transition flex items-center justify-center gap-2 active:scale-[0.99]"
-                  >
-                    I Have Made This Payment
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
+                  <div className="pt-2 pb-2">
+                    <button
+                      type="button"
+                      onClick={handleProceedToProof}
+                      className="w-full py-3.5 px-4 rounded-2xl bg-[#015F6C] hover:bg-[#014d57] text-white font-black text-sm shadow-md transition flex items-center justify-center gap-2 active:scale-[0.99]"
+                    >
+                      I Have Made This Payment
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -637,7 +640,7 @@ export function ProviderQRPaymentModal({
       {/* Fullscreen Zoom of QR */}
       {zoomQr && config?.qrImageUrl && (
         <div
-          className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md"
+          className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md"
           onClick={() => setZoomQr(false)}
         >
           <div className="bg-white p-4 rounded-3xl max-w-sm w-full text-center space-y-3" onClick={(e) => e.stopPropagation()}>
@@ -655,5 +658,7 @@ export function ProviderQRPaymentModal({
       )}
     </div>
   )
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent
 }
 export default ProviderQRPaymentModal
