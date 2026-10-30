@@ -89,8 +89,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
 
   useEffect(() => {
     if (!loading && isAuthenticated && user?.role) {
-      const isLabour = authGroup === 'labours' || user.role === USER_ROLES.LABOUR
-      if (isLabour && user.role === USER_ROLES.LABOUR) {
+      if (authGroup === 'labours' && user.role === USER_ROLES.LABOUR) {
         const kitReceived = Boolean(
           user.welcomeKit?.isReceived ||
           user.welcomeKit?.status === 'DELIVERED' ||
@@ -105,9 +104,11 @@ export function AuthEntryPage({ authGroup = 'users' }) {
         navigate('/serviceprovider', { replace: true })
         return
       }
-      navigate(getRoleHomePath(user.role), { replace: true })
+      const targetFrom = location.state?.from
+      const safeFrom = (authGroup === 'users' && targetFrom?.startsWith('/serviceprovider')) ? null : targetFrom
+      navigate(safeFrom || getRoleHomePath(user.role), { replace: true })
     }
-  }, [isAuthenticated, user, loading, authGroup, navigate])
+  }, [isAuthenticated, user, loading, authGroup, navigate, location.state])
 
   const [mode, setMode] = useState('login')
   const [step, setStep] = useState('form')
@@ -329,8 +330,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
       }
 
       // Route Service Partners directly to the onboarding pipeline or labour home
-      const isLabour = authGroup === 'labours' || signedInUser.role === USER_ROLES.LABOUR
-      if (isLabour) {
+      if (authGroup === 'labours') {
         const kitReceived = Boolean(
           signedInUser.welcomeKit?.isReceived ||
           signedInUser.welcomeKit?.status === 'DELIVERED' ||
@@ -344,7 +344,9 @@ export function AuthEntryPage({ authGroup = 'users' }) {
         return
       }
 
-      let returnPath = location.state?.from || getRoleHomePath(signedInUser.role)
+      const rawFrom = location.state?.from
+      const safeFrom = (authGroup === 'users' && rawFrom?.startsWith('/serviceprovider')) ? null : rawFrom
+      let returnPath = safeFrom || getRoleHomePath(signedInUser.role)
       if (mode === 'register' && (signedInUser.role === USER_ROLES.CUSTOMER || signedInUser.role === USER_ROLES.CONTRACTOR)) {
         returnPath = '/user/profile'
       }
@@ -355,8 +357,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
           const loginRes = await verifyLogin({ phone: p, code, challengeId, authGroup })
           const { token, user } = loginRes.data
           applySession(token, user)
-          const isLabour = authGroup === 'labours' || user.role === USER_ROLES.LABOUR
-          if (isLabour) {
+          if (authGroup === 'labours') {
             const kitReceived = Boolean(
               user.welcomeKit?.isReceived ||
               user.welcomeKit?.status === 'DELIVERED' ||
@@ -366,7 +367,9 @@ export function AuthEntryPage({ authGroup = 'users' }) {
             navigate(returnPath, { replace: true })
             return
           }
-          const returnPath = getRoleHomePath(user.role)
+          const rawFrom = location.state?.from
+          const safeFrom = (authGroup === 'users' && rawFrom?.startsWith('/serviceprovider')) ? null : rawFrom
+          const returnPath = safeFrom || getRoleHomePath(user.role)
           navigate(returnPath, { replace: true })
           return
         } catch {

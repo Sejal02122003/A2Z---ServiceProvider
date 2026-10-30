@@ -24,8 +24,8 @@ export function AppHomePage() {
     return <AppRouteLoader />
   }
 
-  // If visiting /serviceprovider or logged in as labour on serviceprovider route
-  if (user?.role === USER_ROLES.LABOUR || location.pathname.startsWith('/serviceprovider')) {
+  // If visiting /serviceprovider
+  if (location.pathname.startsWith('/serviceprovider')) {
     const kitReceived = Boolean(
       user?.welcomeKit?.isReceived ||
       user?.welcomeKit?.status === 'DELIVERED' ||

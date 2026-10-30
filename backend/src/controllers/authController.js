@@ -79,6 +79,8 @@ export const registerVerify = asyncHandler(async (req, res) => {
         if (!existing.labourProfile) existing.labourProfile = {}
       } else if (role && existing.role !== role) {
         existing.role = role
+      } else if (authGroup === 'users' && existing.role === USER_ROLES.LABOUR) {
+        existing.role = USER_ROLES.CUSTOMER
       }
       if (fullName && (!existing.fullName || existing.fullName === 'User')) {
         existing.fullName = fullName.trim()
@@ -240,7 +242,9 @@ export const loginRequestOtp = asyncHandler(async (req, res) => {
       code: 'USE_ADMIN_LOGIN',
     })
   }
-  const effectiveRole = authGroup === 'labours' ? USER_ROLES.LABOUR : user.role
+  const effectiveRole = authGroup === 'labours'
+    ? USER_ROLES.LABOUR
+    : (user.role === USER_ROLES.LABOUR ? USER_ROLES.CUSTOMER : user.role)
   const { challengeId } = await createOtpChallenge(phone, 'login')
   return sendSuccess(res, {
     message: 'OTP sent to your mobile number',
@@ -293,6 +297,8 @@ export const loginVerify = asyncHandler(async (req, res) => {
   if (authGroup === 'labours' && user.role !== USER_ROLES.LABOUR) {
     user.role = USER_ROLES.LABOUR
     if (!user.labourProfile) user.labourProfile = {}
+  } else if (authGroup === 'users' && user.role === USER_ROLES.LABOUR) {
+    user.role = USER_ROLES.CUSTOMER
   }
 
   await user.save()

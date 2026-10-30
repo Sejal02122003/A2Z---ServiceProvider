@@ -97,7 +97,7 @@ function App() {
           <Route
             path="/user"
             element={
-              <ProtectedRoute roles={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR]} allowGuest>
+              <ProtectedRoute roles={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR, USER_ROLES.LABOUR]} allowGuest>
                 <ErrorBoundary>
                   <AppShell />
                 </ErrorBoundary>
