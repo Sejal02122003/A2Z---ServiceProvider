@@ -149,6 +149,22 @@ export function IndividualBookingFlowPage() {
   const [restrictionError, setRestrictionError] = useState(null)
   const [acceptedPartnerEvent, setAcceptedPartnerEvent] = useState(null)
 
+  const lastHandledEventTimestampRef = useRef(0)
+  const lastHandledPartnerIdRef = useRef(null)
+  const lastFetchedStatusBookingIdRef = useRef(null)
+  const draftRef = useRef(draft)
+  useEffect(() => {
+    draftRef.current = draft
+  }, [draft])
+  const activeBookingIdRef = useRef(activeBookingId)
+  useEffect(() => {
+    activeBookingIdRef.current = activeBookingId
+  }, [activeBookingId])
+  const locationRef = useRef(location)
+  useEffect(() => {
+    locationRef.current = location
+  }, [location])
+
   const playAcceptedChime = useCallback(() => {
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext
@@ -216,6 +232,14 @@ export function IndividualBookingFlowPage() {
 
   const syncDraft = useCallback((patch) => {
     setDraft((prev) => {
+      let changed = false
+      for (const k of Object.keys(patch)) {
+        if (prev[k] !== patch[k]) {
+          changed = true
+          break
+        }
+      }
+      if (!changed) return prev
       const next = { ...prev, ...patch }
       writeBookingDraft(next)
       return next
@@ -224,19 +248,35 @@ export function IndividualBookingFlowPage() {
 
   const flowQuery = useCallback(
     () => ({
-      categoryId: draft.categoryId || categoryIdParam,
-      groupId: draft.groupId || groupIdParam,
-      packageId: draft.packageId || packageIdParam,
-      ref: activeBookingId || draft.lastRef || bookingIdParam,
+      categoryId: draftRef.current?.categoryId || categoryIdParam,
+      groupId: draftRef.current?.groupId || groupIdParam,
+      packageId: draftRef.current?.packageId || packageIdParam,
+      ref: activeBookingIdRef.current || draftRef.current?.lastRef || bookingIdParam,
     }),
-    [categoryIdParam, draft.categoryId, draft.groupId, draft.packageId, draft.lastRef, groupIdParam, packageIdParam, activeBookingId, bookingIdParam],
+    [categoryIdParam, groupIdParam, packageIdParam, bookingIdParam],
   )
 
   const goStep = useCallback(
     (nextStep) => {
-      navigate(buildBookingFlowPath(nextStep, flowQuery()), { replace: true })
+      const currentSearchParams = new URLSearchParams(locationRef.current.search)
+      const currentStep = currentSearchParams.get('step') || 'type'
+      const currentRef = currentSearchParams.get('ref') || currentSearchParams.get('bookingId')
+      const targetRef = activeBookingIdRef.current || draftRef.current?.lastRef || currentRef || ''
+
+      const query = {
+        categoryId: draftRef.current?.categoryId || currentSearchParams.get('categoryId') || '',
+        groupId: draftRef.current?.groupId || currentSearchParams.get('groupId') || '',
+        packageId: draftRef.current?.packageId || currentSearchParams.get('packageId') || '',
+        ref: targetRef,
+      }
+      const targetPath = buildBookingFlowPath(nextStep, query)
+      const currentPathWithSearch = `${locationRef.current.pathname}${locationRef.current.search}`
+      if (currentStep === nextStep && currentPathWithSearch === targetPath) {
+        return
+      }
+      navigate(targetPath, { replace: true })
     },
-    [flowQuery, navigate],
+    [navigate],
   )
 
   const leaveFlow = useCallback(() => {
@@ -246,9 +286,12 @@ export function IndividualBookingFlowPage() {
   useEffect(() => {
     const stored = readBookingDraft()
     if (stored) {
-      queueMicrotask(() => setDraft(stored))
+      setDraft((prev) => {
+        if (JSON.stringify(prev) === JSON.stringify(stored)) return prev
+        return stored
+      })
     }
-  }, [location.search, packageIdParam, categoryIdParam])
+  }, [packageIdParam, categoryIdParam])
 
   // Pre-fill location from stored app user location if draft.address is empty
   useEffect(() => {
@@ -381,13 +424,8 @@ export function IndividualBookingFlowPage() {
           })
           .catch((err) => console.error('Failed to load user bookings:', err))
           .finally(() => setBookingLoading(false))
-      } else if (
-        !activeBooking ||
-        (['ACCEPTED', 'PARTIALLY_ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED'].includes((activeBooking.status || '').toUpperCase()) &&
-          !activeBooking.laborId &&
-          !activeBooking.acceptedLabourId &&
-          (!activeBooking.assignments || activeBooking.assignments.length === 0))
-      ) {
+      } else if (lastFetchedStatusBookingIdRef.current !== activeBookingId) {
+        lastFetchedStatusBookingIdRef.current = activeBookingId
         setBookingLoading(true)
         bookingsApi
           .getBookingStatus(activeBookingId)
@@ -400,7 +438,8 @@ export function IndividualBookingFlowPage() {
           .catch((err) => console.error(err))
           .finally(() => setBookingLoading(false))
       }
-    } else if (activeBookingId && !activeBooking) {
+    } else if (activeBookingId && lastFetchedStatusBookingIdRef.current !== activeBookingId) {
+      lastFetchedStatusBookingIdRef.current = activeBookingId
       bookingsApi
         .getBookingStatus(activeBookingId)
         .then((res) => {
@@ -411,20 +450,28 @@ export function IndividualBookingFlowPage() {
         })
         .catch((err) => console.error(err))
     }
-  }, [step, activeBookingId, activeBooking, realUser, categoryIdParam])
+  }, [step, activeBookingId, realUser, categoryIdParam])
 
   useEffect(() => {
-    if (acceptedPartner && !acceptedPartnerEvent) {
-      setAcceptedPartnerEvent(acceptedPartner)
-      playAcceptedChime()
-      if (step === 'searching') {
-        goStep('active')
-      }
+    if (!acceptedPartner) return
+    const partnerKey = acceptedPartner.laborId || acceptedPartner.partner?.id || acceptedPartner.partner?._id || acceptedPartner.partnerName || 'partner'
+    if (lastHandledPartnerIdRef.current === partnerKey && acceptedPartnerEvent) return
+    lastHandledPartnerIdRef.current = partnerKey
+
+    setAcceptedPartnerEvent(acceptedPartner)
+    playAcceptedChime()
+    if (step === 'searching') {
+      goStep('active')
     }
   }, [acceptedPartner, acceptedPartnerEvent, playAcceptedChime, step, goStep])
 
   useEffect(() => {
     if (!bookingEvent) return
+    if (bookingEvent.timestamp && bookingEvent.timestamp === lastHandledEventTimestampRef.current) {
+      return
+    }
+    lastHandledEventTimestampRef.current = bookingEvent.timestamp || Date.now()
+
     const isAcceptedType =
       bookingEvent.type === 'BOOKING_ACCEPTED' ||
       (bookingEvent.type === 'BOOKING_STATUS_UPDATE' &&
@@ -432,7 +479,7 @@ export function IndividualBookingFlowPage() {
 
     if (isAcceptedType) {
       const bId = activeBookingId || bookingEvent.data?.bookingId
-      if (bId) setActiveBookingId(bId)
+      if (bId && bId !== activeBookingId) setActiveBookingId(bId)
       if (bookingEvent.data?.partner || bookingEvent.data?.partnerName) {
         setAcceptedPartnerEvent(bookingEvent.data)
       }
@@ -475,7 +522,9 @@ export function IndividualBookingFlowPage() {
         }
       })
 
-      goStep('active')
+      if (step === 'searching') {
+        goStep('active')
+      }
       if (bId) {
         bookingsApi.getBookingStatus(bId).then(res => {
           if (res.data?.booking) setActiveBooking(res.data.booking)
@@ -506,20 +555,21 @@ export function IndividualBookingFlowPage() {
   }, [bookingEvent, activeBookingId, goStep, playAcceptedChime, handleOpenReview, clearBookingDraft, step])
 
   // Polling fallback to ensure instant transition when provider accepts
+  const hasWorkerAssigned = Boolean(
+    (typeof activeBooking?.laborId === 'object' && activeBooking.laborId?.fullName) ||
+    (typeof activeBooking?.acceptedLabourId === 'object' && activeBooking.acceptedLabourId?.fullName) ||
+    (activeBooking?.assignments && activeBooking.assignments.some(a => a.labourId && (a.labourId.fullName || a.labourId._id)))
+  )
+
   useEffect(() => {
     if (!realUser || !activeBookingId) return
 
     const bookingStatus = (activeBooking?.status || '').toUpperCase()
-    const hasWorker = Boolean(
-      (typeof activeBooking?.laborId === 'object' && activeBooking.laborId?.fullName) ||
-      (typeof activeBooking?.acceptedLabourId === 'object' && activeBooking.acceptedLabourId?.fullName) ||
-      (activeBooking?.assignments && activeBooking.assignments.some(a => a.labourId && (a.labourId.fullName || a.labourId._id)))
-    )
     const needsPolling =
       step === 'searching' ||
       !activeBooking ||
       ['CREATED', 'BROADCASTING', 'PARTIALLY_ACCEPTED'].includes(bookingStatus) ||
-      (['ACCEPTED', 'ASSIGNED'].includes(bookingStatus) && !hasWorker)
+      (['ACCEPTED', 'ASSIGNED'].includes(bookingStatus) && !hasWorkerAssigned)
 
     if (!needsPolling) return
 
@@ -556,7 +606,7 @@ export function IndividualBookingFlowPage() {
     }, 3000)
 
     return () => clearInterval(interval)
-  }, [realUser, activeBookingId, activeBooking?.status, step, goStep, playAcceptedChime, activeBooking?.laborId, activeBooking?.acceptedLabourId, activeBooking?.assignments])
+  }, [realUser, activeBookingId, activeBooking?.status, hasWorkerAssigned, step, goStep, playAcceptedChime])
 
   useEffect(() => {
     const cid = categoryIdParam
