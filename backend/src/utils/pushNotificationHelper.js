@@ -32,13 +32,51 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
       };
     }
 
-    // Prepare message
+    // Sanitize data payload (FCM multicast data requires all values to be strings)
+    const stringifiedData = {};
+    if (payload.data && typeof payload.data === 'object') {
+      for (const [key, value] of Object.entries(payload.data)) {
+        if (value !== undefined && value !== null) {
+          stringifiedData[key] = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        }
+      }
+    }
+
+    const linkUrl = payload.link || payload.data?.link || '/';
+
+    // Prepare message with webpush & android configs for system-level notifications
     const message = {
       notification: {
-        title: payload.title,
-        body: payload.body,
+        title: payload.title || 'A2Z Service Hub',
+        body: payload.body || '',
       },
-      data: payload.data || {},
+      data: stringifiedData,
+      webpush: {
+        headers: {
+          Urgency: 'high',
+        },
+        notification: {
+          title: payload.title || 'A2Z Service Hub',
+          body: payload.body || '',
+          icon: payload.icon || '/favicon.ico',
+          badge: '/favicon.ico',
+          tag: payload.tag || stringifiedData.type || 'a2z-notification',
+          renotify: true,
+          requireInteraction: false,
+        },
+        fcmOptions: {
+          link: linkUrl,
+        },
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          title: payload.title || 'A2Z Service Hub',
+          body: payload.body || '',
+          sound: 'default',
+          channelId: 'high_importance_channel',
+        },
+      },
       tokens: uniqueTokens,
     };
 

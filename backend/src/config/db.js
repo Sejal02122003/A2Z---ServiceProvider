@@ -1,4 +1,10 @@
 import mongoose from 'mongoose'
+import dns from 'node:dns'
+
+// Force Node.js on Windows to prioritize IPv4 over IPv6 for MongoDB Atlas DNS SRV resolution
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first')
+}
 
 export async function connectDb(maxRetries = 5, retryDelayMs = 3000) {
   const uri = process.env.MONGODB_URI
@@ -12,9 +18,11 @@ export async function connectDb(maxRetries = 5, retryDelayMs = 3000) {
     serverSelectionTimeoutMS: 15000, // 15 seconds to select a replica set server
     connectTimeoutMS: 20000,         // 20 seconds connection timeout
     socketTimeoutMS: 45000,          // 45 seconds socket inactivity timeout
+    maxIdleTimeMS: 60000,            // Close idle sockets after 60s
     maxPoolSize: 25,
     minPoolSize: 5,
     retryWrites: true,
+    family: 4,                       // Force IPv4 to prevent Windows getaddrinfo ENOTFOUND
   }
 
   // Setup connection lifecycle handlers once

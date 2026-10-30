@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSocket } from '../context/SocketContext.jsx'
+import { showDesktopNotification } from '../services/pushNotificationService.js'
 
 export function useLabourSocket() {
   const socket = useSocket()
@@ -22,6 +23,14 @@ export function useLabourSocket() {
       setLiveOffers((prev) => {
         if (prev.find((o) => o.bookingId === data.bookingId)) return prev
         return [...prev, { ...data, receivedAt: Date.now() }]
+      })
+      const priceText = data?.amount || data?.price ? ` (₹${data.amount || data.price})` : ''
+      const svc = data?.serviceName || 'New Service Request'
+      showDesktopNotification({
+        title: `⚡ New Job Alert${priceText}`,
+        body: `${svc}. Tap to review and accept before timeout!`,
+        link: '/serviceprovider',
+        tag: `offer-${data?.bookingId || Date.now()}`
       })
     }
 

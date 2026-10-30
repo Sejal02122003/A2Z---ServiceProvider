@@ -57,14 +57,27 @@ export const testNotification = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   
   // This will send to all tokens registered for this user
-  await sendNotificationToUser(userId, {
-    title: 'Test Notification',
-    body: 'This is a test notification from A2Z backend.',
+  const result = await sendNotificationToUser(userId, {
+    title: 'A2Z Service Hub',
+    body: '🔔 Push notification test! Your device is successfully linked to receive alerts outside the app.',
     data: {
       type: 'test',
       link: '/'
     }
   });
 
-  return sendSuccess(res, { message: 'Test notification sent to user devices' });
+  if (!result || !result.success) {
+    return sendError(res, {
+      message: result?.noTokens
+        ? 'No active device tokens found. Please grant notification permission in your browser.'
+        : (result?.error || 'Failed to dispatch push notification through FCM'),
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      data: result,
+    });
+  }
+
+  return sendSuccess(res, {
+    message: `Test push notification successfully sent (${result.successCount} delivered)`,
+    data: result
+  });
 });

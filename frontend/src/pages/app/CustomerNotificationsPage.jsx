@@ -22,6 +22,8 @@ import {
 import { notificationApi } from '../../api/notificationApi.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { useSocket } from '../../context/SocketContext.jsx'
+import { useAuth } from '../../hooks/useAuth.js'
+import { TestPushNotificationCard } from '../../components/app/TestPushNotificationCard.jsx'
 
 function formatNotificationTime(dateStr) {
   if (!dateStr) return ''
@@ -45,6 +47,7 @@ export function CustomerNotificationsPage() {
   const navigate = useNavigate()
   const reduce = useReducedMotion()
   const socket = useSocket()
+  const { user } = useAuth()
 
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -216,6 +219,9 @@ export function CustomerNotificationsPage() {
           )}
         </div>
       </div>
+
+      {/* Device Push Notifications (Out of App) */}
+      <TestPushNotificationCard user={user} />
 
       {/* Tabs */}
       <GlassPanel className="p-1.5">

@@ -24,6 +24,8 @@ import { notificationApi } from '../api/notificationApi.js'
 import { useSocket } from '../context/SocketContext.jsx'
 import { FloatingCartBar } from '../components/app/booking/FloatingCartBar.jsx'
 import { useBookingCart } from '../context/BookingCartContext.jsx'
+import { showDesktopNotification, registerFCMToken } from '../services/pushNotificationService.js'
+import { PushNotificationPrompt } from '../components/app/PushNotificationPrompt.jsx'
 
 export function AppShell() {
   const { pathname, search } = useLocation()
@@ -53,7 +55,15 @@ export function AppShell() {
 
   useEffect(() => {
     if (!socket) return
-    const onNew = () => setUnreadNotifications((c) => c + 1)
+    const onNew = (payload) => {
+      setUnreadNotifications((c) => c + 1)
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const title = payload?.title || 'A2Z Service Hub'
+        const body = payload?.body || (payload?.partnerName ? `${payload.partnerName} accepted your booking!` : 'You have a new update')
+        const link = payload?.metadata?.link || (payload?.bookingId ? `/user/tracking/${payload.bookingId}` : '/')
+        showDesktopNotification({ title, body, link, tag: payload?._id || 'a2z-socket-alert' })
+      }
+    }
     socket.on('NEW_IN_APP_NOTIFICATION', onNew)
     socket.on('BOOKING_ACCEPTED', onNew)
     return () => {
@@ -61,6 +71,13 @@ export function AppShell() {
       socket.off('BOOKING_ACCEPTED', onNew)
     }
   }, [socket])
+
+  useEffect(() => {
+    if (!user || isGuest) return
+    if ('Notification' in window && Notification.permission === 'granted') {
+      registerFCMToken(false).catch(() => {})
+    }
+  }, [user, isGuest])
 
   const { headerTagline, bottomNav, drawerNav } = useMemo(() => getAppNavigation(user?.role), [user?.role])
 
@@ -503,6 +520,9 @@ export function AppShell() {
           onSelectAddress={() => setAppLocation(readAppUserLocation())}
         />
       ) : null}
+
+      {/* Floating prompt asking user to enable push notifications if default */}
+      <PushNotificationPrompt />
     </div>
   )
 }

@@ -5,30 +5,39 @@ import { store } from '../store/index.js';
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
-// Request notification permission
+// Check current notification permission status
+export function getNotificationPermissionStatus() {
+  if (!('Notification' in window)) return 'unsupported';
+  return Notification.permission; // 'granted' | 'denied' | 'default'
+}
+
+// Request notification permission from browser
 export async function requestNotificationPermission() {
   if ('Notification' in window) {
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      console.log('Notification permission granted');
-      return true;
-    } else {
-      console.log('Notification permission denied');
+    try {
+      const permission = await Notification.requestPermission();
+      console.log('[PUSH] Permission requested, result:', permission);
+      return permission === 'granted';
+    } catch (err) {
+      console.warn('[PUSH] Error requesting notification permission:', err);
       return false;
     }
   }
   return false;
 }
 
-// Register service worker explicitly
-async function registerServiceWorker() {
+// Register service worker explicitly with ready assurance
+export async function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     try {
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-      console.log('Service Worker registered:', registration);
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+        scope: '/'
+      });
+      // Wait until active/ready
+      await navigator.serviceWorker.ready;
       return registration;
     } catch (error) {
-      console.error('Service Worker registration failed:', error);
+      console.error('[PUSH] Service Worker registration failed:', error);
       throw error;
     }
   } else {
@@ -39,7 +48,7 @@ async function registerServiceWorker() {
 // Get FCM token
 export async function getFCMToken() {
   if (!messaging) {
-    console.error('Firebase messaging is not initialized');
+    console.error('[PUSH] Firebase messaging is not initialized');
     return null;
   }
   try {
@@ -48,7 +57,7 @@ export async function getFCMToken() {
     try {
       await registration.update();
     } catch (e) {
-      console.warn('SW update failed', e);
+      // SW update failure is non-fatal
     }
 
     const token = await getToken(messaging, {
@@ -57,14 +66,14 @@ export async function getFCMToken() {
     });
 
     if (token) {
-      console.log('FCM Token obtained:', token);
+      console.log('[PUSH] FCM Token successfully generated');
       return token;
     } else {
-      console.log('No FCM token available');
+      console.warn('[PUSH] No FCM token available from getToken');
       return null;
     }
   } catch (error) {
-    console.error('Error getting FCM token:', error);
+    console.error('[PUSH] Error getting FCM token:', error);
     throw error;
   }
 }
@@ -74,25 +83,37 @@ export async function registerFCMToken(forceUpdate = false) {
   try {
     const state = store.getState();
     if (!state?.auth?.token) {
-      console.log('User not authenticated, skipping FCM registration');
+      console.log('[PUSH] User not authenticated, skipping FCM registration');
       return null;
+    }
+
+    if (!('Notification' in window)) {
+      console.warn('[PUSH] Notifications not supported in this browser');
+      return null;
+    }
+
+    if (Notification.permission !== 'granted') {
+      if (forceUpdate) {
+        const granted = await requestNotificationPermission();
+        if (!granted) {
+          console.warn('[PUSH] Browser notification permission was not granted.');
+          return null;
+        }
+      } else {
+        // If not forceUpdate and permission not yet granted, do not prompt spontaneously
+        return null;
+      }
     }
 
     const savedToken = localStorage.getItem('fcm_token_web');
-    if (savedToken && !forceUpdate) {
-      console.log('FCM token already registered locally');
+    // If we have saved token and not forcing, check if already synced this session
+    if (savedToken && !forceUpdate && sessionStorage.getItem('fcm_synced_session')) {
       return savedToken;
-    }
-
-    const hasPermission = await requestNotificationPermission();
-    if (!hasPermission) {
-      console.warn('Browser notification permission was not granted or was dismissed. Push notifications are disabled.');
-      return null;
     }
 
     const token = await getFCMToken();
     if (!token) {
-      console.warn('Could not retrieve FCM token from Firebase.');
+      console.warn('[PUSH] Could not retrieve FCM token from Firebase.');
       return null;
     }
 
@@ -103,48 +124,76 @@ export async function registerFCMToken(forceUpdate = false) {
 
     if (response?.success) {
       localStorage.setItem('fcm_token_web', token);
-      console.log('FCM token registered with backend');
+      sessionStorage.setItem('fcm_synced_session', 'true');
+      console.log('[PUSH] FCM token registered with backend successfully');
       return token;
     } else {
-      console.warn('Failed to register FCM token with backend:', response?.message);
+      console.warn('[PUSH] Failed to register FCM token with backend:', response?.message);
       return null;
     }
   } catch (error) {
-    console.warn('FCM token registration skipped or failed:', error?.message || error);
+    console.warn('[PUSH] FCM token registration skipped or failed:', error?.message || error);
     return null;
   }
 }
 
 // Send test push notification to the logged-in user
 export async function sendTestNotification() {
-  // Ensure token is registered with backend
   const token = await registerFCMToken(true);
   if (!token) {
-    throw new Error('Please enable browser notification permissions in your browser address bar to test push notifications.');
+    throw new Error('Please enable browser notification permissions in your browser address bar to receive push notifications.');
   }
 
-  // Trigger backend test notification
   const response = await apiRequest('/fcm-tokens/test', {
     method: 'POST',
   });
   return response;
 }
 
+// Display native OS desktop notification directly
+export function showDesktopNotification({ title, body, icon = '/favicon.ico', link = '/', tag = 'a2z-alert' }) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') {
+    return null;
+  }
+  try {
+    const notif = new Notification(title || 'A2Z Service Hub', {
+      body: body || '',
+      icon: icon || '/favicon.ico',
+      badge: '/favicon.ico',
+      tag,
+      renotify: true,
+    });
+    notif.onclick = (e) => {
+      e.preventDefault();
+      window.focus();
+      if (link && window.location.pathname !== link) {
+        window.location.href = link;
+      }
+    };
+    return notif;
+  } catch (err) {
+    console.warn('[PUSH] Native desktop notification display warning:', err);
+    return null;
+  }
+}
+
 // Setup foreground notification handler
 export function setupForegroundNotificationHandler(handler) {
-  if (!messaging) return;
-  onMessage(messaging, (payload) => {
-    console.log('Foreground message received:', payload);
+  if (!messaging) return () => {};
+  return onMessage(messaging, (payload) => {
+    console.log('[PUSH] Foreground message received:', payload);
     
+    // Show system notification banner even in foreground if user is in another tab or minimized
     if ('Notification' in window && Notification.permission === 'granted') {
       try {
-        new Notification(payload?.notification?.title || 'A2Z Notification', {
-          body: payload?.notification?.body || '',
-          icon: payload?.notification?.icon || '/favicon.ico',
-          data: payload?.data
-        });
+        const title = payload?.notification?.title || payload?.data?.title || 'A2Z Notification';
+        const body = payload?.notification?.body || payload?.data?.body || '';
+        const icon = payload?.notification?.icon || payload?.notification?.imageUrl || '/favicon.ico';
+        const link = payload?.data?.link || '/';
+
+        showDesktopNotification({ title, body, icon, link, tag: payload?.data?.type || 'a2z-push' });
       } catch (e) {
-        console.warn('Could not show system notification in foreground:', e);
+        console.warn('[PUSH] Could not show system notification in foreground:', e);
       }
     }
 
@@ -158,7 +207,11 @@ export function setupForegroundNotificationHandler(handler) {
 export async function initializePushNotifications() {
   try {
     await registerServiceWorker();
+    // If permission was already granted previously, auto-sync token with backend
+    if ('Notification' in window && Notification.permission === 'granted') {
+      registerFCMToken(false).catch((e) => console.warn('[PUSH] Auto-sync skipped:', e));
+    }
   } catch (error) {
-    console.error('Error initializing push notifications:', error);
+    console.warn('[PUSH] Error initializing push notifications:', error);
   }
 }

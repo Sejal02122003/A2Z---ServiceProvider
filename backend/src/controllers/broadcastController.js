@@ -521,10 +521,19 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
     query.userId = { $ne: labour._id }
   }
 
-  const activeBookings = await Booking.find(query)
-    .sort({ createdAt: -1 })
-    .limit(1)
-    .populate('userId', 'fullName phone')
+  let activeBookings = []
+  try {
+    activeBookings = await Booking.find(query)
+      .sort({ createdAt: -1 })
+      .limit(1)
+      .populate('userId', 'fullName phone')
+  } catch (err) {
+    console.warn('[BROADCAST] Active broadcast fetch transient DB error:', err.message)
+    return sendSuccess(res, {
+      data: { broadcast: null },
+      statusCode: HTTP_STATUS.OK,
+    })
+  }
 
   if (!activeBookings || activeBookings.length === 0) {
     return sendSuccess(res, {
