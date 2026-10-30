@@ -82,3 +82,20 @@ export function uploadBufferToCloudinary({
     Readable.from(buffer).pipe(stream)
   })
 }
+
+/**
+ * Delete asset from Cloudinary by its public ID.
+ * Safe no-op if publicId is missing or Cloudinary returns not found.
+ */
+export async function deleteCloudinaryAsset(publicId, resourceType = 'image') {
+  if (!publicId) return { result: 'ignored' }
+  const cloudinary = getCloudinary()
+  try {
+    const res = await cloudinary.uploader.destroy(publicId, { resource_type: resourceType })
+    return res
+  } catch (err) {
+    console.warn(`[Cloudinary Warning] Could not destroy asset ${publicId}:`, err?.message)
+    return { result: 'error', error: err?.message }
+  }
+}
+

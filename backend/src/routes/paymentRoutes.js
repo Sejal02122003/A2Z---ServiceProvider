@@ -2,11 +2,16 @@ import { Router } from 'express'
 import { body } from 'express-validator'
 import { protect } from '../middleware/auth.js'
 import { validateRequest } from '../middleware/validateRequest.js'
+import { getActiveQrConfig } from '../controllers/adminPaymentConfigController.js'
 import * as payment from '../controllers/paymentController.js'
 
 const router = Router()
 
 router.use(protect)
+
+// GET /api/v1/payments/qr-config - Fetch latest active QR configuration
+router.get('/qr-config', getActiveQrConfig)
+
 
 router.post(
   '/init',

@@ -20,14 +20,19 @@ import {
   Lock,
   Receipt,
   Sparkles,
+  QrCode,
+  Upload,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth.js'
 import { walletsApi } from '../../api/walletsApi.js'
 import { paymentsApi } from '../../api/paymentsApi.js'
+import { adminQrPaymentsApi } from '../../api/adminQrPaymentsApi.js'
 import { ApiError } from '../../api/http.js'
 import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
+import { ProviderQRPaymentModal } from '../../components/app/ProviderQRPaymentModal.jsx'
+import { useSocket } from '../../context/SocketContext.jsx'
 
 function formatInr(amount) {
   return `₹${Number(amount || 0).toLocaleString('en-IN')}`
@@ -60,18 +65,31 @@ const QUICK_AMOUNTS = [200, 500, 1000, 2000]
 
 export function LaborWallet() {
   const { user } = useAuth()
+  const socket = useSocket()
   const reduce = useReducedMotion()
   const [wallet, setWallet] = useState(null)
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  // Top Up Modal State
+  // Top Up Modal State (Online Gateway)
   const [showTopUpModal, setShowTopUpModal] = useState(false)
   const [topUpAmount, setTopUpAmount] = useState('500')
   const [recharging, setRecharging] = useState(false)
   const [topUpError, setTopUpError] = useState('')
   const [topUpSuccess, setTopUpSuccess] = useState('')
+
+  // UPI QR Payment Modal State
+  const [showQrModal, setShowQrModal] = useState(false)
+  const [qrModalPurpose, setQrModalPurpose] = useState('WALLET_TOPUP')
+  const [qrModalAmount, setQrModalAmount] = useState(500)
+  const [qrModalAllowCustom, setQrModalAllowCustom] = useState(true)
+  const [qrResubmitPayment, setQrResubmitPayment] = useState(null)
+
+  // QR Payment Submissions History
+  const [qrPayments, setQrPayments] = useState([])
+  const [loadingQrPayments, setLoadingQrPayments] = useState(false)
+  const [activeTab, setActiveTab] = useState('ledger') // 'ledger' | 'qr_submissions'
 
   // Clear Dues State
   const [clearing, setClearing] = useState(false)
@@ -94,16 +112,66 @@ export function LaborWallet() {
     }
   }, [])
 
+  const fetchQrPayments = useCallback(async () => {
+    try {
+      setLoadingQrPayments(true)
+      const res = await adminQrPaymentsApi.fetchMyProviderPayments()
+      setQrPayments(res.data?.payments || [])
+    } catch {
+      // safe fallback
+    } finally {
+      setLoadingQrPayments(false)
+    }
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
 
-    fetchWalletData().finally(() => {
+    Promise.all([
+      fetchWalletData(),
+      fetchQrPayments(),
+    ]).finally(() => {
       if (!cancelled) setLoading(false)
     })
 
     return () => { cancelled = true }
-  }, [fetchWalletData])
+  }, [fetchWalletData, fetchQrPayments])
+
+  // Real-time synchronization via Socket.IO
+  useEffect(() => {
+    if (!socket) return
+
+    const handlePaymentUpdate = (payload) => {
+      console.log('[Socket] Provider PAYMENT_STATUS_UPDATE / PAYMENT_VERIFIED received:', payload)
+      fetchWalletData()
+      fetchQrPayments()
+    }
+
+    socket.on('PAYMENT_STATUS_UPDATE', handlePaymentUpdate)
+    socket.on('PAYMENT_VERIFIED', handlePaymentUpdate)
+
+    return () => {
+      socket.off('PAYMENT_STATUS_UPDATE', handlePaymentUpdate)
+      socket.off('PAYMENT_VERIFIED', handlePaymentUpdate)
+    }
+  }, [socket, fetchWalletData, fetchQrPayments])
+
+  // Refresh on window focus / app returned to foreground
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState === 'visible') {
+        fetchWalletData()
+        fetchQrPayments()
+      }
+    }
+    window.addEventListener('focus', handleVisibility)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      window.removeEventListener('focus', handleVisibility)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [fetchWalletData, fetchQrPayments])
 
   const handleTopUp = async () => {
     const num = Number(topUpAmount)
@@ -315,13 +383,28 @@ export function LaborWallet() {
         </div>
 
         {/* Action button inside Hero */}
-        <div className="mt-5 flex gap-3">
+        <div className="mt-5 flex flex-col sm:flex-row gap-2.5">
           <button
-            onClick={() => setShowTopUpModal(true)}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#01C7D0] py-3 text-sm font-bold text-[#263238] shadow-md shadow-[#01C7D0]/30 transition hover:bg-[#00b2bb] active:scale-[0.98]"
+            type="button"
+            onClick={() => {
+              setQrModalPurpose('WALLET_TOPUP')
+              setQrModalAmount(500)
+              setQrModalAllowCustom(true)
+              setQrResubmitPayment(null)
+              setShowQrModal(true)
+            }}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#01C7D0] py-3 text-xs sm:text-sm font-extrabold text-[#263238] shadow-md shadow-[#01C7D0]/30 transition hover:bg-[#00b2bb] active:scale-[0.98]"
           >
-            <PlusCircle className="h-4 w-4" />
-            Recharge Wallet
+            <QrCode className="h-4 w-4" />
+            Scan UPI QR to Recharge (0% Fee)
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowTopUpModal(true)}
+            className="flex items-center justify-center gap-1.5 rounded-xl bg-white/15 px-4 py-3 text-xs font-bold text-white hover:bg-white/25 active:scale-[0.98] transition"
+          >
+            <CreditCard className="h-4 w-4" />
+            Cards / Netbanking
           </button>
         </div>
       </motion.div>
@@ -340,10 +423,15 @@ export function LaborWallet() {
               Your available balance is below the recommended minimum ({formatInr(minRequired)}). You cannot accept bookings with amounts exceeding your balance.
             </p>
             <button
-              onClick={() => setShowTopUpModal(true)}
-              className="mt-2 text-xs font-bold text-amber-900 underline underline-offset-2 hover:text-amber-950"
+              onClick={() => {
+                setQrModalPurpose('WALLET_TOPUP')
+                setQrModalAmount(Math.max(500, minRequired - availableBalance))
+                setQrModalAllowCustom(true)
+                setShowQrModal(true)
+              }}
+              className="mt-2 text-xs font-bold text-amber-900 underline underline-offset-2 hover:text-amber-950 flex items-center gap-1"
             >
-              Recharge now to receive more jobs &rarr;
+              <QrCode className="h-3.5 w-3.5" /> Recharge now via UPI QR &rarr;
             </button>
           </div>
         </motion.div>
@@ -375,7 +463,7 @@ export function LaborWallet() {
       {/* Outstanding Dues (if any) */}
       {adminBalance > 0 && (
         <GlassPanel className="p-4 border-rose-200 bg-rose-50/40">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 text-rose-700 font-bold text-xs">
                 <AlertTriangle className="h-4 w-4" />
@@ -384,13 +472,28 @@ export function LaborWallet() {
               <p className="mt-1 text-2xl font-black text-rose-800">{formatInr(adminBalance)}</p>
               <p className="text-[11px] text-rose-600">Pending recovery from previous cash jobs</p>
             </div>
-            <button
-              disabled={clearing}
-              onClick={handleClearDues}
-              className="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-rose-600/20 hover:bg-rose-700 active:scale-[0.98] disabled:opacity-50"
-            >
-              {clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Pay Dues'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setQrModalPurpose('WALLET_CLEARANCE')
+                  setQrModalAmount(adminBalance)
+                  setQrModalAllowCustom(false)
+                  setQrResubmitPayment(null)
+                  setShowQrModal(true)
+                }}
+                className="rounded-xl bg-[#015F6C] px-3.5 py-2.5 text-xs font-black text-white shadow-md hover:bg-[#014d57] active:scale-[0.98] transition flex items-center gap-1.5"
+              >
+                <QrCode className="h-4 w-4" /> Pay via UPI QR
+              </button>
+              <button
+                disabled={clearing}
+                onClick={handleClearDues}
+                className="rounded-xl bg-white border border-rose-300 px-3 py-2.5 text-xs font-bold text-rose-800 hover:bg-rose-50 active:scale-[0.98] disabled:opacity-50"
+              >
+                {clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Gateway'}
+              </button>
+            </div>
           </div>
         </GlassPanel>
       )}
@@ -431,19 +534,39 @@ export function LaborWallet() {
         <span className="text-xs font-bold text-slate-400">&rarr;</span>
       </Link>
 
-      {/* Transaction History Ledger */}
+      {/* Transaction History & QR Submissions Section */}
       <section className="space-y-3 pt-2">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <History className="h-4 w-4 text-slate-500" />
-            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
-              Wallet Transaction Ledger
-            </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setActiveTab('ledger')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition ${
+                activeTab === 'ledger'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <History className="h-3.5 w-3.5" />
+              Wallet Ledger ({transactions.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('qr_submissions')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition ${
+                activeTab === 'qr_submissions'
+                  ? 'bg-white text-[#015F6C] shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <QrCode className="h-3.5 w-3.5" />
+              UPI QR Submissions ({qrPayments.length})
+            </button>
           </div>
-          <span className="text-xs font-semibold text-slate-400">
-            {transactions.length} record{transactions.length === 1 ? '' : 's'}
-          </span>
         </div>
+
+        {activeTab === 'ledger' && (
+          <div>
 
         {transactions.length === 0 ? (
           <GlassPanel className="p-8 text-center border-dashed border-slate-200">
@@ -576,6 +699,147 @@ export function LaborWallet() {
             })}
           </div>
         )}
+          </div>
+        )}
+
+        {/* TAB 2: UPI QR SUBMISSIONS */}
+        {activeTab === 'qr_submissions' && (
+          <div className="space-y-3">
+            {loadingQrPayments ? (
+              <GlassPanel className="p-8 text-center">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto text-[#015F6C] mb-2" />
+                <p className="text-xs text-slate-500 font-medium">Loading your payment submissions...</p>
+              </GlassPanel>
+            ) : qrPayments.length === 0 ? (
+              <GlassPanel className="p-8 text-center border-dashed border-slate-200">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-50 text-[#015F6C] mb-3">
+                  <QrCode className="h-6 w-6" />
+                </div>
+                <p className="text-sm font-bold text-slate-800">No UPI QR Payments Yet</p>
+                <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                  When you make payments via official Admin UPI QR, your submissions and review status will appear here.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQrModalPurpose('WALLET_TOPUP')
+                    setQrModalAmount(500)
+                    setQrModalAllowCustom(true)
+                    setShowQrModal(true)
+                  }}
+                  className="mt-4 px-4 py-2 bg-[#015F6C] text-white rounded-xl text-xs font-bold shadow-xs hover:bg-[#014d57]"
+                >
+                  Make a UPI Payment
+                </button>
+              </GlassPanel>
+            ) : (
+              <div className="space-y-2.5">
+                {qrPayments.map((p) => {
+                  const isApproved = p.status === 'approved'
+                  const isRejected = p.status === 'rejected'
+
+                  return (
+                    <GlassPanel
+                      key={p._id}
+                      className={`p-4 border transition-all ${
+                        isApproved
+                          ? 'border-emerald-200 bg-emerald-50/20'
+                          : isRejected
+                          ? 'border-rose-200 bg-rose-50/20'
+                          : 'border-slate-200/80 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-sm text-slate-900">
+                              {formatInr(p.amount)}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                isApproved
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : isRejected
+                                  ? 'bg-rose-100 text-rose-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {isApproved ? 'Approved & Credited' : isRejected ? 'Rejected' : 'Under Review'}
+                            </span>
+                          </div>
+
+                          <p className="text-xs font-semibold text-slate-600 mt-1">
+                            Purpose:{' '}
+                            <span className="font-bold text-slate-800">
+                              {p.purpose === 'WALLET_TOPUP'
+                                ? 'Wallet Recharge'
+                                : p.purpose === 'WALLET_CLEARANCE'
+                                ? 'Commission Clearance'
+                                : p.purpose}
+                            </span>
+                          </p>
+
+                          {p.utr && (
+                            <p className="text-[11px] font-mono text-slate-500 mt-0.5">
+                              UTR: <span className="font-bold text-slate-700">{p.utr}</span>
+                            </p>
+                          )}
+
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            Submitted: {formatDate(p.createdAt)}
+                          </p>
+
+                          {/* Rejection notice + resubmit action */}
+                          {isRejected && (
+                            <div className="mt-2.5 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs space-y-1.5">
+                              <p className="font-bold flex items-center gap-1">
+                                <AlertTriangle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+                                Rejection Reason:
+                              </p>
+                              <p className="text-[11px] text-rose-800">{p.rejectionReason || 'Details could not be verified'}</p>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setQrResubmitPayment(p)
+                                  setQrModalPurpose(p.purpose)
+                                  setQrModalAmount(p.amount)
+                                  setQrModalAllowCustom(false)
+                                  setShowQrModal(true)
+                                }}
+                                className="mt-1 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-xs transition"
+                              >
+                                Correct & Resubmit Details &rarr;
+                              </button>
+                            </div>
+                          )}
+
+                          {isApproved && p.financialActionDetails?.balanceAfter !== undefined && (
+                            <p className="text-[11px] font-bold text-emerald-700 mt-1 flex items-center gap-1">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Wallet updated: {formatInr(p.financialActionDetails.balanceAfter)}
+                            </p>
+                          )}
+                        </div>
+
+                        {p.receiptUrl && (
+                          <a
+                            href={p.receiptUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-12 h-12 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100 flex items-center justify-center hover:opacity-80 transition"
+                            title="View Receipt"
+                          >
+                            <img src={p.receiptUrl} alt="Receipt" className="w-full h-full object-cover" />
+                          </a>
+                        )}
+                      </div>
+                    </GlassPanel>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Top-up Modal */}
@@ -612,10 +876,35 @@ export function LaborWallet() {
                 </button>
               </div>
 
+              {/* UPI QR Quick Option */}
+              <div className="mt-4 p-3.5 rounded-2xl bg-teal-50 border border-teal-200 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <QrCode className="h-6 w-6 text-[#015F6C] shrink-0" />
+                  <div>
+                    <p className="text-xs font-black text-slate-900">Scan Official UPI QR</p>
+                    <p className="text-[10px] text-teal-800 font-medium">0% transaction charge • Instant scan</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTopUpModal(false)
+                    setQrModalPurpose('WALLET_TOPUP')
+                    setQrModalAmount(Number(topUpAmount) || 500)
+                    setQrModalAllowCustom(true)
+                    setQrResubmitPayment(null)
+                    setShowQrModal(true)
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-[#015F6C] hover:bg-[#014d57] text-white text-xs font-black shadow-xs transition"
+                >
+                  Use UPI QR
+                </button>
+              </div>
+
               <div className="py-4 space-y-4.5">
                 <div>
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    Select or Enter Amount (₹)
+                    Or Enter Amount for Online Gateway (₹)
                   </label>
                   <div className="relative mt-2">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-slate-400">₹</span>
@@ -671,7 +960,7 @@ export function LaborWallet() {
                     ) : (
                       <>
                         <CreditCard className="h-5 w-5" />
-                        Add ₹{topUpAmount || 0} to Wallet
+                        Pay Online ₹{topUpAmount || 0}
                       </>
                     )}
                   </button>
@@ -681,6 +970,23 @@ export function LaborWallet() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Provider UPI QR Payment Modal */}
+      <ProviderQRPaymentModal
+        isOpen={showQrModal}
+        onClose={() => {
+          setShowQrModal(false)
+          setQrResubmitPayment(null)
+        }}
+        purpose={qrModalPurpose}
+        defaultAmount={qrModalAmount}
+        allowCustomAmount={qrModalAllowCustom}
+        existingPayment={qrResubmitPayment}
+        onPaymentSubmitted={() => {
+          fetchWalletData()
+          fetchQrPayments()
+        }}
+      />
     </div>
   )
 }

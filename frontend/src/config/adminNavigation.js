@@ -36,6 +36,7 @@ import {
   ShieldAlert,
   Ban,
   ShieldCheck,
+  QrCode,
 } from 'lucide-react'
 
 
@@ -130,6 +131,7 @@ export const ADMIN_NAV_SECTIONS = [
     items: [
       { to: '/admin/rewards', label: 'Rewards & Incentives', icon: Award },
       { to: '/admin/billing', label: 'Payments & billing', icon: Wallet },
+      { to: '/admin/qr-payments', label: 'Admin QR Payments', icon: QrCode },
       { to: '/admin/wallet-rewards', label: 'Wallet & Rewards', icon: Gift },
       { to: '/admin/platform-fee', label: 'Platform Fee', icon: HandCoins },
       { to: '/admin/commission-fee', label: 'Commission Fee', icon: HandCoins },
@@ -195,6 +197,7 @@ const ROUTE_TITLES = [
   { prefix: '/admin/commission-fee', title: 'Commission Fee' },
   { prefix: '/admin/labour-wallet', title: 'Service Provider Wallet' },
   { prefix: '/admin/billing', title: 'Payments & billing' },
+  { prefix: '/admin/qr-payments', title: 'Admin QR Payments & Verification' },
   { prefix: '/admin/labour-subscriptions', title: 'Service Provider Subscriptions' },
   { prefix: '/admin/reviews', title: 'Reviews & Ratings' },
   { prefix: '/admin/privacy-policy', title: 'Privacy Policy' },

@@ -13,6 +13,8 @@ import bookingRoutes from './bookingRoutes.js'
 import walletRoutes from './walletRoutes.js'
 import broadcastRoutes from './broadcastRoutes.js'
 import paymentRoutes from './paymentRoutes.js'
+import providerPaymentRoutes from './providerPaymentRoutes.js'
+import adminPaymentConfigRoutes from './adminPaymentConfigRoutes.js'
 import reviewRoutes from './reviewRoutes.js'
 import userSubscriptionRoutes from './userSubscriptionRoutes.js'
 
@@ -72,6 +74,7 @@ router.use('/bookings', bookingRoutes)
 router.use('/wallets', walletRoutes)
 router.use('/broadcasts', broadcastRoutes)
 router.use('/payments', paymentRoutes)
+router.use('/provider-payments', providerPaymentRoutes)
 router.use('/reviews', reviewRoutes)
 router.use('/complaints', complaintRoutes)
 router.use('/banners', bannerRoutes)
@@ -95,13 +98,19 @@ router.use('/admin/bookings', adminBookingRoutes)
 router.use('/admin/labour-subscriptions', adminSubscriptionRoutes)
 router.use('/admin/profile', adminProfileRoutes)
 router.use('/admin', adminLabourCategoryRoutes)
+router.use('/admin/payments', adminPaymentConfigRoutes)
 
 router.use('/labour/location', locationRoutes)
 
 import { getCollectedCommissionAmount } from '../controllers/adminWalletController.js'
+import { getAdminPayments, reviewPayment } from '../controllers/providerPaymentController.js'
 import { protect, restrictTo } from '../middleware/auth.js'
 import { USER_ROLES } from '../constants/roles.js'
+
 router.get('/admin/commission-fee', protect, restrictTo(USER_ROLES.ADMIN), getCollectedCommissionAmount)
+router.get('/admin/provider-payments', protect, restrictTo(USER_ROLES.ADMIN), getAdminPayments)
+router.patch('/admin/provider-payments/:id/review', protect, restrictTo(USER_ROLES.ADMIN), reviewPayment)
 
 export default router
+
 
