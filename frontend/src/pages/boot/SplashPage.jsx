@@ -22,7 +22,13 @@ export function SplashPage() {
     if (continuedRef.current) return
     continuedRef.current = true
 
+    const fromPath = location.state?.from || ''
     const remembered = readBootRole()
+    if (fromPath.startsWith('/serviceprovider') || fromPath.startsWith('/labour') || remembered === 'labour') {
+      navigate('/labours/auth', { replace: true, state: location.state })
+      return
+    }
+
     if (remembered && !token) {
       navigate(getRoleHomePath(remembered), {
         replace: true,
@@ -40,6 +46,19 @@ export function SplashPage() {
   useEffect(() => {
     if (loading) return undefined
 
+    const fromPath = location.state?.from || ''
+    const remembered = readBootRole()
+
+    // Completely remove /splash from the service provider app flow
+    if (fromPath.startsWith('/serviceprovider') || fromPath.startsWith('/labour') || remembered === 'labour') {
+      if (token && realUser?.role === 'labour') {
+        navigate('/serviceprovider', { replace: true })
+      } else {
+        navigate('/labours/auth', { replace: true, state: location.state })
+      }
+      return undefined
+    }
+
     if (token && realUser?.role) {
       navigate(getRoleHomePath(realUser.role), { replace: true })
       return undefined
@@ -50,14 +69,13 @@ export function SplashPage() {
       return undefined
     }
 
-    const remembered = readBootRole()
     if (remembered && !token) {
       navigate(getRoleHomePath(remembered), { replace: true })
       return undefined
     }
 
     return undefined
-  }, [isAuthenticated, loading, navigate, realUser?.role, token, user?.role])
+  }, [isAuthenticated, loading, navigate, realUser?.role, token, user?.role, location.state])
 
   if (loading) {
     return <AppRouteLoader />

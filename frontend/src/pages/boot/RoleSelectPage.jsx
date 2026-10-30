@@ -75,7 +75,7 @@ export function RoleSelectPage() {
         <header className="flex items-center justify-between">
           <button
             type="button"
-            onClick={() => navigate(BOOT_ROUTES.SPLASH, { replace: true })}
+            onClick={() => navigate('/', { replace: true })}
             className="lc-role-back"
             aria-label="Back"
           >

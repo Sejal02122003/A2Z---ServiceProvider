@@ -1,8 +1,8 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth.js'
-import { BOOT_ROUTES } from '../../constants/bootFlow.js'
 import { getRoleHomePath } from '../../lib/roleHomePath.js'
 import { AppRouteLoader } from '../app/AppRouteLoader.jsx'
+import { USER_ROLES } from '../../constants/userRoles.js'
 
 export function ProtectedRoute({ children, roles, allowGuest }) {
   const { isAuthenticated, user, loading, token } = useAuth()
@@ -14,7 +14,12 @@ export function ProtectedRoute({ children, roles, allowGuest }) {
   }
 
   if (!isAuthenticated && !allowGuest) {
-    return <Navigate to={BOOT_ROUTES.SPLASH} replace state={{ from: location.pathname + location.search }} />
+    const isLabour =
+      roles?.includes(USER_ROLES.LABOUR) ||
+      location.pathname.startsWith('/serviceprovider') ||
+      location.pathname.startsWith('/labour')
+    const targetAuth = isLabour ? '/labours/auth' : '/users/auth'
+    return <Navigate to={targetAuth} replace state={{ from: location.pathname + location.search }} />
   }
 
   if (isAuthenticated && roles?.length && role && !roles.includes(role)) {
