@@ -1069,6 +1069,7 @@ export const getBookingStatus = asyncHandler(async (req, res) => {
     .populate('multiServiceBooking.items.serviceId')
     .populate('multiServiceBooking.items.assignedLabourId', 'fullName phone profileImageUrl labourProfile rating experienceYears')
     .populate('laborId', 'fullName phone profileImageUrl labourProfile rating experienceYears')
+    .populate('acceptedLabourId', 'fullName phone profileImageUrl labourProfile rating experienceYears')
     .populate('userId', 'fullName phone')
     .populate('assignments.labourId', 'fullName phone profileImageUrl serviceIds labourProfile rating experienceYears')
     .lean()
@@ -1102,6 +1103,7 @@ export const getBookingStatus = asyncHandler(async (req, res) => {
   // Collect all assigned labour IDs to enrich with real reviews and completed bookings stats
   const labourIds = []
   if (booking.laborId) labourIds.push(booking.laborId._id || booking.laborId)
+  if (booking.acceptedLabourId) labourIds.push(booking.acceptedLabourId._id || booking.acceptedLabourId)
   if (booking.assignments) {
     booking.assignments.forEach((a) => {
       if (a.labourId) labourIds.push(a.labourId._id || a.labourId)
@@ -1126,6 +1128,7 @@ export const getBookingStatus = asyncHandler(async (req, res) => {
       }
     }
     enrich(booking.laborId)
+    enrich(booking.acceptedLabourId)
     if (booking.assignments) {
       booking.assignments.forEach((a) => enrich(a.labourId))
     }
@@ -1165,6 +1168,7 @@ export const getMyBookings = asyncHandler(async (req, res) => {
     .populate('multiServiceBooking.items.assignedLabourId', 'fullName phone profileImageUrl')
     .populate('userId', 'fullName phone')
     .populate('laborId', 'fullName phone profileImageUrl')
+    .populate('acceptedLabourId', 'fullName phone profileImageUrl')
     .populate('assignments.labourId', 'fullName phone profileImageUrl serviceIds labourProfile')
     .sort({ createdAt: -1 })
     .lean()

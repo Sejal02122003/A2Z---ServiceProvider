@@ -151,6 +151,14 @@ export function JobTracking() {
         if (data.status === 'COMPLETED') {
           setShowReview(true)
         }
+        if (['ACCEPTED', 'ASSIGNED', 'PARTIALLY_ACCEPTED', 'EN_ROUTE', 'STARTED'].includes(data.status)) {
+          bookingsApi.getBookingStatus(bookingId)
+            .then((res) => {
+              const b = res.data?.booking
+              if (b) setBooking(b)
+            })
+            .catch(() => {})
+        }
       }
     }
 
@@ -171,10 +179,13 @@ export function JobTracking() {
     }
   }, [socket, bookingId, dispatch])
 
-  // Polling fallback every 3s while searching for workers
+  // Polling fallback every 3s while searching for workers or until provider is assigned
   useEffect(() => {
     if (!bookingId) return
-    const isPending = !booking || ['CREATED', 'BROADCASTING'].includes((booking.status || '').toUpperCase())
+    const isPending =
+      !booking ||
+      ['CREATED', 'BROADCASTING', 'PARTIALLY_ACCEPTED'].includes((booking.status || '').toUpperCase()) ||
+      (!booking.laborId && !booking.acceptedLabourId && (!booking.assignments || booking.assignments.length === 0))
     if (!isPending) return
 
     const interval = setInterval(() => {
@@ -296,7 +307,13 @@ export function JobTracking() {
     )
   }
 
-  const labor = booking.laborId || (booking.assignments && booking.assignments[0]?.labourId)
+  const labor =
+    (typeof booking.laborId === 'object' && booking.laborId?.fullName ? booking.laborId : null) ||
+    (typeof booking.acceptedLabourId === 'object' && booking.acceptedLabourId?.fullName ? booking.acceptedLabourId : null) ||
+    (booking.assignments && typeof booking.assignments[0]?.labourId === 'object' ? booking.assignments[0]?.labourId : null) ||
+    booking.laborId ||
+    booking.acceptedLabourId ||
+    (booking.assignments && booking.assignments[0]?.labourId)
   
   const displayStartOtp = booking.assignments?.length > 0 ? booking.assignments[0].startOtp : booking.startOtp
   const displayCompletionOtp = booking.assignments?.length > 0 ? booking.assignments[0].completionOtp : booking.completionOtp

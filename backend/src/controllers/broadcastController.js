@@ -99,8 +99,8 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     })
   }
 
-  // Fetch booking first (can be BROADCASTING or PARTIALLY_ACCEPTED for multi-service)
-  let booking = await Booking.findOne({ _id: bookingId, status: { $in: ['BROADCASTING', 'PARTIALLY_ACCEPTED'] } })
+  // Fetch booking first (can be CREATED, BROADCASTING or PARTIALLY_ACCEPTED for multi-service)
+  let booking = await Booking.findOne({ _id: bookingId, status: { $in: ['CREATED', 'BROADCASTING', 'PARTIALLY_ACCEPTED'] } })
   
   if (!booking) {
     const currentBooking = await Booking.findById(bookingId)
@@ -298,7 +298,7 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
 
   const query = {
     _id: bookingId,
-    status: { $in: ['BROADCASTING', 'PARTIALLY_ACCEPTED'] },
+    status: { $in: ['CREATED', 'BROADCASTING', 'PARTIALLY_ACCEPTED'] },
     acceptedLabourIds: { $ne: labour._id },
     $expr: {
       $lt: [

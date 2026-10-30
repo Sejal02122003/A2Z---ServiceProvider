@@ -107,7 +107,7 @@ export function IndividualBookingFlowPage() {
   const categoryIdParam = searchParams.get('categoryId')?.trim() || ''
   const groupIdParam = searchParams.get('groupId')?.trim() || ''
   const packageIdParam = searchParams.get('packageId')?.trim() || ''
-  const bookingIdParam = searchParams.get('bookingId')?.trim() || ''
+  const bookingIdParam = searchParams.get('bookingId')?.trim() || searchParams.get('ref')?.trim() || ''
 
   const [draft, setDraft] = useState(() => readBookingDraft() || {})
   const [formError, setFormError] = useState('')
@@ -212,7 +212,7 @@ export function IndividualBookingFlowPage() {
   const markerInstance = useRef(null)
 
 
-  const { bookingEvent } = useBookingSocket(activeBookingId)
+  const { bookingEvent, acceptedPartner } = useBookingSocket(activeBookingId)
 
   const syncDraft = useCallback((patch) => {
     setDraft((prev) => {
@@ -227,8 +227,9 @@ export function IndividualBookingFlowPage() {
       categoryId: draft.categoryId || categoryIdParam,
       groupId: draft.groupId || groupIdParam,
       packageId: draft.packageId || packageIdParam,
+      ref: activeBookingId || draft.lastRef || bookingIdParam,
     }),
-    [categoryIdParam, draft.categoryId, draft.groupId, draft.packageId, groupIdParam, packageIdParam],
+    [categoryIdParam, draft.categoryId, draft.groupId, draft.packageId, draft.lastRef, groupIdParam, packageIdParam, activeBookingId, bookingIdParam],
   )
 
   const goStep = useCallback(
@@ -369,9 +370,9 @@ export function IndividualBookingFlowPage() {
               list.find((b) => {
                 const s = (b.status || '').toUpperCase()
                 const matchesCat = !categoryIdParam || String(b.category?._id || b.category) === categoryIdParam
-                return matchesCat && ['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED'].includes(s)
+                return matchesCat && ['CREATED', 'BROADCASTING', 'ACCEPTED', 'PARTIALLY_ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED'].includes(s)
               }) ||
-              list.find((b) => ['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED'].includes((b.status || '').toUpperCase()))
+              list.find((b) => ['CREATED', 'BROADCASTING', 'ACCEPTED', 'PARTIALLY_ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED'].includes((b.status || '').toUpperCase()))
 
             if (active) {
               setActiveBookingId(active._id)
@@ -380,7 +381,13 @@ export function IndividualBookingFlowPage() {
           })
           .catch((err) => console.error('Failed to load user bookings:', err))
           .finally(() => setBookingLoading(false))
-      } else if (!activeBooking) {
+      } else if (
+        !activeBooking ||
+        (['ACCEPTED', 'PARTIALLY_ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED'].includes((activeBooking.status || '').toUpperCase()) &&
+          !activeBooking.laborId &&
+          !activeBooking.acceptedLabourId &&
+          (!activeBooking.assignments || activeBooking.assignments.length === 0))
+      ) {
         setBookingLoading(true)
         bookingsApi
           .getBookingStatus(activeBookingId)
@@ -407,50 +414,69 @@ export function IndividualBookingFlowPage() {
   }, [step, activeBookingId, activeBooking, realUser, categoryIdParam])
 
   useEffect(() => {
+    if (acceptedPartner && !acceptedPartnerEvent) {
+      setAcceptedPartnerEvent(acceptedPartner)
+      playAcceptedChime()
+      if (step === 'searching') {
+        goStep('active')
+      }
+    }
+  }, [acceptedPartner, acceptedPartnerEvent, playAcceptedChime, step, goStep])
+
+  useEffect(() => {
     if (!bookingEvent) return
-    if (bookingEvent.type === 'BOOKING_ACCEPTED') {
+    const isAcceptedType =
+      bookingEvent.type === 'BOOKING_ACCEPTED' ||
+      (bookingEvent.type === 'BOOKING_STATUS_UPDATE' &&
+        ['ACCEPTED', 'PARTIALLY_ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED'].includes(bookingEvent.data?.status))
+
+    if (isAcceptedType) {
       const bId = activeBookingId || bookingEvent.data?.bookingId
       if (bId) setActiveBookingId(bId)
-      setAcceptedPartnerEvent(bookingEvent.data)
+      if (bookingEvent.data?.partner || bookingEvent.data?.partnerName) {
+        setAcceptedPartnerEvent(bookingEvent.data)
+      }
       playAcceptedChime()
+
+      const partnerObj = bookingEvent.data?.partner || (bookingEvent.data?.partnerName ? {
+        _id: bookingEvent.data?.laborId,
+        fullName: bookingEvent.data?.partnerName,
+        phone: bookingEvent.data?.partnerPhone,
+        profileImageUrl: bookingEvent.data?.partnerAvatar,
+        rating: bookingEvent.data?.partnerRating,
+        totalReviews: bookingEvent.data?.partnerTotalReviews,
+        completedBookingsCount: bookingEvent.data?.partnerCompletedBookings,
+        experienceYears: bookingEvent.data?.partnerExperience,
+      } : null)
 
       setActiveBooking((prev) => {
         const base = prev || { _id: bId }
-        const partnerObj = bookingEvent.data?.partner || {
-          _id: bookingEvent.data?.laborId,
-          fullName: bookingEvent.data?.partnerName,
-          phone: bookingEvent.data?.partnerPhone,
-          profileImageUrl: bookingEvent.data?.partnerAvatar,
-          rating: bookingEvent.data?.partnerRating,
-          totalReviews: bookingEvent.data?.partnerTotalReviews,
-          completedBookingsCount: bookingEvent.data?.partnerCompletedBookings,
-          experienceYears: bookingEvent.data?.partnerExperience,
-        }
+        const pObj = partnerObj || base.laborId || base.acceptedLabourId
         return {
           ...base,
           status: bookingEvent.data?.status || 'ACCEPTED',
           startOtp: bookingEvent.data?.startOtp || base.startOtp,
           completionOtp: bookingEvent.data?.completionOtp || base.completionOtp,
-          laborId: partnerObj,
+          ...(pObj ? { laborId: pObj, acceptedLabourId: pObj } : {}),
           assignments: (base.assignments && base.assignments.length > 0)
             ? base.assignments.map((a, idx) => idx === 0 ? {
                 ...a,
-                labourId: partnerObj,
+                ...(pObj ? { labourId: pObj } : {}),
                 startOtp: bookingEvent.data?.startOtp || a.startOtp,
                 completionOtp: bookingEvent.data?.completionOtp || a.completionOtp,
                 status: 'ACCEPTED',
               } : a)
-            : [{
-                labourId: partnerObj,
+            : (pObj ? [{
+                labourId: pObj,
                 startOtp: bookingEvent.data?.startOtp,
                 completionOtp: bookingEvent.data?.completionOtp,
                 status: 'ACCEPTED',
-              }],
+              }] : base.assignments),
         }
       })
 
       goStep('active')
-      if (realUser && bId) {
+      if (bId) {
         bookingsApi.getBookingStatus(bId).then(res => {
           if (res.data?.booking) setActiveBooking(res.data.booking)
         }).catch(err => console.error(err))
@@ -460,42 +486,40 @@ export function IndividualBookingFlowPage() {
     } else if (bookingEvent.type === 'BOOKING_STATUS_UPDATE') {
       const newStatus = bookingEvent.data?.status
       setActiveBooking(prev => prev ? { ...prev, status: newStatus } : null)
-      if (['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED'].includes(newStatus)) {
-        if (step === 'searching') goStep('active')
-        if (realUser && activeBookingId) {
-          bookingsApi.getBookingStatus(activeBookingId).then(res => {
-            if (res.data?.booking) setActiveBooking(res.data.booking)
-          }).catch(() => {})
-        }
-      }
       if (newStatus === 'COMPLETED') {
-        if (realUser && activeBookingId) {
-          bookingsApi.getBookingStatus(activeBookingId).then(res => {
+        const bId = activeBookingId || bookingEvent.data?.bookingId
+        if (bId) {
+          bookingsApi.getBookingStatus(bId).then(res => {
             if (res.data?.booking) {
               setActiveBooking(res.data.booking)
-              const b = res.data.booking
-              if (b.paymentStatus === 'PAID') {
-                handleOpenReview()
+              if (res.data.booking.paymentStatus === 'PAID') {
+                handleOpenReview(res.data.booking)
               }
             }
-          }).catch(() => { })
+          }).catch(() => {})
         }
       }
     } else if (bookingEvent.type === 'BOOKING_CANCELLED') {
       setActiveBooking(prev => prev ? { ...prev, status: 'CANCELLED', ...bookingEvent.data } : null)
       clearBookingDraft()
     }
-  }, [bookingEvent, activeBookingId, goStep, realUser, playAcceptedChime, handleOpenReview, clearBookingDraft, step])
+  }, [bookingEvent, activeBookingId, goStep, playAcceptedChime, handleOpenReview, clearBookingDraft, step])
 
   // Polling fallback to ensure instant transition when provider accepts
   useEffect(() => {
     if (!realUser || !activeBookingId) return
 
     const bookingStatus = (activeBooking?.status || '').toUpperCase()
+    const hasWorker = Boolean(
+      (typeof activeBooking?.laborId === 'object' && activeBooking.laborId?.fullName) ||
+      (typeof activeBooking?.acceptedLabourId === 'object' && activeBooking.acceptedLabourId?.fullName) ||
+      (activeBooking?.assignments && activeBooking.assignments.some(a => a.labourId && (a.labourId.fullName || a.labourId._id)))
+    )
     const needsPolling =
       step === 'searching' ||
       !activeBooking ||
-      ['CREATED', 'BROADCASTING'].includes(bookingStatus)
+      ['CREATED', 'BROADCASTING', 'PARTIALLY_ACCEPTED'].includes(bookingStatus) ||
+      (['ACCEPTED', 'ASSIGNED'].includes(bookingStatus) && !hasWorker)
 
     if (!needsPolling) return
 
@@ -514,11 +538,12 @@ export function IndividualBookingFlowPage() {
             return
           }
 
-          const hasWorker = Boolean(
+          const workerAssigned = Boolean(
             (typeof fetchedBooking.laborId === 'object' && fetchedBooking.laborId?.fullName) ||
+            (typeof fetchedBooking.acceptedLabourId === 'object' && fetchedBooking.acceptedLabourId?.fullName) ||
             (fetchedBooking.assignments && fetchedBooking.assignments.some(a => a.labourId && (a.labourId.fullName || a.labourId._id)))
           )
-          const isNowAccepted = ['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED', 'COMPLETED'].includes(s) || hasWorker
+          const isNowAccepted = ['ACCEPTED', 'PARTIALLY_ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED', 'COMPLETED'].includes(s) || workerAssigned
 
           if (isNowAccepted && step === 'searching') {
             playAcceptedChime()
@@ -531,7 +556,7 @@ export function IndividualBookingFlowPage() {
     }, 3000)
 
     return () => clearInterval(interval)
-  }, [realUser, activeBookingId, activeBooking?.status, step, goStep, playAcceptedChime])
+  }, [realUser, activeBookingId, activeBooking?.status, step, goStep, playAcceptedChime, activeBooking?.laborId, activeBooking?.acceptedLabourId, activeBooking?.assignments])
 
   useEffect(() => {
     const cid = categoryIdParam
@@ -1087,42 +1112,55 @@ export function IndividualBookingFlowPage() {
     )
   }
 
+  const effectivePartnerData = acceptedPartnerEvent || acceptedPartner
   const rawLabor = activeBooking?.laborId
+  const rawAcceptedLabor = activeBooking?.acceptedLabourId
   const assignmentLabor = activeBooking?.assignments?.[0]?.labourId
-  const eventPartner = acceptedPartnerEvent?.partner || (acceptedPartnerEvent?.partnerName ? {
-    _id: acceptedPartnerEvent.laborId || acceptedPartnerEvent.partner?.id,
-    fullName: acceptedPartnerEvent.partnerName,
-    phone: acceptedPartnerEvent.partnerPhone,
-    profileImageUrl: acceptedPartnerEvent.partnerAvatar,
-    rating: acceptedPartnerEvent.partnerRating,
-    totalReviews: acceptedPartnerEvent.partnerTotalReviews,
-    completedBookingsCount: acceptedPartnerEvent.partnerCompletedBookings,
-    experienceYears: acceptedPartnerEvent.partnerExperience,
+  const eventPartner = effectivePartnerData?.partner ? {
+    _id: effectivePartnerData.partner.id || effectivePartnerData.partner._id || effectivePartnerData.laborId,
+    fullName: effectivePartnerData.partner.name || effectivePartnerData.partner.fullName || effectivePartnerData.partnerName,
+    phone: effectivePartnerData.partner.phone || effectivePartnerData.partnerPhone,
+    profileImageUrl: effectivePartnerData.partner.profileImageUrl || effectivePartnerData.partnerAvatar,
+    rating: effectivePartnerData.partner.rating ?? effectivePartnerData.partnerRating,
+    totalReviews: effectivePartnerData.partner.totalReviews ?? effectivePartnerData.partnerTotalReviews,
+    completedBookingsCount: effectivePartnerData.partner.completedBookingsCount ?? effectivePartnerData.partnerCompletedBookings,
+    experienceYears: effectivePartnerData.partnerExperience,
+  } : (effectivePartnerData?.partnerName ? {
+    _id: effectivePartnerData.laborId || effectivePartnerData.partner?.id,
+    fullName: effectivePartnerData.partnerName,
+    phone: effectivePartnerData.partnerPhone,
+    profileImageUrl: effectivePartnerData.partnerAvatar,
+    rating: effectivePartnerData.partnerRating,
+    totalReviews: effectivePartnerData.partnerTotalReviews,
+    completedBookingsCount: effectivePartnerData.partnerCompletedBookings,
+    experienceYears: effectivePartnerData.partnerExperience,
   } : null)
 
   const worker =
     (typeof rawLabor === 'object' && rawLabor?.fullName ? rawLabor : null) ||
+    (typeof rawAcceptedLabor === 'object' && rawAcceptedLabor?.fullName ? rawAcceptedLabor : null) ||
     (typeof assignmentLabor === 'object' && assignmentLabor?.fullName ? assignmentLabor : null) ||
     eventPartner ||
     (typeof rawLabor === 'object' && rawLabor?._id ? rawLabor : null) ||
+    (typeof rawAcceptedLabor === 'object' && rawAcceptedLabor?._id ? rawAcceptedLabor : null) ||
     (typeof assignmentLabor === 'object' && assignmentLabor?._id ? assignmentLabor : null)
 
-  const bookingStatus = (activeBooking?.status || acceptedPartnerEvent?.status || '').toUpperCase()
+  const bookingStatus = (activeBooking?.status || effectivePartnerData?.status || '').toUpperCase()
   const isTerminal = ['CANCELLED', 'FAILED', 'REJECTED'].includes(bookingStatus)
   const isAccepted =
     !isTerminal &&
-    (['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED', 'COMPLETED'].includes(bookingStatus) ||
-      Boolean(worker?.fullName || (activeBooking?.assignments && activeBooking.assignments.length > 0)))
+    (['ACCEPTED', 'PARTIALLY_ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED', 'COMPLETED'].includes(bookingStatus) ||
+      Boolean(worker?.fullName || (activeBooking?.assignments && activeBooking.assignments.length > 0) || activeBooking?.acceptedLabourId))
 
   const displayStartOtp =
     activeBooking?.assignments?.[0]?.startOtp ||
     activeBooking?.startOtp ||
-    acceptedPartnerEvent?.startOtp
+    effectivePartnerData?.startOtp
 
   const displayCompletionOtp =
     activeBooking?.assignments?.[0]?.completionOtp ||
     activeBooking?.completionOtp ||
-    acceptedPartnerEvent?.completionOtp
+    effectivePartnerData?.completionOtp
 
   useEffect(() => {
     if (step === 'searching' && isAccepted) {

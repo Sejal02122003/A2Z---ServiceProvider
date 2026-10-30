@@ -6,6 +6,7 @@ export function useBookingSocket(bookingId) {
   const socket = useSocket()
   const [socketStatus, setSocketStatus] = useState(socket?.connected ? 'connected' : 'disconnected')
   const [bookingEvent, setBookingEvent] = useState(null)
+  const [acceptedPartner, setAcceptedPartner] = useState(null)
 
   useEffect(() => {
     if (!socket) return
@@ -22,13 +23,14 @@ export function useBookingSocket(bookingId) {
 
     const handleBroadcastStarted = (data) => {
       if (!bookingId || !data?.bookingId || String(data.bookingId) === String(bookingId)) {
-        setBookingEvent({ type: 'BOOKING_BROADCAST_STARTED', data })
+        setBookingEvent({ type: 'BOOKING_BROADCAST_STARTED', data, timestamp: Date.now() })
       }
     }
 
     const handleAccepted = (data) => {
       if (!bookingId || !data?.bookingId || String(data.bookingId) === String(bookingId)) {
-        setBookingEvent({ type: 'BOOKING_ACCEPTED', data })
+        setAcceptedPartner(data)
+        setBookingEvent({ type: 'BOOKING_ACCEPTED', data, timestamp: Date.now() })
         const partnerName = data?.partner?.name || data?.partnerName || 'A service partner'
         showDesktopNotification({
           title: '🎉 Booking Confirmed!',
@@ -41,13 +43,16 @@ export function useBookingSocket(bookingId) {
 
     const handleFailed = (data) => {
       if (!bookingId || !data?.bookingId || String(data.bookingId) === String(bookingId)) {
-        setBookingEvent({ type: 'BOOKING_FAILED', data })
+        setBookingEvent({ type: 'BOOKING_FAILED', data, timestamp: Date.now() })
       }
     }
 
     const handleStatusUpdate = (data) => {
       if (!bookingId || !data?.bookingId || String(data.bookingId) === String(bookingId)) {
-        setBookingEvent({ type: 'BOOKING_STATUS_UPDATE', data })
+        setBookingEvent({ type: 'BOOKING_STATUS_UPDATE', data, timestamp: Date.now() })
+        if (data?.partner || data?.partnerName) {
+          setAcceptedPartner((prev) => prev || data)
+        }
         if (data?.status) {
           showDesktopNotification({
             title: 'Booking Status Update',
@@ -61,7 +66,7 @@ export function useBookingSocket(bookingId) {
 
     const handleCancelled = (data) => {
       if (!bookingId || !data?.bookingId || String(data.bookingId) === String(bookingId)) {
-        setBookingEvent({ type: 'BOOKING_CANCELLED', data })
+        setBookingEvent({ type: 'BOOKING_CANCELLED', data, timestamp: Date.now() })
         showDesktopNotification({
           title: 'Booking Cancelled',
           body: data?.reason || 'Your booking was cancelled.',
@@ -88,6 +93,14 @@ export function useBookingSocket(bookingId) {
     }
   }, [socket, bookingId])
 
-  return { socketStatus, bookingEvent, clearEvent: () => setBookingEvent(null) }
+  return {
+    socketStatus,
+    bookingEvent,
+    acceptedPartner,
+    clearEvent: () => {
+      setBookingEvent(null)
+      setAcceptedPartner(null)
+    },
+  }
 }
 

@@ -80,10 +80,13 @@ export const getIO = getIo
 
 export const emitToUser = (userId, eventName, payload) => {
   if (io) {
-    const room = io.sockets.adapter.rooms.get(userId?.toString())
+    const rawId = userId?._id || userId
+    const strId = rawId ? rawId.toString() : ''
+    if (!strId) return
+    const room = io.sockets.adapter.rooms.get(strId)
     const activeSockets = room ? room.size : 0
-    console.log(`[SOCKET] emitToUser event="${eventName}" to user=${userId} (active sockets in room: ${activeSockets})`)
-    io.to(userId.toString()).emit(eventName, payload)
+    console.log(`[SOCKET] emitToUser event="${eventName}" to user=${strId} (active sockets in room: ${activeSockets})`)
+    io.to(strId).emit(eventName, payload)
   }
 }
 
