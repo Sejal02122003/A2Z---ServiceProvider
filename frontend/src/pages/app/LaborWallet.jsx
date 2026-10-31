@@ -232,10 +232,19 @@ export function LaborWallet() {
           }
         },
         modal: {
+          backdropclose: false,
+          escape: false,
+          handleback: true,
+          confirm_close: true,
           ondismiss: () => {
             setRecharging(false)
           },
         },
+        retry: {
+          enabled: true,
+          max_count: 3,
+        },
+        send_sms_hash: true,
         theme: { color: '#015F6C' },
       }
 
@@ -301,10 +310,19 @@ export function LaborWallet() {
           }
         },
         modal: {
+          backdropclose: false,
+          escape: false,
+          handleback: true,
+          confirm_close: true,
           ondismiss: () => {
             setClearing(false)
           },
         },
+        retry: {
+          enabled: true,
+          max_count: 3,
+        },
+        send_sms_hash: true,
         theme: { color: '#015F6C' },
       }
 
