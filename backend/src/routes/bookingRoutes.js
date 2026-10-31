@@ -54,7 +54,7 @@ router.get('/:id', booking.getBookingStatus)
 
 router.post(
   '/:id/confirm-cash',
-  restrictTo(USER_ROLES.CUSTOMER),
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR, USER_ROLES.ADMIN),
   booking.confirmCashPayment
 )
 

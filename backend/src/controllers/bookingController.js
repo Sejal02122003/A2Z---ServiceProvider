@@ -1418,12 +1418,16 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
     if (!wallet) wallet = new Wallet({ userId: booking.laborId })
 
     if (booking.paymentMethod === 'CASH') {
-      try {
-        const { settleCashBookingPayment } = await import('../services/labourWalletService.js')
-        const effectiveLabourId = booking.laborId || booking.acceptedLabourId || (booking.assignments && booking.assignments.find(a => a.labourId)?.labourId)
-        await settleCashBookingPayment({ bookingId: booking._id, labourId: effectiveLabourId })
-      } catch (settleErr) {
-        console.error('[Auto Cash Settlement on Job Complete Error]:', settleErr)
+      // NOTE: For CASH bookings, settlement and marking paymentStatus as 'PAID'
+      // is performed when the service provider or customer explicitly confirms cash collection via confirmCashPayment.
+      if (booking.paymentStatus === 'PAID') {
+        try {
+          const { settleCashBookingPayment } = await import('../services/labourWalletService.js')
+          const effectiveLabourId = booking.laborId || booking.acceptedLabourId || (booking.assignments && booking.assignments.find(a => a.labourId)?.labourId)
+          await settleCashBookingPayment({ bookingId: booking._id, labourId: effectiveLabourId })
+        } catch (settleErr) {
+          console.error('[Cash Settlement Error in updateBookingStatus]:', settleErr)
+        }
       }
     } else if (booking.paymentMethod === 'ONLINE') {
       // ONLY payout if the customer has actually completed the online payment.
@@ -1640,12 +1644,22 @@ export const confirmCashPayment = asyncHandler(async (req, res) => {
     return sendError(res, { message: 'Booking not found', statusCode: HTTP_STATUS.NOT_FOUND })
   }
   
-  if (booking.userId.toString() !== req.user._id.toString()) {
-    return sendError(res, { message: 'Unauthorized', statusCode: HTTP_STATUS.FORBIDDEN })
+  const isCustomer = booking.userId && booking.userId.toString() === req.user._id.toString()
+  const isAssignedLabour = 
+    (booking.laborId && booking.laborId.toString() === req.user._id.toString()) ||
+    booking.acceptedLabourIds?.some(id => String(id) === String(req.user._id)) ||
+    booking.assignments?.some(a => {
+      const lid = typeof a.labourId === 'object' ? a.labourId?._id : a.labourId
+      return lid && String(lid) === String(req.user._id)
+    })
+  const isAdmin = req.user.role === 'admin'
+
+  if (!isCustomer && !isAssignedLabour && !isAdmin) {
+    return sendError(res, { message: 'Unauthorized to confirm cash payment for this booking', statusCode: HTTP_STATUS.FORBIDDEN })
   }
 
-  if (booking.status !== 'COMPLETED') {
-    return sendError(res, { message: 'Booking must be completed before payment', statusCode: HTTP_STATUS.BAD_REQUEST })
+  if (!['STARTED', 'COMPLETED'].includes(booking.status)) {
+    return sendError(res, { message: 'Booking must be started or completed before confirming cash payment', statusCode: HTTP_STATUS.BAD_REQUEST })
   }
   
   if (booking.paymentMethod !== 'CASH') {

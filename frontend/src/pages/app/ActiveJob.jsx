@@ -25,6 +25,7 @@ import {
   ShieldCheck,
   ShieldAlert,
   AlertTriangle,
+  Banknote,
 } from 'lucide-react'
 import { bookingsApi } from '../../api/bookingsApi.js'
 import { ApiError } from '../../api/http.js'
@@ -135,6 +136,22 @@ export function ActiveJob() {
 
   const [showCashConfirm, setShowCashConfirm] = useState(false)
   const [pendingCashSubmit, setPendingCashSubmit] = useState(null)
+  const [confirmingCash, setConfirmingCash] = useState(false)
+  const [cashConfirmError, setCashConfirmError] = useState('')
+
+  const handleConfirmCashPayment = useCallback(async () => {
+    if (!bookingId) return
+    setConfirmingCash(true)
+    setCashConfirmError('')
+    try {
+      await bookingsApi.confirmCashPayment(bookingId)
+      setBooking((prev) => (prev ? { ...prev, paymentStatus: 'PAID' } : prev))
+    } catch (err) {
+      setCashConfirmError(err instanceof ApiError ? err.message : 'Failed to confirm cash payment')
+    } finally {
+      setConfirmingCash(false)
+    }
+  }, [bookingId])
 
   // Material Management State
   const [materialRequest, setMaterialRequest] = useState(null)
@@ -573,6 +590,26 @@ export function ActiveJob() {
         <p className="mt-2 text-xs font-bold uppercase tracking-wider text-slate-500">Status</p>
         <p className="text-xl font-extrabold text-slate-900">{status.replace('_', ' ')}</p>
       </GlassPanel>
+
+      {/* Pending Cash Collection Banner */}
+      {isCompleted && booking?.paymentMethod === 'CASH' && booking?.paymentStatus !== 'PAID' && (
+        <GlassPanel className="p-4 border-emerald-300 bg-emerald-50/90 text-center space-y-2.5 shadow-sm">
+          <div className="flex items-center justify-center gap-2 text-emerald-800 font-extrabold text-sm">
+            <Banknote className="h-5 w-5 text-emerald-600" />
+            <span>Pending COD Handover: ₹{Math.round(booking?.totalAmount || booking?.basePrice || 0).toLocaleString('en-IN')}</span>
+          </div>
+          <p className="text-xs text-emerald-700">
+            Job is completed! Please collect cash from the customer and confirm handover.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowPaymentWaiting(true)}
+            className="w-full rounded-xl bg-emerald-600 py-3 text-xs font-black uppercase tracking-wider text-white shadow-md hover:bg-emerald-700 active:scale-95 transition"
+          >
+            Collect &amp; Confirm Cash Received
+          </button>
+        </GlassPanel>
+      )}
 
       {/* Progress Steps */}
       <GlassPanel className="p-4">
@@ -1374,6 +1411,55 @@ export function ActiveJob() {
                   className="w-full rounded-xl bg-brand py-3 text-sm font-bold text-white transition hover:bg-brand/90 active:scale-95"
                 >
                   Collect Money
+                </button>
+              </>
+            ) : booking?.paymentMethod === 'CASH' ? (
+              <>
+                <div className="relative mx-auto mb-6 mt-3 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-xl shadow-emerald-500/20">
+                  <Banknote className="h-10 w-10 text-emerald-600" />
+                </div>
+                <h3 className="text-xl font-black text-slate-900 mb-1">
+                  Cash on Delivery (COD) Handover
+                </h3>
+                <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                  Please collect the cash payment directly from the customer. Click the button below once you have received the cash.
+                </p>
+
+                <div className="mb-5 rounded-2xl bg-emerald-50 border border-emerald-200 p-4">
+                  <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Total Cash to Collect</p>
+                  <p className="text-3xl font-black text-emerald-950 mt-1">
+                    ₹{Math.round(booking?.totalAmount || booking?.basePrice || 0).toLocaleString('en-IN')}
+                  </p>
+                </div>
+
+                {cashConfirmError && (
+                  <p className="mb-3 text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-xl p-2.5">
+                    {cashConfirmError}
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  disabled={confirmingCash}
+                  onClick={handleConfirmCashPayment}
+                  className="w-full rounded-xl bg-emerald-600 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-emerald-600/30 transition hover:bg-emerald-700 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {confirmingCash ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-5 w-5" />
+                      Cash Received (Confirm COD Paid)
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentWaiting(false)}
+                  className="mt-3 w-full rounded-xl bg-slate-100 py-2.5 text-xs font-bold text-slate-600 transition hover:bg-slate-200 active:scale-95"
+                >
+                  Close &amp; Collect Later
                 </button>
               </>
             ) : (
