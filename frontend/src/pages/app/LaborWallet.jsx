@@ -986,6 +986,26 @@ export function LaborWallet() {
                     )}
                   </button>
                 </div>
+
+                <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-2.5 text-center">
+                  <p className="text-[11px] text-slate-600 font-medium">
+                    Mobile App me Netbanking ya UPI open hone me problem ho toh{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowTopUpModal(false)
+                        setQrModalPurpose('WALLET_TOPUP')
+                        setQrModalAmount(Number(topUpAmount) || 500)
+                        setQrModalAllowCustom(true)
+                        setShowQrModal(true)
+                      }}
+                      className="text-teal-700 font-bold underline hover:text-teal-900"
+                    >
+                      Official UPI QR Scan
+                    </button>{' '}
+                    se instant recharge karein.
+                  </p>
+                </div>
               </div>
             </motion.div>
           </div>
