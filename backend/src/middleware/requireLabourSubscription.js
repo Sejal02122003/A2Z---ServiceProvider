@@ -83,14 +83,20 @@ export const requireLabourSubscription = async (req, res, next) => {
     })
   }
 
-  // 3. Check Free Trial
+  // 3. Check Subscription Enforcement
+  const isSubscriptionEnforced = settings?.isUserSubscriptionEnabled === true
+  if (!isSubscriptionEnforced) {
+    return next()
+  }
+
+  // 4. Check Free Trial
   const trialEnds = req.user.labourProfile?.trialEndsAt
   if (trialEnds && now <= new Date(trialEnds)) {
     return next() // Trial is active
   }
 
-  // 4. Check Daily Subscription
-  const today = now.toISOString().split('T')[0]
+  // 5. Check Daily Subscription
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
   const activeSub = await UserSubscription.findOne({
     labour: req.user._id,
     date: { $lte: today },

@@ -1,7 +1,6 @@
 import { Router } from 'express'
 import { body } from 'express-validator'
 import { protect, optionalAuth, restrictTo } from '../middleware/auth.js'
-import { requireLabourSubscription } from '../middleware/requireLabourSubscription.js'
 import { validateRequest } from '../middleware/validateRequest.js'
 import { USER_ROLES } from '../constants/roles.js'
 import * as booking from '../controllers/bookingController.js'
@@ -105,7 +104,6 @@ router.patch(
     body('status').isIn(['EN_ROUTE', 'STARTED', 'COMPLETED', 'CANCELLED']).withMessage('Invalid status'),
   ],
   validateRequest,
-  requireLabourSubscription,
   booking.updateBookingStatus,
 )
 
