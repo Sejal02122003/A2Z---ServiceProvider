@@ -36,6 +36,14 @@ export function errorHandler(err, req, res, _next) {
     })
   }
 
+  if (err.name === 'MongoServerSelectionError' || err.name === 'MongoNetworkError') {
+    return sendError(res, {
+      message: 'Database temporarily unavailable. Please retry in a few moments.',
+      statusCode: HTTP_STATUS.SERVICE_UNAVAILABLE,
+      code: 'DATABASE_UNAVAILABLE',
+    })
+  }
+
   const statusCode = err.statusCode || HTTP_STATUS.SERVER_ERROR
   return sendError(res, {
     message: err.message || 'Internal server error',
