@@ -1121,47 +1121,6 @@ export function IndividualBookingFlowPage() {
     }
   }
 
-  const wizardIndex = step === 'type' ? 0 : step === 'details' ? 1 : step === 'summary' ? 2 : 3
-
-  if (step === 'scheduled_success') {
-    return (
-      <div className="space-y-4 pb-8">
-        <AppStackScreenHeader title="Booking confirmed" onBack={() => navigate('/user/my-bookings')} />
-        <GlassPanel className="p-6 text-center">
-          <CheckCircle2 className="mx-auto h-16 w-16 text-blue-600" aria-hidden />
-          <p className="mt-4 text-lg font-black text-slate-900">Your job is scheduled!</p>
-          {(draft.isPackage || draft.packageName) && (
-            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-3 py-1 text-xs font-extrabold text-brand">
-              <Package className="h-3.5 w-3.5" />
-              <span>{draft.packageName}</span>
-            </div>
-          )}
-          <p className="mt-2 text-sm font-medium text-slate-600">
-            We have confirmed your requirement. A service provider will be assigned to you before your scheduled time.
-          </p>
-          <div className="mt-4 text-left rounded-xl bg-slate-50 border border-slate-100 p-4 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500 font-semibold">Date</span>
-              <span className="text-slate-900 font-bold">{new Date(draft.serviceDate).toLocaleDateString()}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500 font-semibold">Time</span>
-              <span className="text-slate-900 font-bold">{draft.timeSlot}</span>
-            </div>
-          </div>
-          <motion.div className="mt-6 flex flex-col gap-2">
-            <BookingPrimaryButton type="button" onClick={() => { window.scrollTo(0, 0); clearBookingDraft(); navigate('/user/my-bookings', { replace: true }) }}>
-              View my bookings
-            </BookingPrimaryButton>
-            <AppButton type="button" variant="secondary" onClick={() => { window.scrollTo(0, 0); clearBookingDraft(); navigate('/user', { replace: true }) }}>
-              Back to home
-            </AppButton>
-          </motion.div>
-        </GlassPanel>
-      </div>
-    )
-  }
-
   const effectivePartnerData = acceptedPartnerEvent || acceptedPartner
   const rawLabor = activeBooking?.laborId
   const rawAcceptedLabor = activeBooking?.acceptedLabourId
@@ -1217,6 +1176,47 @@ export function IndividualBookingFlowPage() {
       goStep('active')
     }
   }, [step, isAccepted, goStep])
+
+  const wizardIndex = step === 'type' ? 0 : step === 'details' ? 1 : step === 'summary' ? 2 : 3
+
+  if (step === 'scheduled_success') {
+    return (
+      <div className="space-y-4 pb-8">
+        <AppStackScreenHeader title="Booking confirmed" onBack={() => navigate('/user/my-bookings')} />
+        <GlassPanel className="p-6 text-center">
+          <CheckCircle2 className="mx-auto h-16 w-16 text-blue-600" aria-hidden />
+          <p className="mt-4 text-lg font-black text-slate-900">Your job is scheduled!</p>
+          {(draft.isPackage || draft.packageName) && (
+            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-3 py-1 text-xs font-extrabold text-brand">
+              <Package className="h-3.5 w-3.5" />
+              <span>{draft.packageName}</span>
+            </div>
+          )}
+          <p className="mt-2 text-sm font-medium text-slate-600">
+            We have confirmed your requirement. A service provider will be assigned to you before your scheduled time.
+          </p>
+          <div className="mt-4 text-left rounded-xl bg-slate-50 border border-slate-100 p-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500 font-semibold">Date</span>
+              <span className="text-slate-900 font-bold">{new Date(draft.serviceDate).toLocaleDateString()}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500 font-semibold">Time</span>
+              <span className="text-slate-900 font-bold">{draft.timeSlot}</span>
+            </div>
+          </div>
+          <motion.div className="mt-6 flex flex-col gap-2">
+            <BookingPrimaryButton type="button" onClick={() => { window.scrollTo(0, 0); clearBookingDraft(); navigate('/user/my-bookings', { replace: true }) }}>
+              View my bookings
+            </BookingPrimaryButton>
+            <AppButton type="button" variant="secondary" onClick={() => { window.scrollTo(0, 0); clearBookingDraft(); navigate('/user', { replace: true }) }}>
+              Back to home
+            </AppButton>
+          </motion.div>
+        </GlassPanel>
+      </div>
+    )
+  }
 
   if (step === 'searching' && !noMatch) {
     const isCancelled = ['CANCELLED', 'FAILED', 'REJECTED'].includes((activeBooking?.status || '').toUpperCase())
