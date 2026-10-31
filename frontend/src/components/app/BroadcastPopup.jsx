@@ -212,8 +212,31 @@ export function BroadcastPopup() {
       setIncoming(null)
       navigate(`/serviceprovider/active-job/${bookingId}`)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to accept')
+      const msg = err instanceof ApiError ? err.message : 'Failed to accept'
+      setError(msg)
       setResponding(false)
+      if (
+        msg.includes('already accepted by you') ||
+        msg.includes('Current status is EN_ROUTE') ||
+        msg.includes('Current status is STARTED')
+      ) {
+        setTimeout(() => {
+          if (timerRef.current) clearInterval(timerRef.current)
+          const bId = incoming.bookingId
+          setIncoming(null)
+          navigate(`/serviceprovider/active-job/${bId}`)
+        }, 1200)
+      } else if (
+        msg.includes('another service provider') ||
+        msg.includes('fully accepted') ||
+        msg.includes('cancelled')
+      ) {
+        setTimeout(() => {
+          if (timerRef.current) clearInterval(timerRef.current)
+          setIncoming(null)
+          setError('')
+        }, 2500)
+      }
     }
   }, [incoming, navigate, selectedServiceId, services])
 
@@ -284,9 +307,23 @@ export function BroadcastPopup() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 ring-1 ring-amber-200/80">
-                  <Clock className="h-3.5 w-3.5 text-amber-600" aria-hidden />
-                  <span className="text-sm font-extrabold text-amber-700">{timeLeft}s</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 ring-1 ring-amber-200/80">
+                    <Clock className="h-3.5 w-3.5 text-amber-600" aria-hidden />
+                    <span className="text-sm font-extrabold text-amber-700">{timeLeft}s</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (timerRef.current) clearInterval(timerRef.current)
+                      setIncoming(null)
+                      setError('')
+                    }}
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 transition"
+                    title="Dismiss"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
 
@@ -638,6 +675,23 @@ export function BroadcastPopup() {
                   <p className="flex items-center gap-1">
                     <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {error}
                   </p>
+                  {(error.toLowerCase().includes('en_route') ||
+                    error.toLowerCase().includes('started') ||
+                    error.toLowerCase().includes('already accepted by you') ||
+                    (error.toLowerCase().includes('already') && !error.toLowerCase().includes('another'))) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (timerRef.current) clearInterval(timerRef.current)
+                        const bId = incoming?.bookingId
+                        setIncoming(null)
+                        if (bId) navigate(`/serviceprovider/active-job/${bId}`)
+                      }}
+                      className="mt-1 block text-xs font-extrabold text-brand underline"
+                    >
+                      Go to Active Job Screen &rarr;
+                    </button>
+                  )}
                   {(error.toLowerCase().includes('wallet') || error.toLowerCase().includes('recharge') || error.toLowerCase().includes('balance')) && (
                     <button
                       type="button"

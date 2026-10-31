@@ -107,8 +107,23 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     if (!currentBooking) {
       return sendError(res, { message: 'Booking not found', statusCode: HTTP_STATUS.NOT_FOUND })
     }
-    if (currentBooking.status === 'ACCEPTED') {
-      return sendError(res, { message: 'Booking was already fully accepted', statusCode: HTTP_STATUS.CONFLICT })
+
+    // Check if this labourer already accepted this booking (e.g., status is ACCEPTED, EN_ROUTE, STARTED)
+    const isAlreadyAcceptedByMe =
+      currentBooking.acceptedLabourIds?.some((id) => String(id) === String(labour._id)) ||
+      String(currentBooking.laborId) === String(labour._id) ||
+      currentBooking.assignments?.some((a) => String(a.labourId) === String(labour._id))
+
+    if (isAlreadyAcceptedByMe) {
+      return sendSuccess(res, {
+        message: 'You have already accepted this booking',
+        data: { booking: currentBooking, bookingId: currentBooking._id },
+        statusCode: HTTP_STATUS.OK,
+      })
+    }
+
+    if (currentBooking.status === 'ACCEPTED' || ['EN_ROUTE', 'STARTED', 'COMPLETED'].includes(currentBooking.status)) {
+      return sendError(res, { message: 'Booking was already accepted by another service provider', statusCode: HTTP_STATUS.CONFLICT })
     }
     if (currentBooking.status === 'CANCELLED') {
       return sendError(res, { message: 'Booking was cancelled by the customer', statusCode: HTTP_STATUS.BAD_REQUEST })
@@ -145,8 +160,12 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
   }
 
   // Check if labourer already accepted
-  if (booking.acceptedLabourIds && booking.acceptedLabourIds.includes(labour._id)) {
-    return sendError(res, { message: 'You have already accepted this booking', statusCode: HTTP_STATUS.CONFLICT })
+  if (booking.acceptedLabourIds && booking.acceptedLabourIds.some(id => String(id) === String(labour._id))) {
+    return sendSuccess(res, {
+      message: 'You have already accepted this booking',
+      data: { booking, bookingId: booking._id },
+      statusCode: HTTP_STATUS.OK,
+    })
   }
 
   // === Service Assignment Logic ===
