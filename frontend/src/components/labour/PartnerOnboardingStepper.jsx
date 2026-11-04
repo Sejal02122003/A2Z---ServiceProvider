@@ -551,31 +551,48 @@ export function PartnerOnboardingStepper({ onFinish }) {
     if (rawFiles.length === 0) return
     try {
       setUploadingKyc(true)
-      const newUrls = []
-      for (let i = 0; i < rawFiles.length; i++) {
-        const file = rawFiles[i]
-        setUploadProgressText(
-          rawFiles.length > 1
-            ? `Uploading ${i + 1} of ${rawFiles.length} photos…`
-            : 'Uploading document photo…'
-        )
-        let res
+      let completedCount = 0
+      setUploadProgressText(
+        rawFiles.length > 1
+          ? `Uploading 0 of ${rawFiles.length} documents…`
+          : 'Uploading document…'
+      )
+
+      const uploadSingleFile = async (file) => {
         try {
-          res = await uploadDocument(file, UPLOAD_FOLDERS.KYC_DOCUMENTS)
-        } catch (docErr) {
-          res = await uploadMedia(file, UPLOAD_FOLDERS.KYC_DOCUMENTS)
-        }
-        const url =
-          res?.data?.asset?.secureUrl ||
-          res?.data?.asset?.url ||
-          res?.asset?.secureUrl ||
-          res?.asset?.url ||
-          res?.url ||
-          res?.data?.url
-        if (url) {
-          newUrls.push(url)
+          let res
+          try {
+            res = await uploadDocument(file, UPLOAD_FOLDERS.KYC_DOCUMENTS)
+          } catch (docErr) {
+            res = await uploadMedia(file, UPLOAD_FOLDERS.KYC_DOCUMENTS)
+          }
+          const url =
+            res?.data?.asset?.secureUrl ||
+            res?.data?.asset?.url ||
+            res?.asset?.secureUrl ||
+            res?.asset?.url ||
+            res?.url ||
+            res?.data?.url
+          return url || null
+        } finally {
+          completedCount++
+          if (rawFiles.length > 1) {
+            setUploadProgressText(`Uploading ${completedCount} of ${rawFiles.length} documents…`)
+          }
         }
       }
+
+      const results = await Promise.allSettled(rawFiles.map((file) => uploadSingleFile(file)))
+      const newUrls = []
+      let failedCount = 0
+
+      results.forEach((r) => {
+        if (r.status === 'fulfilled' && r.value) {
+          newUrls.push(r.value)
+        } else {
+          failedCount++
+        }
+      })
 
       if (newUrls.length > 0) {
         setKycDocUrls((prev) => {
@@ -585,12 +602,19 @@ export function PartnerOnboardingStepper({ onFinish }) {
           })
           return combined
         })
-        showToast(
-          'success',
-          `${newUrls.length} KYC photo${newUrls.length > 1 ? 's' : ''} uploaded successfully!`
-        )
+        if (failedCount === 0) {
+          showToast(
+            'success',
+            `${newUrls.length} document${newUrls.length > 1 ? 's' : ''} uploaded successfully!`
+          )
+        } else {
+          showToast(
+            'warning',
+            `${newUrls.length} document${newUrls.length > 1 ? 's' : ''} uploaded, ${failedCount} failed.`
+          )
+        }
       } else {
-        throw new Error('Upload succeeded but no file URL returned')
+        throw new Error('Upload failed. Please ensure your files are JPG, PNG or PDF format.')
       }
     } catch (err) {
       console.error('KYC upload failed:', err)
@@ -1561,7 +1585,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                                 <input
                                   type="file"
                                   multiple
-                                  accept="image/*,.pdf,video/*"
+                                  accept="image/*,application/pdf,.pdf,image/jpeg,image/png,image/webp,image/jpg"
                                   onChange={handleKycFileUpload}
                                   disabled={uploadingKyc}
                                   className="hidden"
@@ -1570,7 +1594,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                             </div>
 
                             <p className="text-[11px] text-slate-500">
-                              Tip: You can upload multiple photos (e.g. Aadhaar Front, Aadhaar Back, and PAN Card).
+                              Tip: You can select and upload multiple documents at once (e.g. Aadhaar Front, Aadhaar Back, and PAN Card).
                             </p>
                           </div>
                         ) : (
@@ -1587,19 +1611,19 @@ export function PartnerOnboardingStepper({ onFinish }) {
                               )}
                               <span className="font-bold text-slate-800 text-xs sm:text-sm">
                                 {uploadingKyc
-                                  ? uploadProgressText || 'Uploading photos…'
+                                  ? uploadProgressText || 'Uploading documents…'
                                   : 'Upload Aadhaar & PAN Document Photos'}
                               </span>
                               <span className="text-[11px] text-slate-500 text-center font-normal">
-                                Select multiple photos together (Front & Back of Aadhaar, PAN card) or upload one by one
+                                Select multiple documents together (Front & Back of Aadhaar, PAN card) or upload one by one
                               </span>
                               <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                                Supports JPG, PNG, PDF & Videos (Multiple photos allowed)
+                                Supports JPG, PNG, WebP & PDF (Select multiple at once)
                               </span>
                               <input
                                 type="file"
                                 multiple
-                                accept="image/*,.pdf,video/*"
+                                accept="image/*,application/pdf,.pdf,image/jpeg,image/png,image/webp,image/jpg"
                                 onChange={handleKycFileUpload}
                                 disabled={uploadingKyc}
                                 className="hidden"
