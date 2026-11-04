@@ -806,12 +806,20 @@ export function MultiServiceCartPage() {
               </div>
             )}
 
-            {useWallet && walletDiscountApplied > 0 && (
-              <div className="flex justify-between text-amber-700 font-bold">
-                <span>Wallet Discount</span>
-                <span className="font-mono">-₹{walletDiscountApplied.toLocaleString('en-IN')}</span>
-              </div>
-            )}
+            {/* Wallet Deduction in Bill Breakdown */}
+            <div className="flex justify-between font-semibold">
+              <span className="flex items-center gap-1.5 text-slate-700">
+                <WalletIcon className="h-3.5 w-3.5 text-amber-600" />
+                Wallet Deduction
+              </span>
+              {useWallet && walletDiscountApplied > 0 ? (
+                <span className="font-mono text-emerald-600 font-bold">
+                  -₹{walletDiscountApplied.toLocaleString('en-IN')}
+                </span>
+              ) : (
+                <span className="font-mono text-slate-400 font-medium">₹0</span>
+              )}
+            </div>
 
             <div className="border-t border-slate-200/80 pt-2.5 flex justify-between items-baseline">
               <span className="text-sm font-black text-slate-900">Total Payable Amount</span>

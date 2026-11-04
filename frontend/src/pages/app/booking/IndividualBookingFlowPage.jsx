@@ -2727,7 +2727,7 @@ export function IndividualBookingFlowPage() {
                             <div className="flex justify-between items-center text-xs font-bold text-emerald-700 pt-2 border-t border-amber-200/80">
                               <span className="flex items-center gap-1">
                                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                Wallet Discount Applied ({discountPercentage}% max):
+                                Wallet Deduction Applied ({discountPercentage}% max):
                               </span>
                               <span className="font-mono text-sm">-{formatInr(actualWalletDiscount)}</span>
                             </div>
@@ -2744,7 +2744,7 @@ export function IndividualBookingFlowPage() {
                           </div>
                           <div>
                             <p className="text-xs font-bold text-slate-800">A2Z Wallet</p>
-                            <p className="text-[11px] text-slate-500">Balance: ₹0 • Earn 15% cashback on completion</p>
+                            <p className="text-[11px] text-slate-500">Balance: ₹0 • Wallet Deduction: ₹0 • Earn 15% cashback</p>
                           </div>
                         </div>
                         <button
@@ -2758,15 +2758,20 @@ export function IndividualBookingFlowPage() {
                     )
                   })()}
 
-                  {useWallet && (Number(calculatedBill.walletInfo?.actualWalletDiscount) > 0) && (
-                    <div className="mt-2 flex justify-between font-semibold text-emerald-600">
-                      <span className="flex items-center gap-1">
-                        <Wallet className="h-3.5 w-3.5 text-emerald-600" />
-                        Wallet Discount
+                  {/* Wallet Deduction in Bill Breakdown */}
+                  <div className="mt-2 flex justify-between font-semibold">
+                    <span className="flex items-center gap-1.5 text-slate-700">
+                      <Wallet className="h-3.5 w-3.5 text-amber-600" />
+                      Wallet Deduction
+                    </span>
+                    {useWallet && (Number(calculatedBill.walletInfo?.actualWalletDiscount) > 0) ? (
+                      <span className="font-mono text-emerald-600 font-bold">
+                        -{formatInr(calculatedBill.walletInfo?.actualWalletDiscount)}
                       </span>
-                      <span>-{formatInr(calculatedBill.walletInfo?.actualWalletDiscount)}</span>
-                    </div>
-                  )}
+                    ) : (
+                      <span className="font-mono text-slate-400 font-medium">₹0</span>
+                    )}
+                  </div>
 
                   <div className="mt-2 flex justify-between text-base font-extrabold text-black">
                     <span>Total Payable</span>
