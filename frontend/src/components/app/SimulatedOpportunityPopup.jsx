@@ -38,9 +38,11 @@ export function SimulatedOpportunityPopup() {
   const [statusMessage, setStatusMessage] = useState('')
   const [resultState, setResultState] = useState(null) // 'WON' | 'TAKEN' | 'EXPIRED' | 'CANCELLED'
 
-  const isLabour =
+  const isVendor =
     user?.role === USER_ROLES.LABOUR ||
-    user?.role === 'labour'
+    user?.role === 'labour' ||
+    user?.role === USER_ROLES.CONTRACTOR ||
+    user?.role === 'contractor'
 
   // Audio Chime Generator using Web Audio API
   const playAlertChime = useCallback(() => {
@@ -52,7 +54,7 @@ export function SimulatedOpportunityPopup() {
       }
       const ctx = audioCtxRef.current
       if (ctx.state === 'suspended') {
-        ctx.resume()
+        ctx.resume().catch(() => {})
       }
 
       const now = ctx.currentTime
@@ -100,33 +102,39 @@ export function SimulatedOpportunityPopup() {
     }
   }, [])
 
+  const handleAlert = useCallback((data) => {
+    if (!data) return
+    console.log('--- SIMULATED_OPPORTUNITY_ALERT ---', data)
+    let seconds = 15
+    if (data.expiresAt) {
+      const diffSecs = Math.round((new Date(data.expiresAt).getTime() - Date.now()) / 1000)
+      if (diffSecs > 0) {
+        seconds = Math.min(30, Math.max(5, diffSecs))
+      }
+    }
+
+    setIncoming(data)
+    setTimeLeft(seconds)
+    setStatusMessage('')
+    setResultState(null)
+    setResponding(false)
+
+    // Start ringing sound immediately and repeat every 1.1s
+    stopAlertSound()
+    playAlertChime()
+    soundIntervalRef.current = setInterval(() => {
+      playAlertChime()
+    }, 1100)
+  }, [playAlertChime, stopAlertSound])
+
   // Socket listeners for Simulated Opportunities
   useEffect(() => {
-    if (!isLabour) {
+    if (!isVendor) {
       setIncoming(null)
       stopAlertSound()
       return
     }
     if (!socket) return
-
-    const handleAlert = (data) => {
-      console.log('--- SIMULATED_OPPORTUNITY_ALERT ---', data)
-      // 15 seconds alert countdown
-      const seconds = 15
-
-      setIncoming(data)
-      setTimeLeft(seconds)
-      setStatusMessage('')
-      setResultState(null)
-      setResponding(false)
-
-      // Start ringing sound immediately and repeat every 1.1s
-      stopAlertSound()
-      playAlertChime()
-      soundIntervalRef.current = setInterval(() => {
-        playAlertChime()
-      }, 1100)
-    }
 
     const handleTaken = (data) => {
       console.log('--- SIMULATED_OPPORTUNITY_TAKEN ---', data)
@@ -162,7 +170,51 @@ export function SimulatedOpportunityPopup() {
       socket.off('SIMULATED_OPPORTUNITY_TAKEN', handleTaken)
       socket.off('SIMULATED_OPPORTUNITY_CANCELLED', handleCancelled)
     }
-  }, [socket, isLabour, playAlertChime, stopAlertSound])
+  }, [socket, isVendor, handleAlert, stopAlertSound])
+
+  // On mount or focus: check if there are active OPEN simulated opportunities
+  useEffect(() => {
+    if (!isVendor) return
+    let isMounted = true
+
+    const checkActiveOpportunities = async () => {
+      try {
+        const res = await simulatedOpportunitiesApi.getVendorOpportunities()
+        const list = res?.data?.opportunities || []
+        if (!isMounted) return
+        const active = list.find(
+          (o) => o.status === 'OPEN' && new Date(o.expiresAt) > new Date()
+        )
+        if (active && !incoming) {
+          handleAlert({
+            opportunityId: active._id,
+            alertId: active._id,
+            bookingType: 'SIMULATED',
+            isSimulated: true,
+            serviceCategory: active.serviceCategory,
+            serviceType: active.serviceType,
+            location: active.location,
+            serviceDate: active.serviceDate,
+            serviceTime: active.serviceTime,
+            estimatedAmount: active.estimatedAmount,
+            expiresAt: active.expiresAt,
+            priority: active.priority,
+          })
+        }
+      } catch (err) {
+        console.warn('[Check Active Opportunities Error]', err?.message)
+      }
+    }
+
+    checkActiveOpportunities()
+
+    const onFocus = () => checkActiveOpportunities()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      isMounted = false
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [isVendor, incoming, handleAlert])
 
   // 15s Countdown timer -> Automatically transitions to TAKEN (accepted by other partner)
   useEffect(() => {
@@ -238,7 +290,7 @@ export function SimulatedOpportunityPopup() {
     setStatusMessage('')
   }
 
-  if (!isLabour) return null
+  if (!isVendor) return null
 
   return (
     <AnimatePresence>

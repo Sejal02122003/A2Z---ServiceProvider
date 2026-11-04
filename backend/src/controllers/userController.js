@@ -396,30 +396,15 @@ export const submitLabourKycDocuments = asyncHandler(async (req, res) => {
     })
   }
 
-  const isVideoOnlyResubmit =
-    profile.kycStatus === KYC_STATUS.FAILED && Boolean(profile.aadhaarMasked?.trim()) && Boolean(profile.panMasked?.trim())
+  const hasExistingAadhaar = Boolean(profile.aadhaarMasked?.trim())
+  const hasExistingPan = Boolean(profile.panMasked?.trim())
 
   const normalizedAadhaar = normalizeAadhaar(req.body.aadhaar)
   const normalizedPan = normalizePan(req.body.pan)
   const hasAadhaarInput = normalizedAadhaar.length > 0
   const hasPanInput = normalizedPan.length > 0
 
-  if (isVideoOnlyResubmit) {
-    if (hasAadhaarInput && !isValidAadhaarLength(normalizedAadhaar)) {
-      return sendError(res, {
-        message: 'Enter a valid 12-digit Aadhaar number',
-        statusCode: HTTP_STATUS.BAD_REQUEST,
-        code: 'INVALID_AADHAAR',
-      })
-    }
-    if (hasPanInput && !isValidPan(normalizedPan)) {
-      return sendError(res, {
-        message: 'Enter a valid PAN number',
-        statusCode: HTTP_STATUS.BAD_REQUEST,
-        code: 'INVALID_PAN',
-      })
-    }
-  } else {
+  if (hasAadhaarInput) {
     if (!isValidAadhaarLength(normalizedAadhaar)) {
       return sendError(res, {
         message: 'Enter a valid 12-digit Aadhaar number',
@@ -427,6 +412,15 @@ export const submitLabourKycDocuments = asyncHandler(async (req, res) => {
         code: 'INVALID_AADHAAR',
       })
     }
+  } else if (!hasExistingAadhaar) {
+    return sendError(res, {
+      message: 'Enter a valid 12-digit Aadhaar number',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_AADHAAR',
+    })
+  }
+
+  if (hasPanInput) {
     if (!isValidPan(normalizedPan)) {
       return sendError(res, {
         message: 'Enter a valid PAN number',
@@ -434,6 +428,12 @@ export const submitLabourKycDocuments = asyncHandler(async (req, res) => {
         code: 'INVALID_PAN',
       })
     }
+  } else if (!hasExistingPan) {
+    return sendError(res, {
+      message: 'Enter a valid PAN number',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_PAN',
+    })
   }
 
   const rawVideoUrl = normalizeStoredMediaUrl(req.body.videoUrl || req.body.kycVideoUrl)
@@ -1587,6 +1587,8 @@ export const getPartnerOnboardingStatus = asyncHandler(async (req, res) => {
         kycStatus,
         hasAadhaar,
         hasPan,
+        aadhaarMasked: user.labourProfile?.aadhaarMasked || '',
+        panMasked: user.labourProfile?.panMasked || '',
         documentUrls:
           Array.isArray(user.labourProfile?.kycDocumentUrls) && user.labourProfile.kycDocumentUrls.length > 0
             ? user.labourProfile.kycDocumentUrls

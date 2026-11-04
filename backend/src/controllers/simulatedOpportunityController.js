@@ -5,7 +5,7 @@ import { Zone } from '../models/Zone.js'
 import { InAppNotification } from '../models/InAppNotification.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
-import { emitToUser } from '../socket.js'
+import { emitToUser, getIo } from '../socket.js'
 import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
 
 /**
@@ -249,7 +249,17 @@ export const createSimulatedOpportunity = asyncHandler(async (req, res) => {
     }
   })
 
-  console.log(`[SIMULATED_OPPORTUNITY_SENT] Sent alert #${opportunity._id} to ${targetVendorIds.length} vendors.`)
+  // Also broadcast to workforce_vendors room so all online workers/contractors receive it instantly
+  try {
+    const ioInstance = getIo()
+    if (ioInstance) {
+      ioInstance.to('workforce_vendors').emit('SIMULATED_OPPORTUNITY_ALERT', alertPayload)
+    }
+  } catch (ioErr) {
+    console.warn('[Broadcast to workforce_vendors error]', ioErr?.message)
+  }
+
+  console.log(`[SIMULATED_OPPORTUNITY_SENT] Sent alert #${opportunity._id} to ${targetVendorIds.length} vendors and workforce_vendors room.`)
 
   return sendSuccess(res, {
     statusCode: HTTP_STATUS.CREATED,
@@ -370,6 +380,149 @@ export const cancelSimulatedOpportunity = asyncHandler(async (req, res) => {
 })
 
 /**
+ * 6. Admin: Update / Edit Simulated Opportunity
+ */
+export const updateSimulatedOpportunity = asyncHandler(async (req, res) => {
+  const { id } = req.params
+
+  const opportunity = await SimulatedOpportunity.findById(id)
+  if (!opportunity) {
+    return sendError(res, {
+      message: 'Simulated opportunity not found',
+      statusCode: HTTP_STATUS.NOT_FOUND,
+    })
+  }
+
+  if (opportunity.status !== 'OPEN') {
+    return sendError(res, {
+      message: `Cannot edit opportunity with status '${opportunity.status}'. Only OPEN alerts can be modified.`,
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+    })
+  }
+
+  const {
+    serviceCategory,
+    serviceType,
+    services = [],
+    categoryId,
+    subcategoryId,
+    zoneIds = [],
+    isAllZones = false,
+    zoneId,
+    location,
+    serviceDate,
+    serviceTime,
+    estimatedAmount,
+    notifyVendorCount,
+    expiryMinutes,
+    priority,
+  } = req.body
+
+  if (serviceCategory) opportunity.serviceCategory = serviceCategory.trim()
+  if (serviceType) opportunity.serviceType = serviceType.trim()
+  if (categoryId !== undefined) opportunity.categoryId = categoryId || null
+  if (subcategoryId !== undefined) opportunity.subcategoryId = subcategoryId || null
+
+  if (Array.isArray(services)) {
+    opportunity.services = services.map((s) => ({
+      serviceId: s.serviceId || s._id || null,
+      name: typeof s === 'string' ? s : s.name || '',
+      basePrice: Number(s.basePrice || s.price || 0) || undefined,
+    }))
+  }
+
+  if (estimatedAmount != null) {
+    const numAmount = Number(estimatedAmount)
+    if (!isNaN(numAmount) && numAmount >= 0) {
+      opportunity.estimatedAmount = numAmount
+    }
+  }
+
+  if (serviceDate) {
+    opportunity.serviceDate = new Date(serviceDate)
+  }
+  if (serviceTime) {
+    opportunity.serviceTime = serviceTime.trim()
+  }
+  if (priority) {
+    opportunity.priority = priority
+  }
+
+  // Zone resolution
+  const resolvedIsAllZones = isAllZones !== undefined ? Boolean(isAllZones) : opportunity.isAllZones
+  if (
+    resolvedIsAllZones ||
+    zoneId === 'all' ||
+    (Array.isArray(zoneIds) && zoneIds.includes('all'))
+  ) {
+    opportunity.isAllZones = true
+    opportunity.zoneIds = []
+    opportunity.zoneNames = ['All Zones (Broadcast Everywhere)']
+  } else if (Array.isArray(zoneIds) && zoneIds.length > 0) {
+    const dbZones = await Zone.find({ _id: { $in: zoneIds } }).lean()
+    opportunity.isAllZones = false
+    opportunity.zoneIds = dbZones.map((z) => z._id)
+    opportunity.zoneNames = dbZones.map((z) => (z.city ? `${z.name} (${z.city})` : z.name))
+  }
+
+  if (location) {
+    opportunity.location = {
+      address: location.address || opportunity.location?.address || 'City Area',
+      city: location.city || opportunity.location?.city || '',
+      latitude: location.latitude ?? opportunity.location?.latitude ?? null,
+      longitude: location.longitude ?? opportunity.location?.longitude ?? null,
+    }
+  }
+
+  // If expiryMinutes was passed, extend the expiry from now
+  if (expiryMinutes) {
+    const numExpiryMinutes = Math.max(1, Math.min(1440, Number(expiryMinutes) || 10))
+    opportunity.expiresAt = new Date(Date.now() + numExpiryMinutes * 60 * 1000)
+  }
+
+  if (notifyVendorCount) {
+    opportunity.targetVendorCount = Number(notifyVendorCount)
+  }
+
+  await opportunity.save()
+
+  // Re-emit updated socket alert to notified vendors & workforce_vendors room
+  const alertPayload = {
+    opportunityId: opportunity._id,
+    alertId: opportunity._id,
+    bookingType: 'SIMULATED',
+    isSimulated: true,
+    serviceCategory: opportunity.serviceCategory,
+    serviceType: opportunity.serviceType,
+    location: opportunity.location,
+    serviceDate: opportunity.serviceDate,
+    serviceTime: opportunity.serviceTime,
+    estimatedAmount: opportunity.estimatedAmount,
+    expiresAt: opportunity.expiresAt,
+    timeoutMs: 15000,
+    priority: opportunity.priority,
+  }
+
+  opportunity.notifiedVendors.forEach((vendorId) => {
+    emitToUser(vendorId, 'SIMULATED_OPPORTUNITY_ALERT', alertPayload)
+  })
+
+  try {
+    const ioInstance = getIo()
+    if (ioInstance) {
+      ioInstance.to('workforce_vendors').emit('SIMULATED_OPPORTUNITY_ALERT', alertPayload)
+    }
+  } catch {}
+
+  console.log(`[SIMULATED_OPPORTUNITY_UPDATED] ID: ${id} updated by Admin ${req.user._id}`)
+
+  return sendSuccess(res, {
+    message: 'Simulated opportunity alert updated successfully.',
+    data: { opportunity },
+  })
+})
+
+/**
  * 7. Vendor: Get Open Simulated Opportunities Available to This Vendor
  */
 export const getVendorSimulatedOpportunities = asyncHandler(async (req, res) => {
@@ -382,8 +535,12 @@ export const getVendorSimulatedOpportunities = asyncHandler(async (req, res) => 
   )
 
   const opportunities = await SimulatedOpportunity.find({
-    notifiedVendors: vendorId,
-    status: { $in: ['OPEN', 'ACCEPTED'] },
+    $or: [
+      { notifiedVendors: vendorId },
+      { isAllZones: true },
+    ],
+    status: 'OPEN',
+    expiresAt: { $gt: new Date() },
     'vendorResponses.vendorId': { $ne: vendorId }, // Exclude if this vendor rejected it
   })
     .sort({ createdAt: -1 })
@@ -402,7 +559,10 @@ export const getVendorSimulatedOpportunityById = asyncHandler(async (req, res) =
 
   const opportunity = await SimulatedOpportunity.findOne({
     _id: id,
-    notifiedVendors: vendorId,
+    $or: [
+      { notifiedVendors: vendorId },
+      { isAllZones: true },
+    ],
   }).lean()
 
   if (!opportunity) {
@@ -459,7 +619,10 @@ export const acceptSimulatedOpportunity = asyncHandler(async (req, res) => {
       _id: id,
       status: 'OPEN',
       expiresAt: { $gt: now },
-      notifiedVendors: vendorId,
+      $or: [
+        { notifiedVendors: vendorId },
+        { isAllZones: true },
+      ],
     },
     {
       $set: {
@@ -467,6 +630,7 @@ export const acceptSimulatedOpportunity = asyncHandler(async (req, res) => {
         acceptedBy: vendorId,
         acceptedAt: now,
       },
+      $addToSet: { notifiedVendors: vendorId },
     },
     { new: true }
   ).populate('acceptedBy', 'fullName phone name')
@@ -479,7 +643,7 @@ export const acceptSimulatedOpportunity = asyncHandler(async (req, res) => {
       return sendError(res, { message: 'Opportunity not found.', statusCode: HTTP_STATUS.NOT_FOUND })
     }
 
-    if (!existing.notifiedVendors.some((vid) => String(vid) === String(vendorId))) {
+    if (!existing.isAllZones && !existing.notifiedVendors.some((vid) => String(vid) === String(vendorId))) {
       return sendError(res, {
         message: 'You are not authorized to access this opportunity.',
         statusCode: HTTP_STATUS.FORBIDDEN,
@@ -519,17 +683,26 @@ export const acceptSimulatedOpportunity = asyncHandler(async (req, res) => {
 
   console.log(`[SIMULATED_OPPORTUNITY_ACCEPTED] ID: ${id} WON by Vendor ${vendorId} (${opportunity.acceptedBy?.fullName || 'Vendor'})`)
 
-  // Notify all other notified vendors that the opportunity is already taken
+  // Notify all other notified vendors & workforce room that the opportunity is already taken
   const winningVendorName = opportunity.acceptedBy?.fullName || 'Another vendor'
+  const takenPayload = {
+    opportunityId: opportunity._id,
+    message: 'This opportunity has already been taken.',
+    acceptedBy: winningVendorName,
+  }
+
   opportunity.notifiedVendors.forEach((notifiedId) => {
     if (String(notifiedId) !== String(vendorId)) {
-      emitToUser(notifiedId, 'SIMULATED_OPPORTUNITY_TAKEN', {
-        opportunityId: opportunity._id,
-        message: 'This opportunity has already been taken.',
-        acceptedBy: winningVendorName,
-      })
+      emitToUser(notifiedId, 'SIMULATED_OPPORTUNITY_TAKEN', takenPayload)
     }
   })
+
+  try {
+    const ioInstance = getIo()
+    if (ioInstance) {
+      ioInstance.to('workforce_vendors').emit('SIMULATED_OPPORTUNITY_TAKEN', takenPayload)
+    }
+  } catch {}
 
   return sendSuccess(res, {
     message: 'Opportunity accepted successfully! You secured this opportunity.',

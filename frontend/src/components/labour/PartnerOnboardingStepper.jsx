@@ -350,13 +350,26 @@ export function PartnerOnboardingStepper({ onFinish }) {
         }
       }
       if (res.step2) {
+        if (res.step2.aadhaar || res.step2.aadhaarNumber) {
+          setAadhaarInput((prev) => prev || String(res.step2.aadhaar || res.step2.aadhaarNumber))
+        }
+        if (res.step2.pan || res.step2.panNumber) {
+          setPanInput((prev) => prev || String(res.step2.pan || res.step2.panNumber).toUpperCase())
+        }
         if (Array.isArray(res.step2.documentUrls) && res.step2.documentUrls.length > 0) {
           setKycDocUrls((prev) => (prev.length === 0 ? res.step2.documentUrls.filter(Boolean) : prev))
         } else if (res.step2.frontImageUrl) {
           setKycDocUrls((prev) => (prev.length === 0 ? [res.step2.frontImageUrl] : prev))
         }
-      } else if (res.user?.labourProfile) {
+      }
+      if (res.user?.labourProfile) {
         const lp = res.user.labourProfile
+        if (lp.aadhaarNumber || res.user.aadhaarNumber) {
+          setAadhaarInput((prev) => prev || String(lp.aadhaarNumber || res.user.aadhaarNumber))
+        }
+        if (lp.panNumber || res.user.panNumber) {
+          setPanInput((prev) => prev || String(lp.panNumber || res.user.panNumber).toUpperCase())
+        }
         if (Array.isArray(lp.kycDocumentUrls) && lp.kycDocumentUrls.length > 0) {
           setKycDocUrls((prev) => (prev.length === 0 ? lp.kycDocumentUrls.filter(Boolean) : prev))
         } else if (lp.kycFrontImageUrl) {
@@ -502,11 +515,23 @@ export function PartnerOnboardingStepper({ onFinish }) {
     const rawAadhaar = aadhaarInput.replace(/\D/g, '')
     const rawPan = panInput.trim().toUpperCase()
 
-    if (rawAadhaar.length !== 12) {
+    const hasSavedAadhaar = Boolean(step2?.hasAadhaar || step2?.aadhaarMasked)
+    const hasSavedPan = Boolean(step2?.hasPan || step2?.panMasked)
+
+    if (rawAadhaar.length > 0 && rawAadhaar.length !== 12) {
       showToast('error', 'Please enter a valid 12-digit Aadhaar number.')
       return
     }
-    if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(rawPan)) {
+    if (!hasSavedAadhaar && rawAadhaar.length !== 12) {
+      showToast('error', 'Please enter a valid 12-digit Aadhaar number.')
+      return
+    }
+
+    if (rawPan.length > 0 && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(rawPan)) {
+      showToast('error', 'Please enter a valid 10-character PAN number.')
+      return
+    }
+    if (!hasSavedPan && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(rawPan)) {
       showToast('error', 'Please enter a valid 10-character PAN number.')
       return
     }
@@ -521,9 +546,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
       const primaryDoc = kycDocUrls[0] || ''
       const secondaryDoc = kycDocUrls[1] || ''
 
-      await submitLabourKycDocuments({
-        aadhaar: rawAadhaar,
-        pan: rawPan,
+      const kycPayload = {
         documentUrl: primaryDoc,
         frontImageUrl: primaryDoc,
         backImageUrl: secondaryDoc,
@@ -533,7 +556,15 @@ export function PartnerOnboardingStepper({ onFinish }) {
           publicId: `kyc_${user?._id || 'partner'}`,
           uploadedAt: new Date(),
         },
-      })
+      }
+      if (rawAadhaar.length === 12) {
+        kycPayload.aadhaar = rawAadhaar
+      }
+      if (rawPan.length === 10) {
+        kycPayload.pan = rawPan
+      }
+
+      await submitLabourKycDocuments(kycPayload)
 
       showToast('success', 'Aadhaar & PAN KYC submitted for Admin Approval!')
       await loadStatus()
@@ -1030,9 +1061,14 @@ export function PartnerOnboardingStepper({ onFinish }) {
                 </div>
                 <div className="flex items-center gap-2">
                   {step1.completed ? (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                      Submitted ✓
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                        Submitted ✓
+                      </span>
+                      <span className="rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-300 px-2 py-0.5 text-[10px] font-bold text-slate-700 transition">
+                        Edit
+                      </span>
+                    </div>
                   ) : (
                     <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-800">
                       In Progress
@@ -1417,9 +1453,14 @@ export function PartnerOnboardingStepper({ onFinish }) {
                 </div>
                 <div className="flex items-center gap-2">
                   {step2.completed ? (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                      Submitted ✓
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                        Submitted ✓
+                      </span>
+                      <span className="rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-300 px-2 py-0.5 text-[10px] font-bold text-slate-700 transition">
+                        Edit
+                      </span>
+                    </div>
                   ) : !step1.completed ? (
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
                       Locked
@@ -1453,30 +1494,44 @@ export function PartnerOnboardingStepper({ onFinish }) {
                     <form onSubmit={handleSubmitStep2} className="space-y-3">
                       {/* Aadhaar Input */}
                       <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                          Aadhaar Number (12 Digits)
-                        </label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                            Aadhaar Number (12 Digits)
+                          </label>
+                          {(step2?.aadhaarMasked || step2?.hasAadhaar) && (
+                            <span className="text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                              ✓ Saved ({step2?.aadhaarMasked || '•••• •••• ••••'})
+                            </span>
+                          )}
+                        </div>
                         <input
                           type="text"
                           maxLength={12}
                           value={aadhaarInput}
                           onChange={(e) => setAadhaarInput(e.target.value.replace(/\D/g, ''))}
-                          placeholder="e.g. 5432 8765 1290"
+                          placeholder={step2?.aadhaarMasked ? `Saved: ${step2.aadhaarMasked} (Enter 12 digits only if modifying)` : 'e.g. 5432 8765 1290'}
                           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-mono font-bold tracking-wider text-slate-800 outline-none focus:border-brand"
                         />
                       </div>
 
                       {/* PAN Input */}
                       <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                          PAN Card Number (10 Characters)
-                        </label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                            PAN Card Number (10 Characters)
+                          </label>
+                          {(step2?.panMasked || step2?.hasPan) && (
+                            <span className="text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                              ✓ Saved ({step2?.panMasked || '••••••••••'})
+                            </span>
+                          )}
+                        </div>
                         <input
                           type="text"
                           maxLength={10}
                           value={panInput}
                           onChange={(e) => setPanInput(e.target.value.toUpperCase())}
-                          placeholder="e.g. ABCDE1234F"
+                          placeholder={step2?.panMasked ? `Saved: ${step2.panMasked} (Enter 10 chars only if modifying)` : 'e.g. ABCDE1234F'}
                           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-mono font-bold tracking-wider text-slate-800 uppercase outline-none focus:border-brand"
                         />
                       </div>
@@ -1635,7 +1690,14 @@ export function PartnerOnboardingStepper({ onFinish }) {
 
                       <button
                         type="submit"
-                        disabled={submitting || aadhaarInput.length !== 12 || panInput.length !== 10 || kycDocUrls.length === 0}
+                        disabled={
+                          submitting ||
+                          kycDocUrls.length === 0 ||
+                          (aadhaarInput.length !== 12 && !step2?.hasAadhaar && !step2?.aadhaarMasked) ||
+                          (aadhaarInput.length > 0 && aadhaarInput.length !== 12) ||
+                          (panInput.length !== 10 && !step2?.hasPan && !step2?.panMasked) ||
+                          (panInput.length > 0 && panInput.length !== 10)
+                        }
                         className="w-full flex items-center justify-center gap-2 rounded-xl bg-brand py-2.5 text-xs font-bold text-white shadow-md shadow-brand/20 transition hover:bg-brand-600 disabled:opacity-50"
                       >
                         {submitting ? (
@@ -1643,7 +1705,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                         ) : (
                           <ShieldCheck className="h-4 w-4" />
                         )}
-                        <span>Complete KYC Verification</span>
+                        <span>{step2.completed ? 'Update KYC Verification' : 'Complete KYC Verification'}</span>
                       </button>
                     </form>
                   </motion.div>

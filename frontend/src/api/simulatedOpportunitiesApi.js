@@ -33,6 +33,13 @@ export const simulatedOpportunitiesApi = {
     return apiRequest(`/simulated-opportunities/admin/${id}`)
   },
 
+  updateOpportunity: (id, data) => {
+    return apiRequest(`/simulated-opportunities/admin/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  },
+
   cancelOpportunity: (id) => {
     return apiRequest(`/simulated-opportunities/admin/${id}/cancel`, {
       method: 'PATCH',

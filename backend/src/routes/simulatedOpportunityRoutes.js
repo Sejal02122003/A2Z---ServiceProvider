@@ -8,6 +8,7 @@ import {
   getAdminSimulatedOpportunities,
   getAdminSimulatedOpportunityById,
   cancelSimulatedOpportunity,
+  updateSimulatedOpportunity,
   getVendorSimulatedOpportunities,
   getVendorSimulatedOpportunityById,
   acceptSimulatedOpportunity,
@@ -50,6 +51,13 @@ router.get(
   protect,
   restrictTo(USER_ROLES.ADMIN),
   getAdminSimulatedOpportunityById
+)
+
+router.patch(
+  '/admin/:id',
+  protect,
+  restrictTo(USER_ROLES.ADMIN),
+  updateSimulatedOpportunity
 )
 
 router.patch(

@@ -52,6 +52,11 @@ export const initSocket = (httpServer) => {
     // Join a room specific to this user ID so we can emit directly to them
     socket.join(socket.user._id.toString())
 
+    // Join workforce vendors room for simulated & real broadcast alerts
+    if (socket.user.role === 'labour' || socket.user.role === 'contractor') {
+      socket.join('workforce_vendors')
+    }
+
     socket.on('disconnect', () => {
       console.log(`Socket disconnected: ${socket.id}`)
     })
