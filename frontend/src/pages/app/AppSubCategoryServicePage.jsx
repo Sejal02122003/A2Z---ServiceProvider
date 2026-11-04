@@ -298,11 +298,6 @@ export function AppSubCategoryServicePage() {
                             <Wrench className="h-6 w-6 text-slate-300" />
                           </div>
                         )}
-                        {offer.hasOffer && (
-                          <div className="absolute top-1 left-1">
-                            <ServiceOfferBadge label={offer.offerBadge} variant="ribbon" className="!px-1.5 !text-[8px]" />
-                          </div>
-                        )}
                       </div>
 
                       {/* Name & Offer Details */}
