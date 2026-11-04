@@ -753,7 +753,11 @@ export function BroadcastPopup() {
                   ) : (
                     <>
                       <Check className="h-4 w-4" aria-hidden />
-                      {requiresSelection && !selectedServiceId ? 'Pick Service' : 'Accept'}
+                      {requiresSelection && !selectedServiceId
+                        ? 'Pick Service'
+                        : incoming.isMultiServiceBooking && services.length > 1 && !selectedServiceId
+                        ? `Accept All (${services.length} Services)`
+                        : 'Accept'}
                     </>
                   )}
                 </button>

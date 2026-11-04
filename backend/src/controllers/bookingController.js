@@ -1368,15 +1368,15 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
 
   // Sync multiServiceBooking item status if applicable
   if (booking.multiServiceBooking?.isMultiService && Array.isArray(booking.multiServiceBooking.items)) {
-    const multiItem = booking.multiServiceBooking.items.find(it => 
+    const multiItems = booking.multiServiceBooking.items.filter(it => 
       String(it.assignedLabourId) === labourIdStr || 
       (assignment && String(it.serviceId) === String(assignment.serviceId))
     )
-    if (multiItem) {
+    multiItems.forEach(multiItem => {
       multiItem.status = status
       if (status === 'STARTED') multiItem.startedAt = new Date()
       if (status === 'COMPLETED') multiItem.completedAt = new Date()
-    }
+    })
 
     const activeItems = booking.multiServiceBooking.items.filter(it => it.status !== 'CANCELLED')
     const itemStatuses = activeItems.map(it => it.status)

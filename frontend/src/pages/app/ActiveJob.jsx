@@ -708,12 +708,12 @@ export function ActiveJob() {
         {booking && (() => {
           let share = booking.laborShare || booking.basePrice || 0;
           if (booking.multiServiceBooking?.isMultiService) {
-            const myMultiItem = (booking.multiServiceBooking.items || []).find(it => {
+            const myMultiItems = (booking.multiServiceBooking.items || []).filter(it => {
               const lId = typeof it.assignedLabourId === 'object' ? it.assignedLabourId?._id : it.assignedLabourId
               return String(lId) === String(user?._id)
             })
-            if (myMultiItem) {
-              share = Math.round((myMultiItem.itemTotal || 0) * 0.90)
+            if (myMultiItems.length > 0) {
+              share = myMultiItems.reduce((acc, it) => acc + Math.round((it.itemTotal || 0) * 0.90), 0)
             }
           } else if (booking.assignments && booking.assignments.length > 0) {
             if (booking.contractorInfo?.services?.length > 0) {
@@ -876,25 +876,40 @@ export function ActiveJob() {
           </>
         )}
         {booking.multiServiceBooking?.isMultiService && (() => {
-          const myItem = (booking.multiServiceBooking.items || []).find(it => {
+          const myItems = (booking.multiServiceBooking.items || []).filter(it => {
             const lId = typeof it.assignedLabourId === 'object' ? it.assignedLabourId?._id : it.assignedLabourId
             return String(lId) === String(user?._id)
           })
-          if (!myItem) return null
+          if (myItems.length === 0) return null
           return (
-            <div className="mb-2 pb-2 border-b border-slate-100">
-              <span className="text-xs font-bold uppercase tracking-wider text-brand">Your Assigned Service</span>
-              <p className="text-sm font-black text-slate-900 mt-0.5">{myItem.serviceName}</p>
-              {myItem.subServiceName && (
-                <p className="text-xs text-brand font-semibold">{myItem.subServiceName}</p>
-              )}
-              <div className="flex items-center gap-2 mt-1 text-xs text-slate-600 flex-wrap">
-                <span>Quantity: <strong className="text-slate-800">{myItem.quantity || 1}</strong></span>
-                <span>•</span>
-                <span className="text-teal-800 font-bold bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200">
-                  Est. Timing: ~{myItem.formattedDuration || (myItem.totalDurationMins ? `${myItem.totalDurationMins} mins` : `${(myItem.estimatedDurationMins || 45) * (myItem.quantity || 1)} mins`)}
-                </span>
-              </div>
+            <div className="mb-2 pb-2 border-b border-slate-100 space-y-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-brand">
+                Your Assigned Services ({myItems.length})
+              </span>
+              {myItems.map((myItem, mIdx) => (
+                <div key={myItem._id || mIdx} className="rounded-xl bg-slate-50 p-2.5 border border-slate-200/80">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-black text-slate-900">{myItem.serviceName}</p>
+                      {myItem.subServiceName && (
+                        <p className="text-xs text-brand font-semibold">{myItem.subServiceName}</p>
+                      )}
+                    </div>
+                    <span className="text-xs font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      Qty: {myItem.quantity || 1}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-600 flex-wrap">
+                    <span className="text-teal-800 font-bold bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200">
+                      Est. Timing: ~{myItem.formattedDuration || (myItem.totalDurationMins ? `${myItem.totalDurationMins} mins` : `${(myItem.estimatedDurationMins || 45) * (myItem.quantity || 1)} mins`)}
+                    </span>
+                    <span>•</span>
+                    <span className="font-bold text-emerald-700">
+                      Earnings: ₹{Math.round((myItem.itemTotal || 0) * 0.90)}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           )
         })()}

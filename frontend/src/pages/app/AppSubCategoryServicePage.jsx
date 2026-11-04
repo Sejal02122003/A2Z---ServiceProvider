@@ -670,6 +670,18 @@ export function AppSubCategoryServicePage() {
                                             type="button"
                                             onClick={(e) => {
                                               e.stopPropagation()
+                                              if (cartCount > 0) {
+                                                if (!isInCart(service._id, subItem?._id)) {
+                                                  addToCart(service, subItem, {
+                                                    categoryId: cat?._id,
+                                                    categoryName: cat?.name,
+                                                    subcategoryId: cat?._id,
+                                                    subcategoryName: cat?.name,
+                                                  })
+                                                }
+                                                navigate('/user/cart')
+                                                return
+                                              }
                                               setBookingService({
                                                 ...service,
                                                 selectedSubService: subItem,
@@ -718,6 +730,18 @@ export function AppSubCategoryServicePage() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
+                              if (cartCount > 0) {
+                                if (!isInCart(service._id)) {
+                                  addToCart(service, null, {
+                                    categoryId: cat?._id,
+                                    categoryName: cat?.name,
+                                    subcategoryId: cat?._id,
+                                    subcategoryName: cat?.name,
+                                  })
+                                }
+                                navigate('/user/cart')
+                                return
+                              }
                               setBookingService(service)
                               setBookingTypeOpen(true)
                             }}

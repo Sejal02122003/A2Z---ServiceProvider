@@ -160,7 +160,7 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
   }
 
   // Check if labourer already accepted
-  if (booking.acceptedLabourIds && booking.acceptedLabourIds.some(id => String(id) === String(labour._id))) {
+  if (!isMultiServiceBooking && booking.acceptedLabourIds && booking.acceptedLabourIds.some(id => String(id) === String(labour._id))) {
     return sendSuccess(res, {
       message: 'You have already accepted this booking',
       data: { booking, bookingId: booking._id },
@@ -174,10 +174,8 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
   let assignedServiceName = ''
   let assignedLabourShare = 0
 
-  const isMultiServiceBooking = Boolean(booking.multiServiceBooking?.isMultiService && booking.multiServiceBooking.items?.length > 0)
-  const isContractorBooking = booking.contractorInfo?.services?.length > 0
-
   let chosenMultiItem = null
+  let chosenMultiItems = []
 
   if (isMultiServiceBooking) {
     const openItems = booking.multiServiceBooking.items.filter(it => it.status === 'PENDING')
@@ -200,22 +198,28 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
 
     if (chosenItemId) {
       chosenMultiItem = openItems.find(it => String(it._id) === chosenItemId)
+      if (chosenMultiItem) chosenMultiItems = [chosenMultiItem]
     } else if (chosenServiceId) {
       chosenMultiItem = openItems.find(it => String(it.serviceId) === chosenServiceId)
+      if (chosenMultiItem) chosenMultiItems = [chosenMultiItem]
     } else if (matchingOpen.length > 0) {
+      chosenMultiItems = matchingOpen
       chosenMultiItem = matchingOpen[0]
     } else {
+      chosenMultiItems = openItems
       chosenMultiItem = openItems[0]
     }
 
-    if (!chosenMultiItem) {
+    if (!chosenMultiItem && chosenMultiItems.length === 0) {
       return sendError(res, { message: 'Selected service item is no longer available', statusCode: HTTP_STATUS.BAD_REQUEST })
     }
 
     assignedServiceId = chosenMultiItem.serviceId
     assignedPricePerHour = chosenMultiItem.unitPrice || 0
-    assignedServiceName = chosenMultiItem.subServiceName ? `${chosenMultiItem.serviceName} (${chosenMultiItem.subServiceName})` : chosenMultiItem.serviceName
-    assignedLabourShare = Math.round(chosenMultiItem.itemTotal * 0.90)
+    assignedServiceName = chosenMultiItems.length === 1
+      ? (chosenMultiItem.subServiceName ? `${chosenMultiItem.serviceName} (${chosenMultiItem.subServiceName})` : chosenMultiItem.serviceName)
+      : `Multi-Service (${chosenMultiItems.length} services)`
+    assignedLabourShare = chosenMultiItems.reduce((acc, it) => acc + Math.round((it.itemTotal || 0) * 0.90), 0)
   } else if (isContractorBooking) {
     const currentAssignments = booking.assignments || []
     const { LabourService } = await import('../models/LabourService.js')
@@ -290,20 +294,42 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
   const startOtp = Math.floor(1000 + Math.random() * 9000).toString()
   const completionOtp = Math.floor(1000 + Math.random() * 9000).toString()
 
-  const newAssignment = {
-    labourId: labour._id,
-    serviceId: assignedServiceId,
-    serviceName: assignedServiceName,
-    pricePerHour: assignedPricePerHour,
-    labourShare: assignedLabourShare,
-    status: 'ACCEPTED',
-    startOtp,
-    completionOtp,
+  const newAssignments = []
+  if (isMultiServiceBooking && chosenMultiItems.length > 0) {
+    for (const itm of chosenMultiItems) {
+      newAssignments.push({
+        labourId: labour._id,
+        serviceId: itm.serviceId,
+        serviceName: itm.subServiceName ? `${itm.serviceName} (${itm.subServiceName})` : itm.serviceName,
+        pricePerHour: itm.unitPrice || 0,
+        labourShare: Math.round((itm.itemTotal || 0) * 0.90),
+        status: 'ACCEPTED',
+        startOtp: itm.startOtp || startOtp,
+        completionOtp: itm.completionOtp || completionOtp,
+      })
+    }
+  } else {
+    newAssignments.push({
+      labourId: labour._id,
+      serviceId: assignedServiceId,
+      serviceName: assignedServiceName,
+      pricePerHour: assignedPricePerHour,
+      labourShare: assignedLabourShare,
+      status: 'ACCEPTED',
+      startOtp,
+      completionOtp,
+    })
   }
 
+  const remainingPendingItems = isMultiServiceBooking
+    ? booking.multiServiceBooking.items.filter(it => 
+        it.status === 'PENDING' && !chosenMultiItems.some(ci => String(ci._id) === String(it._id))
+      )
+    : []
+
   const willBeFullyAccepted = isMultiServiceBooking
-    ? (booking.multiServiceBooking.items.filter(it => it.status === 'PENDING').length <= 1)
-    : ((booking.assignments?.length || 0) + 1 >= totalRequested)
+    ? (remainingPendingItems.length === 0)
+    : ((booking.assignments?.length || 0) + newAssignments.length >= totalRequested)
 
   const setFields = {
     acceptedLabourId: labour._id,
@@ -315,38 +341,55 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     setFields.status = 'PARTIALLY_ACCEPTED'
   }
 
-  const query = {
-    _id: bookingId,
-    status: { $in: ['CREATED', 'BROADCASTING', 'PARTIALLY_ACCEPTED'] },
-    acceptedLabourIds: { $ne: labour._id },
-    $expr: {
-      $lt: [
-        { $size: { $ifNull: ['$acceptedLabourIds', []] } },
-        totalRequested,
-      ],
-    },
-  }
+  let updatedBooking = null
 
-  if (isMultiServiceBooking && chosenMultiItem) {
-    query['multiServiceBooking.items'] = {
-      $elemMatch: { _id: chosenMultiItem._id, status: 'PENDING' }
+  if (isMultiServiceBooking && chosenMultiItems.length > 0) {
+    const targetItemIds = chosenMultiItems.map(it => it._id)
+    const msQuery = {
+      _id: bookingId,
+      status: { $in: ['CREATED', 'BROADCASTING', 'PARTIALLY_ACCEPTED'] },
+      'multiServiceBooking.items': {
+        $elemMatch: { _id: { $in: targetItemIds }, status: 'PENDING' }
+      }
     }
-    setFields['multiServiceBooking.items.$.assignedLabourId'] = labour._id
-    setFields['multiServiceBooking.items.$.status'] = 'ACCEPTED'
-  }
-
-  // Atomic conditional update to prevent double-assignment concurrent races
-  const updatedBooking = await Booking.findOneAndUpdate(
-    query,
-    {
-      $push: {
-        acceptedLabourIds: labour._id,
-        assignments: newAssignment,
+    const msUpdate = {
+      $addToSet: { acceptedLabourIds: labour._id },
+      $push: { assignments: { $each: newAssignments } },
+      $set: {
+        ...setFields,
+        'multiServiceBooking.items.$[elem].assignedLabourId': labour._id,
+        'multiServiceBooking.items.$[elem].status': 'ACCEPTED',
+      }
+    }
+    const msOptions = {
+      new: true,
+      arrayFilters: [{ 'elem._id': { $in: targetItemIds }, 'elem.status': 'PENDING' }]
+    }
+    updatedBooking = await Booking.findOneAndUpdate(msQuery, msUpdate, msOptions)
+  } else {
+    const query = {
+      _id: bookingId,
+      status: { $in: ['CREATED', 'BROADCASTING', 'PARTIALLY_ACCEPTED'] },
+      acceptedLabourIds: { $ne: labour._id },
+      $expr: {
+        $lt: [
+          { $size: { $ifNull: ['$acceptedLabourIds', []] } },
+          totalRequested,
+        ],
       },
-      $set: setFields,
-    },
-    { new: true }
-  )
+    }
+    updatedBooking = await Booking.findOneAndUpdate(
+      query,
+      {
+        $push: {
+          acceptedLabourIds: labour._id,
+          assignments: newAssignments[0],
+        },
+        $set: setFields,
+      },
+      { new: true }
+    )
+  }
 
   if (!updatedBooking) {
     // Release cash reservation if concurrent accept race lost
@@ -362,6 +405,13 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
   }
 
   booking = updatedBooking
+
+  // For multi-service bookings where some items remain PENDING, continue broadcasting for those items
+  if (isMultiServiceBooking && !willBeFullyAccepted) {
+    import('../services/broadcastService.js').then(({ startBroadcastCycle }) => {
+      startBroadcastCycle(booking._id).catch(err => console.error('[PARTIALLY_ACCEPTED_BROADCAST_ERROR]', err))
+    }).catch(() => {})
+  }
 
   // Auto-generate material requirement if service has mapped products
   import('../services/materialRequirementService.js')
@@ -392,7 +442,7 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
       sendBookingAcceptedNotification({
         booking,
         partner: labour,
-        assignment: newAssignment,
+        assignment: newAssignments[0],
       }).catch((err) => console.error('[Notification Dispatch Error on Accept]', err))
     })
     .catch((err) => console.error('[Import Error bookingNotificationService]', err))
@@ -591,7 +641,7 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       openSlots: 1,
     }))
 
-    const bestEarning = servicesPayload.reduce((max, s) => Math.max(max, s.estimatedEarnings), 0)
+    const totalEarnings = servicesPayload.reduce((sum, s) => sum + (s.estimatedEarnings || 0), 0)
     const totalBookingDuration = booking.totalDurationMins || Math.round(bookingHours * 60)
     const formattedBookingDuration = booking.formattedDuration || formatDurationHuman(totalBookingDuration)
     const totalBookingQty = (booking.multiServiceBooking?.items || []).reduce((acc, it) => acc + (it.quantity || 1), 0) || booking.quantity || 1
@@ -601,10 +651,10 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       type: booking.type || 'SCHEDULED',
       customerName: booking.userId?.fullName || 'Customer',
       customerPhone: booking.userId?.phone || '',
-      serviceName: servicesPayload.length === 1 ? servicesPayload[0].name : 'Multi-Service Booking',
+      serviceName: servicesPayload.length === 1 ? servicesPayload[0].name : `Multi-Service (${servicesPayload.length} services)`,
       services: servicesPayload,
       isMultiServiceBooking: true,
-      requiresServiceSelection: servicesPayload.length > 1,
+      requiresServiceSelection: false,
       quantity: totalBookingQty,
       totalQuantity: totalBookingQty,
       totalDurationMins: totalBookingDuration,
@@ -614,7 +664,7 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       duration: bookingHours,
       customerLocation: booking.address?.locationText || 'Service Location',
       approximateDistance: 2.5,
-      estimatedEarnings: bestEarning,
+      estimatedEarnings: totalEarnings,
       timeoutMs: remainingMs,
     }
   } else if (booking.contractorInfo?.services?.length > 0) {

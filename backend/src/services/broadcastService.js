@@ -498,22 +498,22 @@ export async function startBroadcastCycle(bookingId) {
             ? matchingMulti
             : openMultiItems.map(mapMultiItem)
 
-          const bestEarning = servicesPayload.reduce((max, s) => Math.max(max, s.estimatedEarnings), 0)
+          const totalEarnings = servicesPayload.reduce((sum, s) => sum + (s.estimatedEarnings || 0), 0)
           const totalBookingDuration = booking.totalDurationMins || Math.round(bookingHours * 60)
           const formattedBookingDuration = booking.formattedDuration || formatDurationHuman(totalBookingDuration)
           const totalBookingQty = (booking.multiServiceBooking?.items || []).reduce((acc, it) => acc + (it.quantity || 1), 0) || booking.quantity || 1
 
           import('../socket.js').then(({ emitToUser }) => {
-            console.log(`[BROADCAST] Emitting BOOKING_RECEIVED to labour ${labor.fullName || labor.phone} (${labor._id}) for multi-service booking ${booking._id}, earnings=₹${bestEarning}`)
+            console.log(`[BROADCAST] Emitting BOOKING_RECEIVED to labour ${labor.fullName || labor.phone} (${labor._id}) for multi-service booking ${booking._id}, earnings=₹${totalEarnings}`)
             emitToUser(labor._id, 'BOOKING_RECEIVED', {
               bookingId: booking._id,
               type: booking.type || 'SCHEDULED',
               customerName: booking.userId?.fullName || 'Customer',
               customerPhone: booking.userId?.phone || '',
-              serviceName: servicesPayload.length === 1 ? servicesPayload[0].name : 'Multi-Service Booking',
+              serviceName: servicesPayload.length === 1 ? servicesPayload[0].name : `Multi-Service (${servicesPayload.length} services)`,
               services: servicesPayload,
               isMultiServiceBooking: true,
-              requiresServiceSelection: servicesPayload.length > 1,
+              requiresServiceSelection: false,
               quantity: totalBookingQty,
               totalQuantity: totalBookingQty,
               totalDurationMins: totalBookingDuration,
@@ -523,14 +523,14 @@ export async function startBroadcastCycle(bookingId) {
               duration: bookingHours,
               customerLocation: booking.address?.locationText || 'Service Location',
               approximateDistance: labor.approximateDistance,
-              estimatedEarnings: bestEarning,
+              estimatedEarnings: totalEarnings,
               timeoutMs: BROADCAST_TIMEOUT_MS
             })
           })
 
           sendNotificationToUser(labor._id, {
             title: booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡',
-            body: `New multi-service job (${servicesPayload.length} services, ~${formattedBookingDuration}) near you. Estimated earnings: ₹${bestEarning}`,
+            body: `New multi-service job (${servicesPayload.length} services, ~${formattedBookingDuration}) near you. Estimated earnings: ₹${totalEarnings}`,
             data: { type: 'booking_received', bookingId: String(booking._id) }
           })
         } else if (booking.contractorInfo?.services?.length > 0) {
