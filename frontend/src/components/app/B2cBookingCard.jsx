@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
-import { Calendar, CreditCard, MapPin, User, Loader2, Plus, Minus, Clock, CheckCircle, Package, Star } from 'lucide-react'
+import { Calendar, CreditCard, MapPin, User, Loader2, Plus, Minus, Clock, CheckCircle, Star } from 'lucide-react'
 import { GlassPanel } from '../ui/GlassPanel.jsx'
 import { bookingsApi } from '../../api/bookingsApi.js'
 import { getLabourBookingShare } from '../../lib/bookingLabourShare.js'
@@ -36,9 +36,6 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
   
   const subcategory = typeof booking.subcategoryId === 'object' ? booking.subcategoryId : null
   const isActive = (status !== 'COMPLETED' || !isPaid) && status !== 'CANCELLED'
-
-  const displayStartOtp = booking.assignments?.length > 0 ? booking.assignments[0].startOtp : booking.startOtp;
-  const displayCompletionOtp = booking.assignments?.length > 0 ? booking.assignments[0].completionOtp : booking.completionOtp;
 
   const [extraHours, setExtraHours] = useState({})
   const [loadingTime, setLoadingTime] = useState(null)
