@@ -127,7 +127,7 @@ function AddServiceModal({ open, subcategories, activeZones = [], onClose, onSav
         maxHours: chargeType === 'PER_HOUR' ? Number(maxHours || 24) : 24,
         discountType,
         discountValue: Number(discountValue),
-        isAllZones: zones.length === activeZones.length,
+        isAllZones: true,
         zones: zones
           .filter(z => (typeof z.zone === 'object' ? z.zone?._id : z.zone))
           .map(z => ({
@@ -803,7 +803,7 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
         maxHours: chargeType === 'PER_HOUR' ? Number(maxHours || 24) : 24,
         discountType,
         discountValue: Number(discountValue),
-        isAllZones: zones.length === activeZones.length,
+        isAllZones: true,
         zones: zones
           .filter(z => (typeof z.zone === 'object' ? z.zone?._id : z.zone))
           .map(z => ({

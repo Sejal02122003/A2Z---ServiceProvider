@@ -40,7 +40,12 @@ export const listGrouped = asyncHandler(async (req, res) => {
   if (userZoneId) {
     serviceFilter.$or = [
       { isAllZones: true },
-      { "zones.zone": userZoneId }
+      { "zones.zone": userZoneId },
+      { isAllZones: { $ne: false } },
+      { zones: { $size: 0 } },
+      { zones: { $exists: false } },
+      { basePrice: { $gt: 0 } },
+      { hourlyPrice: { $gt: 0 } },
     ]
   }
   

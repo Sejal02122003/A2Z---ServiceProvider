@@ -89,26 +89,53 @@ export function AppSubCategoryServicePage() {
     if (!cat?.services?.length) {
       setLoading(true)
     }
-    fetchLabourCategoriesGrouped(loc?.lat, loc?.lng, loc?.city, loc?.address)
-      .then(res => {
-        if (cancelled) return
-        const groups = res.data?.groups || []
-        let matched = null
-        for (const g of groups) {
-          for (const c of (g.categories || [])) {
-            if (String(c._id) === String(id) || String(c._id) === String(cat?._id)) {
-              matched = { ...c, groupId: g._id, groupName: g.name, services: c.services || [] }
-              break
-            }
-          }
-          if (matched) break
-          if (String(g._id) === String(id)) {
-            matched = { ...g, groupId: g._id, groupName: g.name, services: g.services || [] }
+
+    const findMatch = (groups) => {
+      let matched = null
+      for (const g of groups) {
+        for (const c of (g.categories || [])) {
+          if (String(c._id) === String(id) || String(c._id) === String(cat?._id)) {
+            matched = { ...c, groupId: g._id, groupName: g.name, services: c.services || [] }
             break
           }
         }
-        if (matched) {
-          setCat(matched)
+        if (matched) break
+        if (String(g._id) === String(id)) {
+          matched = { ...g, groupId: g._id, groupName: g.name, services: g.services || [] }
+          break
+        }
+      }
+      return matched
+    }
+
+    fetchLabourCategoriesGrouped(loc?.lat, loc?.lng, loc?.city, loc?.address)
+      .then(async (res) => {
+        if (cancelled) return
+        const groups = res.data?.groups || []
+        let matched = findMatch(groups)
+
+        // Fallback: If location-restricted query returned no services, fetch global catalogue so services never disappear
+        if (!matched || !matched.services?.length) {
+          try {
+            const fallbackRes = await fetchLabourCategoriesGrouped()
+            if (!cancelled && fallbackRes.data?.groups) {
+              const fallbackMatched = findMatch(fallbackRes.data.groups)
+              if (fallbackMatched) {
+                matched = fallbackMatched
+              }
+            }
+          } catch (err) {
+            console.error('Fallback catalogue fetch error:', err)
+          }
+        }
+
+        if (matched && !cancelled) {
+          setCat(prev => ({
+            ...matched,
+            services: (matched.services && matched.services.length > 0)
+              ? matched.services
+              : (prev?.services && prev.services.length > 0 ? prev.services : (matched.services || []))
+          }))
         }
       })
       .catch(console.error)
