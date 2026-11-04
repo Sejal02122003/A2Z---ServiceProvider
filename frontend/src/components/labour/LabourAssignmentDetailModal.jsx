@@ -182,18 +182,14 @@ export function LabourAssignmentDetailModal({ open, onClose, job, rawJob, assign
       setErrorMsg('OTP is required.')
       return
     }
-    if (requireOtp && !jobImage) {
-      setErrorMsg(nextStatus === 'STARTED' ? 'Before Work image is required.' : 'After Work image is required.')
-      return
-    }
     setLoading(true)
     setErrorMsg('')
     try {
       let payload = nextStatus
       if (requireOtp) {
         payload = { status: nextStatus, otp }
-        if (nextStatus === 'STARTED') payload.beforeImage = jobImage
-        if (nextStatus === 'COMPLETED') payload.afterImage = jobImage
+        if (nextStatus === 'STARTED' && jobImage) payload.beforeImage = jobImage
+        if (nextStatus === 'COMPLETED' && jobImage) payload.afterImage = jobImage
       }
 
       const res = await bookingsApi.updateBookingStatus(activeRawJob._id, payload)
@@ -404,7 +400,7 @@ export function LabourAssignmentDetailModal({ open, onClose, job, rawJob, assign
                   {displayStatus === 'EN_ROUTE' && (
                     <div className="space-y-4">
                       <div>
-                        <p className="text-sm font-bold text-slate-800 mb-2">1. Upload Before Work Image</p>
+                        <p className="text-sm font-bold text-slate-800 mb-2">1. Upload Before Work Image <span className="text-xs font-normal text-slate-500">(Optional)</span></p>
                         {jobImage ? (
                           <div className="relative h-40 w-full overflow-hidden rounded-xl border border-slate-200">
                             <img src={jobImage} alt="Before work" className="h-full w-full object-cover" />
@@ -452,7 +448,7 @@ export function LabourAssignmentDetailModal({ open, onClose, job, rawJob, assign
                       <AppPrimaryButton 
                         type="button" 
                         onClick={() => handleStatusUpdate('STARTED', true)}
-                        disabled={loading || otp.length < 4 || !jobImage || uploadingImage}
+                        disabled={loading || otp.length < 4 || uploadingImage}
                         className="w-full"
                       >
                         {loading ? 'Updating...' : 'Start Job'}
@@ -479,7 +475,7 @@ export function LabourAssignmentDetailModal({ open, onClose, job, rawJob, assign
                         return <JobCountdownTimer startedAt={startedAt} hours={totalHours} />;
                       })()}
                       <div>
-                        <p className="text-sm font-bold text-slate-800 mb-2">1. Upload After Work Image</p>
+                        <p className="text-sm font-bold text-slate-800 mb-2">1. Upload After Work Image <span className="text-xs font-normal text-slate-500">(Optional)</span></p>
                         {jobImage ? (
                           <div className="relative h-40 w-full overflow-hidden rounded-xl border border-slate-200">
                             <img src={jobImage} alt="After work" className="h-full w-full object-cover" />
@@ -527,7 +523,7 @@ export function LabourAssignmentDetailModal({ open, onClose, job, rawJob, assign
                       <AppPrimaryButton 
                         type="button" 
                         onClick={() => handleStatusUpdate('COMPLETED', true)}
-                        disabled={loading || otp.length < 4 || !jobImage || uploadingImage}
+                        disabled={loading || otp.length < 4 || uploadingImage}
                         className="w-full bg-blue-600 hover:bg-blue-700"
                       >
                         {loading ? 'Updating...' : 'Complete Job'}

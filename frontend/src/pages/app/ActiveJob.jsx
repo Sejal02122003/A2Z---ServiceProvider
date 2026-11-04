@@ -381,12 +381,6 @@ export function ActiveJob() {
       setUpdateError('OTP is required.')
       return
     }
-    if (requireOtp && !jobImage) {
-      setUpdateError(nextStatus === 'STARTED' ? 'Before Work image is required.' : 'After Work image is required.')
-      return
-    }
-
-
 
     setUpdating(true)
     setUpdateError('')
@@ -394,8 +388,8 @@ export function ActiveJob() {
       let payload = nextStatus
       if (requireOtp) {
         payload = { status: nextStatus, otp }
-        if (nextStatus === 'STARTED') payload.beforeImage = jobImage
-        if (nextStatus === 'COMPLETED') payload.afterImage = jobImage
+        if (nextStatus === 'STARTED' && jobImage) payload.beforeImage = jobImage
+        if (nextStatus === 'COMPLETED' && jobImage) payload.afterImage = jobImage
       }
 
       const res = await bookingsApi.updateBookingStatus(bookingId, payload)
@@ -1271,7 +1265,7 @@ export function ActiveJob() {
               {status === 'EN_ROUTE' ? (
                 <GlassPanel className="space-y-4 border-brand/20 bg-brand/5 p-4 text-left">
                   <div>
-                    <p className="text-sm font-bold text-slate-800 mb-2">1. Upload Before Work Image</p>
+                    <p className="text-sm font-bold text-slate-800 mb-2">1. Upload Before Work Image <span className="text-xs font-normal text-slate-500">(Optional)</span></p>
                     {jobImage ? (
                       <div className="relative h-40 w-full overflow-hidden rounded-xl border border-slate-200">
                         <img src={jobImage} alt="Before work" className="h-full w-full object-cover" />
@@ -1319,7 +1313,7 @@ export function ActiveJob() {
 
                   <button
                     type="button"
-                    disabled={updating || otp.length < 4 || !jobImage || uploadingImage || (booking.type === 'SCHEDULED' && booking.scheduledAt && new Date(booking.scheduledAt).getTime() > now)}
+                    disabled={updating || otp.length < 4 || uploadingImage || (booking.type === 'SCHEDULED' && booking.scheduledAt && new Date(booking.scheduledAt).getTime() > now)}
                     onClick={() => handleStatusUpdate(config.next, true)}
                     className={`flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-extrabold text-white shadow-lg transition hover:opacity-90 active:scale-[0.98] disabled:opacity-50 ${config.color}`}
                   >
@@ -1367,7 +1361,7 @@ export function ActiveJob() {
                     </div>
                   )}
                   <div>
-                    <p className="text-sm font-bold text-slate-800 mb-2">1. Upload After Work Image</p>
+                    <p className="text-sm font-bold text-slate-800 mb-2">1. Upload After Work Image <span className="text-xs font-normal text-slate-500">(Optional)</span></p>
                     {jobImage ? (
                       <div className="relative h-40 w-full overflow-hidden rounded-xl border border-slate-200">
                         <img src={jobImage} alt="After work" className="h-full w-full object-cover" />
@@ -1415,7 +1409,7 @@ export function ActiveJob() {
 
                   <button
                     type="button"
-                    disabled={updating || otp.length < 4 || !jobImage || uploadingImage}
+                    disabled={updating || otp.length < 4 || uploadingImage}
                     onClick={() => handleStatusUpdate(config.next, true)}
                     className={`flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-extrabold text-white shadow-lg transition hover:opacity-90 active:scale-[0.98] disabled:opacity-50 ${config.color}`}
                   >
