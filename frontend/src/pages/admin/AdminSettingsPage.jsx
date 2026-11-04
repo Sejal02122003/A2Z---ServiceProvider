@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import { Settings, Percent, IndianRupee, Wallet, Receipt, AlertTriangle, CheckCircle2, Loader2, Clock, Image as ImageIcon, Trash2, Radio } from 'lucide-react'
+import { Settings, Percent, IndianRupee, Wallet, Receipt, AlertTriangle, CheckCircle2, Loader2, Clock, Image as ImageIcon, Trash2, Radio, Search } from 'lucide-react'
 import { adminSettingsApi } from '../../api/adminSettingsApi.js'
 import { walletsApi } from '../../api/walletsApi.js'
 import { fetchAdminLabourCategoryTree, updateAdminLabourCategoryGst } from '../../api/adminLabourCategoriesApi.js'
@@ -115,6 +115,7 @@ export function AdminSettingsPage() {
   const [categories, setCategories] = useState([])
   const [selectedGstCategory, setSelectedGstCategory] = useState('')
   const [isGstActive, setIsGstActive] = useState(true)
+  const [gstSearch, setGstSearch] = useState('')
 
   // Payment Modes
   const [cashEnabled, setCashEnabled] = useState(true)
@@ -598,6 +599,90 @@ export function AdminSettingsPage() {
           >
             Save GST
           </AppPrimaryButton>
+
+          {/* Category GST Breakdown Overview */}
+          <div className="pt-4 border-t border-slate-100 space-y-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <p className="text-xs font-black uppercase tracking-wider text-slate-800">
+                  Category GST Rates Overview
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  Live tax percentage applied to each service category
+                </p>
+              </div>
+              <span className="text-[10px] font-extrabold text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-full">
+                {categories.length} Categories
+              </span>
+            </div>
+
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={gstSearch}
+                onChange={(e) => setGstSearch(e.target.value)}
+                placeholder="Search category GST..."
+                className="w-full rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-xs outline-none focus:border-brand"
+              />
+            </div>
+
+            <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1 divide-y divide-slate-100">
+              {categories
+                .filter(c => (c.name || '').toLowerCase().includes(gstSearch.toLowerCase()))
+                .map((cat) => {
+                  const isSelected = selectedGstCategory === cat._id
+                  const hasGst = cat.isGstActive !== false && Number(cat.gstPercentage || 0) > 0
+                  return (
+                    <div
+                      key={cat._id}
+                      className={`flex items-center justify-between p-2.5 rounded-xl transition cursor-pointer ${
+                        isSelected
+                          ? 'bg-brand/10 border border-brand/30 shadow-2xs'
+                          : 'bg-white hover:bg-slate-50 border border-slate-100'
+                      }`}
+                      onClick={() => {
+                        setSelectedGstCategory(cat._id)
+                        setGstPercentage(String(cat.gstPercentage || 0))
+                        setIsGstActive(cat.isGstActive !== false)
+                      }}
+                    >
+                      <div className="min-w-0 flex-1 pr-2">
+                        <p className="text-xs font-bold text-slate-900 truncate">{cat.name}</p>
+                        <p className="text-[10px] text-slate-400 font-mono truncate">{cat.slug || cat._id}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-black border ${
+                            hasGst
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              : cat.isGstActive === false
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                          }`}
+                        >
+                          <Receipt className="h-3 w-3" />
+                          {hasGst
+                            ? `${cat.gstPercentage}% GST`
+                            : cat.isGstActive === false
+                            ? 'Disabled'
+                            : '0% (Exempt)'}
+                        </span>
+                        <button
+                          type="button"
+                          className="text-[10px] font-bold text-blue-600 hover:text-blue-800 px-1.5 py-0.5 rounded bg-blue-50 border border-blue-200"
+                        >
+                          {isSelected ? 'Editing' : 'Select'}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              {categories.filter(c => (c.name || '').toLowerCase().includes(gstSearch.toLowerCase())).length === 0 && (
+                <p className="text-xs text-center text-slate-400 py-3">No matching categories found</p>
+              )}
+            </div>
+          </div>
         </SettingsSection>
 
         {/* Payment Modes */}

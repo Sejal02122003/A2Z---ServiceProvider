@@ -14,6 +14,8 @@ export function EditCategoryModal({ open, category, onClose, onSaved, busy, setB
   const [imageUrl, setImageUrl] = useState('')
   const [sortOrder, setSortOrder] = useState(0)
   const [isActive, setIsActive] = useState(true)
+  const [gstPercentage, setGstPercentage] = useState('')
+  const [isGstActive, setIsGstActive] = useState(true)
   const [uploadBusy, setUploadBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -24,6 +26,8 @@ export function EditCategoryModal({ open, category, onClose, onSaved, busy, setB
       setImageUrl(category.imageUrl || '')
       setSortOrder(category.sortOrder ?? 0)
       setIsActive(category.isActive ?? true)
+      setGstPercentage(category.gstPercentage != null ? String(category.gstPercentage) : '0')
+      setIsGstActive(category.isGstActive !== false)
       setError('')
     }
   }, [open, category])
@@ -64,7 +68,9 @@ export function EditCategoryModal({ open, category, onClose, onSaved, busy, setB
         subtitle: subtitle.trim(),
         imageUrl: imageUrl.trim() || undefined,
         sortOrder: Number(sortOrder),
-        isActive
+        isActive,
+        gstPercentage: gstPercentage !== '' ? Number(gstPercentage) : 0,
+        isGstActive: Boolean(isGstActive),
       }
       await patchAdminLabourCategory(category._id, payload)
       onSaved()
@@ -135,6 +141,31 @@ export function EditCategoryModal({ open, category, onClose, onSaved, busy, setB
                   className="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand/35"
                 />
                 <span className="text-sm font-semibold text-slate-700">Active</span>
+              </label>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">GST Rate (%)</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={gstPercentage}
+                onChange={(e) => setGstPercentage(e.target.value)}
+                placeholder="e.g. 18"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+              />
+            </div>
+
+            <div className="flex items-center pt-5">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isGstActive}
+                  onChange={(e) => setIsGstActive(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand/35"
+                />
+                <span className="text-sm font-semibold text-slate-700">GST Active</span>
               </label>
             </div>
 

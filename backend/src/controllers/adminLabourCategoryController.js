@@ -116,7 +116,7 @@ export const patchGroup = asyncHandler(async (req, res) => {
 })
 
 export const createCategory = asyncHandler(async (req, res) => {
-  const { name, subtitle = '', sortOrder = 0, imageUrl } = req.body
+  const { name, subtitle = '', sortOrder = 0, imageUrl, gstPercentage = 0, isGstActive = true } = req.body
   const base = slugify(name)
   let slug = `${base}-${sortOrder}`
   let n = 0
@@ -144,6 +144,8 @@ export const createCategory = asyncHandler(async (req, res) => {
     imageUrl: image,
     sortOrder,
     isActive: true,
+    gstPercentage: Number(gstPercentage) || 0,
+    isGstActive: isGstActive !== false,
   })
   return sendSuccess(res, { message: 'Category created', statusCode: HTTP_STATUS.CREATED, data: { category: c } })
 })
@@ -161,11 +163,13 @@ export const patchCategory = asyncHandler(async (req, res) => {
   if (!c) {
     return sendError(res, { message: 'Category not found', statusCode: HTTP_STATUS.NOT_FOUND, code: 'NOT_FOUND' })
   }
-  const { name, subtitle, sortOrder, isActive, imageUrl } = req.body
+  const { name, subtitle, sortOrder, isActive, imageUrl, gstPercentage, isGstActive } = req.body
   if (name != null) c.name = String(name).trim()
   if (subtitle != null) c.subtitle = String(subtitle)
   if (sortOrder != null) c.sortOrder = Number(sortOrder)
   if (isActive != null) c.isActive = Boolean(isActive)
+  if (gstPercentage !== undefined) c.gstPercentage = Math.max(0, Math.min(100, Number(gstPercentage) || 0))
+  if (isGstActive !== undefined) c.isGstActive = Boolean(isGstActive)
   if (imageUrl !== undefined) {
     const normalized = normalizeImageUrl(imageUrl)
     if (normalized === null) {
@@ -186,11 +190,13 @@ export const putCategory = asyncHandler(async (req, res) => {
   if (!c) {
     return sendError(res, { message: 'Category not found', statusCode: HTTP_STATUS.NOT_FOUND, code: 'NOT_FOUND' })
   }
-  const { name, subtitle, sortOrder, isActive, imageUrl } = req.body
+  const { name, subtitle, sortOrder, isActive, imageUrl, gstPercentage, isGstActive } = req.body
   if (name != null) c.name = String(name).trim()
   if (subtitle != null) c.subtitle = String(subtitle)
   if (sortOrder != null) c.sortOrder = Number(sortOrder)
   if (isActive != null) c.isActive = Boolean(isActive)
+  if (gstPercentage !== undefined) c.gstPercentage = Math.max(0, Math.min(100, Number(gstPercentage) || 0))
+  if (isGstActive !== undefined) c.isGstActive = Boolean(isGstActive)
   if (imageUrl !== undefined) {
     const normalized = normalizeImageUrl(imageUrl)
     if (normalized === null) {

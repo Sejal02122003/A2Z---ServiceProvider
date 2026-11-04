@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useMemo } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Plus, Search, RefreshCw, Layers, Edit2, Trash2, Eye, X, AlertTriangle } from 'lucide-react'
+import { Plus, Search, RefreshCw, Layers, Edit2, Trash2, Eye, X, AlertTriangle, Receipt } from 'lucide-react'
 import {
   fetchAdminLabourCategoryTree,
   createAdminLabourCategory,
@@ -23,6 +23,8 @@ function AddCategoryModal({ open, onClose, onSaved, busy, setBusy }) {
   const [imageUrl, setImageUrl] = useState('')
   const [sortOrder, setSortOrder] = useState(0)
   const [isActive, setIsActive] = useState(true)
+  const [gstPercentage, setGstPercentage] = useState('')
+  const [isGstActive, setIsGstActive] = useState(true)
   const [uploadBusy, setUploadBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -33,6 +35,8 @@ function AddCategoryModal({ open, onClose, onSaved, busy, setBusy }) {
       setImageUrl('')
       setSortOrder(0)
       setIsActive(true)
+      setGstPercentage('')
+      setIsGstActive(true)
       setError('')
     }
   }, [open])
@@ -73,7 +77,9 @@ function AddCategoryModal({ open, onClose, onSaved, busy, setBusy }) {
         subtitle: subtitle.trim(),
         imageUrl: imageUrl.trim() || undefined,
         sortOrder: Number(sortOrder),
-        isActive
+        isActive,
+        gstPercentage: gstPercentage !== '' ? Number(gstPercentage) : 0,
+        isGstActive: Boolean(isGstActive),
       }
       await createAdminLabourCategory(payload)
       onSaved()
@@ -144,6 +150,31 @@ function AddCategoryModal({ open, onClose, onSaved, busy, setBusy }) {
                   className="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand/35"
                 />
                 <span className="text-sm font-semibold text-slate-700">Active</span>
+              </label>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-[11px] font-bold uppercase text-slate-500">GST Rate (%)</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={gstPercentage}
+                onChange={(e) => setGstPercentage(e.target.value)}
+                placeholder="e.g. 18"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand/35"
+              />
+            </div>
+
+            <div className="flex items-center pt-5">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isGstActive}
+                  onChange={(e) => setIsGstActive(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand/35"
+                />
+                <span className="text-sm font-semibold text-slate-700">GST Active</span>
               </label>
             </div>
 
@@ -280,13 +311,32 @@ function ViewCategoryModal({ open, categoryId, onClose }) {
                     <p className="text-sm font-medium text-slate-700">{category.sortOrder}</p>
                   </div>
                 </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase text-slate-400">Status</p>
-                  <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ${
-                    category.isActive ? 'bg-blue-50 text-blue-700 ring-blue-200' : 'bg-slate-100 text-slate-500 ring-slate-200'
-                  }`}>
-                    {category.isActive ? 'Active' : 'Hidden'}
-                  </span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase text-slate-400">Status</p>
+                    <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ${
+                      category.isActive ? 'bg-blue-50 text-blue-700 ring-blue-200' : 'bg-slate-100 text-slate-500 ring-slate-200'
+                    }`}>
+                      {category.isActive ? 'Active' : 'Hidden'}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase text-slate-400">GST Rate</p>
+                    <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+                      category.isGstActive !== false && Number(category.gstPercentage || 0) > 0
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        : category.isGstActive === false
+                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                        : 'bg-slate-100 text-slate-600 border-slate-200'
+                    }`}>
+                      <Receipt className="h-2.5 w-2.5" />
+                      {category.isGstActive !== false && Number(category.gstPercentage || 0) > 0
+                        ? `${category.gstPercentage}% GST`
+                        : category.isGstActive === false
+                        ? 'Disabled'
+                        : '0% (Exempt)'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -667,17 +717,18 @@ export function AdminCategoriesPage() {
                 <th className="px-4 py-3">Image</th>
                 <th className="px-4 py-3">Name & Slug</th>
                 <th className="px-4 py-3 text-center">Status</th>
+                <th className="px-4 py-3 text-center">GST Rate</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading && categories.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-500">Loading...</td>
+                  <td colSpan={6} className="p-8 text-center text-slate-500">Loading...</td>
                 </tr>
               ) : paginatedCategories.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-500">No categories found matching criteria.</td>
+                  <td colSpan={6} className="p-8 text-center text-slate-500">No categories found matching criteria.</td>
                 </tr>
               ) : (
                 paginatedCategories.map(c => (
@@ -719,6 +770,24 @@ export function AdminCategoriesPage() {
                       >
                         {c.isActive ? 'Active' : 'Hidden'}
                       </button>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${
+                          c.isGstActive !== false && Number(c.gstPercentage || 0) > 0
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : c.isGstActive === false
+                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            : 'bg-slate-100 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        <Receipt className="h-3 w-3" />
+                        {c.isGstActive !== false && Number(c.gstPercentage || 0) > 0
+                          ? `${c.gstPercentage}% GST`
+                          : c.isGstActive === false
+                          ? 'Disabled'
+                          : '0% (Exempt)'}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-1">
