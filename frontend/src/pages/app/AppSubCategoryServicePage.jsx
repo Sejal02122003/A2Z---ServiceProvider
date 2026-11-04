@@ -13,6 +13,27 @@ import { useBookingCart } from '../../context/BookingCartContext.jsx'
 import { walletsApi } from '../../api/walletsApi.js'
 import { useAuth } from '../../hooks/useAuth.js'
 
+function getServiceDisplayDuration(service) {
+  if (!service) return null
+  if (Array.isArray(service.subServices) && service.subServices.length > 0) {
+    const activeSub = service.subServices.filter((ss) => ss.isActive !== false)
+    if (activeSub.length > 0) {
+      const durations = activeSub
+        .map((ss) => Number(ss.estimatedDurationMins) || 0)
+        .filter((m) => m > 0)
+      if (durations.length > 0) {
+        const min = Math.min(...durations)
+        const max = Math.max(...durations)
+        return min === max ? `${min} mins` : `${min}-${max} mins`
+      }
+    }
+  }
+  const mins = Number(service.estimatedDurationMins) || 0
+  if (mins > 0) return `${mins} mins`
+  if (service.minHours) return `${Number(service.minHours) * 60} mins`
+  return null
+}
+
 export function AppSubCategoryServicePage() {
   const { id } = useParams()
   const location = useLocation()
@@ -299,6 +320,7 @@ export function AppSubCategoryServicePage() {
                 const effectiveWalletPrice = Math.max(0, serviceRawPrice - walletSavingsAmount);
                 const walletCashbackAmount = Math.round((serviceRawPrice * serviceCreditPct) / 100);
                 const hasWalletOffer = Boolean(walletSettings?.enabled !== false && walletDiscountPct > 0 && serviceRawPrice > 0);
+                const serviceDuration = getServiceDisplayDuration(service);
 
                 return (
                   <div
@@ -352,9 +374,16 @@ export function AppSubCategoryServicePage() {
                               Save {offer.displaySavings}{offer.unitLabel}
                             </p>
                           )}
+                          {!isExpanded && serviceDuration && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
+                              {offer.hasOffer && <span className="text-slate-300">•</span>}
+                              <Clock className="h-3 w-3 text-slate-400 shrink-0" />
+                              <span>{serviceDuration}</span>
+                            </span>
+                          )}
                           {hasWalletOffer && !isExpanded && (
                             <p className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
-                              {offer.hasOffer && <span>•</span>}
+                              {(offer.hasOffer || serviceDuration) && <span className="text-slate-300">•</span>}
                               <span>Save up to ₹{walletSavingsAmount} with Wallet</span>
                             </p>
                           )}
@@ -452,7 +481,7 @@ export function AppSubCategoryServicePage() {
                           </div>
                         )}
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                           <div>
                             <p className="text-[10px] font-bold uppercase text-slate-400">Pricing Breakdown</p>
                             <p className="text-xs font-semibold text-slate-700 mt-1">
@@ -472,6 +501,15 @@ export function AppSubCategoryServicePage() {
                               </p>
                             )}
                           </div>
+                          {serviceDuration && (
+                            <div>
+                              <p className="text-[10px] font-bold uppercase text-slate-400">Estimated Duration</p>
+                              <p className="text-xs font-bold text-slate-700 mt-1 flex items-center gap-1.5">
+                                <Clock className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                                <span>{serviceDuration}</span>
+                              </p>
+                            </div>
+                          )}
                           <div>
                             <p className="text-[10px] font-bold uppercase text-slate-400">Status</p>
                             <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ${service.isActive !== false ? 'bg-blue-50 text-blue-700 ring-blue-200' : 'bg-slate-100 text-slate-500 ring-slate-200'
