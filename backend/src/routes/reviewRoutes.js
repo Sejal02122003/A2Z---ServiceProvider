@@ -13,11 +13,14 @@ router.post(
   [
     body('bookingId').isMongoId().withMessage('bookingId is required'),
     body('rating').isInt({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5'),
+    body('tags').optional().isArray(),
     body('comment').optional().isString()
   ],
   validateRequest,
   review.submitReview,
 )
+
+router.get('/booking/:bookingId', review.getBookingReview)
 
 router.get('/user/:userId', review.getReviews)
 

@@ -6,7 +6,7 @@ import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { evaluateBookingRating } from '../services/trialEvaluationService.js'
 
 export const submitReview = asyncHandler(async (req, res) => {
-  const { bookingId, rating, comment, revieweeId: providedRevieweeId } = req.body
+  const { bookingId, rating, comment, tags, revieweeId: providedRevieweeId } = req.body
 
   const booking = await Booking.findById(bookingId)
   if (!booking) {
@@ -38,7 +38,8 @@ export const submitReview = asyncHandler(async (req, res) => {
     reviewerId: req.user._id,
     revieweeId,
     rating,
-    comment
+    tags: Array.isArray(tags) ? tags : [],
+    comment: comment?.trim() || undefined,
   })
 
   // If customer reviewed a vendor/worker, trigger trial evaluation & rewards evaluation
@@ -106,4 +107,10 @@ export const deleteReview = asyncHandler(async (req, res) => {
     return sendError(res, { message: 'Review not found', statusCode: HTTP_STATUS.NOT_FOUND })
   }
   return sendSuccess(res, { message: 'Review deleted successfully' })
+})
+
+export const getBookingReview = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params
+  const review = await Review.findOne({ bookingId, reviewerId: req.user._id })
+  return sendSuccess(res, { data: { hasReviewed: Boolean(review), review } })
 })

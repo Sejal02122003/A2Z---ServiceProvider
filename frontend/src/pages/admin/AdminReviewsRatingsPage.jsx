@@ -580,6 +580,20 @@ export function AdminReviewsRatingsPage() {
                                 </span>
                               </div>
 
+                              {/* Customer Feedback Tags */}
+                              {review.tags && review.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                  {review.tags.map((tag, tIdx) => (
+                                    <span
+                                      key={tIdx}
+                                      className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-800 border border-emerald-200"
+                                    >
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
                               {/* Customer Feedback Comment */}
                               {review.comment ? (
                                 <p className="text-sm text-slate-800 font-medium bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">

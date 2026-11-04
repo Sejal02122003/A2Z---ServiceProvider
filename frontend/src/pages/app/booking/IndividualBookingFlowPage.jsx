@@ -2019,6 +2019,12 @@ export function IndividualBookingFlowPage() {
             (reviewQueue[currentReviewIndex]?.fullName || reviewQueue[currentReviewIndex]?.name) ||
             (activeBooking?.laborId?.fullName || activeBooking?.laborId?.name) || ''
           }
+          workerAvatar={
+            reviewQueue[currentReviewIndex]?.profileImageUrl ||
+            activeBooking?.laborId?.profileImageUrl ||
+            activeBooking?.assignments?.[0]?.labourId?.profileImageUrl
+          }
+          serviceName={activeBooking?.serviceId?.name || activeBooking?.subcategoryId?.name}
           revieweeId={reviewQueue[currentReviewIndex]?._id || reviewQueue[currentReviewIndex]}
           onClose={() => setReviewOpen(false)}
           onSubmitted={handleReviewSubmitted}

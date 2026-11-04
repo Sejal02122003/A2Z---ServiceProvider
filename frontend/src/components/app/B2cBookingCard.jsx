@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
-import { Calendar, CreditCard, MapPin, User, Loader2, Plus, Minus, Clock, CheckCircle, Package } from 'lucide-react'
+import { Calendar, CreditCard, MapPin, User, Loader2, Plus, Minus, Clock, CheckCircle, Package, Star } from 'lucide-react'
 import { GlassPanel } from '../ui/GlassPanel.jsx'
 import { bookingsApi } from '../../api/bookingsApi.js'
 import { getLabourBookingShare } from '../../lib/bookingLabourShare.js'
 import { CancelBookingModal } from './booking/CancelBookingModal.jsx'
 import { RescheduleBookingModal } from './booking/RescheduleBookingModal.jsx'
+import { BookingReviewModal } from './booking/BookingReviewModal.jsx'
 
 const STATUS_STYLES = {
   CREATED: 'bg-amber-100 text-amber-800 border-amber-200',
@@ -45,6 +46,7 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
   const [successModalOpen, setSuccessModalOpen] = useState(false)
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false)
+  const [reviewModalOpen, setReviewModalOpen] = useState(false)
 
   const handleAddExtraTimeClick = (e, targetLabourId) => {
     e.stopPropagation()
@@ -446,6 +448,23 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
             </button>
           </div>
         )}
+
+        {/* Action Row for Customer Completed Review */}
+        {!isLabour && status === 'COMPLETED' && isPaid && (
+          <div className="flex items-center justify-end gap-2 px-4 pb-3 pt-2 bg-white border-t border-slate-100/60">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setReviewModalOpen(true)
+              }}
+              className="rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-1.5 text-xs font-extrabold text-amber-800 hover:bg-amber-100 hover:border-amber-300 transition shadow-xs flex items-center gap-1.5"
+            >
+              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
+              <span>Review Partner</span>
+            </button>
+          </div>
+        )}
       </div>
     </GlassPanel>
 
@@ -472,6 +491,26 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
           onBookingUpdated(updatedBooking)
         }
       }}
+    />
+
+    {/* Review Partner Modal */}
+    <BookingReviewModal
+      open={reviewModalOpen}
+      bookingId={booking._id}
+      workerName={
+        booking?.laborId?.fullName ||
+        booking?.laborId?.name ||
+        booking?.assignments?.[0]?.labourId?.fullName ||
+        ''
+      }
+      workerAvatar={
+        booking?.laborId?.profileImageUrl ||
+        booking?.assignments?.[0]?.labourId?.profileImageUrl
+      }
+      serviceName={booking?.serviceId?.name || booking?.subcategoryId?.name}
+      revieweeId={booking?.laborId?._id || booking?.assignments?.[0]?.labourId?._id}
+      onClose={() => setReviewModalOpen(false)}
+      onSubmitted={() => setReviewModalOpen(false)}
     />
 
     {/* Confirmation Modal */}

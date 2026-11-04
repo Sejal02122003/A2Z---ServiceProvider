@@ -8,6 +8,10 @@ export const reviewsApi = {
     })
   },
 
+  getBookingReview: (bookingId) => {
+    return apiRequest(`/reviews/booking/${bookingId}`, { method: 'GET' })
+  },
+
   getUserReviews: (userId) => {
     return apiRequest(`/reviews/user/${userId}`, { method: 'GET' })
   },

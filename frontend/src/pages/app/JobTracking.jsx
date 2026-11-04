@@ -15,6 +15,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { bookingsApi } from '../../api/bookingsApi.js'
+import { reviewsApi } from '../../api/reviewsApi.js'
 import { ApiError } from '../../api/http.js'
 import { useSocket } from '../../context/SocketContext.jsx'
 import { setActiveBooking, updateBookingStatus as updateBookingStatusAction, clearActiveBooking } from '../../store/slices/activeBookingSlice.js'
@@ -85,6 +86,17 @@ export function JobTracking() {
         if (b) {
           setBooking(b)
           dispatch(setActiveBooking({ bookingId: b._id, status: b.status }))
+          if (b.status === 'COMPLETED') {
+            reviewsApi.getBookingReview(b._id)
+              .then((revRes) => {
+                if (!cancelled && !revRes?.data?.hasReviewed) {
+                  setShowReview(true)
+                }
+              })
+              .catch(() => {
+                if (!cancelled) setShowReview(true)
+              })
+          }
         }
       })
       .catch((err) => {
@@ -851,6 +863,8 @@ export function JobTracking() {
         open={showReview}
         bookingId={bookingId}
         workerName={booking?.laborId?.fullName || booking?.laborId?.name || booking?.assignments?.[0]?.labourId?.fullName || ''}
+        workerAvatar={booking?.laborId?.profileImageUrl || booking?.assignments?.[0]?.labourId?.profileImageUrl}
+        serviceName={booking?.serviceId?.name || booking?.subcategoryId?.name}
         revieweeId={booking?.laborId?._id || booking?.assignments?.[0]?.labourId?._id}
         onClose={handleReviewClose}
         onSubmitted={() => setShowReview(false)}
