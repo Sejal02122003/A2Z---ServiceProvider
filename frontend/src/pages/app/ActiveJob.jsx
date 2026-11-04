@@ -26,6 +26,7 @@ import {
   ShieldAlert,
   AlertTriangle,
   Banknote,
+  Calendar,
 } from 'lucide-react'
 import { bookingsApi } from '../../api/bookingsApi.js'
 import { ApiError } from '../../api/http.js'
@@ -41,6 +42,54 @@ import {
   fetchServiceProductMappings,
 } from '../../api/inventoryApi.js'
 import { LabourBounceCancelModal } from '../../components/labour/LabourBounceCancelModal.jsx'
+
+function formatDateTime(val) {
+  if (!val) return '—'
+  try {
+    const d = new Date(val)
+    if (isNaN(d.getTime())) return String(val)
+    return d.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    })
+  } catch {
+    return String(val)
+  }
+}
+
+function formatDate(val) {
+  if (!val) return ''
+  try {
+    const d = new Date(val)
+    if (isNaN(d.getTime())) return String(val)
+    return d.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    })
+  } catch {
+    return String(val)
+  }
+}
+
+function formatTime(val) {
+  if (!val) return ''
+  try {
+    const d = new Date(val)
+    if (isNaN(d.getTime())) return String(val)
+    return d.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    })
+  } catch {
+    return String(val)
+  }
+}
 
 function formatCountdown(ms) {
   if (ms <= 0) return '00:00:00'
@@ -710,23 +759,114 @@ export function ActiveJob() {
               }
             }
           }
-          return share > 0 ? (
-            <div className="flex justify-between">
-              <span className="text-slate-500">Your Earning</span>
-              <span className="font-bold text-slate-900">₹{Math.round(share).toLocaleString('en-IN')}</span>
-            </div>
-          ) : null;
+
+          let resolvedStartedAt = booking.startedAt;
+          if (booking.assignments && booking.assignments.length > 0 && user) {
+            const myAssignment = booking.assignments.find(a => {
+              const aId = typeof a.labourId === 'object' ? a.labourId?._id : a.labourId;
+              return String(aId) === String(user._id);
+            });
+            if (myAssignment?.startedAt) resolvedStartedAt = myAssignment.startedAt;
+          }
+          if (booking.multiServiceBooking?.isMultiService && user) {
+            const myMulti = (booking.multiServiceBooking.items || []).find(it => {
+              const lId = typeof it.assignedLabourId === 'object' ? it.assignedLabourId?._id : it.assignedLabourId;
+              return String(lId) === String(user._id);
+            });
+            if (myMulti?.startedAt) resolvedStartedAt = myMulti.startedAt;
+          }
+
+          const isStarted = status === 'STARTED' || status === 'COMPLETED' || Boolean(resolvedStartedAt);
+
+          let serviceStartInfo = null;
+          if (isStarted && resolvedStartedAt) {
+            serviceStartInfo = {
+              label: 'Service Started At',
+              value: formatDateTime(resolvedStartedAt),
+              badgeClass: 'text-emerald-800 bg-emerald-50 border-emerald-200',
+              isStarted: true,
+            };
+          } else if (booking.type === 'SCHEDULED') {
+            const dateStr = formatDate(booking.scheduledAt || booking.date);
+            const slotStr = booking.timeSlot ? booking.timeSlot.trim() : '';
+            const combined = dateStr && slotStr ? `${dateStr} (${slotStr})` : (slotStr || dateStr || 'Scheduled Slot');
+            serviceStartInfo = {
+              label: 'Service Start Time',
+              value: combined,
+              badgeClass: 'text-indigo-800 bg-indigo-50 border-indigo-200',
+              isStarted: false,
+            };
+          } else {
+            let instantVal = 'Immediate (ASAP)';
+            if (booking.timeSlot && booking.timeSlot !== 'Earliest available') {
+              instantVal = booking.timeSlot;
+            } else if (booking.createdAt) {
+              instantVal = `${formatTime(booking.createdAt)} (Immediate)`;
+            }
+            serviceStartInfo = {
+              label: 'Service Start Time',
+              value: instantVal,
+              badgeClass: 'text-teal-800 bg-teal-50 border-teal-200',
+              isStarted: false,
+            };
+          }
+
+          return (
+            <>
+              {share > 0 && (
+                <div className="flex justify-between items-center py-0.5">
+                  <span className="text-slate-500">Your Earning</span>
+                  <span className="font-bold text-slate-900">₹{Math.round(share).toLocaleString('en-IN')}</span>
+                </div>
+              )}
+
+              {/* Booking Time */}
+              <div className="flex justify-between items-center py-1 border-t border-slate-100 mt-2">
+                <span className="text-slate-500 flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  Booking Time
+                </span>
+                <span className="font-semibold text-slate-800 text-xs text-right">
+                  {formatDateTime(booking.createdAt || booking.date || booking.scheduledAt)}
+                </span>
+              </div>
+
+              {/* Scheduled Slot (if scheduled & already started, so partner still sees planned slot) */}
+              {booking.type === 'SCHEDULED' && serviceStartInfo.isStarted && (
+                <div className="flex justify-between items-center py-1 border-t border-slate-100">
+                  <span className="text-slate-500 flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    Scheduled Slot
+                  </span>
+                  <span className="font-semibold text-slate-700 text-xs text-right">
+                    {formatDate(booking.scheduledAt || booking.date)} ({booking.timeSlot || 'Scheduled'})
+                  </span>
+                </div>
+              )}
+
+              {/* Service Start Time */}
+              <div className="flex justify-between items-center py-1 border-t border-slate-100">
+                <span className="text-slate-500 flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  {serviceStartInfo.label}
+                </span>
+                <span className={`font-bold text-right text-xs px-2 py-0.5 rounded border ${serviceStartInfo.badgeClass}`}>
+                  {serviceStartInfo.value}
+                </span>
+              </div>
+            </>
+          );
         })()}
         {booking && (
           <>
-            <div className="flex justify-between items-center py-1 border-t border-slate-100 mt-2">
+            <div className="flex justify-between items-center py-1 border-t border-slate-100">
               <span className="text-slate-500">Service Timing</span>
               <span className="font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded text-xs border border-teal-200">
                 ~{booking.formattedDuration || (booking.totalDurationMins ? `${booking.totalDurationMins} mins` : `${booking.hours || 1} hr`)}
               </span>
             </div>
             {(booking.quantity > 1 || (booking.multiServiceBooking?.items?.length > 0)) && (
-              <div className="flex justify-between items-center py-1">
+              <div className="flex justify-between items-center py-1 border-t border-slate-100">
                 <span className="text-slate-500">Service Quantity</span>
                 <span className="font-bold text-slate-900">
                   {booking.quantity || booking.multiServiceBooking?.items?.reduce((acc, it) => acc + (it.quantity || 1), 0)} Items
