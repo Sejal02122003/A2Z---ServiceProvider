@@ -16,7 +16,8 @@ const DEFAULT_CONFIG = {
  * Build the exact DLT-approved SMS message replacing {#var#} with the generated OTP
  */
 export function buildOtpSmsMessage(otp) {
-  const template = process.env.SMS_TEMPLATE || DEFAULT_CONFIG.templateText
+  let template = process.env.SMS_TEMPLATE || DEFAULT_CONFIG.templateText
+  template = template.replace(/\\n/g, '\n')
   return template.replace(/\{#var#\}/g, String(otp))
 }
 
@@ -29,15 +30,17 @@ export function getSmsConfig() {
     dltEntityId: process.env.DLT_HEADER_ID || process.env.DLT_ENTITY_ID || DEFAULT_CONFIG.dltEntityId,
     dltTemplateId: process.env.DLT_ID || process.env.DLT_TEMPLATE_ID || DEFAULT_CONFIG.dltTemplateId,
     header: process.env.SMS_HEADER || process.env.SMS_SENDER_ID || DEFAULT_CONFIG.header,
-    gatewayUrl: process.env.SMS_GATEWAY_URL || '',
+    gatewayUrl: process.env.SMS_GATEWAY_URL || 'http://wsms.pansoftech.com/api/pushsms.php',
+    username: process.env.SMS_USERNAME || 'BRINGSHINE',
+    password: process.env.SMS_PASSWORD || '',
     apiKey: process.env.SMS_API_KEY || process.env.SMS_AUTH_KEY || '',
-    provider: (process.env.SMS_PROVIDER || 'generic').toLowerCase(),
+    provider: (process.env.SMS_PROVIDER || 'pansoft').toLowerCase(),
   }
 }
 
 /**
  * Send OTP via DLT-approved SMS Gateway
- * Supports Fast2SMS, MSG91, Textlocal, and custom HTTP SMS gateways.
+ * Supports PanSoft, Fast2SMS, MSG91, Textlocal, and custom HTTP SMS gateways.
  * Safe and non-blocking: never crashes the OTP generation flow if telecom API is unreachable.
  */
 export async function sendOtpSms({ phone, otp, purpose = 'auth' }) {
@@ -57,13 +60,13 @@ export async function sendOtpSms({ phone, otp, purpose = 'auth' }) {
     return { success: true, bypassed: true, mode: 'DISABLED' }
   }
 
-  // If no gateway URL or API key is configured yet, log formatted DLT dispatch for inspection
-  if (!config.gatewayUrl && !config.apiKey) {
+  // If no gateway URL or credentials configured, log formatted DLT dispatch for inspection
+  if (!config.gatewayUrl && !config.apiKey && !config.password) {
     console.info(
       `[SMS DLT Ready] Header: ${config.header} | DLT Template ID: ${config.dltTemplateId} | Entity: ${config.dltEntityId}\n` +
       `  To: +91${normalizedPhone}\n` +
       `  Message: "${message.replace(/\n/g, ' ')}"\n` +
-      `  Status: Set SMS_GATEWAY_URL / SMS_API_KEY in .env to dispatch live SMS packets.`
+      `  Status: Set SMS credentials in .env to dispatch live SMS packets.`
     )
     return { success: true, queued: true, provider: 'mock' }
   }
@@ -75,7 +78,31 @@ export async function sendOtpSms({ phone, otp, purpose = 'auth' }) {
     let response
     const provider = config.provider
 
-    if (provider === 'fast2sms') {
+    if (
+      provider === 'pansoft' ||
+      config.gatewayUrl.includes('pansoftech.com') ||
+      config.gatewayUrl.includes('pushsms.php')
+    ) {
+      // PanSoft Technologies DLT pushsms endpoint
+      const targetUrl = config.gatewayUrl || 'http://wsms.pansoftech.com/api/pushsms.php'
+      const params = new URLSearchParams()
+      params.append('username', config.username)
+      params.append('password', config.password)
+      params.append('sender', config.header)
+      params.append('message', message)
+      params.append('numbers', normalizedPhone)
+      params.append('unicode', 'false')
+      params.append('flash', 'false')
+
+      response = await fetch(targetUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.toString(),
+        signal: controller.signal,
+      })
+    } else if (provider === 'fast2sms') {
       // Fast2SMS DLT endpoint
       const url = 'https://www.fast2sms.com/dev/bulkV2'
       response = await fetch(url, {
@@ -145,10 +172,24 @@ export async function sendOtpSms({ phone, otp, purpose = 'auth' }) {
 
     if (response) {
       const respText = await response.text().catch(() => '')
-      if (response.ok) {
-        console.info(`[SMS] Successfully dispatched OTP to +91${normalizedPhone} via ${provider}. Status: ${response.status}`)
-        return { success: true, response: respText }
+      let respJson = null
+      try {
+        respJson = JSON.parse(respText)
+      } catch {
+        // Plain text response
       }
+
+      if (respJson && respJson.return === false) {
+        console.warn(`[SMS] Gateway rejected SMS dispatch to +91${normalizedPhone}: ${respJson.message || respText}`)
+        return { success: false, reason: respJson.message || 'GATEWAY_ERROR', response: respText }
+      }
+
+      if (response.ok || (respJson && respJson.return === true)) {
+        const jobId = respJson?.job_id ? ` (Job ID: ${respJson.job_id})` : ''
+        console.info(`[SMS] Successfully dispatched OTP to +91${normalizedPhone} via ${provider}.${jobId}`)
+        return { success: true, response: respText, jobId: respJson?.job_id }
+      }
+
       console.warn(`[SMS] Gateway responded with HTTP ${response.status}: ${respText}`)
       return { success: false, status: response.status, response: respText }
     }
