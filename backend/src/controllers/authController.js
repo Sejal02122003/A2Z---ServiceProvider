@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs'
 import { User } from '../models/User.js'
 import { USER_ROLES } from '../constants/roles.js'
 import { IDENTITY_STATUS } from '../constants/identityConstants.js'
-import { createOtpChallenge, validateOtpChallenge, deleteOtpChallengeDoc } from '../services/otpService.js'
+import { createOtpChallenge, validateOtpChallenge, deleteOtpChallengeDoc, isOtpBypassLast6Enabled } from '../services/otpService.js'
 import { signAccessToken } from '../services/tokenService.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
@@ -55,10 +55,16 @@ export const registerRequestOtp = asyncHandler(async (req, res) => {
       code: 'WRONG_PORTAL',
     })
   }
-  const { challengeId } = await createOtpChallenge(phone, 'register')
+  const { challengeId, plainOtp } = await createOtpChallenge(phone, 'register')
+  const isDev = process.env.NODE_ENV !== 'production' || process.env.OTP_DEV_LOG === 'true' || isOtpBypassLast6Enabled()
   return sendSuccess(res, {
     message: 'OTP sent to your mobile number',
-    data: { phone, role, challengeId },
+    data: {
+      phone,
+      role,
+      challengeId,
+      ...(isDev ? { devOtp: plainOtp, bypassHint: `Use ${plainOtp} or 123456` } : {}),
+    },
   })
 })
 
@@ -295,10 +301,16 @@ export const loginRequestOtp = asyncHandler(async (req, res) => {
   const effectiveRole = authGroup === 'labours'
     ? USER_ROLES.LABOUR
     : (user.role === USER_ROLES.LABOUR ? USER_ROLES.CUSTOMER : user.role)
-  const { challengeId } = await createOtpChallenge(phone, 'login')
+  const { challengeId, plainOtp } = await createOtpChallenge(phone, 'login')
+  const isDev = process.env.NODE_ENV !== 'production' || process.env.OTP_DEV_LOG === 'true' || isOtpBypassLast6Enabled()
   return sendSuccess(res, {
     message: 'OTP sent to your mobile number',
-    data: { phone, role: effectiveRole, challengeId },
+    data: {
+      phone,
+      role: effectiveRole,
+      challengeId,
+      ...(isDev ? { devOtp: plainOtp, bypassHint: `Use ${plainOtp} or 123456` } : {}),
+    },
   })
 })
 

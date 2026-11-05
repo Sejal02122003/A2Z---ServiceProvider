@@ -53,7 +53,7 @@ export async function createOtpChallenge(phone, purpose) {
     )
   }
 
-  return { expiresAt, challengeId: created._id.toString() }
+  return { expiresAt, challengeId: created._id.toString(), plainOtp: plain }
 }
 
 export async function validateOtpChallenge({ phone, purpose, code, challengeId }) {

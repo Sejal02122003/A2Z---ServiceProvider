@@ -13,7 +13,7 @@ const DEFAULT_CONFIG = {
   apiKey: '3SdfsumVWy9wDZ1yMEHOYSDjHYxKdR2JshjZVE-RE9sv8Gt0_27WYtX8sNBISMiU',
   templateName: 'OTPs',
   templateText:
-    'Your Verification Code for sign up in A2Z Service Hub LLP is {#var#}Valid for limited time only.  A2Z Service Hub.LLP',
+    'Your Verification Code for sign up in A2Z Service Hub LLP is {#var#} Valid for limited time only.  A2Z Service Hub.LLP',
 }
 
 /**
@@ -28,6 +28,8 @@ export function buildOtpSmsMessage(otp) {
     .replace(/\r\n/g, ' ')
     .replace(/\n/g, ' ')
     .trim()
+  // Ensure variable is properly spaced if accidentally joined with subsequent letters
+  template = template.replace(/\{#\s*var\s*#\}(?=[A-Za-z])/gi, '{#var#} ')
   return template.replace(/\{#\s*var\s*#\}/gi, String(otp))
 }
 
