@@ -455,34 +455,34 @@ export function BroadcastPopup() {
                   </div>
 
                   {!requiresSelection && incoming.serviceName && (!incoming.services || incoming.services.length <= 1) && (
-                    <div className="space-y-2 pt-0.5">
+                    <div className="space-y-2 pt-1">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-brand/80">
-                          Requested Service
-                        </p>
+                        <span className="text-[11px] font-black uppercase tracking-wider text-brand/80 flex items-center gap-1">
+                          <Sparkles className="h-3 w-3 text-brand" /> Requested Service
+                        </span>
                         {incoming.subServiceName && (
-                          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200">
+                          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-800 border border-emerald-200">
                             {incoming.subServiceName}
                           </span>
                         )}
                       </div>
 
                       {/* Prominently Highlighted Service Card */}
-                      <div className="rounded-2xl bg-white p-3.5 border border-brand/20 shadow-xs space-y-3">
-                        <p className="text-base font-black text-slate-900 leading-snug break-words">
+                      <div className="rounded-2xl bg-gradient-to-br from-white via-white to-teal-50/40 p-4 border-2 border-teal-500/25 shadow-sm space-y-3">
+                        <h3 className="text-base font-black text-slate-900 leading-snug break-words">
                           {incoming.serviceName}
-                        </p>
+                        </h3>
 
                         {/* Highlighted Time & Quantity Badges */}
-                        <div className="flex items-center gap-2 flex-wrap pt-1.5 border-t border-slate-100">
+                        <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-100">
                           {(incoming.formattedDuration || incoming.totalDurationMins || incoming.duration) && (
                             <div className="inline-flex items-center gap-1.5 rounded-xl bg-teal-50 px-3 py-1.5 text-xs font-black text-teal-900 border border-teal-200 shadow-2xs">
-                              <Clock className="h-3.5 w-3.5 text-brand" />
+                              <Clock className="h-4 w-4 text-brand" />
                               <span>Service Timing: {incoming.formattedDuration || formatDuration(incoming.totalDurationMins || (Number(incoming.duration) * 60))}</span>
                             </div>
                           )}
                           <div className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-800 border border-slate-200 shadow-2xs">
-                            <Layers className="h-3.5 w-3.5 text-slate-500" />
+                            <Layers className="h-4 w-4 text-slate-500" />
                             <span>Qty: {incoming.quantity || 1} {Number(incoming.quantity || 1) === 1 ? 'Item' : 'Items'}</span>
                           </div>
                         </div>
@@ -492,23 +492,25 @@ export function BroadcastPopup() {
 
                   {/* Multi-Service Booked Items Breakdown (When multiple items exist without requiring single selection) */}
                   {!requiresSelection && incoming.services && incoming.services.length > 1 && (
-                    <div className="space-y-2.5 pt-0.5">
+                    <div className="space-y-2.5 pt-1">
                       {/* Summary Banner with Total Timing & Count */}
-                      <div className="flex items-center justify-between flex-wrap gap-2 rounded-xl bg-white p-2.5 border border-brand/20 shadow-2xs">
-                        <div className="flex items-center gap-1.5">
-                          <Sparkles className="h-4 w-4 text-brand" />
+                      <div className="flex items-center justify-between flex-wrap gap-2 rounded-2xl bg-gradient-to-r from-teal-50 via-white to-blue-50 p-3 border border-teal-200/90 shadow-2xs">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand text-white shadow-2xs">
+                            <Sparkles className="h-3.5 w-3.5" />
+                          </span>
                           <span className="text-xs font-black uppercase tracking-wider text-slate-900">
                             Booked Services ({incoming.services.length})
                           </span>
                         </div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap">
                           {(incoming.formattedDuration || incoming.totalDurationMins || incoming.duration) && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-black text-teal-900 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200">
-                              <Clock className="h-3 w-3 text-brand" />
+                            <span className="inline-flex items-center gap-1 text-[11px] font-black text-teal-900 bg-teal-100/80 px-2.5 py-1 rounded-lg border border-teal-200">
+                              <Clock className="h-3.5 w-3.5 text-brand" />
                               Total Time: {incoming.formattedDuration || formatDuration(incoming.totalDurationMins || (Number(incoming.duration) * 60))}
                             </span>
                           )}
-                          <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-700 border border-slate-200">
+                          <span className="inline-block rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-800 border border-slate-200">
                             {incoming.quantity || incoming.services.reduce((acc, s) => acc + (s.quantity || 1), 0)} Items
                           </span>
                         </div>
@@ -525,7 +527,7 @@ export function BroadcastPopup() {
                             >
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
-                                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-black text-brand">
+                                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[11px] font-black text-brand">
                                     {idx + 1}
                                   </span>
                                   <p className="font-black text-slate-900 text-sm truncate">
