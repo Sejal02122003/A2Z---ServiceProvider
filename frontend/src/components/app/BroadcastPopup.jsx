@@ -755,18 +755,6 @@ export function BroadcastPopup() {
                 </div>
               )}
 
-              {eligibilityData && eligibilityData.eligible === true && (
-                <div className="mt-3 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs font-bold text-emerald-800">
-                  <span className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                    Wallet Eligible to Accept
-                  </span>
-                  <span className="text-[10px] text-emerald-700 font-medium">
-                    Avail: ₹{eligibilityData.availableBalance} ≥ Req: ₹{eligibilityData.requiredBalance}
-                  </span>
-                </div>
-              )}
-
               {error && (
                 <div className="mt-2 rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700 border border-rose-200 space-y-1">
                   <p className="flex items-center gap-1">
