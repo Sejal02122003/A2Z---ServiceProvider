@@ -45,10 +45,10 @@ export async function getLabourWalletDetails(userId) {
   ])
 
   const currentBalance = Number(wallet.selfBalance !== undefined ? wallet.selfBalance : (wallet.balance || 0))
-  const reservedBalance = Math.max(0, Number(wallet.reservedBalance || 0))
-  const availableBalance = Math.max(0, currentBalance - reservedBalance)
-  const adminBalance = Math.max(0, Number(wallet.adminBalance || 0))
   const minimumRequiredBalance = Math.max(0, Number(settings.minimumWalletBalance ?? 300))
+  const reservedBalance = minimumRequiredBalance // Constant required reserve across all providers
+  const availableBalance = Math.max(0, currentBalance - minimumRequiredBalance)
+  const adminBalance = Math.max(0, Number(wallet.adminBalance || 0))
   const commissionPercentage = Number(settings.commissionPercentage ?? 25)
   const isWalletEnabled = Boolean(settings.eligibilitySystemEnabled ?? true)
 
@@ -56,14 +56,15 @@ export async function getLabourWalletDetails(userId) {
     walletId: wallet._id,
     userId: wallet.userId,
     currentBalance,
+    selfBalance: currentBalance,
     reservedBalance,
     availableBalance,
     adminBalance,
     minimumRequiredBalance,
     commissionPercentage,
     isWalletEnabled,
-    isLowBalance: availableBalance < minimumRequiredBalance,
-    isEligible: !isWalletEnabled || availableBalance >= minimumRequiredBalance,
+    isLowBalance: currentBalance < minimumRequiredBalance,
+    isEligible: !isWalletEnabled || currentBalance >= minimumRequiredBalance,
     isActive: Boolean(wallet.isActive ?? true),
     currency: wallet.currency || 'INR',
     updatedAt: wallet.updatedAt,

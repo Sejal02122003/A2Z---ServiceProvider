@@ -367,14 +367,16 @@ export function LaborWallet() {
     )
   }
 
-  const availableBalance = wallet?.availableBalance ?? (wallet?.selfBalance || 0)
-  const currentBalance = wallet?.currentBalance ?? (wallet?.selfBalance || 0)
-  const reservedBalance = wallet?.reservedBalance || 0
-  const adminBalance = wallet?.adminBalance || 0
   const minRequired = eligibility?.minimumWalletBalance ?? (wallet?.minimumRequiredBalance || 300)
+  const reservedCharges = minRequired || 300
+  const currentBalance = wallet?.currentBalance ?? (wallet?.selfBalance || 0)
+  const availableBalance = wallet?.availableBalance !== undefined
+    ? wallet.availableBalance
+    : Math.max(0, currentBalance - reservedCharges)
+  const adminBalance = wallet?.adminBalance || 0
   const commissionPercentage = eligibility?.commissionPercentage ?? (wallet?.commissionPercentage || 25)
-  const isEligible = eligibility ? eligibility.eligible : (availableBalance >= minRequired)
-  const shortageAmount = Math.max(0, minRequired - availableBalance)
+  const isEligible = eligibility ? eligibility.eligible : (currentBalance >= minRequired)
+  const shortageAmount = Math.max(0, minRequired - currentBalance)
 
   return (
     <div className="space-y-4 pb-8">
@@ -406,18 +408,13 @@ export function LaborWallet() {
                 <AlertTriangle className="h-3 w-3 text-amber-300" /> Low Balance
               </span>
             )}
-            {minRequired > 0 && (
-              <span className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-teal-100 backdrop-blur-md">
-                Min: {formatInr(minRequired)}
-              </span>
-            )}
           </div>
         </div>
 
         <div className="mt-4">
           <p className="text-3xl sm:text-4xl font-black tracking-tight text-white">{formatInr(availableBalance)}</p>
           <p className="mt-1 text-xs text-teal-100/80">
-            Booking Rule: Available Balance ({formatInr(availableBalance)}) must be ≥ Min Baseline ({formatInr(minRequired)}) + Commission ({commissionPercentage}%)
+            Booking acceptance rule: Available balance must be ≥ Booking amount
           </p>
         </div>
 
@@ -477,45 +474,25 @@ export function LaborWallet() {
       )}
 
       {/* Secondary Balance Breakdown Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-2 gap-3">
         {/* Total / Ledger Balance */}
-        <GlassPanel className="p-3.5 border-slate-200/70">
+        <GlassPanel className="p-4 border-slate-200/70">
           <div className="flex items-center gap-1.5 text-slate-500">
             <ArrowDownLeft className="h-3.5 w-3.5 text-emerald-600" />
-            <p className="text-[10px] font-bold uppercase tracking-wider">Total Balance</p>
+            <p className="text-[11px] font-bold uppercase tracking-wider">Total Balance</p>
           </div>
-          <p className="mt-1 font-mono text-lg font-black text-slate-900">{formatInr(currentBalance)}</p>
-          <p className="mt-0.5 text-[9px] text-slate-400">Total deposited funds</p>
+          <p className="mt-1.5 text-xl font-extrabold text-slate-900">{formatInr(currentBalance)}</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">Total deposited & earned</p>
         </GlassPanel>
 
-        {/* Reserved Balance for Active Jobs */}
-        <GlassPanel className={`p-3.5 ${reservedBalance > 0 ? 'border-blue-200/80 bg-blue-50/20' : 'border-slate-200/70'}`}>
+        {/* Reserved Charges (₹300 for all providers) */}
+        <GlassPanel className="p-4 border-slate-200/70">
           <div className="flex items-center gap-1.5 text-slate-500">
             <Lock className="h-3.5 w-3.5 text-blue-600" />
-            <p className="text-[10px] font-bold uppercase tracking-wider">Commission Hold</p>
+            <p className="text-[11px] font-bold uppercase tracking-wider">Reserved Charges</p>
           </div>
-          <p className="mt-1 font-mono text-lg font-black text-blue-700">{formatInr(reservedBalance)}</p>
-          <p className="mt-0.5 text-[9px] text-slate-400">Reserved for accepted jobs</p>
-        </GlassPanel>
-
-        {/* Minimum Baseline Threshold */}
-        <GlassPanel className="p-3.5 border-slate-200/70">
-          <div className="flex items-center gap-1.5 text-slate-500">
-            <ShieldCheck className="h-3.5 w-3.5 text-brand" />
-            <p className="text-[10px] font-bold uppercase tracking-wider">Min Required</p>
-          </div>
-          <p className="mt-1 font-mono text-lg font-black text-slate-800">{formatInr(minRequired)}</p>
-          <p className="mt-0.5 text-[9px] text-slate-400">Admin configured baseline</p>
-        </GlassPanel>
-
-        {/* Commission Percentage */}
-        <GlassPanel className="p-3.5 border-slate-200/70">
-          <div className="flex items-center gap-1.5 text-slate-500">
-            <Receipt className="h-3.5 w-3.5 text-teal-600" />
-            <p className="text-[10px] font-bold uppercase tracking-wider">Commission Rate</p>
-          </div>
-          <p className="mt-1 font-mono text-lg font-black text-teal-700">{commissionPercentage}%</p>
-          <p className="mt-0.5 text-[9px] text-slate-400">Standard booking deduction</p>
+          <p className="mt-1.5 text-xl font-extrabold text-blue-700">{formatInr(reservedCharges)}</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">Held for active accepted jobs</p>
         </GlassPanel>
       </div>
 

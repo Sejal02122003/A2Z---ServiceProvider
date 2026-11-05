@@ -128,11 +128,12 @@ export function calculateEligibility({ wallet, settings, bookingAmount = 0 }) {
 
   const actualBalance = Number(wallet?.selfBalance !== undefined ? wallet.selfBalance : (wallet?.balance || 0))
   const walletBalancePaise = Math.round(actualBalance * 100)
-  const reservedAmountPaise = Math.max(0, Math.round(Number(wallet?.reservedBalance || 0) * 100))
+  // Reserved amount is the constant minimum baseline (₹300 default) across all providers
+  const reservedAmountPaise = minBalancePaise
   const availableBalancePaise = Math.max(0, walletBalancePaise - reservedAmountPaise)
 
-  const isEligible = !systemEnabled || (availableBalancePaise >= requiredBalancePaise)
-  const shortagePaise = isEligible ? 0 : Math.max(0, requiredBalancePaise - availableBalancePaise)
+  const isEligible = !systemEnabled || (walletBalancePaise >= requiredBalancePaise)
+  const shortagePaise = isEligible ? 0 : Math.max(0, requiredBalancePaise - walletBalancePaise)
 
   return {
     eligible: isEligible,
