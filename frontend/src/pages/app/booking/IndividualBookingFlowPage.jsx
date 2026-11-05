@@ -1098,7 +1098,7 @@ export function IndividualBookingFlowPage() {
       setActiveBooking(createdBooking)
       patchBookingDraft({ lastRef: createdBooking._id })
       setNoMatch(false)
-      goStep(draft.bookingType === 'scheduled' ? 'scheduled_success' : 'searching')
+      goStep('searching')
     } catch (err) {
       console.error(err)
       const isRestricted =
@@ -1467,7 +1467,7 @@ export function IndividualBookingFlowPage() {
             <p className="text-base font-extrabold text-slate-900">Searching for Available Service Providers</p>
             <p className="mt-1 text-xs text-slate-500">
               {booking.type === 'SCHEDULED' 
-                ? 'Your scheduled booking is confirmed. A service provider will be assigned before your service slot.' 
+                ? 'Broadcasting your scheduled request to qualified nearby service providers...' 
                 : 'Broadcasting your request to qualified nearby service providers...'}
             </p>
           </GlassPanel>
