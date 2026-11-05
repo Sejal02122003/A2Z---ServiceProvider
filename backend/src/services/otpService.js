@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs'
 import mongoose from 'mongoose'
 import { OtpChallenge } from '../models/OtpChallenge.js'
 import { normalizeIndianPhone } from '../utils/phone.js'
+import { sendOtpSms } from './smsService.js'
 
 const OTP_TTL_MS = 10 * 60 * 1000
 const MAX_ATTEMPTS = 5
@@ -37,6 +38,11 @@ export async function createOtpChallenge(phone, purpose) {
   const codeHash = await bcrypt.hash(plain, 10)
   const expiresAt = new Date(Date.now() + OTP_TTL_MS)
   const created = await OtpChallenge.create({ phone, purpose, codeHash, expiresAt })
+
+  // Dispatch DLT-approved SMS OTP (non-blocking for resilience)
+  sendOtpSms({ phone, otp: plain, purpose }).catch((err) => {
+    console.error(`[OTP_SMS_ERROR] Failed to dispatch SMS for ${phone}:`, err.message)
+  })
 
   const printOtpForTesting =
     process.env.NODE_ENV !== 'production' || process.env.OTP_DEV_LOG === 'true'
