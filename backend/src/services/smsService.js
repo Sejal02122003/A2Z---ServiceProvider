@@ -13,7 +13,7 @@ const DEFAULT_CONFIG = {
   apiKey: '3SdfsumVWy9wDZ1yMEHOYSDjHYxKdR2JshjZVE-RE9sv8Gt0_27WYtX8sNBISMiU',
   templateName: 'OTPs',
   templateText:
-    'Your Verification Code for sign up in Bringshine A2Z Service Hub is {#var#} Valid for limited time only. Bringshine A2Z Service Hub',
+    'Your Verification Code for sign up in A2Z Service Hub LLP is {#var#}Valid for limited time only.  A2Z Service Hub.LLP',
 }
 
 /**
@@ -27,9 +27,8 @@ export function buildOtpSmsMessage(otp) {
     .replace(/\\n/g, ' ')
     .replace(/\r\n/g, ' ')
     .replace(/\n/g, ' ')
-    .replace(/\s+/g, ' ')
     .trim()
-  return template.replace(/\{#var#\}/g, String(otp))
+  return template.replace(/\{#\s*var\s*#\}/gi, String(otp))
 }
 
 /**
