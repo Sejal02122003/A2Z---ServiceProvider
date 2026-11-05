@@ -9,11 +9,12 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/socket.io': {
-        target: 'http://localhost:5005',
+        target: 'http://127.0.0.1:5005',
         ws: true,
+        changeOrigin: true,
         configure: (proxy) => {
           proxy.on('error', (err) => {
-            if (err?.code === 'ECONNRESET' || err?.code === 'EPIPE') return
+            if (['ECONNRESET', 'EPIPE', 'ECONNREFUSED'].includes(err?.code)) return
             console.error('[vite] ws proxy error:', err?.message || err)
           })
         },
