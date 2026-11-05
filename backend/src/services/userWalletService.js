@@ -204,7 +204,8 @@ export async function ensureWelcomeBonus(userId) {
     }
 
     const settings = await getWalletSettings()
-    const isEnabled = Boolean(settings.enabled) && settings.welcomeBonusEnabled !== false
+    // Welcome bonus is directly governed by welcomeBonusEnabled (defaults to true)
+    const isEnabled = settings.welcomeBonusEnabled !== false
     if (!isEnabled) {
       return { credited: false, reason: 'FEATURE_DISABLED', bonusAmount: 0 }
     }

@@ -197,6 +197,11 @@ export default function UserWalletPage() {
         <div className="space-y-1.5 text-xs text-slate-800 dark:text-slate-200">
           <p className="font-bold text-amber-900 dark:text-amber-200">Wallet Rewards & Benefits</p>
           <ul className="list-disc pl-4 space-y-1 text-slate-700 dark:text-slate-300 leading-relaxed">
+            {settings.welcomeBonusEnabled !== false && (
+              <li>
+                <strong>₹{Number(settings.welcomeBonusAmount || 1000).toLocaleString('en-IN')} Welcome Bonus:</strong> Credited automatically to your wallet on registration to save on your service bookings.
+              </li>
+            )}
             <li>
               <strong>15% Automatic Service Credit:</strong> Receive 15% of the eligible service charge credited directly to your wallet every time a booking is completed.
             </li>

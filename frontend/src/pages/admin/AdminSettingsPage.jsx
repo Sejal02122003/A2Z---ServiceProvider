@@ -139,8 +139,15 @@ export function AdminSettingsPage() {
   // Max-Hour Discount
   const [maxHourDiscountPercentage, setMaxHourDiscountPercentage] = useState('')
 
-  // Wallet Deduction Percentage Settings
-  const [walletSettings, setWalletSettings] = useState({ enabled: true, walletDiscountPercentage: 20, updatedAt: null, updatedBy: null })
+  // Wallet Deduction & Welcome Bonus Settings
+  const [walletSettings, setWalletSettings] = useState({
+    enabled: true,
+    walletDiscountPercentage: 20,
+    welcomeBonusEnabled: true,
+    welcomeBonusAmount: 1000,
+    updatedAt: null,
+    updatedBy: null,
+  })
 
 
 
@@ -159,6 +166,8 @@ export function AdminSettingsPage() {
           setWalletSettings({
             enabled: ws.enabled !== false,
             walletDiscountPercentage: ws.walletDiscountPercentage ?? 20,
+            welcomeBonusEnabled: ws.welcomeBonusEnabled !== false,
+            welcomeBonusAmount: ws.welcomeBonusAmount ?? 1000,
             updatedAt: ws.updatedAt,
             updatedBy: ws.updatedBy,
           })
@@ -924,17 +933,79 @@ export function AdminSettingsPage() {
           </AppPrimaryButton>
         </SettingsSection>
 
-        {/* Dynamic Wallet Deduction Percentage Section */}
+        {/* Dynamic Wallet Deduction & Welcome Bonus Settings Section */}
         <SettingsSection
           icon={Wallet}
-          title="Customer Wallet Deduction Settings"
-          description="Control the maximum percentage of an eligible order amount payable using customer wallet funds."
+          title="Customer Wallet & Welcome Bonus Settings"
+          description="Control the customer registration welcome bonus and the maximum wallet deduction allowed at checkout."
           accent="brand"
         >
+          {/* 1. Welcome Bonus on Registration */}
+          <div className="p-3.5 bg-gradient-to-r from-amber-50/60 to-white border border-amber-200/80 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-wider text-amber-900">
+                  Customer Registration Welcome Bonus
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  Automatically credited to newly registered customer accounts on sign-up.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={walletSettings.welcomeBonusEnabled}
+                  onChange={(e) => setWalletSettings({ ...walletSettings, welcomeBonusEnabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+              </label>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between">
+                <label className={labelClass}>Welcome Bonus Amount (₹)</label>
+                <span className="text-[11px] font-semibold text-slate-400">Permitted: ₹500 - ₹1,500</span>
+              </div>
+              <div className="relative mt-1.5">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 font-bold">
+                  ₹
+                </div>
+                <input
+                  className={inputClass + ' pl-7 font-mono font-bold'}
+                  type="number"
+                  min={500}
+                  max={1500}
+                  step={1}
+                  placeholder="1000"
+                  value={walletSettings.welcomeBonusAmount}
+                  onChange={(e) => setWalletSettings({ ...walletSettings, welcomeBonusAmount: e.target.value === '' ? '' : Number(e.target.value) })}
+                />
+              </div>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {[500, 750, 1000, 1250, 1500].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setWalletSettings({ ...walletSettings, welcomeBonusAmount: preset })}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition ${
+                      Number(walletSettings.welcomeBonusAmount) === preset
+                        ? 'bg-amber-500 text-white border-amber-500'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-amber-400'
+                    }`}
+                  >
+                    ₹{preset.toLocaleString('en-IN')}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Checkout Usage Toggle */}
           <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
             <div>
-              <p className="text-xs font-bold text-slate-800">Enable Wallet Balance Usage</p>
-              <p className="text-[11px] text-slate-500">Allow customers to use wallet funds at checkout.</p>
+              <p className="text-xs font-bold text-slate-800">Enable Wallet Balance Usage at Checkout</p>
+              <p className="text-[11px] text-slate-500">Allow customers to redeem their wallet funds towards booking bills.</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -947,9 +1018,10 @@ export function AdminSettingsPage() {
             </label>
           </div>
 
+          {/* 3. Max Wallet Deduction Limit */}
           <div>
             <div className="flex items-center justify-between">
-              <label className={labelClass}>Max Wallet Usage Limit (%)</label>
+              <label className={labelClass}>Max Checkout Deduction Limit (%)</label>
               <span className="text-[11px] font-semibold text-slate-400">Accepts 0 - 100%</span>
             </div>
             <div className="relative mt-1.5">
@@ -997,24 +1069,35 @@ export function AdminSettingsPage() {
               type="button"
               loading={saving === 'WalletDeduction'}
               onClick={async () => {
-                const val = Number(walletSettings.walletDiscountPercentage)
-                if (isNaN(val) || !isFinite(val) || val < 0 || val > 100) {
+                const discountVal = Number(walletSettings.walletDiscountPercentage)
+                if (isNaN(discountVal) || !isFinite(discountVal) || discountVal < 0 || discountVal > 100) {
                   showToast('Wallet deduction percentage must be between 0% and 100%', 'error')
                   return
                 }
+
+                const bonusVal = Number(walletSettings.welcomeBonusAmount)
+                if (isNaN(bonusVal) || !Number.isInteger(bonusVal) || bonusVal < 500 || bonusVal > 1500) {
+                  showToast('Welcome bonus amount must be between ₹500 and ₹1,500', 'error')
+                  return
+                }
+
                 setSaving('WalletDeduction')
                 try {
                   const res = await walletsApi.updateAdminWalletSettings({
                     enabled: Boolean(walletSettings.enabled),
-                    walletDiscountPercentage: val,
+                    walletDiscountPercentage: discountVal,
+                    welcomeBonusEnabled: Boolean(walletSettings.welcomeBonusEnabled),
+                    welcomeBonusAmount: bonusVal,
                   })
                   if (res.success) {
-                    showToast('Wallet deduction settings updated successfully!')
+                    showToast('Wallet deduction & welcome bonus settings updated successfully!')
                     const updated = res.data?.settings || res.data
                     if (updated) {
                       setWalletSettings({
                         enabled: updated.enabled !== false,
-                        walletDiscountPercentage: updated.walletDiscountPercentage ?? val,
+                        walletDiscountPercentage: updated.walletDiscountPercentage ?? discountVal,
+                        welcomeBonusEnabled: updated.welcomeBonusEnabled !== false,
+                        welcomeBonusAmount: updated.welcomeBonusAmount ?? bonusVal,
                         updatedAt: updated.updatedAt,
                         updatedBy: updated.updatedBy,
                       })
@@ -1027,7 +1110,7 @@ export function AdminSettingsPage() {
                 }
               }}
             >
-              Save Wallet Percentage
+              Save Wallet Settings
             </AppPrimaryButton>
 
             <Link

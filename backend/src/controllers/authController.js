@@ -151,11 +151,33 @@ export const registerVerify = asyncHandler(async (req, res) => {
         }
         fallback.lastLoginAt = new Date()
         await fallback.save()
+
+        let welcomeBonus = null
+        if (fallback.role === USER_ROLES.CUSTOMER) {
+          try {
+            const { ensureWelcomeBonus } = await import('../services/userWalletService.js')
+            const bonusRes = await ensureWelcomeBonus(fallback._id)
+            if (bonusRes && bonusRes.credited) {
+              welcomeBonus = {
+                credited: true,
+                amount: bonusRes.bonusAmount,
+                balance: bonusRes.balanceAfter,
+                message: bonusRes.message || `₹${bonusRes.bonusAmount.toLocaleString('en-IN')} welcome bonus added to your wallet`,
+              }
+            }
+          } catch (bonusErr) {
+            console.error('[AUTH_ERROR] Error in fallback welcome bonus processing:', bonusErr)
+          }
+        }
+
         const token = signAccessToken(fallback)
         return sendSuccess(res, {
           message: 'Account already exists — logged in successfully',
           statusCode: HTTP_STATUS.OK,
-          data: buildAuthPayload(fallback, token),
+          data: {
+            ...buildAuthPayload(fallback, token),
+            welcomeBonus,
+          },
         })
       }
       return sendError(res, {
@@ -304,10 +326,19 @@ export const loginVerify = asyncHandler(async (req, res) => {
   await user.save()
   await deleteOtpChallengeDoc(otp.doc)
 
+  let welcomeBonus = null
   if (user.role === USER_ROLES.CUSTOMER) {
     try {
       const { ensureWelcomeBonus } = await import('../services/userWalletService.js')
-      await ensureWelcomeBonus(user._id)
+      const bonusRes = await ensureWelcomeBonus(user._id)
+      if (bonusRes && bonusRes.credited) {
+        welcomeBonus = {
+          credited: true,
+          amount: bonusRes.bonusAmount,
+          balance: bonusRes.balanceAfter,
+          message: bonusRes.message || `₹${bonusRes.bonusAmount.toLocaleString('en-IN')} welcome bonus added to your wallet`,
+        }
+      }
     } catch (e) {
       console.error('[AUTH_ERROR] Error checking welcome bonus in loginVerify:', e)
     }
@@ -316,7 +347,10 @@ export const loginVerify = asyncHandler(async (req, res) => {
   const token = signAccessToken(user)
   return sendSuccess(res, {
     message: 'Login successful',
-    data: buildAuthPayload(user, token),
+    data: {
+      ...buildAuthPayload(user, token),
+      welcomeBonus,
+    },
   })
 })
 
