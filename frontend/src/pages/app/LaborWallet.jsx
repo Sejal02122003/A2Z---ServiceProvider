@@ -23,10 +23,12 @@ import {
   Sparkles,
   QrCode,
   Upload,
+  ShieldCheck,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth.js'
 import { walletsApi } from '../../api/walletsApi.js'
+import { walletEligibilityApi } from '../../api/walletEligibilityApi.js'
 import { paymentsApi } from '../../api/paymentsApi.js'
 import { adminQrPaymentsApi } from '../../api/adminQrPaymentsApi.js'
 import { ApiError } from '../../api/http.js'
@@ -99,15 +101,20 @@ export function LaborWallet() {
 
   // Selected Transaction for Details Modal / Popover
   const [selectedTx, setSelectedTx] = useState(null)
+  const [eligibility, setEligibility] = useState(null)
 
   const fetchWalletData = useCallback(async () => {
     try {
-      const [walletRes, txRes] = await Promise.all([
+      const [walletRes, txRes, eligRes] = await Promise.all([
         walletsApi.getMyWallet(),
         walletsApi.getMyTransactions().catch(() => ({ data: { transactions: [] } })),
+        walletEligibilityApi.getProviderEligibility().catch(() => null),
       ])
       setWallet(walletRes.data?.wallet || {})
       setTransactions(txRes.data?.transactions || [])
+      if (eligRes?.data) {
+        setEligibility(eligRes.data)
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load wallet')
     }
@@ -364,8 +371,10 @@ export function LaborWallet() {
   const currentBalance = wallet?.currentBalance ?? (wallet?.selfBalance || 0)
   const reservedBalance = wallet?.reservedBalance || 0
   const adminBalance = wallet?.adminBalance || 0
-  const minRequired = wallet?.minimumRequiredBalance || 0
-  const isLowBalance = availableBalance < minRequired
+  const minRequired = eligibility?.minimumWalletBalance ?? (wallet?.minimumRequiredBalance || 300)
+  const commissionPercentage = eligibility?.commissionPercentage ?? (wallet?.commissionPercentage || 25)
+  const isEligible = eligibility ? eligibility.eligible : (availableBalance >= minRequired)
+  const shortageAmount = Math.max(0, minRequired - availableBalance)
 
   return (
     <div className="space-y-4 pb-8">
@@ -380,24 +389,35 @@ export function LaborWallet() {
         <div className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-[#01C7D0]/20 blur-3xl" />
         <div className="pointer-events-none absolute -left-12 -bottom-12 h-44 w-44 rounded-full bg-[#015F6C]/30 blur-3xl" />
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 backdrop-blur-md">
               <Wallet className="h-4 w-4 text-[#01C7D0]" />
             </span>
             <span className="text-xs font-bold uppercase tracking-wider text-teal-100/90">Available to Accept Jobs</span>
           </div>
-          {minRequired > 0 && (
-            <span className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-teal-100 backdrop-blur-md">
-              Min Req: {formatInr(minRequired)}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {isEligible ? (
+              <span className="rounded-full bg-emerald-500/25 border border-emerald-400/40 px-2.5 py-1 text-[11px] font-bold text-emerald-100 backdrop-blur-md flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3 text-emerald-300" /> Eligible
+              </span>
+            ) : (
+              <span className="rounded-full bg-amber-500/30 border border-amber-300/50 px-2.5 py-1 text-[11px] font-bold text-amber-200 backdrop-blur-md flex items-center gap-1 animate-pulse">
+                <AlertTriangle className="h-3 w-3 text-amber-300" /> Low Balance
+              </span>
+            )}
+            {minRequired > 0 && (
+              <span className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-teal-100 backdrop-blur-md">
+                Min: {formatInr(minRequired)}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="mt-4">
           <p className="text-3xl sm:text-4xl font-black tracking-tight text-white">{formatInr(availableBalance)}</p>
           <p className="mt-1 text-xs text-teal-100/80">
-            Booking acceptance rule: Available balance must be ≥ Booking amount
+            Booking Rule: Available Balance ({formatInr(availableBalance)}) must be ≥ Min Baseline ({formatInr(minRequired)}) + Commission ({commissionPercentage}%)
           </p>
         </div>
 
@@ -407,7 +427,7 @@ export function LaborWallet() {
             type="button"
             onClick={() => {
               setQrModalPurpose('WALLET_TOPUP')
-              setQrModalAmount(500)
+              setQrModalAmount(shortageAmount > 0 ? Math.max(300, shortageAmount) : 500)
               setQrModalAllowCustom(true)
               setQrResubmitPayment(null)
               setShowQrModal(true)
@@ -429,7 +449,7 @@ export function LaborWallet() {
       </motion.div>
 
       {/* Low Balance Alert Banner */}
-      {isLowBalance && (
+      {!isEligible && (
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -439,43 +459,63 @@ export function LaborWallet() {
           <div className="flex-1">
             <h4 className="text-xs font-extrabold uppercase tracking-wide text-amber-900">Low Wallet Balance Alert</h4>
             <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
-              Your available balance is below the recommended minimum ({formatInr(minRequired)}). You cannot accept bookings with amounts exceeding your balance.
+              Your available balance ({formatInr(availableBalance)}) is below the required minimum baseline ({formatInr(minRequired)}). Shortage: <strong className="font-extrabold text-amber-950">{formatInr(shortageAmount)}</strong>. Recharge your wallet to continue accepting bookings.
             </p>
             <button
               onClick={() => {
                 setQrModalPurpose('WALLET_TOPUP')
-                setQrModalAmount(Math.max(500, minRequired - availableBalance))
+                setQrModalAmount(Math.max(300, shortageAmount))
                 setQrModalAllowCustom(true)
                 setShowQrModal(true)
               }}
               className="mt-2 text-xs font-bold text-amber-900 underline underline-offset-2 hover:text-amber-950 flex items-center gap-1"
             >
-              <QrCode className="h-3.5 w-3.5" /> Recharge now via UPI QR &rarr;
+              <QrCode className="h-3.5 w-3.5" /> Recharge now via UPI QR (min ₹{Math.max(300, shortageAmount)}) &rarr;
             </button>
           </div>
         </motion.div>
       )}
 
       {/* Secondary Balance Breakdown Cards */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         {/* Total / Ledger Balance */}
-        <GlassPanel className="p-4 border-slate-200/70">
+        <GlassPanel className="p-3.5 border-slate-200/70">
           <div className="flex items-center gap-1.5 text-slate-500">
             <ArrowDownLeft className="h-3.5 w-3.5 text-emerald-600" />
-            <p className="text-[11px] font-bold uppercase tracking-wider">Total Balance</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider">Total Balance</p>
           </div>
-          <p className="mt-1.5 text-xl font-extrabold text-slate-900">{formatInr(currentBalance)}</p>
-          <p className="mt-0.5 text-[10px] text-slate-400">Total deposited & earned</p>
+          <p className="mt-1 font-mono text-lg font-black text-slate-900">{formatInr(currentBalance)}</p>
+          <p className="mt-0.5 text-[9px] text-slate-400">Total deposited funds</p>
         </GlassPanel>
 
         {/* Reserved Balance for Active Jobs */}
-        <GlassPanel className={`p-4 ${reservedBalance > 0 ? 'border-blue-200/80 bg-blue-50/20' : 'border-slate-200/70'}`}>
+        <GlassPanel className={`p-3.5 ${reservedBalance > 0 ? 'border-blue-200/80 bg-blue-50/20' : 'border-slate-200/70'}`}>
           <div className="flex items-center gap-1.5 text-slate-500">
             <Lock className="h-3.5 w-3.5 text-blue-600" />
-            <p className="text-[11px] font-bold uppercase tracking-wider">Reserved Charges</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider">Commission Hold</p>
           </div>
-          <p className="mt-1.5 text-xl font-extrabold text-blue-700">{formatInr(reservedBalance)}</p>
-          <p className="mt-0.5 text-[10px] text-slate-400">Held for active accepted jobs</p>
+          <p className="mt-1 font-mono text-lg font-black text-blue-700">{formatInr(reservedBalance)}</p>
+          <p className="mt-0.5 text-[9px] text-slate-400">Reserved for accepted jobs</p>
+        </GlassPanel>
+
+        {/* Minimum Baseline Threshold */}
+        <GlassPanel className="p-3.5 border-slate-200/70">
+          <div className="flex items-center gap-1.5 text-slate-500">
+            <ShieldCheck className="h-3.5 w-3.5 text-brand" />
+            <p className="text-[10px] font-bold uppercase tracking-wider">Min Required</p>
+          </div>
+          <p className="mt-1 font-mono text-lg font-black text-slate-800">{formatInr(minRequired)}</p>
+          <p className="mt-0.5 text-[9px] text-slate-400">Admin configured baseline</p>
+        </GlassPanel>
+
+        {/* Commission Percentage */}
+        <GlassPanel className="p-3.5 border-slate-200/70">
+          <div className="flex items-center gap-1.5 text-slate-500">
+            <Receipt className="h-3.5 w-3.5 text-teal-600" />
+            <p className="text-[10px] font-bold uppercase tracking-wider">Commission Rate</p>
+          </div>
+          <p className="mt-1 font-mono text-lg font-black text-teal-700">{commissionPercentage}%</p>
+          <p className="mt-0.5 text-[9px] text-slate-400">Standard booking deduction</p>
         </GlassPanel>
       </div>
 
@@ -600,7 +640,9 @@ export function LaborWallet() {
         ) : (
           <div className="space-y-2.5">
             {transactions.map((tx) => {
-              const isSettlement = tx.context === 'CASH_BOOKING_SETTLEMENT'
+              const isSettlement = tx.context === 'CASH_BOOKING_SETTLEMENT' || tx.context === 'BOOKING_COMMISSION_SETTLEMENT'
+              const isHold = tx.type === 'HOLD' || tx.context === 'BOOKING_COMMISSION_RESERVE'
+              const isRelease = tx.type === 'RELEASE' || tx.context === 'BOOKING_COMMISSION_RELEASE'
               const isRecharge = tx.context === 'WALLET_RECHARGE'
               const isPenalty = tx.context === 'PENALTY'
               const isPayout = tx.context === 'PAYOUT'
@@ -613,10 +655,21 @@ export function LaborWallet() {
               let amountColor = isCredit ? 'text-emerald-600' : 'text-slate-900'
               let prefix = isCredit ? '+' : '-'
 
-              if (isSettlement) {
-                badgeText = 'Cash Settlement'
+              if (isHold) {
+                badgeText = 'Commission Hold'
+                badgeStyle = 'bg-amber-50 text-amber-800 border-amber-200'
+                amountColor = 'text-amber-800'
+                prefix = '🔒 '
+              } else if (isRelease) {
+                badgeText = 'Hold Released'
+                badgeStyle = 'bg-teal-50 text-teal-700 border-teal-200'
+                amountColor = 'text-teal-700'
+                prefix = '🔓 +'
+              } else if (isSettlement) {
+                badgeText = tx.context === 'BOOKING_COMMISSION_SETTLEMENT' ? 'Commission Settled' : 'Cash Settlement'
                 badgeStyle = 'bg-blue-50 text-blue-700 border-blue-200'
                 amountColor = 'text-blue-700'
+                prefix = '-'
               } else if (isRecharge) {
                 badgeText = 'Wallet Recharge'
                 badgeStyle = 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -639,13 +692,17 @@ export function LaborWallet() {
                   key={tx._id}
                   onClick={() => setSelectedTx(selectedTx?._id === tx._id ? null : tx)}
                   className={`p-3.5 border transition-all cursor-pointer hover:border-slate-300 ${
-                    isSettlement ? 'border-blue-100 bg-blue-50/10' : 'border-slate-200/70'
+                    isHold ? 'border-amber-200/80 bg-amber-50/15' : isSettlement ? 'border-blue-100 bg-blue-50/10' : 'border-slate-200/70'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0">
                       <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${badgeStyle}`}>
-                        {isCredit ? (
+                        {isHold ? (
+                          <Lock className="h-4 w-4 text-amber-700" />
+                        ) : isRelease ? (
+                          <ArrowDownLeft className="h-4 w-4 text-teal-600" />
+                        ) : isCredit ? (
                           <ArrowDownLeft className="h-4 w-4 text-emerald-600" />
                         ) : (
                           <ArrowUpRight className="h-4 w-4 text-slate-700" />
@@ -654,8 +711,12 @@ export function LaborWallet() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-xs font-bold text-slate-900">
-                            {isSettlement
-                              ? 'Job Recovery Deduction'
+                            {isHold
+                              ? 'Booking Commission Hold'
+                              : isRelease
+                              ? 'Commission Hold Released'
+                              : isSettlement
+                              ? (tx.context === 'BOOKING_COMMISSION_SETTLEMENT' ? 'Booking Commission Settled' : 'Job Recovery Deduction')
                               : isRecharge
                               ? 'Wallet Top-up'
                               : isPenalty
@@ -677,26 +738,34 @@ export function LaborWallet() {
                           </p>
                         )}
 
-                        {/* Charges Breakdown Pill if Cash Settlement */}
-                        {isSettlement && breakdown && (
-                          <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
-                            {breakdown.commission > 0 && (
-                              <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600 border border-slate-200">
-                                Comm: ₹{breakdown.commission}
-                              </span>
-                            )}
-                            {breakdown.platformFee > 0 && (
-                              <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600 border border-slate-200">
-                                Fee: ₹{breakdown.platformFee}
-                              </span>
-                            )}
-                            {breakdown.gst > 0 && (
-                              <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600 border border-slate-200">
-                                GST: ₹{breakdown.gst}
-                              </span>
-                            )}
-                          </div>
-                        )}
+                        {/* Commission Snapshot or Charges Breakdown Pill */}
+                        <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
+                          {tx.commissionPercentageSnapshot != null && (
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600 border border-slate-200">
+                              Comm Snapshot: {tx.commissionPercentageSnapshot}%
+                            </span>
+                          )}
+                          {tx.minimumBalanceSnapshot != null && (
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600 border border-slate-200">
+                              Min Req: ₹{tx.minimumBalanceSnapshot}
+                            </span>
+                          )}
+                          {isSettlement && breakdown && breakdown.commission > 0 && (
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600 border border-slate-200">
+                              Comm: ₹{breakdown.commission}
+                            </span>
+                          )}
+                          {isSettlement && breakdown && breakdown.platformFee > 0 && (
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600 border border-slate-200">
+                              Fee: ₹{breakdown.platformFee}
+                            </span>
+                          )}
+                          {isSettlement && breakdown && breakdown.gst > 0 && (
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600 border border-slate-200">
+                              GST: ₹{breakdown.gst}
+                            </span>
+                          )}
+                        </div>
 
                         <p className="mt-1 text-[10px] font-medium text-slate-400">
                           {formatDate(tx.createdAt)} {tx.transactionId ? `• ID: ${tx.transactionId}` : ''}

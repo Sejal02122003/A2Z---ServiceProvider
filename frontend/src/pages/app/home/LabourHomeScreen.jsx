@@ -22,6 +22,7 @@ import {
   IdCard,
   IndianRupee,
   LifeBuoy,
+  Lock,
   LogIn,
   LogOut,
   MapPin,
@@ -30,6 +31,7 @@ import {
   Navigation,
   Package,
   Phone,
+  RefreshCw,
   Shield,
   ShieldCheck,
   Sparkles,
@@ -81,6 +83,7 @@ import {
   subscribeLabourNotifications,
 } from '../../../lib/labourNotifications.js'
 import { getLabourBookingShare } from '../../../lib/bookingLabourShare.js'
+import { walletEligibilityApi } from '../../../api/walletEligibilityApi.js'
 
 function getTimeGreeting() {
   const h = new Date().getHours()
@@ -179,9 +182,41 @@ export function LabourHomeScreen({ user }) {
     }).catch(console.error)
   }, [user])
 
+  const [walletEligibility, setWalletEligibility] = useState(null)
+  const [loadingEligibility, setLoadingEligibility] = useState(false)
+
+  const loadEligibility = useCallback(() => {
+    if (!user || user.id === 'guest' || user._id === 'guest') return
+    setLoadingEligibility(true)
+    walletEligibilityApi.getProviderEligibility()
+      .then(res => {
+        if (res?.data) {
+          setWalletEligibility(res.data)
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingEligibility(false))
+  }, [user])
+
   useEffect(() => {
     loadBookings()
-  }, [loadBookings])
+    loadEligibility()
+  }, [loadBookings, loadEligibility])
+
+  // Real-time / focus refresh for wallet eligibility
+  useEffect(() => {
+    const handleRefresh = () => {
+      if (document.visibilityState === 'visible') {
+        loadEligibility()
+      }
+    }
+    window.addEventListener('focus', handleRefresh)
+    document.addEventListener('visibilitychange', handleRefresh)
+    return () => {
+      window.removeEventListener('focus', handleRefresh)
+      document.removeEventListener('visibilitychange', handleRefresh)
+    }
+  }, [loadEligibility])
 
   useEffect(() => {
     let cancelled = false
@@ -626,6 +661,142 @@ export function LabourHomeScreen({ user }) {
       </section>
 
       <div className="space-y-5 px-4">
+        {/* Dynamic Wallet Balance & Booking Acceptance Eligibility Widget */}
+        {walletEligibility && (
+          <motion.div
+            initial={reduce ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`overflow-hidden rounded-3xl border transition-all shadow-lg ${
+              walletEligibility.eligible
+                ? 'border-emerald-200/90 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/40 shadow-emerald-900/5'
+                : 'border-amber-300 bg-gradient-to-br from-amber-50/90 via-white to-orange-50/40 shadow-amber-900/10'
+            }`}
+          >
+            {/* Header / Status Banner */}
+            <div className={`flex flex-wrap items-center justify-between gap-2.5 px-4 py-3 border-b ${
+              walletEligibility.eligible ? 'border-emerald-100 bg-emerald-50/50' : 'border-amber-200 bg-amber-100/60'
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${
+                  walletEligibility.eligible ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'
+                }`}>
+                  <Wallet className="h-4 w-4" />
+                </span>
+                <div>
+                  <h3 className="text-xs font-black tracking-tight text-slate-900">
+                    Wallet Eligibility Status
+                  </h3>
+                  <p className="text-[10px] text-slate-500 font-medium">
+                    Commission Hold: {walletEligibility.commissionPercentage}% · Booking Acceptance Rules
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {walletEligibility.eligible ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-100/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-800 shadow-xs">
+                    <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                    Eligible
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-200/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-900 shadow-xs animate-pulse">
+                    <AlertTriangle className="h-3 w-3 text-amber-700" />
+                    Low Balance
+                  </span>
+                )}
+                <button
+                  type="button"
+                  title="Refresh wallet eligibility"
+                  onClick={loadEligibility}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white/80 text-slate-500 hover:text-slate-800 transition active:scale-95"
+                >
+                  <RefreshCw className={`h-3 w-3 ${loadingEligibility ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* 4-Box Key Metrics Grid */}
+            <div className="p-4 space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-2.5 shadow-xs">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Wallet Balance</p>
+                  <p className="mt-1 font-mono text-base font-black text-slate-900">
+                    ₹{Number(walletEligibility.walletBalance || 0).toLocaleString('en-IN')}
+                  </p>
+                  <p className="text-[9px] text-slate-400">Total deposited funds</p>
+                </div>
+
+                <div className="rounded-2xl border border-blue-200/80 bg-blue-50/40 p-2.5 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Reserved Amount</p>
+                    <Lock className="h-3 w-3 text-blue-500" />
+                  </div>
+                  <p className="mt-1 font-mono text-base font-black text-blue-800">
+                    ₹{Number(walletEligibility.reservedAmount || 0).toLocaleString('en-IN')}
+                  </p>
+                  <p className="text-[9px] text-blue-600">Pending booking hold</p>
+                </div>
+
+                <div className={`rounded-2xl border p-2.5 shadow-xs ${
+                  walletEligibility.eligible ? 'border-emerald-200 bg-emerald-50/40' : 'border-amber-200 bg-amber-50/60'
+                }`}>
+                  <p className={`text-[10px] font-bold uppercase tracking-wider ${
+                    walletEligibility.eligible ? 'text-emerald-800' : 'text-amber-800'
+                  }`}>Available Balance</p>
+                  <p className={`mt-1 font-mono text-base font-black ${
+                    walletEligibility.eligible ? 'text-emerald-900' : 'text-amber-900'
+                  }`}>
+                    ₹{Number(walletEligibility.availableBalance || 0).toLocaleString('en-IN')}
+                  </p>
+                  <p className="text-[9px] text-slate-500">Balance - Reserved</p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-2.5 shadow-xs">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Minimum Required</p>
+                  <p className="mt-1 font-mono text-base font-black text-slate-800">
+                    ₹{Number(walletEligibility.minimumWalletBalance || 0).toLocaleString('en-IN')}
+                  </p>
+                  <p className="text-[9px] text-slate-400">Admin configured threshold</p>
+                </div>
+              </div>
+
+              {/* Informational Guidance & Action Button */}
+              {!walletEligibility.eligible ? (
+                <div className="rounded-2xl border border-amber-300 bg-amber-50/80 p-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-black text-amber-950 flex items-center gap-1.5">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-700 shrink-0" />
+                        Shortage: ₹{Math.max(0, (walletEligibility.minimumWalletBalance || 0) - (walletEligibility.availableBalance || 0)).toLocaleString('en-IN')}
+                      </p>
+                      <p className="text-[11px] text-amber-800 leading-snug">
+                        Your wallet balance is insufficient to accept bookings. Please recharge your wallet with at least ₹{Math.max(0, (walletEligibility.minimumWalletBalance || 0) - (walletEligibility.availableBalance || 0)).toLocaleString('en-IN')} to become eligible.
+                      </p>
+                    </div>
+                    <Link
+                      to="/serviceprovider/wallet"
+                      className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-black text-slate-950 shadow-md shadow-amber-500/25 transition hover:bg-amber-400 active:scale-95"
+                    >
+                      <Wallet className="h-3.5 w-3.5" />
+                      Recharge Wallet
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between rounded-xl border border-emerald-200/70 bg-emerald-50/40 px-3 py-2 text-[11px] text-emerald-800">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    You are fully eligible to accept new job broadcasts! Available balance exceeds minimum requirements.
+                  </span>
+                  <Link to="/serviceprovider/wallet" className="font-bold underline ml-2 shrink-0 hover:text-emerald-950">
+                    View Wallet &rarr;
+                  </Link>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
         {/* Service Partner Registration Flow Banner */}
         {(!user?.welcomeKit?.isReceived && !(user?.welcomeKit?.uniformIssued && user?.welcomeKit?.idCardIssued && user?.welcomeKit?.bagIssued)) && (
           <motion.div

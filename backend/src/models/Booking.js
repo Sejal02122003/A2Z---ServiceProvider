@@ -175,6 +175,14 @@ const bookingSchema = new mongoose.Schema(
     },
     totalAmount: { type: Number, required: true },
     commissionAmount: { type: Number, required: true, default: 0 },
+    commissionPercentageSnapshot: { type: Number },
+    minimumBalanceSnapshot: { type: Number },
+    commissionReservationId: { type: mongoose.Schema.Types.ObjectId, ref: 'WalletReservation' },
+    walletReservationStatus: {
+      type: String,
+      enum: ['NONE', 'RESERVED', 'SETTLED', 'RELEASED'],
+      default: 'NONE',
+    },
     laborShare: { type: Number, required: true },
     paymentMethod: {
       type: String,

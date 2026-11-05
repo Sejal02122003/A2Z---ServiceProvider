@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { AlertCircle, Check, CheckCircle2, Clock, IndianRupee, Layers, Loader2, MapPin, Package, Sparkles, X, Zap } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Check, CheckCircle2, Clock, IndianRupee, Layers, Loader2, MapPin, Package, ShieldCheck, Sparkles, Wallet, X, Zap } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { broadcastsApi } from '../../api/broadcastsApi.js'
+import { walletEligibilityApi } from '../../api/walletEligibilityApi.js'
 import { ApiError } from '../../api/http.js'
 import { useSocket } from '../../context/SocketContext.jsx'
 import { USER_ROLES } from '../../constants/userRoles.js'
@@ -50,6 +51,8 @@ export function BroadcastPopup() {
   const [responding, setResponding] = useState(false)
   const [error, setError] = useState('')
   const [selectedServiceId, setSelectedServiceId] = useState(null)
+  const [eligibilityData, setEligibilityData] = useState(null)
+  const [checkingEligibility, setCheckingEligibility] = useState(false)
   const audioCtxRef = useRef(null)
 
   // Web Audio chime generator
@@ -186,12 +189,43 @@ export function BroadcastPopup() {
     }
   }, [incoming])
 
+  // Dynamic Wallet Eligibility Check on broadcast receipt
+  useEffect(() => {
+    if (!incoming?.bookingId) {
+      setEligibilityData(null)
+      return
+    }
+    let cancelled = false
+    setCheckingEligibility(true)
+    walletEligibilityApi.checkBookingEligibility(incoming.bookingId)
+      .then((res) => {
+        if (!cancelled && res?.data) {
+          setEligibilityData(res.data)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled && err?.data) {
+          setEligibilityData(err.data)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingEligibility(false)
+      })
+    return () => { cancelled = true }
+  }, [incoming?.bookingId])
+
   const services = incoming?.services || []
   const requiresSelection = incoming?.requiresServiceSelection && services.length > 1
   const selectedService = services.find(s => (s.itemId || s.serviceId) === selectedServiceId)
 
   const handleAccept = useCallback(async () => {
     if (!incoming) return
+
+    // If wallet balance is insufficient, prevent acceptance
+    if (eligibilityData && eligibilityData.eligible === false) {
+      setError(`Insufficient wallet balance. Recharge with at least ₹${eligibilityData.shortageAmount || 50} to accept this booking.`)
+      return
+    }
 
     // If multi-service and no selection yet, prompt
     if (incoming.requiresServiceSelection && !selectedServiceId) {
@@ -215,7 +249,11 @@ export function BroadcastPopup() {
       const msg = err instanceof ApiError ? err.message : 'Failed to accept'
       setError(msg)
       setResponding(false)
-      if (
+      if (err?.code === 'LOW_WALLET_BALANCE' || err?.data?.eligible === false || msg.toLowerCase().includes('wallet balance')) {
+        if (err?.data) {
+          setEligibilityData(err.data)
+        }
+      } else if (
         msg.includes('already accepted by you') ||
         msg.includes('Current status is EN_ROUTE') ||
         msg.includes('Current status is STARTED')
@@ -238,7 +276,7 @@ export function BroadcastPopup() {
         }, 2500)
       }
     }
-  }, [incoming, navigate, selectedServiceId, services])
+  }, [incoming, navigate, selectedServiceId, services, eligibilityData])
 
   const handleReject = useCallback(async () => {
     if (!incoming) return
@@ -657,6 +695,78 @@ export function BroadcastPopup() {
                 )}
               </div>
 
+              {/* Dynamic Wallet Balance & Booking Acceptance Eligibility Warning (Section 10) */}
+              {eligibilityData && eligibilityData.eligible === false && (
+                <div className="mt-3 rounded-2xl border-2 border-amber-300 bg-amber-50/90 p-3.5 shadow-sm">
+                  <div className="flex items-start gap-2.5">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-600 text-white shadow-xs">
+                      <AlertTriangle className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-black uppercase tracking-wider text-amber-950">
+                          LOW WALLET BALANCE
+                        </p>
+                        <span className="rounded-full bg-amber-200/90 px-2 py-0.5 text-[9px] font-black text-amber-900">
+                          Ineligible
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-amber-900 leading-snug">
+                        Your wallet balance is insufficient to accept this booking. Please recharge your wallet with at least <span className="font-extrabold text-amber-950 underline">₹{eligibilityData.shortageAmount}</span> to become eligible.
+                      </p>
+
+                      <div className="mt-2.5 grid grid-cols-2 gap-1.5 text-[11px] rounded-xl bg-white/90 p-2.5 border border-amber-200">
+                        <div>
+                          <span className="text-slate-500">Available Balance:</span>
+                          <span className="font-bold text-slate-800 ml-1">₹{Number(eligibilityData.availableBalance || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Minimum Baseline:</span>
+                          <span className="font-bold text-slate-700 ml-1">₹{Number(eligibilityData.minimumBalance || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Est. Commission ({eligibilityData.commissionPercentage}%):</span>
+                          <span className="font-bold text-slate-700 ml-1">₹{Number(eligibilityData.estimatedCommission || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Required Balance:</span>
+                          <span className="font-extrabold text-slate-900 ml-1">₹{Number(eligibilityData.requiredBalance || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="col-span-2 pt-1 border-t border-amber-100 flex items-center justify-between">
+                          <span className="font-bold text-amber-900">Shortage to Recharge:</span>
+                          <span className="font-black text-amber-950 text-sm">₹{Number(eligibilityData.shortageAmount || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (timerRef.current) clearInterval(timerRef.current)
+                          setIncoming(null)
+                          navigate('/serviceprovider/wallet')
+                        }}
+                        className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-amber-500 py-2.5 text-xs font-black text-slate-950 shadow-md shadow-amber-500/25 hover:bg-amber-400 active:scale-98 transition"
+                      >
+                        <Wallet className="h-3.5 w-3.5" />
+                        Recharge Wallet Now (₹{eligibilityData.shortageAmount})
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {eligibilityData && eligibilityData.eligible === true && (
+                <div className="mt-3 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs font-bold text-emerald-800">
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    Wallet Eligible to Accept
+                  </span>
+                  <span className="text-[10px] text-emerald-700 font-medium">
+                    Avail: ₹{eligibilityData.availableBalance} ≥ Req: ₹{eligibilityData.requiredBalance}
+                  </span>
+                </div>
+              )}
+
               {error && (
                 <div className="mt-2 rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700 border border-rose-200 space-y-1">
                   <p className="flex items-center gap-1">
@@ -731,12 +841,21 @@ export function BroadcastPopup() {
                 </button>
                 <button
                   type="button"
-                  disabled={responding || (requiresSelection && !selectedServiceId)}
+                  disabled={responding || eligibilityData?.eligible === false || (requiresSelection && !selectedServiceId)}
                   onClick={handleAccept}
-                  className="flex items-center justify-center gap-2 rounded-2xl bg-brand px-4 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-brand/25 transition hover:bg-brand/90 active:scale-[0.97] disabled:opacity-50"
+                  className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-extrabold text-white transition active:scale-[0.97] ${
+                    eligibilityData?.eligible === false
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+                      : 'bg-brand shadow-lg shadow-brand/25 hover:bg-brand/90 disabled:opacity-50'
+                  }`}
                 >
                   {responding ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : eligibilityData?.eligible === false ? (
+                    <>
+                      <AlertTriangle className="h-4 w-4 text-amber-700" />
+                      Low Balance (Short ₹{eligibilityData.shortageAmount})
+                    </>
                   ) : (
                     <>
                       <Check className="h-4 w-4" aria-hidden />

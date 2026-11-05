@@ -102,10 +102,18 @@ router.use('/admin/payments', adminPaymentConfigRoutes)
 
 router.use('/labour/location', locationRoutes)
 
-import { getCollectedCommissionAmount } from '../controllers/adminWalletController.js'
-import { getAdminPayments, reviewPayment } from '../controllers/providerPaymentController.js'
-import { protect, restrictTo } from '../middleware/auth.js'
-import { USER_ROLES } from '../constants/roles.js'
+import adminWalletEligibilityRoutes from './adminWalletEligibilityRoutes.js'
+import providerWalletEligibilityRoutes from './providerWalletEligibilityRoutes.js'
+import { acceptBooking } from '../controllers/providerWalletEligibilityController.js'
+
+router.use('/admin/wallet-eligibility', adminWalletEligibilityRoutes)
+router.use('/provider/wallet', providerWalletEligibilityRoutes)
+router.post(
+  '/provider/bookings/:bookingId/accept',
+  protect,
+  restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),
+  acceptBooking
+)
 
 router.get('/admin/commission-fee', protect, restrictTo(USER_ROLES.ADMIN), getCollectedCommissionAmount)
 router.get('/admin/provider-payments', protect, restrictTo(USER_ROLES.ADMIN), getAdminPayments)

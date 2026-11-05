@@ -53,6 +53,7 @@ import AdminRewardsHubPage from './pages/admin/AdminRewardsHubPage.jsx'
 import AdminBookingRemindersPage from './pages/admin/AdminBookingRemindersPage.jsx'
 import AdminPenaltyManagementPage from './pages/admin/AdminPenaltyManagementPage.jsx'
 import AdminBookingCancellationPage from './pages/admin/AdminBookingCancellationPage.jsx'
+import { AdminWalletEligibilityPage } from './pages/admin/AdminWalletEligibilityPage.jsx'
 
 import { BroadcastPopup } from './components/app/BroadcastPopup.jsx'
 import { SimulatedOpportunityPopup } from './components/app/SimulatedOpportunityPopup.jsx'
@@ -191,6 +192,7 @@ function App() {
             <Route path="zone-management" element={<AdminZoneManagementPage />} />
             <Route path="platform-fee" element={<AdminPlatformFeePage />} />
             <Route path="commission-fee" element={<AdminCommissionFeePage />} />
+            <Route path="wallet-eligibility" element={<AdminWalletEligibilityPage />} />
             <Route path="labour-wallet" element={<AdminLabourWalletPage />} />
             <Route path="cash-management" element={<Navigate to="/admin/labour-wallet" replace />} />
             <Route path="reviews" element={<AdminReviewsRatingsPage />} />

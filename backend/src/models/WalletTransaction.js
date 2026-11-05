@@ -33,7 +33,7 @@ const walletTransactionSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['CREDIT', 'DEBIT'],
+      enum: ['CREDIT', 'DEBIT', 'HOLD', 'RELEASE'],
       required: true,
     },
     targetWallet: {
@@ -62,6 +62,9 @@ const walletTransactionSchema = new mongoose.Schema(
         'WALLET_RECHARGE',
         'REVERSAL',
         'SERVICE_CREDIT',
+        'BOOKING_COMMISSION_RESERVE',
+        'BOOKING_COMMISSION_SETTLEMENT',
+        'BOOKING_COMMISSION_RELEASE',
       ],
       required: true,
     },
@@ -72,6 +75,15 @@ const walletTransactionSchema = new mongoose.Schema(
     balanceAfter: {
       type: Number,
       default: 0,
+    },
+    commissionPercentageSnapshot: {
+      type: Number,
+    },
+    minimumBalanceSnapshot: {
+      type: Number,
+    },
+    reservedAmount: {
+      type: Number,
     },
     chargesBreakdown: {
       commission: { type: Number, default: 0 },

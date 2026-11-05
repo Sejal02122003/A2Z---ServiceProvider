@@ -144,29 +144,16 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     booking.contractorInfo.services.length > 0
   )
 
-  // Wallet Eligibility Check
-  const { checkLabourBookingEligibility, reserveCashBookingCharges } = await import('../services/labourWalletService.js')
-  if (booking.paymentMethod === 'CASH') {
-    const walletCheck = await checkLabourBookingEligibility({ labourId: labour._id, booking })
-    if (!walletCheck.eligible && walletCheck.code === 'WALLET_INACTIVE') {
-      return sendError(res, {
-        message: walletCheck.reason,
-        statusCode: HTTP_STATUS.BAD_REQUEST,
-        code: walletCheck.code,
-      })
-    }
-  }
-
-  // Concurrency-safe reservation for cash bookings
-  if (booking.paymentMethod === 'CASH') {
-    const reserveResult = await reserveCashBookingCharges({ labourId: labour._id, booking })
-    if (!reserveResult.reserved) {
-      return sendError(res, {
-        message: reserveResult.message || 'Insufficient available wallet balance to accept this booking.',
-        statusCode: HTTP_STATUS.CONFLICT,
-        code: 'CONCURRENT_WALLET_HOLD_FAILED',
-      })
-    }
+  // Dynamic Wallet Eligibility Check & Atomic Commission Reservation
+  const { reserveBookingCommission } = await import('../services/walletEligibilityService.js')
+  const reserveResult = await reserveBookingCommission({ providerId: labour._id, booking })
+  if (!reserveResult.reserved) {
+    return sendError(res, {
+      message: reserveResult.message || 'Insufficient wallet balance to accept this booking.',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: reserveResult.code || 'LOW_WALLET_BALANCE',
+      data: reserveResult.data,
+    })
   }
 
   // Check if labourer already accepted
@@ -402,7 +389,10 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
   }
 
   if (!updatedBooking) {
-    // Release cash reservation if concurrent accept race lost
+    // Release commission reservation if concurrent accept race lost
+    const { releaseBookingCommissionReservation } = await import('../services/walletEligibilityService.js')
+    await releaseBookingCommissionReservation({ bookingId: booking._id, reason: 'CONCURRENT_ACCEPT_RACE_LOST' }).catch(() => {})
+
     if (booking.paymentMethod === 'CASH') {
       const { releaseCashBookingCharges } = await import('../services/labourWalletService.js')
       await releaseCashBookingCharges({ labourId: labour._id, bookingId: booking._id }).catch(() => {})
@@ -675,6 +665,8 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       customerLocation: booking.address?.locationText || 'Service Location',
       approximateDistance: 2.5,
       estimatedEarnings: totalEarnings,
+      bookingAmount: Number(booking.totalAmount || booking.basePrice || 0),
+      totalAmount: Number(booking.totalAmount || booking.basePrice || 0),
       timeoutMs: remainingMs,
     }
   } else if (booking.contractorInfo?.services?.length > 0) {
@@ -719,6 +711,8 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       customerLocation: booking.address?.locationText || 'Service Location',
       approximateDistance: 2.5,
       estimatedEarnings: bestEarning,
+      bookingAmount: Number(booking.totalAmount || booking.basePrice || 0),
+      totalAmount: Number(booking.totalAmount || booking.basePrice || 0),
       timeoutMs: remainingMs,
     }
   } else {
@@ -785,6 +779,8 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       customerLocation: booking.address?.locationText || 'Service Location',
       approximateDistance: 2.5,
       estimatedEarnings: singleShare,
+      bookingAmount: Number(booking.totalAmount || booking.basePrice || 0),
+      totalAmount: Number(booking.totalAmount || booking.basePrice || 0),
       timeoutMs: remainingMs,
     }
   }

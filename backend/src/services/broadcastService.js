@@ -524,6 +524,8 @@ export async function startBroadcastCycle(bookingId) {
               customerLocation: booking.address?.locationText || 'Service Location',
               approximateDistance: labor.approximateDistance,
               estimatedEarnings: totalEarnings,
+              bookingAmount: Number(booking.totalAmount || booking.basePrice || 0),
+              totalAmount: Number(booking.totalAmount || booking.basePrice || 0),
               timeoutMs: BROADCAST_TIMEOUT_MS
             })
           })
@@ -588,6 +590,8 @@ export async function startBroadcastCycle(bookingId) {
               customerLocation: booking.address?.locationText || 'Service Location',
               approximateDistance: labor.approximateDistance,
               estimatedEarnings: bestEarning,
+              bookingAmount: Number(booking.totalAmount || booking.basePrice || 0),
+              totalAmount: Number(booking.totalAmount || booking.basePrice || 0),
               timeoutMs: BROADCAST_TIMEOUT_MS
             })
           })
@@ -672,6 +676,8 @@ export async function startBroadcastCycle(bookingId) {
               customerLocation: booking.address?.locationText || 'Service Location',
               approximateDistance: labor.approximateDistance,
               estimatedEarnings: singleShare,
+              bookingAmount: Number(booking.totalAmount || booking.basePrice || 0),
+              totalAmount: Number(booking.totalAmount || booking.basePrice || 0),
               timeoutMs: BROADCAST_TIMEOUT_MS
             })
           })

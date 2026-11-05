@@ -1433,6 +1433,11 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
       // ONLY payout if the customer has actually completed the online payment.
       // If they haven't paid yet, the paymentController will handle this payout later once they pay.
       if (booking.paymentStatus === 'PAID') {
+        // Settle booking commission reservation
+        import('../services/walletEligibilityService.js').then(({ settleBookingCommission }) => {
+          settleBookingCommission({ bookingId: booking._id }).catch(err => console.error('[Online Settlement Error]:', err))
+        }).catch(() => {})
+
         // Add laborShare to labor's self wallet
         wallet.selfBalance += booking.laborShare
         await wallet.save()
@@ -1548,6 +1553,12 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
         }).catch(err => console.error('Error refunding customer wallet on cancellation:', err))
       })
     }
+
+    // Release commission reservation hold
+    import('../services/walletEligibilityService.js').then(({ releaseBookingCommissionReservation }) => {
+      releaseBookingCommissionReservation({ bookingId: booking._id, reason: `Booking cancelled by ${booking.cancelledBy || 'User'}` })
+        .catch(err => console.error('Error releasing commission reservation on cancellation:', err))
+    }).catch(() => {})
 
     // Release held cash charges reservation for labourer if cash booking
     if (booking.paymentMethod === 'CASH') {

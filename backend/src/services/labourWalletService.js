@@ -38,17 +38,19 @@ export async function getOrCreateLabourWallet(userId, session = null) {
  * Get detailed Labour Wallet state including available balance and settings
  */
 export async function getLabourWalletDetails(userId) {
+  const { getWalletEligibilitySettings } = await import('./walletEligibilityService.js')
   const [wallet, settings] = await Promise.all([
     getOrCreateLabourWallet(userId),
-    getWalletSettings(),
+    getWalletEligibilitySettings(),
   ])
 
   const currentBalance = Number(wallet.selfBalance !== undefined ? wallet.selfBalance : (wallet.balance || 0))
   const reservedBalance = Math.max(0, Number(wallet.reservedBalance || 0))
   const availableBalance = Math.max(0, currentBalance - reservedBalance)
   const adminBalance = Math.max(0, Number(wallet.adminBalance || 0))
-  const minimumRequiredBalance = Math.max(0, Number(settings.minimumLabourWalletBalance || 0))
-  const isWalletEnabled = Boolean(settings.enabled ?? true)
+  const minimumRequiredBalance = Math.max(0, Number(settings.minimumWalletBalance ?? 300))
+  const commissionPercentage = Number(settings.commissionPercentage ?? 25)
+  const isWalletEnabled = Boolean(settings.eligibilitySystemEnabled ?? true)
 
   return {
     walletId: wallet._id,
@@ -58,8 +60,10 @@ export async function getLabourWalletDetails(userId) {
     availableBalance,
     adminBalance,
     minimumRequiredBalance,
+    commissionPercentage,
     isWalletEnabled,
     isLowBalance: availableBalance < minimumRequiredBalance,
+    isEligible: !isWalletEnabled || availableBalance >= minimumRequiredBalance,
     isActive: Boolean(wallet.isActive ?? true),
     currency: wallet.currency || 'INR',
     updatedAt: wallet.updatedAt,
@@ -74,70 +78,43 @@ export async function getLabourWalletDetails(userId) {
  * 2. availableWalletBalance >= minimumLabourWalletBalance (admin configured minimum)
  */
 export async function checkLabourBookingEligibility({ labourId, bookingId, booking = null }) {
-  let targetBooking = booking
-  if (!targetBooking && bookingId) {
-    targetBooking = await Booking.findById(bookingId).lean()
-  }
+  const { checkProviderBookingEligibility } = await import('./walletEligibilityService.js')
+  const result = await checkProviderBookingEligibility({ providerId: labourId, bookingId, booking })
 
-  if (!targetBooking) {
-    return {
-      eligible: false,
-      reason: 'Booking not found',
-      code: 'BOOKING_NOT_FOUND',
-    }
-  }
-
-  const walletDetails = await getLabourWalletDetails(labourId)
-  if (!walletDetails.isActive) {
+  if (!result.isActive) {
     return {
       eligible: false,
       reason: 'Labour wallet is suspended or inactive',
       code: 'WALLET_INACTIVE',
-      walletDetails,
+      ...result,
     }
   }
 
-  // Canonical payable amount for the booking
-  const bookingAmount = Number(targetBooking.totalAmount || targetBooking.basePrice || 0)
-  const availableBalance = walletDetails.availableBalance
-  const minRequired = walletDetails.minimumRequiredBalance
-
-  // 1. Primary Rule: availableWalletBalance >= bookingAmount
-  if (availableBalance < bookingAmount) {
-    const requiredTopUp = Math.max(0, Math.max(bookingAmount, minRequired) - availableBalance)
+  if (!result.eligible) {
     return {
       eligible: false,
-      code: 'INSUFFICIENT_WALLET_BALANCE',
-      bookingAmount,
-      availableWalletBalance: availableBalance,
-      currentBalance: walletDetails.currentBalance,
-      reservedBalance: walletDetails.reservedBalance,
-      minimumWalletBalance: minRequired,
-      requiredTopUp,
-      reason: `Insufficient wallet balance to accept this booking. Booking amount: ₹${bookingAmount}. Available wallet balance: ₹${availableBalance}. Please recharge your wallet.`,
-    }
-  }
-
-  // 2. Admin Minimum Policy: availableWalletBalance >= minimumRequiredBalance
-  if (minRequired > 0 && availableBalance < minRequired) {
-    const requiredTopUp = Math.max(0, minRequired - availableBalance)
-    return {
-      eligible: false,
-      code: 'BELOW_MINIMUM_WALLET_BALANCE',
-      bookingAmount,
-      availableWalletBalance: availableBalance,
-      minimumWalletBalance: minRequired,
-      requiredTopUp,
-      reason: `Wallet balance is below the minimum required balance of ₹${minRequired}. Available wallet balance: ₹${availableBalance}. Please recharge your wallet.`,
+      code: 'LOW_WALLET_BALANCE',
+      bookingAmount: result.bookingAmount,
+      availableWalletBalance: result.availableBalance,
+      currentBalance: result.walletBalance,
+      reservedBalance: result.reservedAmount,
+      minimumWalletBalance: result.minimumBalance,
+      requiredBalance: result.requiredBalance,
+      requiredTopUp: result.shortageAmount,
+      shortageAmount: result.shortageAmount,
+      reason: `Insufficient wallet balance to accept this booking. Required wallet balance: ₹${result.requiredBalance} (Min balance: ₹${result.minimumBalance} + Commission: ₹${result.estimatedCommission}). Available: ₹${result.availableBalance}. Shortage: ₹${result.shortageAmount}.`,
+      ...result,
     }
   }
 
   return {
     eligible: true,
-    bookingAmount,
-    availableWalletBalance: availableBalance,
-    minimumWalletBalance: minRequired,
-    walletDetails,
+    bookingAmount: result.bookingAmount,
+    availableWalletBalance: result.availableBalance,
+    minimumWalletBalance: result.minimumBalance,
+    requiredBalance: result.requiredBalance,
+    shortageAmount: 0,
+    ...result,
   }
 }
 
@@ -212,6 +189,14 @@ export async function releaseCashBookingCharges({ labourId, bookingId = null, am
   if (wallet && wallet.reservedBalance < 0) {
     wallet.reservedBalance = 0
     await wallet.save()
+  }
+
+  if (bookingId) {
+    import('./walletEligibilityService.js')
+      .then(({ releaseBookingCommissionReservation }) => {
+        releaseBookingCommissionReservation({ bookingId, reason: 'CHARGES_RELEASED' }).catch(() => {})
+      })
+      .catch(() => {})
   }
 
   return {
@@ -340,7 +325,16 @@ export async function settleCashBookingPayment({ bookingId, labourId = null, ses
   // Update booking status
   booking.adminSettlementStatus = 'SETTLED'
   booking.paymentStatus = 'PAID'
+  booking.walletReservationStatus = 'SETTLED'
   await booking.save({ session })
+
+  // Update WalletReservation if one exists
+  import('../models/WalletReservation.js').then(({ WalletReservation }) => {
+    WalletReservation.findOneAndUpdate(
+      { bookingId: booking._id, status: 'RESERVED' },
+      { $set: { status: 'SETTLED', settledAmount: commission, settledAt: new Date() } }
+    ).catch(() => {})
+  })
 
   return {
     settled: true,
@@ -441,6 +435,13 @@ export async function rechargeLabourWallet({
     adminWallet.totalCommissionsCollected += autoDeductedDues
     await adminWallet.save({ session })
   }
+
+  // Dispatch recharge success notification
+  import('./walletEligibilityService.js')
+    .then(({ notifyRechargeSuccess }) => {
+      notifyRechargeSuccess({ providerId: labourId, amount: rechargeAmount, newBalance: wallet.selfBalance })
+    })
+    .catch(() => {})
 
   return {
     success: true,

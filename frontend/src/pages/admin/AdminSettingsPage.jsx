@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import { Settings, Percent, IndianRupee, Wallet, Receipt, AlertTriangle, CheckCircle2, Loader2, Clock, Image as ImageIcon, Trash2, Radio, Search } from 'lucide-react'
+import { Settings, Percent, IndianRupee, Wallet, Receipt, AlertTriangle, CheckCircle2, Loader2, Clock, Image as ImageIcon, Trash2, Radio, Search, ShieldCheck } from 'lucide-react'
 import { adminSettingsApi } from '../../api/adminSettingsApi.js'
 import { walletsApi } from '../../api/walletsApi.js'
 import { fetchAdminLabourCategoryTree, updateAdminLabourCategoryGst } from '../../api/adminLabourCategoriesApi.js'
@@ -538,6 +538,31 @@ export function AdminSettingsPage() {
           >
             Save Commission
           </AppPrimaryButton>
+        </SettingsSection>
+
+        {/* Dynamic Minimum Wallet Balance & Booking Eligibility */}
+        <SettingsSection
+          icon={ShieldCheck}
+          title="Wallet Eligibility Settings"
+          description="Dynamic minimum provider balance & booking commission reservation"
+        >
+          <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-extrabold text-blue-950">Dynamic Minimum Wallet Balance & Commission Hold</p>
+                <p className="mt-1 text-xs text-blue-800 leading-relaxed max-w-xl">
+                  Configure default minimum wallet balance (₹300), booking commission percentage (25%), atomic commission holds at booking acceptance, and view live provider eligibility audits.
+                </p>
+              </div>
+              <Link
+                to="/admin/wallet-eligibility"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-600/20 hover:bg-blue-700 transition shrink-0"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                Open Wallet Eligibility Hub &rarr;
+              </Link>
+            </div>
+          </div>
         </SettingsSection>
 
         {/* GST */}

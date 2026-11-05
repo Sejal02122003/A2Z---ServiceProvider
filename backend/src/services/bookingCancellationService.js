@@ -570,6 +570,16 @@ export async function processVendorCancellation({
       .catch((err) => console.error(err))
   }
 
+  // Release commission reservation hold
+  import('./walletEligibilityService.js')
+    .then(({ releaseBookingCommissionReservation }) => {
+      releaseBookingCommissionReservation({
+        bookingId: booking._id,
+        reason: 'BOOKING_CANCELLED',
+      }).catch((err) => console.error('Error releasing commission reservation on cancellation:', err))
+    })
+    .catch(() => {})
+
   // Release cash booking charges reservation if cash booking
   if (booking.paymentMethod === 'CASH') {
     const expectedCharges =
@@ -1463,7 +1473,17 @@ export async function processCustomerCancellation({
       .catch((err) => console.error(err))
   }
 
-  // B. Release held cash booking charges on assigned labourer
+  // B. Release commission reservation hold
+  import('./walletEligibilityService.js')
+    .then(({ releaseBookingCommissionReservation }) => {
+      releaseBookingCommissionReservation({
+        bookingId: booking._id,
+        reason: 'CUSTOMER_CANCELLED',
+      }).catch((err) => console.error('[Commission Hold Release Warning]', err?.message))
+    })
+    .catch(() => {})
+
+  // Release held cash booking charges on assigned labourer
   if (booking.paymentMethod === 'CASH') {
     const expectedCharges =
       (booking.platformFee || 0) + (booking.taxes || 0) + (booking.commissionAmount || 0)
