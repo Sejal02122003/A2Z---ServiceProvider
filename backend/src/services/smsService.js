@@ -8,6 +8,9 @@ const DEFAULT_CONFIG = {
   dltHeaderId: '1705176734391048562',
   dltTemplateId: '1707176735046894644',
   header: 'BRSATZ',
+  username: 'BRINGSHINE',
+  password: '5619',
+  apiKey: '3SdfsumVWy9wDZ1yMEHOYSDjHYxKdR2JshjZVE-RE9sv8Gt0_27WYtX8sNBISMiU',
   templateName: 'OTPs',
   templateText:
     'Your Verification Code for sign up in Bringshine A2Z Service Hub is {#var#} Valid for limited time only. Bringshine A2Z Service Hub',
@@ -40,9 +43,9 @@ export function getSmsConfig() {
     dltTemplateId: process.env.DLT_ID || process.env.DLT_TEMPLATE_ID || DEFAULT_CONFIG.dltTemplateId,
     header: process.env.SMS_HEADER || process.env.SMS_SENDER_ID || DEFAULT_CONFIG.header,
     gatewayUrl: process.env.SMS_GATEWAY_URL || 'http://wsms.pansoftech.com/api/pushsms.php',
-    username: process.env.SMS_USERNAME || 'BRINGSHINE',
-    password: process.env.SMS_PASSWORD || '',
-    apiKey: process.env.SMS_API_KEY || process.env.SMS_AUTH_KEY || '',
+    username: process.env.SMS_USERNAME || DEFAULT_CONFIG.username,
+    password: process.env.SMS_PASSWORD || DEFAULT_CONFIG.password,
+    apiKey: process.env.SMS_API_KEY || process.env.SMS_AUTH_KEY || DEFAULT_CONFIG.apiKey,
     provider: (process.env.SMS_PROVIDER || 'pansoft').toLowerCase(),
   }
 }
