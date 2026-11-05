@@ -4,12 +4,13 @@ import { normalizeIndianPhone } from '../utils/phone.js'
  * Production DLT configuration for Bringshine A2Z Service Hub
  */
 const DEFAULT_CONFIG = {
-  dltEntityId: '1705176734391048562',
+  dltEntityId: '1701176673394787391',
+  dltHeaderId: '1705176734391048562',
   dltTemplateId: '1707176735046894644',
   header: 'BRSATZ',
   templateName: 'OTPs',
   templateText:
-    'Your Verification Code for sign up in Bringshine A2Z Service Hub is \n{#var#}\n Valid for limited time only. Bringshine A2Z Service Hub',
+    'Your Verification Code for sign up in Bringshine A2Z Service Hub is {#var#} Valid for limited time only. Bringshine A2Z Service Hub',
 }
 
 /**
@@ -17,7 +18,14 @@ const DEFAULT_CONFIG = {
  */
 export function buildOtpSmsMessage(otp) {
   let template = process.env.SMS_TEMPLATE || DEFAULT_CONFIG.templateText
-  template = template.replace(/\\n/g, '\n')
+  // Telecom DLT strictly requires exact spacing without extra newlines
+  template = template
+    .replace(/\\r\\n/g, ' ')
+    .replace(/\\n/g, ' ')
+    .replace(/\r\n/g, ' ')
+    .replace(/\n/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
   return template.replace(/\{#var#\}/g, String(otp))
 }
 
@@ -27,7 +35,8 @@ export function buildOtpSmsMessage(otp) {
 export function getSmsConfig() {
   return {
     enabled: process.env.SMS_ENABLED !== 'false',
-    dltEntityId: process.env.DLT_HEADER_ID || process.env.DLT_ENTITY_ID || DEFAULT_CONFIG.dltEntityId,
+    dltEntityId: process.env.DLT_PE_ID || process.env.DLT_ENTITY_ID || DEFAULT_CONFIG.dltEntityId,
+    dltHeaderId: process.env.DLT_HEADER_ID || DEFAULT_CONFIG.dltHeaderId,
     dltTemplateId: process.env.DLT_ID || process.env.DLT_TEMPLATE_ID || DEFAULT_CONFIG.dltTemplateId,
     header: process.env.SMS_HEADER || process.env.SMS_SENDER_ID || DEFAULT_CONFIG.header,
     gatewayUrl: process.env.SMS_GATEWAY_URL || 'http://wsms.pansoftech.com/api/pushsms.php',
@@ -65,7 +74,7 @@ export async function sendOtpSms({ phone, otp, purpose = 'auth' }) {
     console.info(
       `[SMS DLT Ready] Header: ${config.header} | DLT Template ID: ${config.dltTemplateId} | Entity: ${config.dltEntityId}\n` +
       `  To: +91${normalizedPhone}\n` +
-      `  Message: "${message.replace(/\n/g, ' ')}"\n` +
+      `  Message: "${message}"\n` +
       `  Status: Set SMS credentials in .env to dispatch live SMS packets.`
     )
     return { success: true, queued: true, provider: 'mock' }
@@ -93,6 +102,15 @@ export async function sendOtpSms({ phone, otp, purpose = 'auth' }) {
       params.append('numbers', normalizedPhone)
       params.append('unicode', 'false')
       params.append('flash', 'false')
+      // Essential DLT IDs for operator telecom routing
+      params.append('dlt_template_id', config.dltTemplateId)
+      params.append('template_id', config.dltTemplateId)
+      if (config.dltHeaderId) {
+        params.append('dlt_header_id', config.dltHeaderId)
+      }
+      if (config.dltEntityId) {
+        params.append('pe_id', config.dltEntityId)
+      }
 
       response = await fetch(targetUrl, {
         method: 'POST',
