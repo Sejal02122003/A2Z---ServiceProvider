@@ -301,9 +301,16 @@ export function AuthEntryPage({ authGroup = 'users' }) {
       let signedInUser
       if (mode === 'login') {
         const res = await verifyLogin({ phone: p, code, challengeId, authGroup })
-        const { token, user } = res.data
+        const { token, user, welcomeBonus } = res.data
         applySession(token, user)
         signedInUser = user
+        if (welcomeBonus?.credited) {
+          signedInUser.welcomeBonus = welcomeBonus
+          try {
+            sessionStorage.setItem('a2z_pending_welcome_bonus', JSON.stringify(welcomeBonus))
+            window.dispatchEvent(new CustomEvent('a2z-show-welcome-bonus', { detail: welcomeBonus }))
+          } catch {}
+        }
       } else {
         const nameErr = validateClientName(fullName)
         if (nameErr) {
@@ -326,6 +333,10 @@ export function AuthEntryPage({ authGroup = 'users' }) {
         signedInUser = user
         if (welcomeBonus?.credited) {
           signedInUser.welcomeBonus = welcomeBonus
+          try {
+            sessionStorage.setItem('a2z_pending_welcome_bonus', JSON.stringify(welcomeBonus))
+            window.dispatchEvent(new CustomEvent('a2z-show-welcome-bonus', { detail: welcomeBonus }))
+          } catch {}
         }
       }
 
@@ -355,8 +366,15 @@ export function AuthEntryPage({ authGroup = 'users' }) {
       if (e instanceof ApiError && (e.code === 'USER_EXISTS' || e.statusCode === 409)) {
         try {
           const loginRes = await verifyLogin({ phone: p, code, challengeId, authGroup })
-          const { token, user } = loginRes.data
+          const { token, user, welcomeBonus } = loginRes.data
           applySession(token, user)
+          if (welcomeBonus?.credited) {
+            user.welcomeBonus = welcomeBonus
+            try {
+              sessionStorage.setItem('a2z_pending_welcome_bonus', JSON.stringify(welcomeBonus))
+              window.dispatchEvent(new CustomEvent('a2z-show-welcome-bonus', { detail: welcomeBonus }))
+            } catch {}
+          }
           if (authGroup === 'labours') {
             const kitReceived = Boolean(
               user.welcomeKit?.isReceived ||
@@ -370,7 +388,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
           const rawFrom = location.state?.from
           const safeFrom = (authGroup === 'users' && rawFrom?.startsWith('/serviceprovider')) ? null : rawFrom
           const returnPath = safeFrom || getRoleHomePath(user.role)
-          navigate(returnPath, { replace: true })
+          navigate(returnPath, { replace: true, state: { welcomeBonus: user.welcomeBonus } })
           return
         } catch {
           setBanner({

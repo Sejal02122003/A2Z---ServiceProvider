@@ -87,10 +87,35 @@ export const registerVerify = asyncHandler(async (req, res) => {
       }
       await existing.save()
       const token = signAccessToken(existing)
+
+      let welcomeBonus = null
+      if (existing.role === USER_ROLES.CUSTOMER) {
+        try {
+          const { ensureWelcomeBonus } = await import('../services/userWalletService.js')
+          const bonusRes = await ensureWelcomeBonus(existing._id)
+          if (bonusRes && bonusRes.credited) {
+            existing.welcomeBonusCredited = true
+            existing.welcomeBonusAmount = bonusRes.bonusAmount
+            existing.welcomeBonusCreditedAt = new Date()
+            welcomeBonus = {
+              credited: true,
+              amount: bonusRes.bonusAmount,
+              balance: bonusRes.balanceAfter,
+              message: bonusRes.message || `₹${bonusRes.bonusAmount.toLocaleString('en-IN')} welcome bonus added to your wallet`,
+            }
+          }
+        } catch (bonusErr) {
+          console.error('[AUTH_ERROR] Error in existing user welcome bonus processing:', bonusErr)
+        }
+      }
+
       return sendSuccess(res, {
         message: 'Account already exists — logged in successfully',
         statusCode: HTTP_STATUS.OK,
-        data: buildAuthPayload(existing, token),
+        data: {
+          ...buildAuthPayload(existing, token),
+          welcomeBonus,
+        },
       })
     }
     return sendError(res, {
@@ -215,6 +240,9 @@ export const registerVerify = asyncHandler(async (req, res) => {
       const { ensureWelcomeBonus } = await import('../services/userWalletService.js')
       const bonusRes = await ensureWelcomeBonus(user._id)
       if (bonusRes && bonusRes.credited) {
+        user.welcomeBonusCredited = true
+        user.welcomeBonusAmount = bonusRes.bonusAmount
+        user.welcomeBonusCreditedAt = new Date()
         welcomeBonus = {
           credited: true,
           amount: bonusRes.bonusAmount,
@@ -332,6 +360,9 @@ export const loginVerify = asyncHandler(async (req, res) => {
       const { ensureWelcomeBonus } = await import('../services/userWalletService.js')
       const bonusRes = await ensureWelcomeBonus(user._id)
       if (bonusRes && bonusRes.credited) {
+        user.welcomeBonusCredited = true
+        user.welcomeBonusAmount = bonusRes.bonusAmount
+        user.welcomeBonusCreditedAt = new Date()
         welcomeBonus = {
           credited: true,
           amount: bonusRes.bonusAmount,

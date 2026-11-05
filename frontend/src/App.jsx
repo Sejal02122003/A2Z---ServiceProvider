@@ -57,6 +57,7 @@ import AdminBookingCancellationPage from './pages/admin/AdminBookingCancellation
 import { BroadcastPopup } from './components/app/BroadcastPopup.jsx'
 import { SimulatedOpportunityPopup } from './components/app/SimulatedOpportunityPopup.jsx'
 import { BookingConfirmedToast } from './components/app/BookingConfirmedToast.jsx'
+import { WelcomeBonusPopup } from './components/app/WelcomeBonusPopup.jsx'
 import { ErrorBoundary } from './components/ErrorBoundary.jsx'
 import { useEffect } from 'react'
 import { APP_B2C_ROLES } from './constants/panelRoles.js'
@@ -221,6 +222,9 @@ function App() {
         </ErrorBoundary>
         <ErrorBoundary>
           <BookingConfirmedToast />
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <WelcomeBonusPopup />
         </ErrorBoundary>
           </BookingCartProvider>
         </AuthProvider>
