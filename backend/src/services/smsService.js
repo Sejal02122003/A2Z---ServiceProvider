@@ -112,14 +112,33 @@ export async function sendOtpSms({ phone, otp, purpose = 'auth' }) {
         params.append('pe_id', config.dltEntityId)
       }
 
-      response = await fetch(targetUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: params.toString(),
-        signal: controller.signal,
-      })
+      try {
+        response = await fetch(targetUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
+          signal: controller.signal,
+        })
+      } catch (fetchErr) {
+        // If domain DNS lookup fails (e.g. ENOTFOUND wsms.pansoftech.com), fallback directly to PanSoft's IP
+        if (targetUrl.includes('wsms.pansoftech.com')) {
+          console.warn(`[SMS] DNS lookup failed for wsms.pansoftech.com (${fetchErr.message}). Retrying with direct IP fallback (125.17.179.82)...`)
+          const fallbackUrl = 'http://125.17.179.82/api/pushsms.php'
+          response = await fetch(fallbackUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Host': 'wsms.pansoftech.com',
+            },
+            body: params.toString(),
+            signal: controller.signal,
+          })
+        } else {
+          throw fetchErr
+        }
+      }
     } else if (provider === 'fast2sms') {
       // Fast2SMS DLT endpoint
       const url = 'https://www.fast2sms.com/dev/bulkV2'
