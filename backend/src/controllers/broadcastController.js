@@ -134,6 +134,16 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     })
   }
 
+  const isMultiServiceBooking = Boolean(
+    booking.multiServiceBooking?.isMultiService &&
+    Array.isArray(booking.multiServiceBooking?.items) &&
+    booking.multiServiceBooking.items.length > 0
+  )
+  const isContractorBooking = Boolean(
+    booking.contractorInfo?.services &&
+    booking.contractorInfo.services.length > 0
+  )
+
   // Wallet Eligibility Check
   const { checkLabourBookingEligibility, reserveCashBookingCharges } = await import('../services/labourWalletService.js')
   if (booking.paymentMethod === 'CASH') {
