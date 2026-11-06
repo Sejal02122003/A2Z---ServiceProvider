@@ -13,16 +13,18 @@ const RATING_CONFIG = {
 }
 
 const POSITIVE_TAGS = [
-  { id: 'friendly', label: 'Friendly', icon: '🤝' },
-  { id: 'timely', label: 'Timely', icon: '⏰' },
-  { id: 'polite', label: 'Polite', icon: '🙂' },
+  { id: 'uniform', label: 'Uniform', icon: '👔' },
+  { id: 'grooming', label: 'Grooming', icon: '✨' },
+  { id: 'behavior', label: 'Behavior', icon: '🤝' },
+  { id: 'work_efficiency', label: 'Work Efficiency', icon: '⚡' },
   { id: 'other', label: 'Other', icon: '' },
 ]
 
 const NEGATIVE_TAGS = [
-  { id: 'late', label: 'Arrived Late', icon: '⏰' },
-  { id: 'unprofessional', label: 'Unprofessional', icon: '🙁' },
-  { id: 'quality', label: 'Work Quality', icon: '🛠️' },
+  { id: 'uniform', label: 'Uniform', icon: '👔' },
+  { id: 'grooming', label: 'Grooming', icon: '✨' },
+  { id: 'behavior', label: 'Behavior', icon: '🤝' },
+  { id: 'work_efficiency', label: 'Work Efficiency', icon: '⚡' },
   { id: 'other', label: 'Other', icon: '' },
 ]
 
@@ -273,6 +275,8 @@ export function BookingReviewModal({
                           type="button"
                           onClick={() => toggleTag(tag)}
                           className={`flex items-center justify-center gap-2 rounded-2xl py-3 px-3 text-xs sm:text-sm font-bold transition-all duration-150 active:scale-95 border ${
+                            tag.id === 'other' ? 'col-span-2' : ''
+                          } ${
                             isSelected
                               ? 'bg-emerald-50 text-emerald-800 border-emerald-400 ring-2 ring-emerald-500/20 shadow-xs'
                               : 'bg-[#F1F3F5] hover:bg-slate-200/70 text-slate-700 border-transparent'
