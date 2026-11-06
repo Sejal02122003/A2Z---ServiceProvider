@@ -444,6 +444,7 @@ export function LabourHomeScreen({ user }) {
       removeOfferLocal(offerId)
       loadBookings() // Refresh active jobs
       showToast('Job accepted — see Active in My Jobs.')
+      navigate(`/serviceprovider/active-job/${offerId}`)
     } catch (err) {
       removeOfferLocal(offerId)
       showToast(err.message || 'Failed to accept job. It might have expired.')

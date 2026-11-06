@@ -424,7 +424,7 @@ export function IndividualBookingFlowPage() {
           })
           .catch((err) => console.error('Failed to load user bookings:', err))
           .finally(() => setBookingLoading(false))
-      } else if (lastFetchedStatusBookingIdRef.current !== activeBookingId) {
+      } else {
         lastFetchedStatusBookingIdRef.current = activeBookingId
         setBookingLoading(true)
         bookingsApi
@@ -460,10 +460,14 @@ export function IndividualBookingFlowPage() {
 
     setAcceptedPartnerEvent(acceptedPartner)
     playAcceptedChime()
-    if (step === 'searching') {
+    const targetBookingId = activeBookingId || acceptedPartner.bookingId
+    if (targetBookingId) {
+      clearBookingDraft()
+      navigate(`/user/tracking/${targetBookingId}`, { replace: true })
+    } else if (step === 'searching') {
       goStep('active')
     }
-  }, [acceptedPartner, acceptedPartnerEvent, playAcceptedChime, step, goStep])
+  }, [acceptedPartner, acceptedPartnerEvent, playAcceptedChime, step, goStep, activeBookingId, navigate, clearBookingDraft])
 
   useEffect(() => {
     if (!bookingEvent) return
@@ -522,6 +526,11 @@ export function IndividualBookingFlowPage() {
         }
       })
 
+      if (bId) {
+        clearBookingDraft()
+        navigate(`/user/tracking/${bId}`, { replace: true })
+        return
+      }
       if (step === 'searching') {
         goStep('active')
       }
@@ -552,7 +561,7 @@ export function IndividualBookingFlowPage() {
       setActiveBooking(prev => prev ? { ...prev, status: 'CANCELLED', ...bookingEvent.data } : null)
       clearBookingDraft()
     }
-  }, [bookingEvent, activeBookingId, goStep, playAcceptedChime, handleOpenReview, clearBookingDraft, step])
+  }, [bookingEvent, activeBookingId, goStep, playAcceptedChime, handleOpenReview, clearBookingDraft, step, navigate])
 
   // Polling fallback to ensure instant transition when provider accepts
   const hasWorkerAssigned = Boolean(
@@ -595,9 +604,11 @@ export function IndividualBookingFlowPage() {
           )
           const isNowAccepted = ['ACCEPTED', 'PARTIALLY_ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED', 'COMPLETED'].includes(s) || workerAssigned
 
-          if (isNowAccepted && step === 'searching') {
+          if (isNowAccepted && (step === 'searching' || !hasWorkerAssigned)) {
             playAcceptedChime()
-            goStep('active')
+            clearBookingDraft()
+            navigate(`/user/tracking/${activeBookingId}`, { replace: true })
+            return
           }
         })
         .catch((err) => {
@@ -606,7 +617,7 @@ export function IndividualBookingFlowPage() {
     }, 3000)
 
     return () => clearInterval(interval)
-  }, [realUser, activeBookingId, activeBooking?.status, hasWorkerAssigned, step, goStep, playAcceptedChime])
+  }, [realUser, activeBookingId, activeBooking?.status, hasWorkerAssigned, step, goStep, playAcceptedChime, navigate, clearBookingDraft])
 
   useEffect(() => {
     const cid = categoryIdParam
@@ -1172,17 +1183,23 @@ export function IndividualBookingFlowPage() {
     effectivePartnerData?.completionOtp
 
   useEffect(() => {
-    if (step === 'searching' && isAccepted) {
-      goStep('active')
+    if ((step === 'searching' || step === 'active') && isAccepted) {
+      const targetId = activeBookingId || effectivePartnerData?.bookingId
+      if (targetId) {
+        clearBookingDraft()
+        navigate(`/user/tracking/${targetId}`, { replace: true })
+      } else if (step === 'searching') {
+        goStep('active')
+      }
     }
-  }, [step, isAccepted, goStep])
+  }, [step, isAccepted, activeBookingId, effectivePartnerData, navigate, goStep, clearBookingDraft])
 
   const wizardIndex = step === 'type' ? 0 : step === 'details' ? 1 : step === 'summary' ? 2 : 3
 
   if (step === 'scheduled_success') {
     return (
       <div className="space-y-4 pb-8">
-        <AppStackScreenHeader title="Booking confirmed" onBack={() => navigate('/user/my-bookings')} />
+        <AppStackScreenHeader title="Booking confirmed" onBack={() => navigate('/user')} />
         <GlassPanel className="p-6 text-center">
           <CheckCircle2 className="mx-auto h-16 w-16 text-blue-600" aria-hidden />
           <p className="mt-4 text-lg font-black text-slate-900">Your job is scheduled!</p>
@@ -1206,8 +1223,17 @@ export function IndividualBookingFlowPage() {
             </div>
           </div>
           <motion.div className="mt-6 flex flex-col gap-2">
-            <BookingPrimaryButton type="button" onClick={() => { window.scrollTo(0, 0); clearBookingDraft(); navigate('/user/my-bookings', { replace: true }) }}>
-              View my bookings
+            <BookingPrimaryButton type="button" onClick={() => {
+              window.scrollTo(0, 0);
+              const targetId = activeBookingId || readBookingDraft()?.lastRef;
+              clearBookingDraft();
+              if (targetId) {
+                navigate(`/user/tracking/${targetId}`, { replace: true });
+              } else {
+                navigate('/user/my-bookings', { replace: true });
+              }
+            }}>
+              Track Booking & Service Provider
             </BookingPrimaryButton>
             <AppButton type="button" variant="secondary" onClick={() => { window.scrollTo(0, 0); clearBookingDraft(); navigate('/user', { replace: true }) }}>
               Back to home
@@ -1363,7 +1389,7 @@ export function IndividualBookingFlowPage() {
               ? 'Booking Accepted'
               : 'Finding Service Provider'
           }
-          onBack={() => (step === 'payment' ? goStep(booking?.status === 'COMPLETED' ? 'billing' : 'active') : navigate('/user/my-bookings', { replace: true }))}
+          onBack={() => (step === 'payment' ? goStep(booking?.status === 'COMPLETED' ? 'billing' : 'active') : navigate('/user', { replace: true }))}
         />
         <BookingServiceHighlight
           categoryName={draft.categoryName || booking?.category?.name || 'Service'}
@@ -1382,13 +1408,23 @@ export function IndividualBookingFlowPage() {
             <p className="text-sm font-bold text-slate-800">No active booking details found</p>
             <p className="text-xs text-slate-500">We could not find an ongoing booking for this session.</p>
             <div className="pt-2 flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => navigate('/user/my-bookings')}
-                className="w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition"
-              >
-                View My Bookings
-              </button>
+              {activeBookingId ? (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/user/tracking/${activeBookingId}`)}
+                  className="w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition"
+                >
+                  Track My Booking
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate('/user/my-bookings')}
+                  className="w-full rounded-xl bg-slate-900 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition"
+                >
+                  View My Bookings
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => navigate('/user')}
