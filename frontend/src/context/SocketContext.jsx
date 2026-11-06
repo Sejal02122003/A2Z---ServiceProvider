@@ -6,7 +6,9 @@ const SocketContext = createContext(null)
 
 const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL ||
-  (import.meta.env.DEV ? '/' : (import.meta.env.VITE_API_URL || 'http://localhost:5005/api/v1').replace('/api/v1', ''))
+  (import.meta.env.VITE_API_URL
+    ? import.meta.env.VITE_API_URL.replace(/\/api\/v1\/?$/, '')
+    : 'http://localhost:5005')
 
 let currentSocket = null
 let currentToken = null
