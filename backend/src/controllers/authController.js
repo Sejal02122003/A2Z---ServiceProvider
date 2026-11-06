@@ -56,14 +56,14 @@ export const registerRequestOtp = asyncHandler(async (req, res) => {
     })
   }
   const { challengeId, plainOtp } = await createOtpChallenge(phone, 'register')
-  const isDev = process.env.NODE_ENV !== 'production' || process.env.OTP_DEV_LOG === 'true' || isOtpBypassLast6Enabled()
+  const includeDevOtp = isOtpBypassLast6Enabled()
   return sendSuccess(res, {
     message: 'OTP sent to your mobile number',
     data: {
       phone,
       role,
       challengeId,
-      ...(isDev ? { devOtp: plainOtp, bypassHint: `Use ${plainOtp} or 123456` } : {}),
+      ...(includeDevOtp ? { devOtp: plainOtp, bypassHint: `Use ${plainOtp} or 123456` } : {}),
     },
   })
 })
@@ -302,14 +302,14 @@ export const loginRequestOtp = asyncHandler(async (req, res) => {
     ? USER_ROLES.LABOUR
     : (user.role === USER_ROLES.LABOUR ? USER_ROLES.CUSTOMER : user.role)
   const { challengeId, plainOtp } = await createOtpChallenge(phone, 'login')
-  const isDev = process.env.NODE_ENV !== 'production' || process.env.OTP_DEV_LOG === 'true' || isOtpBypassLast6Enabled()
+  const includeDevOtp = isOtpBypassLast6Enabled()
   return sendSuccess(res, {
     message: 'OTP sent to your mobile number',
     data: {
       phone,
       role: effectiveRole,
       challengeId,
-      ...(isDev ? { devOtp: plainOtp, bypassHint: `Use ${plainOtp} or 123456` } : {}),
+      ...(includeDevOtp ? { devOtp: plainOtp, bypassHint: `Use ${plainOtp} or 123456` } : {}),
     },
   })
 })

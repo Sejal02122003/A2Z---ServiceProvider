@@ -13,8 +13,7 @@ function generateSixDigitCode() {
 
 /** Demo / client review: OTP = last 6 digits of the normalized 10-digit mobile. */
 export function isOtpBypassLast6Enabled() {
-  if (process.env.OTP_BYPASS_LAST6 === 'false') return false
-  return true
+  return process.env.OTP_BYPASS_LAST6 === 'true'
 }
 
 export function otpFromPhoneLast6(phone) {
@@ -58,8 +57,8 @@ export async function createOtpChallenge(phone, purpose) {
 
 export async function validateOtpChallenge({ phone, purpose, code, challengeId }) {
   const submitted = String(code || '').trim()
-  const bypass = otpFromPhoneLast6(phone)
-  const isBypassMatch = (bypass && submitted === bypass) || submitted === '123456'
+  const bypass = isOtpBypassLast6Enabled() ? otpFromPhoneLast6(phone) : null
+  const isBypassMatch = isOtpBypassLast6Enabled() && ((bypass && submitted === bypass) || submitted === '123456')
 
   if (challengeId && mongoose.Types.ObjectId.isValid(challengeId)) {
     const doc = await OtpChallenge.findOne({ _id: challengeId, phone, purpose })

@@ -123,7 +123,6 @@ export function AuthEntryPage({ authGroup = 'users' }) {
   const [otpCells, setOtpCells] = useState(() => Array(6).fill(''))
   const [showOtp, setShowOtp] = useState(true)
   const [challengeId, setChallengeId] = useState(null)
-  const [devOtpHint, setDevOtpHint] = useState(null)
   const [busy, setBusy] = useState(false)
   const [banner, setBanner] = useState(null)
   const [termsAccepted, setTermsAccepted] = useState(false)
@@ -170,7 +169,6 @@ export function AuthEntryPage({ authGroup = 'users' }) {
   function resetFlowToForm() {
     setStep('form')
     setChallengeId(null)
-    setDevOtpHint(null)
     setBanner(null)
     setOtpCells(Array(6).fill(''))
   }
@@ -214,8 +212,6 @@ export function AuthEntryPage({ authGroup = 'users' }) {
       if (mode === 'login') {
         const res = await requestLoginOtp({ phone: p, authGroup })
         setChallengeId(res.data?.challengeId ?? null)
-        const hint = res.data?.devOtp || (p ? p.slice(-6) : null)
-        setDevOtpHint(hint)
       } else {
         const registrationRole = authGroup === 'labours' ? USER_ROLES.LABOUR : role
         const res = await requestRegisterOtp({
@@ -225,8 +221,6 @@ export function AuthEntryPage({ authGroup = 'users' }) {
           fullName: fullName.trim() || undefined,
         })
         setChallengeId(res.data?.challengeId ?? null)
-        const hint = res.data?.devOtp || (p ? p.slice(-6) : null)
-        setDevOtpHint(hint)
       }
       setOtpCells(Array(6).fill(''))
       setStep('otp')
@@ -673,31 +667,6 @@ export function AuthEntryPage({ authGroup = 'users' }) {
                     <span>{showOtp ? 'Hide' : 'Show'}</span>
                   </button>
                 </div>
-                {devOtpHint ? (
-                  <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-xs text-teal-900">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="inline-block h-2 w-2 rounded-full bg-teal-500 shrink-0" />
-                      <span className="truncate">
-                        Test Code: <strong className="font-mono text-teal-950 font-bold">{devOtpHint}</strong> (or 123456)
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const codeToFill = String(devOtpHint).replace(/\D/g, '').slice(0, 6) || (phone ? phone.slice(-6) : '123456')
-                        const cells = digitsToOtpCells(codeToFill)
-                        setOtpCells(cells)
-                        clearOtpError()
-                        queueMicrotask(() => {
-                          otpInputRefs.current[5]?.focus()
-                        })
-                      }}
-                      className="shrink-0 rounded-lg bg-teal-700 px-2.5 py-1 text-[11px] font-bold text-white shadow-2xs hover:bg-teal-800 active:scale-95 transition cursor-pointer"
-                    >
-                      Fill OTP
-                    </button>
-                  </div>
-                ) : null}
                 <p className="mt-4 mb-3 text-[11px] font-bold uppercase tracking-wide text-slate-500">Enter OTP</p>
                 <div className="flex gap-2" onPaste={handleOtpPaste}>
                   {otpCells.map((digit, i) => (

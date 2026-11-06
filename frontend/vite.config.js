@@ -13,8 +13,14 @@ export default defineConfig({
         ws: true,
         changeOrigin: true,
         configure: (proxy) => {
-          proxy.on('error', (err) => {
-            if (['ECONNRESET', 'EPIPE', 'ECONNREFUSED'].includes(err?.code)) return
+          proxy.on('error', (err, _req, res) => {
+            if (['ECONNRESET', 'EPIPE', 'ECONNREFUSED'].includes(err?.code)) {
+              if (res && !res.headersSent && typeof res.writeHead === 'function') {
+                res.writeHead(502, { 'Content-Type': 'text/plain' })
+                res.end()
+              }
+              return
+            }
             console.error('[vite] ws proxy error:', err?.message || err)
           })
         },
