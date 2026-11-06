@@ -479,8 +479,8 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
         partnerCompletedBookings,
         partnerExperience: labour.labourProfile?.experienceYears,
         serviceName: assignedServiceName || 'Service',
-        startOtp: newAssignment.startOtp,
-        completionOtp: newAssignment.completionOtp,
+        startOtp: newAssignments[0]?.startOtp,
+        completionOtp: newAssignments[0]?.completionOtp,
       })
 
       emitToUser(booking.userId, 'BOOKING_STATUS_UPDATE', {

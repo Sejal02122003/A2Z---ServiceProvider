@@ -2061,7 +2061,14 @@ export function IndividualBookingFlowPage() {
             activeBooking?.assignments?.[0]?.labourId?.profileImageUrl
           }
           serviceName={activeBooking?.serviceId?.name || activeBooking?.subcategoryId?.name}
-          revieweeId={reviewQueue[currentReviewIndex]?._id || reviewQueue[currentReviewIndex]}
+          revieweeId={
+            reviewQueue[currentReviewIndex]?._id ||
+            reviewQueue[currentReviewIndex] ||
+            activeBooking?.laborId?._id ||
+            activeBooking?.acceptedLabourId?._id ||
+            activeBooking?.assignments?.[0]?.labourId?._id ||
+            activeBooking?.laborId
+          }
           onClose={() => setReviewOpen(false)}
           onSubmitted={handleReviewSubmitted}
         />
