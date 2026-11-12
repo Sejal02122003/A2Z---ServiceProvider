@@ -153,6 +153,7 @@ router.patch(
   '/labour-services/:id',
   [
     param('id').isMongoId().withMessage('Invalid id'),
+    body('subcategoryId').optional().isMongoId().withMessage('Invalid subcategory id'),
     body('name').optional().trim().notEmpty(),
     body('description').optional().trim(),
     body('basePrice').optional().isNumeric(),

@@ -443,8 +443,41 @@ export const patchService = asyncHandler(async (req, res) => {
   if (!s) {
     return sendError(res, { message: 'Service not found', statusCode: HTTP_STATUS.NOT_FOUND, code: 'NOT_FOUND' })
   }
-  const { name, description, basePrice, estimatedDurationMins, isActive, sortOrder, iconUrl, hourlyPrice, minHours, maxHours, discountType, discountValue, offerBadge, offerDescription, isAllZones, zones, chargeType, unitName, pricePerUnit, subServices } = req.body
-  if (name != null) s.name = String(name).trim()
+  const { name, subcategoryId, description, basePrice, estimatedDurationMins, isActive, sortOrder, iconUrl, hourlyPrice, minHours, maxHours, discountType, discountValue, offerBadge, offerDescription, isAllZones, zones, chargeType, unitName, pricePerUnit, subServices } = req.body
+
+  let targetSubcategory = null
+  if (subcategoryId && String(subcategoryId) !== String(s.subcategoryId)) {
+    targetSubcategory = await LabourSubcategory.findById(subcategoryId)
+    if (!targetSubcategory) {
+      return sendError(res, {
+        message: 'Selected sub-category does not exist',
+        statusCode: HTTP_STATUS.BAD_REQUEST,
+        code: 'INVALID_SUBCATEGORY',
+      })
+    }
+  }
+
+  const targetSubcategoryId = targetSubcategory ? targetSubcategory._id : s.subcategoryId
+  const targetName = name != null ? String(name).trim() : s.name
+
+  // Check duplicate name within target subcategory if name or subcategory changed
+  if (name != null || targetSubcategory) {
+    const duplicate = await LabourService.findOne({
+      subcategoryId: targetSubcategoryId,
+      name: { $regex: new RegExp(`^${targetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      _id: { $ne: s._id },
+    })
+    if (duplicate) {
+      return sendError(res, {
+        message: 'A service with this name already exists in the selected sub-category',
+        statusCode: HTTP_STATUS.CONFLICT,
+        code: 'DUPLICATE',
+      })
+    }
+  }
+
+  if (targetSubcategory) s.subcategoryId = targetSubcategory._id
+  if (name != null) s.name = targetName
   if (description != null) s.description = String(description)
   if (estimatedDurationMins != null) s.estimatedDurationMins = Number(estimatedDurationMins)
   if (sortOrder != null) s.sortOrder = Number(sortOrder) || 0

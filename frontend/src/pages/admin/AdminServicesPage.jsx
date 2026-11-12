@@ -716,8 +716,13 @@ function EditServiceModal({ open, service, subcategories, activeZones = [], onCl
   useEffect(() => {
     if (open && service) {
       setName(service.name || '')
-      setSortOrder(service.sortOrder ?? 0)
-      setSubcategoryId(service.subcategoryId || (subcategories[0]?._id ?? ''))
+      const initSubcatId =
+        typeof service.subcategoryId === 'object' && service.subcategoryId?._id
+          ? String(service.subcategoryId._id)
+          : service.subcategoryId
+            ? String(service.subcategoryId)
+            : (subcategories[0]?._id ?? '')
+      setSubcategoryId(initSubcatId)
       setDescription(service.description || '')
       setChargeType(service.chargeType || 'PER_HOUR')
       setUnitName(service.unitName || '')
