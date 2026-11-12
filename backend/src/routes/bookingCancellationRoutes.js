@@ -64,6 +64,30 @@ router.post(
     return cancelCustomerBooking(req, res, next)
   }
 )
+router.post(
+  '/customer/bookings/:bookingId/penalty/init',
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  async (req, res, next) => {
+    const { initCustomerPenaltyPaymentController } = await import('../controllers/bookingCancellationController.js')
+    return initCustomerPenaltyPaymentController(req, res, next)
+  }
+)
+router.post(
+  '/customer/bookings/:bookingId/penalty/verify',
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  async (req, res, next) => {
+    const { verifyCustomerPenaltyPaymentController } = await import('../controllers/bookingCancellationController.js')
+    return verifyCustomerPenaltyPaymentController(req, res, next)
+  }
+)
+router.get(
+  '/customer/bookings/:bookingId/penalty-status',
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  async (req, res, next) => {
+    const { getCustomerPenaltyStatusController } = await import('../controllers/bookingCancellationController.js')
+    return getCustomerPenaltyStatusController(req, res, next)
+  }
+)
 
 // -------------------------------------------------------------
 // ADMIN MANAGEMENT ENDPOINTS
@@ -83,5 +107,19 @@ router.get('/admin/customers/:id/history', getAdminCustomerHistoryController)
 router.post('/admin/customers/:id/restrict', adminRestrictCustomerController)
 router.post('/admin/customers/:id/unrestrict', adminUnrestrictCustomerController)
 router.post('/admin/bookings/:bookingId/bounce', recordAdminBouncePenaltyController)
+
+// Admin Cancellation Penalties & Policy Cycles
+router.get('/admin/penalty-records', async (req, res, next) => {
+  const { getAdminPenaltyRecordsController } = await import('../controllers/bookingCancellationController.js')
+  return getAdminPenaltyRecordsController(req, res, next)
+})
+router.get('/admin/bookings/:bookingId/policy-cycles', async (req, res, next) => {
+  const { getAdminBookingPolicyCyclesController } = await import('../controllers/bookingCancellationController.js')
+  return getAdminBookingPolicyCyclesController(req, res, next)
+})
+router.post('/admin/penalties/:penaltyId/waive', async (req, res, next) => {
+  const { adminWaivePenaltyController } = await import('../controllers/bookingCancellationController.js')
+  return adminWaivePenaltyController(req, res, next)
+})
 
 export default router

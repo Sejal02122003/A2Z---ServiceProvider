@@ -293,3 +293,114 @@ export const recordAdminBouncePenaltyController = asyncHandler(async (req, res) 
   })
 })
 
+/**
+ * 17. Customer: Initiate Cancellation Penalty Payment
+ */
+export const initCustomerPenaltyPaymentController = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params
+  const { penaltyId } = req.body
+  const { initiateCancellationPenaltyPayment } = await import('../services/cancellationPenaltyService.js')
+
+  const result = await initiateCancellationPenaltyPayment({
+    bookingId,
+    customerId: req.user._id,
+    penaltyId,
+  })
+
+  return sendSuccess(res, {
+    message: 'Cancellation penalty payment initialized successfully',
+    data: result,
+  })
+})
+
+/**
+ * 18. Customer: Verify Cancellation Penalty Payment and Restart Policy
+ */
+export const verifyCustomerPenaltyPaymentController = asyncHandler(async (req, res) => {
+  const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body
+  const { verifyAndRestartCancellationPolicy } = await import('../services/cancellationPenaltyService.js')
+
+  const result = await verifyAndRestartCancellationPolicy({
+    razorpayOrderId,
+    razorpayPaymentId,
+    razorpaySignature,
+    userId: req.user._id,
+  })
+
+  return sendSuccess(res, {
+    message: result.message,
+    data: result,
+  })
+})
+
+/**
+ * 19. Customer: Get Cancellation Penalty Status for a Booking
+ */
+export const getCustomerPenaltyStatusController = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params
+  const { BookingCancellationPenalty } = await import('../models/BookingCancellationPenalty.js')
+  const { BookingCancellationCycle } = await import('../models/BookingCancellationCycle.js')
+  const { Booking } = await import('../models/Booking.js')
+
+  const booking = await Booking.findById(bookingId).lean()
+  if (!booking) {
+    return sendError(res, { message: 'Booking not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  const penalties = await BookingCancellationPenalty.find({ bookingId }).sort({ createdAt: -1 }).lean()
+  const cycles = await BookingCancellationCycle.find({ bookingId }).sort({ cycleNumber: 1 }).lean()
+
+  return sendSuccess(res, {
+    data: {
+      bookingId,
+      cancellationBilling: booking.cancellationBilling || null,
+      cancellationPolicyCycle: booking.cancellationPolicyCycle || null,
+      penalties,
+      cycles,
+    },
+  })
+})
+
+/**
+ * 20. Admin: Get List of Penalty Records with filters and search
+ */
+export const getAdminPenaltyRecordsController = asyncHandler(async (req, res) => {
+  const { page, limit, paymentStatus, penaltyStatus, search } = req.query
+  const { getAdminPenaltyRecords } = await import('../services/cancellationPenaltyService.js')
+
+  const result = await getAdminPenaltyRecords({ page, limit, paymentStatus, penaltyStatus, search })
+  return sendSuccess(res, { data: result })
+})
+
+/**
+ * 21. Admin: Get Policy Cycle History for a Booking
+ */
+export const getAdminBookingPolicyCyclesController = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params
+  const { getBookingPolicyCycles } = await import('../services/cancellationPenaltyService.js')
+
+  const result = await getBookingPolicyCycles(bookingId)
+  return sendSuccess(res, { data: result })
+})
+
+/**
+ * 22. Admin: Waive Cancellation Penalty
+ */
+export const adminWaivePenaltyController = asyncHandler(async (req, res) => {
+  const { penaltyId } = req.params
+  const { reason } = req.body
+  const { adminWaiveCancellationPenalty } = await import('../services/cancellationPenaltyService.js')
+
+  const result = await adminWaiveCancellationPenalty({
+    penaltyId,
+    adminUser: req.user,
+    reason,
+  })
+
+  return sendSuccess(res, {
+    message: result.message,
+    data: result,
+  })
+})
+
+

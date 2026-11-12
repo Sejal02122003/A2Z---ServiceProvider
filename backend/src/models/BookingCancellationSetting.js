@@ -94,6 +94,51 @@ const bookingCancellationSettingSchema = new mongoose.Schema(
         'Other',
       ],
     },
+    // ==========================================
+    // CUSTOMER CANCELLATION PENALTY & RESTART ENGINE
+    // ==========================================
+    customerPenaltyEnabled: {
+      type: Boolean,
+      default: true,
+    },
+    customerPenaltyType: {
+      type: String,
+      enum: ['FIXED', 'PERCENTAGE'],
+      default: 'PERCENTAGE',
+    },
+    customerPenaltyValue: {
+      type: Number,
+      default: 25,
+      min: 0,
+    },
+    customerMinPenaltyAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    customerMaxPenaltyAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    customerPenaltyCondition: {
+      type: String,
+      enum: ['WITHIN_CUTOFF', 'ALWAYS', 'AFTER_ASSIGNMENT'],
+      default: 'WITHIN_CUTOFF',
+    },
+    customerPenaltyEffectiveDate: {
+      type: Date,
+      default: Date.now,
+    },
+    customerAutoRestartEnabled: {
+      type: Boolean,
+      default: true,
+    },
+    customerRestartTimerMinutes: {
+      type: Number,
+      default: 60,
+      min: 0,
+    },
     // Repeat Customer Cancellation Warning & Restriction Policy
     customerWarningEnabled: {
       type: Boolean,

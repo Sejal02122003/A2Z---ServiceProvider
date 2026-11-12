@@ -21,6 +21,18 @@ export const initPayment = asyncHandler(async (req, res) => {
   if (purpose === 'WORKFORCE_REQUEST' && !req.body.requestId) {
     return sendError(res, { message: 'requestId is required for WORKFORCE_REQUEST purpose', statusCode: HTTP_STATUS.BAD_REQUEST })
   }
+  if (purpose === 'CANCELLATION_PENALTY') {
+    if (!bookingId) {
+      return sendError(res, { message: 'bookingId is required for CANCELLATION_PENALTY purpose', statusCode: HTTP_STATUS.BAD_REQUEST })
+    }
+    const { initiateCancellationPenaltyPayment } = await import('../services/cancellationPenaltyService.js')
+    const initRes = await initiateCancellationPenaltyPayment({
+      bookingId,
+      customerId: req.user._id,
+      penaltyId: req.body.penaltyId,
+    })
+    return sendSuccess(res, { data: initRes })
+  }
 
   // Generate Razorpay Order
   const receiptId = `rcpt_${req.user._id.toString().slice(-4)}_${Date.now().toString().slice(-4)}`
@@ -260,6 +272,18 @@ export const verifyPayment = asyncHandler(async (req, res) => {
       razorpayPaymentId,
       razorpaySignature,
       finalChanceRequestId: pTx.finalChanceRequestId,
+    })
+  } else if (pTx.purpose === 'CANCELLATION_PENALTY') {
+    const { verifyAndRestartCancellationPolicy } = await import('../services/cancellationPenaltyService.js')
+    const restartRes = await verifyAndRestartCancellationPolicy({
+      razorpayOrderId,
+      razorpayPaymentId,
+      razorpaySignature,
+      userId: req.user._id,
+    })
+    return sendSuccess(res, {
+      message: restartRes.message || 'Payment verified and policy restarted successfully',
+      data: { pTx, ...restartRes },
     })
   }
 

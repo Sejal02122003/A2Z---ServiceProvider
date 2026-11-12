@@ -31,6 +31,7 @@ import {
   Unlock,
   ChevronUp,
   ChevronDown,
+  CreditCard,
 } from 'lucide-react'
 import { bookingCancellationApi } from '../../api/bookingCancellationApi.js'
 import { ApiError } from '../../api/http.js'
@@ -137,6 +138,77 @@ export function AdminBookingCancellationPage() {
     error: '',
   })
 
+  // Customer Penalty Cycles & Payments Tab State
+  const [penaltiesList, setPenaltiesList] = useState([])
+  const [loadingPenalties, setLoadingPenalties] = useState(false)
+  const [penaltyPagination, setPenaltyPagination] = useState({ page: 1, limit: 15, total: 0, pages: 1 })
+  const [penaltyPaymentFilter, setPenaltyPaymentFilter] = useState('ALL')
+  const [penaltyStatusFilter, setPenaltyStatusFilter] = useState('ALL')
+  const [penaltySearch, setPenaltySearch] = useState('')
+  const [policyCyclesModal, setPolicyCyclesModal] = useState({ open: false, bookingId: null, cycles: [], penalties: [], loading: false })
+  const [waiveCustomerPenaltyModal, setWaiveCustomerPenaltyModal] = useState({ open: false, penalty: null, reason: '', loading: false, error: '' })
+
+  const fetchPenalties = useCallback(
+    async (page = 1) => {
+      setLoadingPenalties(true)
+      try {
+        const res = await bookingCancellationApi.getAdminPenaltyRecords({
+          page,
+          limit: penaltyPagination.limit,
+          paymentStatus: penaltyPaymentFilter,
+          penaltyStatus: penaltyStatusFilter,
+          search: penaltySearch,
+        })
+        if (res.data) {
+          setPenaltiesList(res.data.records || [])
+          setPenaltyPagination(res.data.pagination || { page, limit: 15, total: 0, pages: 1 })
+        }
+      } catch (err) {
+        console.error('Failed to load penalty records:', err)
+      } finally {
+        setLoadingPenalties(false)
+      }
+    },
+    [penaltyPagination.limit, penaltyPaymentFilter, penaltyStatusFilter, penaltySearch]
+  )
+
+  const handleOpenPolicyCycles = async (bookingId) => {
+    setPolicyCyclesModal({ open: true, bookingId, cycles: [], penalties: [], loading: true })
+    try {
+      const res = await bookingCancellationApi.getAdminBookingPolicyCycles(bookingId)
+      setPolicyCyclesModal({
+        open: true,
+        bookingId,
+        cycles: res.data?.cycles || [],
+        penalties: res.data?.penalties || [],
+        loading: false,
+      })
+    } catch (err) {
+      console.error('Failed to load booking policy cycles:', err)
+      setPolicyCyclesModal({ open: false, bookingId: null, cycles: [], penalties: [], loading: false })
+      alert('Failed to load policy cycle history')
+    }
+  }
+
+  const handleWaiveCustomerPenalty = async (e) => {
+    e.preventDefault()
+    if (!waiveCustomerPenaltyModal.reason.trim()) {
+      setWaiveCustomerPenaltyModal((m) => ({ ...m, error: 'Please enter a waiver reason for audit log' }))
+      return
+    }
+    setWaiveCustomerPenaltyModal((m) => ({ ...m, loading: true, error: '' }))
+    try {
+      await bookingCancellationApi.waivePenaltyRecord(
+        waiveCustomerPenaltyModal.penalty.penaltyId,
+        waiveCustomerPenaltyModal.reason.trim()
+      )
+      setWaiveCustomerPenaltyModal({ open: false, penalty: null, reason: '', loading: false, error: '' })
+      fetchPenalties(penaltyPagination.page)
+    } catch (err) {
+      setWaiveCustomerPenaltyModal((m) => ({ ...m, loading: false, error: err.message || 'Failed to waive penalty' }))
+    }
+  }
+
   // Fetch Stats
   const fetchOverview = useCallback(async () => {
     try {
@@ -222,10 +294,12 @@ export function AdminBookingCancellationPage() {
       fetchRecords(1)
     } else if (activeTab === 'customers') {
       fetchCustomerCancellations(1)
+    } else if (activeTab === 'penalties') {
+      fetchPenalties(1)
     } else if (activeTab === 'settings') {
       fetchSettings()
     }
-  }, [activeTab, fetchRecords, fetchCustomerCancellations, fetchSettings])
+  }, [activeTab, fetchRecords, fetchCustomerCancellations, fetchPenalties, fetchSettings])
 
   // Customer History & Restriction Handlers
   const handleOpenCustomerHistory = async (customerId) => {
@@ -484,6 +558,19 @@ export function AdminBookingCancellationPage() {
         >
           <Users className="h-4 w-4" />
           Customer Cancellations & Restrictions
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('penalties')}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition ${
+            activeTab === 'penalties'
+              ? 'bg-brand text-white shadow-md shadow-brand/20'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <CreditCard className="h-4 w-4" />
+          Penalty Cycles & Payments
         </button>
 
         <button
@@ -1626,6 +1713,213 @@ export function AdminBookingCancellationPage() {
                 </div>
               </GlassPanel>
 
+              {/* Card 5: Customer Cancellation Penalty & Automatic Policy Restart Engine */}
+              <GlassPanel className="p-6 border-slate-200/80 space-y-6">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-5 w-5 text-brand" />
+                      <h3 className="text-base font-extrabold text-slate-900">
+                        Customer Cancellation Penalty & Automatic Policy Restart
+                      </h3>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Configure dynamic cancellation penalty calculation (fixed or percentage-based) and automated policy cycle restart upon verified payment.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex cursor-pointer items-center">
+                    <input
+                      type="checkbox"
+                      checked={settings.customerPenaltyEnabled !== false}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          customerPenaltyEnabled: e.target.checked,
+                        })
+                      }
+                      className="peer sr-only"
+                    />
+                    <div className="h-6 w-11 rounded-full bg-slate-200 peer-checked:bg-emerald-600 peer-focus:outline-hidden after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full" />
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                  {/* Penalty Calculation Type */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      Penalty Calculation Type
+                    </label>
+                    <select
+                      value={settings.customerPenaltyType || 'PERCENTAGE'}
+                      onChange={(e) =>
+                        setSettings({ ...settings, customerPenaltyType: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden focus:border-brand"
+                    >
+                      <option value="PERCENTAGE">Percentage of Booking Value (%)</option>
+                      <option value="FIXED">Fixed Amount (₹)</option>
+                    </select>
+                    <p className="text-[11px] font-medium text-slate-400 mt-1">
+                      Percentage calculates against applicable booking amount.
+                    </p>
+                  </div>
+
+                  {/* Penalty Value */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      {settings.customerPenaltyType === 'FIXED' ? 'Penalty Amount (₹)' : 'Penalty Rate (%)'}
+                    </label>
+                    <div className="flex items-center rounded-xl border border-slate-200 bg-white focus-within:border-brand focus-within:ring-1 focus-within:ring-brand overflow-hidden">
+                      <span className="pl-3 text-sm font-bold text-slate-400 select-none">
+                        {settings.customerPenaltyType === 'FIXED' ? '₹' : '%'}
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        max={settings.customerPenaltyType === 'PERCENTAGE' ? 100 : undefined}
+                        value={settings.customerPenaltyValue ?? 25}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            customerPenaltyValue: Math.max(0, Number(e.target.value) || 0),
+                          })
+                        }
+                        className="w-full bg-transparent px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden"
+                      />
+                    </div>
+                    <p className="text-[11px] font-medium text-slate-400 mt-1">
+                      Example: 25% penalty on ₹1,000 booking = ₹250.
+                    </p>
+                  </div>
+
+                  {/* Cancellation Condition */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      Applicable Cancellation Condition
+                    </label>
+                    <select
+                      value={settings.customerPenaltyCondition || 'WITHIN_CUTOFF'}
+                      onChange={(e) =>
+                        setSettings({ ...settings, customerPenaltyCondition: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden focus:border-brand"
+                    >
+                      <option value="WITHIN_CUTOFF">Within Cutoff Time (&lt; {settings.customerCutoffMinutes ?? 60}m before service)</option>
+                      <option value="AFTER_ASSIGNMENT">After Partner is Assigned</option>
+                      <option value="ALWAYS">Always Apply Penalty</option>
+                    </select>
+                    <p className="text-[11px] font-medium text-slate-400 mt-1">
+                      Trigger rule when cancellation penalty applies.
+                    </p>
+                  </div>
+
+                  {/* Min Penalty */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      Minimum Penalty Limit (₹) <span className="text-slate-400 font-normal">(Optional)</span>
+                    </label>
+                    <div className="flex items-center rounded-xl border border-slate-200 bg-white focus-within:border-brand focus-within:ring-1 focus-within:ring-brand overflow-hidden">
+                      <span className="pl-3 text-sm font-bold text-slate-400 select-none">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={settings.customerMinPenaltyAmount ?? 0}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            customerMinPenaltyAmount: Math.max(0, Number(e.target.value) || 0),
+                          })
+                        }
+                        placeholder="0 = No minimum"
+                        className="w-full bg-transparent px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden"
+                      />
+                    </div>
+                    <p className="text-[11px] font-medium text-slate-400 mt-1">
+                      Floor cap for penalty calculation.
+                    </p>
+                  </div>
+
+                  {/* Max Penalty */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      Maximum Penalty Limit (₹) <span className="text-slate-400 font-normal">(Optional)</span>
+                    </label>
+                    <div className="flex items-center rounded-xl border border-slate-200 bg-white focus-within:border-brand focus-within:ring-1 focus-within:ring-brand overflow-hidden">
+                      <span className="pl-3 text-sm font-bold text-slate-400 select-none">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={settings.customerMaxPenaltyAmount ?? 0}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            customerMaxPenaltyAmount: Math.max(0, Number(e.target.value) || 0),
+                          })
+                        }
+                        placeholder="0 = No maximum"
+                        className="w-full bg-transparent px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden"
+                      />
+                    </div>
+                    <p className="text-[11px] font-medium text-slate-400 mt-1">
+                      Ceiling cap for penalty calculation.
+                    </p>
+                  </div>
+
+                  {/* Restart Timer Window */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      Policy Restart Timer (Minutes)
+                    </label>
+                    <div className="flex items-center rounded-xl border border-slate-200 bg-white focus-within:border-brand focus-within:ring-1 focus-within:ring-brand overflow-hidden">
+                      <input
+                        type="number"
+                        min="1"
+                        value={settings.customerRestartTimerMinutes ?? 60}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            customerRestartTimerMinutes: Math.max(1, Number(e.target.value) || 1),
+                          })
+                        }
+                        className="w-full bg-transparent px-3 py-2.5 text-sm font-bold text-slate-800 outline-hidden"
+                      />
+                      <span className="text-xs font-bold text-slate-400 px-2 shrink-0 select-none">
+                        Mins
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-medium text-slate-400 mt-1">
+                      Grace window for customer after verified restart.
+                    </p>
+                  </div>
+
+                  {/* Auto Restart Switch */}
+                  <div className="sm:col-span-3 flex items-center justify-between rounded-2xl bg-slate-50 border border-slate-200 p-4">
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">
+                        Automatic Policy Restart after Verified Payment
+                      </p>
+                      <p className="text-[11px] font-medium text-slate-500 mt-0.5">
+                        When enabled, verified payment automatically closes the current policy cycle, creates a new cycle, keeps booking active, and restores customer cancellation eligibility.
+                      </p>
+                    </div>
+                    <label className="relative inline-flex cursor-pointer items-center shrink-0 ml-4">
+                      <input
+                        type="checkbox"
+                        checked={settings.customerAutoRestartEnabled !== false}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            customerAutoRestartEnabled: e.target.checked,
+                          })
+                        }
+                        className="peer sr-only"
+                      />
+                      <div className="h-6 w-11 rounded-full bg-slate-200 peer-checked:bg-brand peer-focus:outline-hidden after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full" />
+                    </label>
+                  </div>
+                </div>
+              </GlassPanel>
+
               {/* Save Button */}
               <div className="flex justify-end pt-2">
                 <button
@@ -1644,6 +1938,387 @@ export function AdminBookingCancellationPage() {
             </>
           )}
         </form>
+      )}
+
+      {/* ======================================================== */}
+      {/* TAB 5: CUSTOMER PENALTY CYCLES & PAYMENTS */}
+      {/* ======================================================== */}
+      {activeTab === 'penalties' && (
+        <div className="space-y-4">
+          {/* Filter Bar */}
+          <GlassPanel className="p-4 border-slate-200/80">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search Booking, Customer, or Penalty ID..."
+                  value={penaltySearch}
+                  onChange={(e) => setPenaltySearch(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 outline-hidden focus:border-brand focus:ring-1 focus:ring-brand"
+                />
+              </div>
+
+              <div>
+                <select
+                  value={penaltyPaymentFilter}
+                  onChange={(e) => setPenaltyPaymentFilter(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-hidden focus:border-brand"
+                >
+                  <option value="ALL">All Payment Statuses</option>
+                  <option value="PAID">Paid Only</option>
+                  <option value="PENDING">Pending Payment</option>
+                  <option value="PROCESSING">Processing</option>
+                  <option value="FAILED">Payment Failed</option>
+                </select>
+              </div>
+
+              <div>
+                <select
+                  value={penaltyStatusFilter}
+                  onChange={(e) => setPenaltyStatusFilter(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-hidden focus:border-brand"
+                >
+                  <option value="ALL">All Penalty Statuses</option>
+                  <option value="PENDING">Pending Dues</option>
+                  <option value="PAID">Paid & Settled</option>
+                  <option value="WAIVED">Admin Waived</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fetchPenalties(1)}
+                  className="w-full rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition flex items-center justify-center gap-1.5"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  Apply Filter
+                </button>
+              </div>
+            </div>
+          </GlassPanel>
+
+          {/* Table */}
+          <GlassPanel className="overflow-hidden border-slate-200/80">
+            {loadingPenalties ? (
+              <div className="flex flex-col items-center justify-center py-24 space-y-3">
+                <Loader2 className="h-8 w-8 animate-spin text-brand" />
+                <p className="text-xs font-bold text-slate-500">Loading penalty records & cycles...</p>
+              </div>
+            ) : penaltiesList.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center text-slate-400 space-y-2">
+                <CreditCard className="h-10 w-10 text-slate-300" />
+                <p className="text-sm font-bold text-slate-600">No Cancellation Penalty Records Found</p>
+                <p className="text-xs text-slate-400">
+                  When customers cancel within policy cutoff, penalty assessments will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/80 text-[11px] font-black uppercase tracking-wider text-slate-500 border-b border-slate-200/60">
+                    <tr>
+                      <th className="px-4 py-3.5">Booking / Penalty Ref</th>
+                      <th className="px-4 py-3.5">Customer</th>
+                      <th className="px-4 py-3.5">Policy Cycle</th>
+                      <th className="px-4 py-3.5">Calculation Rule</th>
+                      <th className="px-4 py-3.5">Penalty Amount</th>
+                      <th className="px-4 py-3.5">Paid Amount</th>
+                      <th className="px-4 py-3.5">Payment Status</th>
+                      <th className="px-4 py-3.5">Assessed / Paid Date</th>
+                      <th className="px-4 py-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                    {penaltiesList.map((p) => {
+                      const shortBooking = String(p.bookingId?._id || p.bookingId || '').slice(-6).toUpperCase()
+                      return (
+                        <tr key={p._id} className="hover:bg-slate-50/70 transition">
+                          <td className="px-4 py-3">
+                            <span className="font-bold text-slate-900 block">
+                              #{shortBooking}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {p.penaltyId}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-bold text-slate-900 block">
+                              {p.customerId?.fullName || 'Customer'}
+                            </span>
+                            <span className="text-[11px] text-slate-500">
+                              {p.customerId?.phone || '—'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200 px-2.5 py-0.5 text-[11px] font-black">
+                              Cycle #{p.policyCycleNumber || 1}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-bold text-slate-800 block">
+                              {p.penaltyCalculationType === 'PERCENTAGE'
+                                ? `${p.configuredPenaltyValue}% of booking`
+                                : `Fixed ₹${p.configuredPenaltyValue}`}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              Base: {formatInr(p.originalApplicableBookingAmount)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-extrabold text-rose-700 text-sm">
+                              {formatInr(p.calculatedPenaltyAmount)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`font-bold ${p.amountPaid > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
+                              {formatInr(p.amountPaid || 0)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {p.penaltyStatus === 'WAIVED' ? (
+                              <span className="inline-flex items-center rounded-full bg-teal-50 text-teal-800 border border-teal-200 px-2.5 py-0.5 text-[10px] font-black">
+                                Waived
+                              </span>
+                            ) : p.paymentStatus === 'PAID' ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-black">
+                                <Check className="h-3 w-3" /> Paid & Restarted
+                              </span>
+                            ) : p.paymentStatus === 'PROCESSING' ? (
+                              <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-800 border border-blue-200 px-2.5 py-0.5 text-[10px] font-black">
+                                Processing
+                              </span>
+                            ) : p.paymentStatus === 'FAILED' ? (
+                              <span className="inline-flex items-center rounded-full bg-rose-50 text-rose-800 border border-rose-200 px-2.5 py-0.5 text-[10px] font-black">
+                                Failed
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center rounded-full bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-0.5 text-[10px] font-black">
+                                Payment Pending
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-[11px] text-slate-500">
+                            <span>Assessed: {formatDate(p.createdAt)}</span>
+                            {p.paidAt && (
+                              <span className="block text-emerald-700 font-bold">
+                                Paid: {formatDate(p.paidAt)}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenPolicyCycles(p.bookingId?._id || p.bookingId)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-100 transition shadow-xs"
+                              title="View Policy Cycles History"
+                            >
+                              <RotateCcw className="h-3 w-3 text-brand" />
+                              Cycles
+                            </button>
+                            {p.penaltyStatus !== 'WAIVED' && (
+                              <button
+                                type="button"
+                                onClick={() => setWaiveCustomerPenaltyModal({ open: true, penalty: p, reason: '', loading: false, error: '' })}
+                                className="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-2 py-1 text-[11px] font-bold text-teal-700 hover:bg-teal-100 transition"
+                                title="Waive Penalty"
+                              >
+                                Waive
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {penaltyPagination.pages > 1 && (
+              <div className="flex items-center justify-between border-t border-slate-100 p-4">
+                <span className="text-xs text-slate-500 font-medium">
+                  Page {penaltyPagination.page} of {penaltyPagination.pages} ({penaltyPagination.total} total penalties)
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={penaltyPagination.page <= 1}
+                    onClick={() => fetchPenalties(penaltyPagination.page - 1)}
+                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    disabled={penaltyPagination.page >= penaltyPagination.pages}
+                    onClick={() => fetchPenalties(penaltyPagination.page + 1)}
+                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </GlassPanel>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: POLICY CYCLES & PENALTY HISTORY FOR A BOOKING */}
+      {/* ======================================================== */}
+      {policyCyclesModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <RotateCcw className="h-5 w-5 text-brand" />
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Policy Cycles & Cancellation History
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPolicyCyclesModal({ open: false, bookingId: null, cycles: [], penalties: [], loading: false })}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto space-y-4 flex-1 pr-1">
+              {policyCyclesModal.loading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-brand" />
+                </div>
+              ) : policyCyclesModal.cycles.length === 0 ? (
+                <p className="text-xs text-slate-500 text-center py-8">No policy cycles found for this booking.</p>
+              ) : (
+                <div className="space-y-3">
+                  {policyCyclesModal.cycles.map((c) => (
+                    <div key={c._id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-extrabold text-slate-900 text-sm">
+                          Cycle #{c.cycleNumber} — {c.cycleId}
+                        </span>
+                        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase border ${
+                          c.cycleStatus === 'ACTIVE'
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : c.cycleStatus === 'COMPLETED'
+                            ? 'bg-blue-50 text-blue-800 border-blue-200'
+                            : 'bg-slate-100 text-slate-700 border-slate-200'
+                        }`}>
+                          {c.cycleStatus}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                        <p><b>Cycle Started:</b> {formatDate(c.cycleStartTimestamp || c.createdAt)}</p>
+                        <p><b>Cycle Ended:</b> {formatDate(c.cycleEndTimestamp)}</p>
+                        {c.restartTimestamp && (
+                          <p><b>Restarted At:</b> {formatDate(c.restartTimestamp)}</p>
+                        )}
+                        {c.restartExpiresAt && (
+                          <p><b>Restart Timer Expires:</b> {formatDate(c.restartExpiresAt)}</p>
+                        )}
+                      </div>
+
+                      {c.cancellationAttempts && c.cancellationAttempts.length > 0 && (
+                        <div className="border-t border-slate-200/60 pt-2 text-xs space-y-1">
+                          <p className="font-bold text-slate-800">Cancellation Attempts in this Cycle:</p>
+                          {c.cancellationAttempts.map((att, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200/70 text-[11px]">
+                              <span><b>{att.reason || 'Attempt'}</b> ({formatDate(att.requestedAt)})</span>
+                              <span className="font-bold text-rose-700">₹{att.assessedPenaltyAmount || 0}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setPolicyCyclesModal({ open: false, bookingId: null, cycles: [], penalties: [], loading: false })}
+                className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-bold text-white hover:bg-slate-800 transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: WAIVE CUSTOMER CANCELLATION PENALTY */}
+      {/* ======================================================== */}
+      {waiveCustomerPenaltyModal.open && waiveCustomerPenaltyModal.penalty && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <form onSubmit={handleWaiveCustomerPenalty} className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-teal-800 font-extrabold text-base">
+                <RotateCcw className="h-5 w-5 text-teal-600" />
+                Waive Cancellation Penalty
+              </div>
+              <button
+                type="button"
+                onClick={() => setWaiveCustomerPenaltyModal({ open: false, penalty: null, reason: '', loading: false, error: '' })}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="rounded-2xl bg-teal-50/60 border border-teal-200/60 p-3.5 text-xs text-slate-700 space-y-1">
+              <p><b>Penalty ID:</b> {waiveCustomerPenaltyModal.penalty.penaltyId}</p>
+              <p><b>Penalty Amount:</b> {formatInr(waiveCustomerPenaltyModal.penalty.calculatedPenaltyAmount)}</p>
+              <p><b>Customer:</b> {waiveCustomerPenaltyModal.penalty.customerId?.fullName || 'Customer'}</p>
+            </div>
+
+            {waiveCustomerPenaltyModal.error && (
+              <p className="text-xs font-bold text-rose-600">{waiveCustomerPenaltyModal.error}</p>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Waiver Reason (Required for Administrative Audit Log) *
+              </label>
+              <textarea
+                rows={3}
+                required
+                value={waiveCustomerPenaltyModal.reason}
+                onChange={(e) => setWaiveCustomerPenaltyModal((m) => ({ ...m, reason: e.target.value }))}
+                placeholder="Explain why this cancellation penalty is being waived..."
+                className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-medium text-slate-800 outline-hidden focus:border-brand"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setWaiveCustomerPenaltyModal({ open: false, penalty: null, reason: '', loading: false, error: '' })}
+                disabled={waiveCustomerPenaltyModal.loading}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={waiveCustomerPenaltyModal.loading}
+                className="rounded-xl bg-teal-600 px-5 py-2 text-xs font-bold text-white hover:bg-teal-700 transition flex items-center gap-1.5"
+              >
+                {waiveCustomerPenaltyModal.loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Confirm Waiver
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       {/* ======================================================== */}

@@ -2022,6 +2022,34 @@ export const cancelBookingItem = asyncHandler(async (req, res) => {
     return sendError(res, { message: 'Completed services cannot be cancelled', statusCode: HTTP_STATUS.BAD_REQUEST })
   }
 
+  // Check cancellation penalty applicability for individual item
+  const { getBookingCancellationSettings } = await import('../services/bookingCancellationService.js')
+  const settings = await getBookingCancellationSettings()
+  const { calculatePenaltyAmount, prepareCancellationPenaltyRecord } = await import('../services/cancellationPenaltyService.js')
+  const calc = calculatePenaltyAmount({ booking, settings, itemId })
+
+  if (calc.penaltyApplicable && !req.body.bypassPenalty) {
+    const penaltyRes = await prepareCancellationPenaltyRecord({
+      booking,
+      customerId: req.user._id,
+      settings,
+      itemId,
+      reason,
+      reasonNote,
+    })
+    return sendSuccess(res, {
+      message: 'Cancellation penalty payment is required to cancel this service item. Once paid, the policy will restart.',
+      data: {
+        penaltyRequired: true,
+        status: 'PENALTY_PENDING',
+        itemId,
+        penalty: penaltyRes.penalty,
+        billingSummary: penaltyRes.billingSummary,
+        cycle: penaltyRes.cycle,
+      },
+    })
+  }
+
   // Mark item as cancelled
   item.status = 'CANCELLED'
   item.cancellationReason = [reason, reasonNote].filter(Boolean).join(': ')

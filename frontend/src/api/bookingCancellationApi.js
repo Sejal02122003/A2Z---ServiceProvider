@@ -63,6 +63,18 @@ export const bookingCancellationApi = {
   // Customer Endpoints
   getCustomerPolicyStatus: () =>
     apiRequest('/booking-cancellations/customer/policy-status'),
+  initCustomerPenaltyPayment: (bookingId, payload = {}) =>
+    apiRequest(`/booking-cancellations/customer/bookings/${bookingId}/penalty/init`, {
+      method: 'POST',
+      body: payload,
+    }),
+  verifyCustomerPenaltyPayment: (bookingId, payload) =>
+    apiRequest(`/booking-cancellations/customer/bookings/${bookingId}/penalty/verify`, {
+      method: 'POST',
+      body: payload,
+    }),
+  getCustomerPenaltyStatus: (bookingId) =>
+    apiRequest(`/booking-cancellations/customer/bookings/${bookingId}/penalty-status`),
 
   // Admin Customer Cancellations Management
   getAdminCustomerCancellations: (params = {}) => {
@@ -85,5 +97,24 @@ export const bookingCancellationApi = {
     apiRequest(`/booking-cancellations/admin/customers/${id}/unrestrict`, {
       method: 'POST',
       body: data,
+    }),
+
+  // Admin Cancellation Penalties & Policy Cycles
+  getAdminPenaltyRecords: (params = {}) => {
+    const qs = new URLSearchParams()
+    if (params.page) qs.set('page', params.page)
+    if (params.limit) qs.set('limit', params.limit)
+    if (params.search) qs.set('search', params.search)
+    if (params.paymentStatus && params.paymentStatus !== 'ALL') qs.set('paymentStatus', params.paymentStatus)
+    if (params.penaltyStatus && params.penaltyStatus !== 'ALL') qs.set('penaltyStatus', params.penaltyStatus)
+    const query = qs.toString() ? `?${qs.toString()}` : ''
+    return apiRequest(`/booking-cancellations/admin/penalty-records${query}`)
+  },
+  getAdminBookingPolicyCycles: (bookingId) =>
+    apiRequest(`/booking-cancellations/admin/bookings/${bookingId}/policy-cycles`),
+  waivePenaltyRecord: (penaltyId, reason) =>
+    apiRequest(`/booking-cancellations/admin/penalties/${penaltyId}/waive`, {
+      method: 'POST',
+      body: { reason },
     }),
 }

@@ -281,6 +281,45 @@ const bookingSchema = new mongoose.Schema(
     cancellationReason: { type: String, trim: true },
     penaltyDeducted: { type: Number, default: 0 },
 
+    // Cancellation Penalty Billing & Policy Cycle Architecture
+    cancellationBilling: {
+      originalBookingAmount: { type: Number, default: 0 },
+      previouslyPaidAmount: { type: Number, default: 0 },
+      totalPenaltyCharged: { type: Number, default: 0 },
+      totalPenaltyPaid: { type: Number, default: 0 },
+      additionalAmountPayable: { type: Number, default: 0 },
+      totalOutstandingAmount: { type: Number, default: 0 },
+      penaltyLineItems: [
+        {
+          penaltyId: { type: String, trim: true },
+          cycleNumber: { type: Number, default: 1 },
+          cycleId: { type: String, trim: true },
+          description: { type: String, default: 'Cancellation Penalty Fee' },
+          amount: { type: Number, required: true },
+          calculationType: { type: String, enum: ['FIXED', 'PERCENTAGE'] },
+          configuredValue: { type: Number },
+          paymentStatus: {
+            type: String,
+            enum: ['PENDING', 'PROCESSING', 'PAID', 'FAILED', 'REFUNDED', 'WAIVED'],
+            default: 'PENDING',
+          },
+          paymentReference: { type: String },
+          razorpayOrderId: { type: String },
+          razorpayPaymentId: { type: String },
+          assessedAt: { type: Date, default: Date.now },
+          paidAt: { type: Date },
+        },
+      ],
+    },
+    cancellationPolicyCycle: {
+      currentCycleNumber: { type: Number, default: 1 },
+      currentCycleId: { type: String },
+      cycleStatus: { type: String, default: 'ACTIVE' },
+      lastRestartedAt: { type: Date },
+      restartExpiresAt: { type: Date },
+      totalCyclesCount: { type: Number, default: 1 },
+    },
+
     // Reschedule Tracking
     isRescheduled: { type: Boolean, default: false },
     rescheduledAt: { type: Date },

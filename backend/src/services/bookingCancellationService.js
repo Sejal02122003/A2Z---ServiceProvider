@@ -13,6 +13,11 @@ import { InAppNotification } from '../models/InAppNotification.js'
 import { User } from '../models/User.js'
 import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
 import { parseISTDateTime } from '../utils/dateHelper.js'
+import {
+  calculatePenaltyAmount,
+  prepareCancellationPenaltyRecord,
+  getOrCreateCurrentPolicyCycle,
+} from './cancellationPenaltyService.js'
 
 /**
  * 1. Get or create Master Booking Cancellation Settings
@@ -64,7 +69,43 @@ export async function updateBookingCancellationSettings(data, adminUser) {
     'customerPushNotificationsEnabled',
     'customerWarningMessage',
     'customerRestrictionMessage',
+    'customerPenaltyEnabled',
+    'customerPenaltyType',
+    'customerPenaltyValue',
+    'customerMinPenaltyAmount',
+    'customerMaxPenaltyAmount',
+    'customerPenaltyCondition',
+    'customerPenaltyEffectiveDate',
+    'customerAutoRestartEnabled',
+    'customerRestartTimerMinutes',
   ]
+
+  // Customer penalty validations
+  if (data.customerPenaltyType !== undefined) {
+    if (!['FIXED', 'PERCENTAGE'].includes(data.customerPenaltyType)) {
+      throw new Error('Invalid penalty type. Allowed: FIXED, PERCENTAGE')
+    }
+  }
+  if (data.customerPenaltyCondition !== undefined) {
+    if (!['WITHIN_CUTOFF', 'ALWAYS', 'AFTER_ASSIGNMENT'].includes(data.customerPenaltyCondition)) {
+      throw new Error('Invalid penalty condition. Allowed: WITHIN_CUTOFF, ALWAYS, AFTER_ASSIGNMENT')
+    }
+  }
+  if (data.customerPenaltyValue !== undefined) {
+    const val = Number(data.customerPenaltyValue)
+    if (isNaN(val) || val < 0) {
+      throw new Error('Penalty value must be a non-negative number')
+    }
+    if (data.customerPenaltyType === 'PERCENTAGE' && val > 100) {
+      throw new Error('Percentage penalty rate cannot exceed 100%')
+    }
+  }
+  if (data.customerRestartTimerMinutes !== undefined) {
+    const val = Number(data.customerRestartTimerMinutes)
+    if (isNaN(val) || val < 0) {
+      throw new Error('Restart timer minutes must be a non-negative number')
+    }
+  }
 
   // Positive integer validations
   if (data.customerWarningThreshold !== undefined) {
@@ -1192,31 +1233,42 @@ export async function getCustomerCancellationEligibility(bookingId, customerId, 
   // 5. Cutoff boundary check for SCHEDULED bookings
   if (booking.type === 'SCHEDULED') {
     if (timeRemainingMs <= 0) {
-      return {
-        isEligible: false,
-        code: 'SERVICE_TIME_PASSED',
-        isExpired: true,
-        serviceStartDateTime,
-        timeRemainingMinutes,
-        reason: 'Scheduled service start time has already passed. Cancellation is no longer available.',
+      if (!settings.customerPenaltyEnabled) {
+        return {
+          isEligible: false,
+          code: 'SERVICE_TIME_PASSED',
+          isExpired: true,
+          serviceStartDateTime,
+          timeRemainingMinutes,
+          reason: 'Scheduled service start time has already passed. Cancellation is no longer available.',
+        }
       }
     }
 
     if (cutoffMinutes > 0 && timeRemainingMinutes < cutoffMinutes) {
-      return {
-        isEligible: false,
-        code: 'CUTOFF_EXCEEDED',
-        isCutoffExceeded: true,
-        cutoffMinutes,
-        timeRemainingMinutes,
-        serviceStartDateTime,
-        reason: `Cancellations must be made at least ${cutoffMinutes} minutes before the scheduled start time (${timeRemainingMinutes}m remaining). Please contact support.`,
+      if (!settings.customerPenaltyEnabled) {
+        return {
+          isEligible: false,
+          code: 'CUTOFF_EXCEEDED',
+          isCutoffExceeded: true,
+          cutoffMinutes,
+          timeRemainingMinutes,
+          serviceStartDateTime,
+          reason: `Cancellations must be made at least ${cutoffMinutes} minutes before the scheduled start time (${timeRemainingMinutes}m remaining). Please contact support.`,
+        }
       }
     }
   }
 
-  // 6. Compute Fee & Disclosures (Default fee is ₹0 - never charge customer vendor penalties)
-  const cancellationFee = Math.max(0, Number(settings.customerCancellationFee || 0))
+  // 6. Dynamic Penalty Calculation & Billing Breakdown
+  const penaltyCalc = calculatePenaltyAmount({ booking, settings, overrideTime })
+  const cycle = await getOrCreateCurrentPolicyCycle({ bookingId: booking._id, customerId })
+
+  // 7. Compute Fee & Disclosures
+  const cancellationFee = penaltyCalc.penaltyApplicable
+    ? penaltyCalc.calculatedPenaltyAmount
+    : Math.max(0, Number(settings.customerCancellationFee || 0))
+
   const allowedReasons = settings.customerAllowedReasons && settings.customerAllowedReasons.length > 0
     ? settings.customerAllowedReasons
     : [
@@ -1243,7 +1295,7 @@ export async function getCustomerCancellationEligibility(bookingId, customerId, 
 
   return {
     isEligible: true,
-    code: 'ELIGIBLE',
+    code: penaltyCalc.penaltyApplicable ? 'PENALTY_APPLICABLE' : 'ELIGIBLE',
     bookingId: booking._id,
     currentStatus: booking.status,
     bookingType: booking.type,
@@ -1251,12 +1303,35 @@ export async function getCustomerCancellationEligibility(bookingId, customerId, 
     timeRemainingMinutes,
     cutoffMinutes,
     cancellationFee,
+    penaltyApplicable: Boolean(penaltyCalc.penaltyApplicable),
+    penaltyDetails: penaltyCalc.penaltyApplicable
+      ? {
+          penaltyCalculationType: penaltyCalc.penaltyCalculationType,
+          configuredPenaltyValue: penaltyCalc.configuredPenaltyValue,
+          calculatedPenaltyAmount: penaltyCalc.calculatedPenaltyAmount,
+          minLimitApplied: penaltyCalc.minLimitApplied,
+          maxLimitApplied: penaltyCalc.maxLimitApplied,
+          billingSummary: penaltyCalc.billingSummary,
+          cycleNumber: cycle.cycleNumber,
+          cycleId: cycle.cycleId,
+          autoRestartEnabled: settings.customerAutoRestartEnabled !== false,
+          restartTimerMinutes: settings.customerRestartTimerMinutes ?? 60,
+          message:
+            'Your cancellation request requires a penalty payment according to the applicable cancellation policy. After successful payment, your cancellation policy will restart, and you will receive another cancellation opportunity.',
+        }
+      : null,
+    billingSummary: penaltyCalc.billingSummary || null,
     allowedReasons,
     paymentMethod: booking.paymentMethod,
     paymentStatus: booking.paymentStatus,
     totalAmount: booking.totalAmount || 0,
     refundNote,
     customerPolicy,
+    cycle: {
+      cycleNumber: cycle.cycleNumber,
+      cycleId: cycle.cycleId,
+      status: cycle.cycleStatus,
+    },
   }
 }
 
@@ -1325,6 +1400,34 @@ export async function processCustomerCancellation({
       }
     }
     throw new Error(eligibility.reason || 'Booking is not eligible for cancellation')
+  }
+
+  // 2b. If Penalty applies: DO NOT CANCEL THE BOOKING!
+  // Calculate penalty, add separate line item to booking bill, and return penalty requirement
+  if (eligibility.penaltyApplicable) {
+    const booking = await Booking.findById(bookingId)
+    const settings = await getBookingCancellationSettings()
+    const penaltyRes = await prepareCancellationPenaltyRecord({
+      booking,
+      customerId,
+      settings,
+      reason: finalReasonText,
+      reasonNote: trimmedNote,
+      overrideTime,
+    })
+
+    return {
+      success: true,
+      penaltyRequired: true,
+      status: 'PENALTY_PENDING',
+      message:
+        'Your cancellation request requires a penalty payment according to the applicable cancellation policy. After successful payment, your cancellation policy will restart, and you will receive another cancellation opportunity.',
+      penalty: penaltyRes.penalty,
+      billingSummary: penaltyRes.billingSummary,
+      cycle: penaltyRes.cycle,
+      attemptId: penaltyRes.attemptId,
+      booking,
+    }
   }
 
   const now = overrideTime ? new Date(overrideTime) : new Date()
