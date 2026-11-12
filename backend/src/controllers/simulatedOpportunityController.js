@@ -141,17 +141,6 @@ export const createSimulatedOpportunity = asyncHandler(async (req, res) => {
     .limit(numVendorCount * 2)
     .lean()
 
-  // Fallback if category matching yields fewer vendors
-  if (eligibleVendors.length === 0) {
-    eligibleVendors = await User.find({
-      role: { $in: ['labour', 'contractor'] },
-      isBlocked: { $ne: true },
-    })
-      .select('_id fullName phone role labourProfile')
-      .limit(numVendorCount)
-      .lean()
-  }
-
   const targetVendors = eligibleVendors.slice(0, numVendorCount)
   const targetVendorIds = targetVendors.map((v) => v._id)
 
@@ -249,17 +238,7 @@ export const createSimulatedOpportunity = asyncHandler(async (req, res) => {
     }
   })
 
-  // Also broadcast to workforce_vendors room so all online workers/contractors receive it instantly
-  try {
-    const ioInstance = getIo()
-    if (ioInstance) {
-      ioInstance.to('workforce_vendors').emit('SIMULATED_OPPORTUNITY_ALERT', alertPayload)
-    }
-  } catch (ioErr) {
-    console.warn('[Broadcast to workforce_vendors error]', ioErr?.message)
-  }
-
-  console.log(`[SIMULATED_OPPORTUNITY_SENT] Sent alert #${opportunity._id} to ${targetVendorIds.length} vendors and workforce_vendors room.`)
+  console.log(`[SIMULATED_OPPORTUNITY_SENT] Sent alert #${opportunity._id} to ${targetVendorIds.length} matching vendors.`)
 
   return sendSuccess(res, {
     statusCode: HTTP_STATUS.CREATED,
@@ -534,10 +513,37 @@ export const getVendorSimulatedOpportunities = asyncHandler(async (req, res) => 
     { $set: { status: 'EXPIRED' } }
   )
 
+  const fullVendor = await User.findById(vendorId).select('labourProfile').lean()
+  const vendorServiceIds = (fullVendor?.labourProfile?.serviceIds || []).map((id) => String(id))
+  const vendorSubcatIds = (fullVendor?.labourProfile?.subcategoryIds || []).map((id) => String(id))
+  const vendorCatIds = (fullVendor?.labourProfile?.categoryIds || []).map((id) => String(id))
+
+  const tradeMatchConditions = []
+  if (vendorServiceIds.length > 0) {
+    tradeMatchConditions.push({ 'services.serviceId': { $in: vendorServiceIds } })
+  }
+  if (vendorSubcatIds.length > 0) {
+    tradeMatchConditions.push({ subcategoryId: { $in: vendorSubcatIds } })
+  }
+  if (vendorCatIds.length > 0) {
+    tradeMatchConditions.push({ categoryId: { $in: vendorCatIds } })
+  }
+
+  if (tradeMatchConditions.length === 0) {
+    return sendSuccess(res, { data: { opportunities: [] } })
+  }
+
   const opportunities = await SimulatedOpportunity.find({
-    $or: [
-      { notifiedVendors: vendorId },
-      { isAllZones: true },
+    $and: [
+      {
+        $or: [
+          { notifiedVendors: vendorId },
+          { isAllZones: true },
+        ],
+      },
+      {
+        $or: tradeMatchConditions,
+      },
     ],
     status: 'OPEN',
     expiresAt: { $gt: new Date() },

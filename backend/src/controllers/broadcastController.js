@@ -186,29 +186,35 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
 
     // Match open items against provider skills
     const matchingOpen = openItems.filter(it => 
-      labourServiceIds.includes(String(it.serviceId)) ||
-      (it.subcategoryId && labourSubcatIds.includes(String(it.subcategoryId)))
+      labourServiceIds.length > 0
+        ? labourServiceIds.includes(String(it.serviceId))
+        : (it.subcategoryId && labourSubcatIds.includes(String(it.subcategoryId)))
     )
+
+    if (matchingOpen.length === 0) {
+      return sendError(res, {
+        message: 'You cannot accept this booking because you do not offer any of the available services in it.',
+        statusCode: HTTP_STATUS.FORBIDDEN,
+        code: 'SERVICE_NOT_OFFERED',
+      })
+    }
 
     const chosenItemId = req.body?.itemId ? String(req.body.itemId) : null
     const chosenServiceId = req.body?.serviceId ? String(req.body.serviceId) : null
 
     if (chosenItemId) {
-      chosenMultiItem = openItems.find(it => String(it._id) === chosenItemId)
+      chosenMultiItem = matchingOpen.find(it => String(it._id) === chosenItemId)
       if (chosenMultiItem) chosenMultiItems = [chosenMultiItem]
     } else if (chosenServiceId) {
-      chosenMultiItem = openItems.find(it => String(it.serviceId) === chosenServiceId)
+      chosenMultiItem = matchingOpen.find(it => String(it.serviceId) === chosenServiceId)
       if (chosenMultiItem) chosenMultiItems = [chosenMultiItem]
     } else if (matchingOpen.length > 0) {
       chosenMultiItems = matchingOpen
       chosenMultiItem = matchingOpen[0]
-    } else {
-      chosenMultiItems = openItems
-      chosenMultiItem = openItems[0]
     }
 
     if (!chosenMultiItem && chosenMultiItems.length === 0) {
-      return sendError(res, { message: 'Selected service item is no longer available', statusCode: HTTP_STATUS.BAD_REQUEST })
+      return sendError(res, { message: 'Selected service item is not offered by you or is no longer available', statusCode: HTTP_STATUS.BAD_REQUEST })
     }
 
     assignedServiceId = chosenMultiItem.serviceId
@@ -241,17 +247,25 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     // Find matching open services for this labourer
     const matchingOpen = openServices.filter(s => labourServiceIds.includes(String(s.serviceId)))
 
+    if (matchingOpen.length === 0) {
+      return sendError(res, {
+        message: 'You cannot accept this booking because you do not offer any of the requested contractor services.',
+        statusCode: HTTP_STATUS.FORBIDDEN,
+        code: 'SERVICE_NOT_OFFERED',
+      })
+    }
+
     let chosenService = null
     if (chosenServiceId) {
       // Labourer explicitly chose a service
-      chosenService = openServices.find(s => String(s.serviceId) === chosenServiceId)
+      chosenService = matchingOpen.find(s => String(s.serviceId) === chosenServiceId)
       if (!chosenService) {
-        return sendError(res, { message: 'Chosen service is not available or already full', statusCode: HTTP_STATUS.BAD_REQUEST })
+        return sendError(res, { message: 'Chosen service is not offered by you or is already full', statusCode: HTTP_STATUS.BAD_REQUEST })
       }
     } else if (matchingOpen.length === 1) {
       // Only one matching service — auto-assign
       chosenService = matchingOpen[0]
-    } else if (matchingOpen.length > 1) {
+    } else {
       // Multiple matching services and no explicit choice — require front-end to send serviceId
       return sendError(res, {
         message: 'Multiple matching services. Please choose a service to accept.',
@@ -259,9 +273,6 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
         data: { services: matchingOpen.map(s => ({ serviceId: s.serviceId, price: s.price })) },
         statusCode: 400
       })
-    } else {
-      // Labour has no matching service, fall back to first open slot
-      chosenService = openServices[0]
     }
 
     assignedServiceId = chosenService.serviceId
@@ -275,7 +286,33 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     const bookingHours = booking.duration || booking.hours || 1
     assignedLabourShare = Math.round(assignedPricePerHour * bookingHours * 0.90)
   } else {
-    // Simple single-service booking
+    // Simple single-service or package booking: Strictly verify labourer offers this service
+    const fullLabour = await (await import('../models/User.js')).User.findById(labour._id).lean()
+    const labourServiceIds = (fullLabour?.labourProfile?.serviceIds || []).map(id => String(id))
+    const labourSubcatIds = (fullLabour?.labourProfile?.subcategoryIds || []).map(id => String(id))
+
+    let offersService = false
+    if (booking.packageBooking?.isPackage && Array.isArray(booking.packageBooking.inclusions)) {
+      const pkgServiceIds = booking.packageBooking.inclusions.map(inc => String(inc.serviceId)).filter(Boolean)
+      offersService = labourServiceIds.length > 0
+        ? pkgServiceIds.some(sId => labourServiceIds.includes(sId))
+        : (booking.subcategoryId && labourSubcatIds.includes(String(booking.subcategoryId)))
+    } else if (booking.serviceId) {
+      offersService = labourServiceIds.length > 0
+        ? labourServiceIds.includes(String(booking.serviceId))
+        : (booking.subcategoryId && labourSubcatIds.includes(String(booking.subcategoryId)))
+    } else if (booking.subcategoryId) {
+      offersService = labourSubcatIds.includes(String(booking.subcategoryId))
+    }
+
+    if (!offersService) {
+      return sendError(res, {
+        message: 'You cannot accept this booking because this service is not in your selected services list.',
+        statusCode: HTTP_STATUS.FORBIDDEN,
+        code: 'SERVICE_NOT_OFFERED',
+      })
+    }
+
     const bookingHours = booking.duration || booking.hours || 1
     assignedLabourShare = booking.laborShare || 0
     assignedPricePerHour = booking.basePrice ? Math.round(booking.basePrice / bookingHours) : 0
@@ -578,12 +615,37 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
   const labour = req.user
   const cutoff = new Date(Date.now() - BROADCAST_TIMEOUT_MS) // 1.5 minutes timeout window
 
-  // Find recent bookings in BROADCASTING or PARTIALLY_ACCEPTED status
+  // Fetch full labour details with labourProfile
+  const { User } = await import('../models/User.js')
+  const fullLabour = await User.findById(labour._id).select('labourProfile').lean()
+  const labourServiceIds = (fullLabour?.labourProfile?.serviceIds || []).map((id) => String(id))
+  const labourSubcatIds = (fullLabour?.labourProfile?.subcategoryIds || []).map((id) => String(id))
+
+  // Build service match conditions so labour only receives bookings for their chosen services
+  const serviceMatchConditions = []
+  if (labourServiceIds.length > 0) {
+    serviceMatchConditions.push({ serviceId: { $in: labourServiceIds } })
+    serviceMatchConditions.push({ 'packageBooking.inclusions.serviceId': { $in: labourServiceIds } })
+    serviceMatchConditions.push({ 'multiServiceBooking.items': { $elemMatch: { status: 'PENDING', serviceId: { $in: labourServiceIds } } } })
+    serviceMatchConditions.push({ 'contractorInfo.services.serviceId': { $in: labourServiceIds } })
+  } else if (labourSubcatIds.length > 0) {
+    serviceMatchConditions.push({ subcategoryId: { $in: labourSubcatIds } })
+    serviceMatchConditions.push({ 'multiServiceBooking.items': { $elemMatch: { status: 'PENDING', subcategoryId: { $in: labourSubcatIds } } } })
+  } else {
+    // If worker has chosen no services, they cannot receive any broadcasts
+    return sendSuccess(res, {
+      data: { broadcast: null },
+      statusCode: HTTP_STATUS.OK,
+    })
+  }
+
+  // Find recent bookings in BROADCASTING or PARTIALLY_ACCEPTED status matching this labour's services
   const query = {
     status: { $in: ['BROADCASTING', 'PARTIALLY_ACCEPTED'] },
     createdAt: { $gte: cutoff },
     rejectedBy: { $ne: labour._id },
     acceptedLabourIds: { $ne: labour._id },
+    $or: serviceMatchConditions,
   }
   // In production, avoid matching the user who placed the booking
   if (process.env.NODE_ENV === 'production') {
@@ -620,11 +682,17 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
 
   if (isMultiService) {
     const openMultiItems = (booking.multiServiceBooking?.items || []).filter((it) => it.status === 'PENDING')
-    if (openMultiItems.length === 0) {
+    const matchingMulti = openMultiItems.filter((it) =>
+      labourServiceIds.length > 0
+        ? labourServiceIds.includes(String(it.serviceId))
+        : (it.subcategoryId && labourSubcatIds.includes(String(it.subcategoryId)))
+    )
+
+    if (matchingMulti.length === 0) {
       return sendSuccess(res, { data: { broadcast: null }, statusCode: HTTP_STATUS.OK })
     }
 
-    const servicesPayload = openMultiItems.map((it) => ({
+    const servicesPayload = matchingMulti.map((it) => ({
       itemId: String(it._id),
       serviceId: String(it.serviceId),
       name: it.subServiceName ? `${it.serviceName} - ${it.subServiceName}` : it.serviceName,
@@ -681,7 +749,9 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
     const openServices = booking.contractorInfo.services
       .filter((s) => {
         const filled = currentAssignments.filter((a) => String(a.serviceId) === String(s.serviceId)).length
-        return filled < (s.quantity || 1)
+        const hasSlot = filled < (s.quantity || 1)
+        const hasSkill = labourServiceIds.includes(String(s.serviceId))
+        return hasSlot && hasSkill
       })
       .map((s) => ({
         serviceId: String(s.serviceId),
@@ -716,7 +786,25 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       timeoutMs: remainingMs,
     }
   } else {
-    // Single service booking
+    // Single service / package booking: Strictly verify labourer offers this service
+    let offersService = false
+    if (booking.packageBooking?.isPackage && Array.isArray(booking.packageBooking.inclusions)) {
+      const pkgServiceIds = booking.packageBooking.inclusions.map(inc => String(inc.serviceId)).filter(Boolean)
+      offersService = labourServiceIds.length > 0
+        ? pkgServiceIds.some(sId => labourServiceIds.includes(sId))
+        : (booking.subcategoryId && labourSubcatIds.includes(String(booking.subcategoryId)))
+    } else if (booking.serviceId) {
+      offersService = labourServiceIds.length > 0
+        ? labourServiceIds.includes(String(booking.serviceId))
+        : (booking.subcategoryId && labourSubcatIds.includes(String(booking.subcategoryId)))
+    } else if (booking.subcategoryId) {
+      offersService = labourSubcatIds.includes(String(booking.subcategoryId))
+    }
+
+    if (!offersService) {
+      return sendSuccess(res, { data: { broadcast: null }, statusCode: HTTP_STATUS.OK })
+    }
+
     const { LabourService } = await import('../models/LabourService.js')
     let singleServiceName = 'Requested Service'
     let singleServiceDetail = ''
