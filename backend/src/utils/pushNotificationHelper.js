@@ -27,12 +27,13 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
       }
     }
 
+    const rawType = (stringifiedData.type || payload.type || '').toUpperCase();
     const isBookingOffer =
-      stringifiedData.type === 'NEW_BOOKING' ||
-      stringifiedData.type === 'booking_received' ||
-      stringifiedData.type === 'NEW_BROADCAST_JOB' ||
-      stringifiedData.type === 'booking_rebroadcasting' ||
-      Boolean(stringifiedData.bookingId);
+      rawType === 'NEW_BOOKING' ||
+      rawType === 'BOOKING_RECEIVED' ||
+      rawType === 'NEW_BROADCAST_JOB' ||
+      rawType === 'BOOKING_REBROADCASTING' ||
+      payload.isBookingOffer === true;
 
     const notifType = stringifiedData.type || (isBookingOffer ? 'NEW_BOOKING' : 'NOTIFICATION');
     const bookingId = stringifiedData.bookingId || '';
@@ -92,16 +93,19 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
     const timestampStr = stringifiedData.timestamp || stringifiedData.createdAt || String(Date.now());
     const channelId = isBookingOffer ? 'new_booking_alerts' : 'high_importance_channel';
 
-    const defaultTitle = isBookingOffer ? 'New Booking Received!' : 'A2Z Service Hub';
+    const defaultTitle = isBookingOffer ? 'New Booking Received! ⚡' : 'A2Z Service Hub';
     const defaultBody = isBookingOffer
       ? 'You have received a new booking. Open the app to view details.'
       : 'You have a new update';
     const finalTitle = payload.title || stringifiedData.title || defaultTitle;
     const finalBody = payload.body || stringifiedData.body || defaultBody;
 
-    const targetUrl = bookingId
-      ? `/serviceprovider?incoming_booking=${bookingId}`
-      : (payload.link || payload.data?.link || '/serviceprovider');
+    const targetUrl =
+      payload.link ||
+      stringifiedData.link ||
+      (isBookingOffer
+        ? `/serviceprovider?incoming_booking=${bookingId}`
+        : (bookingId ? `/booking-details/${bookingId}` : '/'));
 
     // Prepare message with webpush & android configs for system-level notifications
     const message = {
@@ -115,13 +119,13 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
         body: finalBody,
         type: notifType,
         bookingId: bookingId,
-        serviceProviderId: String(userId),
-        providerId: String(userId),
+        serviceProviderId: isBookingOffer ? String(userId) : (stringifiedData.serviceProviderId || ''),
+        providerId: isBookingOffer ? String(userId) : (stringifiedData.providerId || ''),
         eventId: eventId,
         notificationId: eventId,
         createdAt: timestampStr,
         timestamp: timestampStr,
-        sound: '/alert.mp3',
+        sound: isBookingOffer ? '/alert.mp3' : 'default',
         channelId: channelId,
         channel_id: channelId,
         priority: 'high',
@@ -141,7 +145,7 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
           renotify: true,
           requireInteraction: isBookingOffer,
           silent: false,
-          sound: '/alert.mp3',
+          sound: isBookingOffer ? '/alert.mp3' : undefined,
           vibrate: isBookingOffer ? [500, 200, 500, 200, 500, 200, 800] : [200, 100, 200],
           actions: isBookingOffer
             ? [
@@ -190,11 +194,21 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
       const invalidTokens = [];
       response.responses.forEach((resp, index) => {
         if (!resp.success) {
-          const errCode = resp.error?.code;
+          const errCode = String(resp.error?.code || '');
+          const errMsg = String(resp.error?.message || '');
           if (
             errCode === 'messaging/invalid-registration-token' ||
             errCode === 'messaging/registration-token-not-registered' ||
-            errCode === 'messaging/invalid-argument'
+            errCode === 'messaging/invalid-argument' ||
+            errCode === 'messaging/third-party-auth-error' ||
+            errCode.toLowerCase().includes('unregistered') ||
+            errCode.toLowerCase().includes('permission-denied') ||
+            errCode.toLowerCase().includes('third-party') ||
+            errMsg.includes('401') ||
+            errMsg.includes('403') ||
+            errMsg.includes('404') ||
+            errMsg.toLowerCase().includes('unregistered') ||
+            errMsg.toLowerCase().includes('not found')
           ) {
             invalidTokens.push(uniqueTokens[index]);
           }

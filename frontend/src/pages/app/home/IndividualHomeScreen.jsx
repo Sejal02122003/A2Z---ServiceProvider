@@ -52,6 +52,7 @@ import { enrichDiscoverLabourUi, DEMO_LABOUR_ROWS } from '../../../lib/discoverL
 import { displayBookingsList, loadIndividualBookings } from '../../../lib/individualBookings.js'
 import { buildBookingFlowPath } from '../../../lib/bookingFlowNavigation.js'
 import { useAuth } from '../../../hooks/useAuth.js'
+import { CustomerNotificationBanner } from '../../../components/app/CustomerNotificationBanner.jsx'
 import heroImg from '../../../assets/hero.png'
 
 function formatBookingDay(serviceDate) {
@@ -336,6 +337,8 @@ export function IndividualHomeScreen({ user }) {
             <img src={heroImg} alt="Explore Skills" className="w-full h-full object-contain" />
           )}
         </div>
+
+        <CustomerNotificationBanner user={user} />
 
         <IndividualHomeRecentlyBooked
           bookings={ongoingBookings}

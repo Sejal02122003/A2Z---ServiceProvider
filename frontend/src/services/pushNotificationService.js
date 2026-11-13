@@ -60,8 +60,9 @@ export async function getFCMToken() {
       // SW update failure is non-fatal
     }
 
+    const cleanVapidKey = (VAPID_KEY || '').trim();
     const token = await getToken(messaging, {
-      vapidKey: VAPID_KEY || undefined,
+      vapidKey: cleanVapidKey || undefined,
       serviceWorkerRegistration: registration
     });
 
@@ -108,13 +109,12 @@ export async function registerFCMToken(forceUpdate = false) {
     const currentUserId = state?.auth?.user?._id;
     const savedToken = localStorage.getItem('fcm_token_web');
     
-    // Check if this token was already confirmed synced for THIS specific user
+    // Check if this token was already confirmed synced for THIS specific user in this tab session
     if (
       savedToken &&
       !forceUpdate &&
       currentUserId &&
-      localStorage.getItem(`fcm_synced_user_${currentUserId}`) === savedToken &&
-      sessionStorage.getItem(`fcm_synced_${currentUserId}`)
+      sessionStorage.getItem(`fcm_synced_${currentUserId}`) === savedToken
     ) {
       return savedToken;
     }
@@ -144,7 +144,7 @@ export async function registerFCMToken(forceUpdate = false) {
     if (response?.success) {
       localStorage.setItem('fcm_token_web', token);
       if (currentUserId) {
-        sessionStorage.setItem(`fcm_synced_${currentUserId}`, 'true');
+        sessionStorage.setItem(`fcm_synced_${currentUserId}`, token);
         localStorage.setItem(`fcm_synced_user_${currentUserId}`, token);
       }
       console.log(`[PUSH] FCM token registered with backend successfully for user ${currentUserId}`);
@@ -214,7 +214,7 @@ export function showDesktopNotification({
   sound = '/alert.mp3',
   vibrate = [500, 200, 500, 200, 500, 200, 800],
   requireInteraction = true,
-  playAlert = true,
+  playAlert = false,
 }) {
   if (!('Notification' in window) || Notification.permission !== 'granted') {
     return null;
@@ -258,15 +258,29 @@ export function setupForegroundNotificationHandler(handler) {
   return onMessage(messaging, (payload) => {
     console.log('[PUSH] Foreground message received:', payload);
     
+    const rawType = (payload?.data?.type || '').toUpperCase();
+    const isBookingAlert =
+      rawType === 'NEW_BOOKING' ||
+      rawType === 'BOOKING_RECEIVED' ||
+      rawType === 'NEW_BROADCAST_JOB' ||
+      rawType === 'BOOKING_REBROADCASTING';
+
     // Show system notification banner even in foreground if user is in another tab or minimized
     if ('Notification' in window && Notification.permission === 'granted') {
       try {
-        const title = payload?.notification?.title || payload?.data?.title || 'A2Z Notification';
-        const body = payload?.notification?.body || payload?.data?.body || '';
-        const icon = payload?.notification?.icon || payload?.notification?.imageUrl || '/favicon.ico';
-        const link = payload?.data?.link || '/';
+        const title = payload?.notification?.title || payload?.data?.title || (isBookingAlert ? 'New Booking Received! ⚡' : 'A2Z Service Hub');
+        const body = payload?.notification?.body || payload?.data?.body || (isBookingAlert ? 'You have received a new booking.' : 'You have a new update.');
+        const icon = payload?.notification?.icon || payload?.notification?.imageUrl || '/logo.png';
+        const link = payload?.data?.link || (isBookingAlert && payload?.data?.bookingId ? `/serviceprovider?incoming_booking=${payload.data.bookingId}` : '/');
 
-        showDesktopNotification({ title, body, icon, link, tag: payload?.data?.type || 'a2z-push' });
+        showDesktopNotification({
+          title,
+          body,
+          icon,
+          link,
+          tag: payload?.data?.bookingId ? `booking-${payload.data.bookingId}` : (payload?.data?.type || 'a2z-push'),
+          playAlert: isBookingAlert,
+        });
       } catch (e) {
         console.warn('[PUSH] Could not show system notification in foreground:', e);
       }

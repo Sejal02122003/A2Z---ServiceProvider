@@ -82,12 +82,12 @@ function App() {
     setupForegroundNotificationHandler((payload) => {
       console.log('[PUSH] Foreground notification received:', payload);
       window.dispatchEvent(new CustomEvent('a2z-push-notification', { detail: payload }));
+      const rawType = (payload?.data?.type || '').toUpperCase();
       const isBookingOffer =
-        payload?.data?.type === 'NEW_BOOKING' ||
-        payload?.data?.type === 'booking_received' ||
-        payload?.data?.type === 'NEW_BROADCAST_JOB' ||
-        payload?.data?.type === 'booking_rebroadcasting' ||
-        Boolean(payload?.data?.bookingId);
+        rawType === 'NEW_BOOKING' ||
+        rawType === 'BOOKING_RECEIVED' ||
+        rawType === 'NEW_BROADCAST_JOB' ||
+        rawType === 'BOOKING_REBROADCASTING';
       if (isBookingOffer) {
         playBookingAlertSound(payload?.data?.bookingId);
       }

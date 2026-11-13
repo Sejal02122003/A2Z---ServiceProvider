@@ -45,14 +45,15 @@ self.addEventListener('push', (event) => {
 
   const dataObj = payload.data || {};
   const notifObj = payload.notification || {};
-  const isBookingAlert =
-    dataObj.type === 'NEW_BOOKING' ||
-    dataObj.type === 'booking_received' ||
-    dataObj.type === 'NEW_BROADCAST_JOB' ||
-    dataObj.type === 'booking_rebroadcasting' ||
-    Boolean(dataObj.bookingId);
 
-  // Instantly wake up all open tabs (foreground or background) to play the /alert.mp3 chime
+  const rawType = (dataObj.type || '').toUpperCase();
+  const isBookingAlert =
+    rawType === 'NEW_BOOKING' ||
+    rawType === 'BOOKING_RECEIVED' ||
+    rawType === 'NEW_BROADCAST_JOB' ||
+    rawType === 'BOOKING_REBROADCASTING';
+
+  // Instantly wake up all open tabs to play the /alert.mp3 chime for service provider booking offers
   if (isBookingAlert && self.clients) {
     const wakePromise = self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
@@ -71,69 +72,51 @@ self.addEventListener('push', (event) => {
     event.waitUntil(wakePromise);
   }
 
-  // Display rich notification with vibration, interaction, and action buttons
-  const isPlainData = !notifObj.title && (dataObj.title || dataObj.bookingId);
-  if (isBookingAlert || isPlainData) {
-    const title = dataObj.title || notifObj.title || (isBookingAlert ? 'New Booking Received! ⚡' : 'A2Z Service Hub');
-    const body = dataObj.body || notifObj.body || 'You have received a new booking. Open the app to view details.';
-    const showPromise = self.registration.showNotification(title, {
-      body,
-      icon: notifObj.icon || '/logo.png',
-      badge: '/logo.png',
-      tag: dataObj.bookingId ? `booking-${dataObj.bookingId}` : (notifObj.tag || 'new_booking_alerts'),
-      renotify: true,
-      requireInteraction: isBookingAlert,
-      silent: false,
-      sound: '/alert.mp3',
-      vibrate: isBookingAlert ? [500, 200, 500, 200, 500, 200, 800] : [200, 100, 200],
-      data: {
-        ...dataObj,
-        channelId: isBookingAlert ? 'new_booking_alerts' : 'high_importance_channel',
-        link: dataObj.link || (dataObj.bookingId ? `/serviceprovider?incoming_booking=${dataObj.bookingId}` : '/serviceprovider'),
-      },
-      actions: isBookingAlert
-        ? [
-            { action: 'open_booking', title: '⚡ View & Accept Job' },
-            { action: 'dismiss', title: 'Dismiss' },
-          ]
-        : [],
-    });
+  // Display rich notification with vibration and action buttons
+  const title =
+    dataObj.title ||
+    notifObj.title ||
+    (isBookingAlert ? 'New Booking Received! ⚡' : 'A2Z Service Hub');
 
-    event.waitUntil(showPromise);
+  const body =
+    dataObj.body ||
+    notifObj.body ||
+    (isBookingAlert
+      ? 'You have received a new booking. Open the app to view details.'
+      : 'You have a new update.');
+
+  const icon = notifObj.icon || notifObj.imageUrl || dataObj.icon || '/logo.png';
+
+  let targetLink = dataObj.link || dataObj.click_action;
+  if (!targetLink) {
+    if (isBookingAlert && dataObj.bookingId) {
+      targetLink = `/serviceprovider?incoming_booking=${dataObj.bookingId}`;
+    } else if (dataObj.bookingId) {
+      targetLink = `/booking-details/${dataObj.bookingId}`;
+    } else {
+      targetLink = '/';
+    }
   }
-});
 
-// Firebase background message handler (fallback)
-messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] onBackgroundMessage received:', payload);
-
-  const title = payload?.notification?.title || payload?.data?.title || 'New Booking Received! ⚡';
-  const body = payload?.notification?.body || payload?.data?.body || 'You have received a new booking. Open the app to view details.';
-  const icon = payload?.notification?.icon || payload?.notification?.imageUrl || '/logo.png';
-  const targetLink = payload?.data?.link || (payload?.data?.bookingId ? `/serviceprovider?incoming_booking=${payload.data.bookingId}` : '/serviceprovider');
-
-  const isBookingAlert =
-    payload?.data?.type === 'NEW_BOOKING' ||
-    payload?.data?.type === 'booking_received' ||
-    payload?.data?.type === 'NEW_BROADCAST_JOB' ||
-    payload?.data?.type === 'booking_rebroadcasting' ||
-    Boolean(payload?.data?.bookingId);
+  const notificationTag =
+    dataObj.tag ||
+    (dataObj.bookingId ? `booking-${dataObj.bookingId}` : (notifObj.tag || (isBookingAlert ? 'new_booking_alerts' : 'a2z-push')));
 
   const notificationOptions = {
     body,
     icon,
     badge: '/logo.png',
-    tag: payload?.data?.bookingId ? `booking-${payload.data.bookingId}` : (payload?.data?.type || 'new_booking_alerts'),
+    tag: notificationTag,
     renotify: true,
     requireInteraction: isBookingAlert,
     silent: false,
-    sound: '/alert.mp3',
+    sound: isBookingAlert ? '/alert.mp3' : undefined,
     vibrate: isBookingAlert ? [500, 200, 500, 200, 500, 200, 800] : [200, 100, 200],
     data: {
-      ...payload?.data,
-      channelId: isBookingAlert ? 'new_booking_alerts' : 'high_importance_channel',
+      ...dataObj,
+      isBookingAlert,
       link: targetLink,
-      sound: '/alert.mp3',
+      sound: isBookingAlert ? '/alert.mp3' : undefined,
     },
     actions: isBookingAlert
       ? [
@@ -143,21 +126,26 @@ messaging.onBackgroundMessage((payload) => {
       : [],
   };
 
-  // Signal all open client windows to play audio
-  if (isBookingAlert && self.clients) {
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      windowClients.forEach((client) => {
-        client.postMessage({
-          type: 'PLAY_BOOKING_ALERT_SOUND',
-          bookingId: payload?.data?.bookingId,
-          eventId: payload?.data?.eventId || payload?.data?.notificationId,
-          sound: '/alert.mp3',
-        });
+  const showPromise = self.registration
+    .showNotification(title, notificationOptions)
+    .catch((err) => {
+      console.warn('[SW push] Rich showNotification failed, retrying simple:', err);
+      return self.registration.showNotification(title, {
+        body,
+        icon: '/logo.png',
+        badge: '/logo.png',
+        tag: notificationTag,
+        data: { link: targetLink, isBookingAlert },
       });
-    }).catch(() => {});
-  }
+    });
 
-  return self.registration.showNotification(title, notificationOptions);
+  event.waitUntil(showPromise);
+});
+
+// Firebase background message handler (fallback/compat logger)
+messaging.onBackgroundMessage((payload) => {
+  console.log('[firebase-messaging-sw.js] onBackgroundMessage received:', payload);
+  return Promise.resolve();
 });
 
 self.addEventListener('notificationclick', (event) => {
@@ -177,37 +165,41 @@ self.addEventListener('notificationclick', (event) => {
     return;
   }
 
-  const bId = event.notification.data?.bookingId;
-  let rawLink = event.notification.data?.link || '/serviceprovider';
-  if (bId && !rawLink.includes('incoming_booking=')) {
-    rawLink = `${rawLink}${rawLink.includes('?') ? '&' : '?'}incoming_booking=${bId}`;
+  const notifData = event.notification.data || {};
+  let targetUrlStr = notifData.link || '/';
+  if (notifData.isBookingAlert && notifData.bookingId && !targetUrlStr.includes('incoming_booking=')) {
+    targetUrlStr = `/serviceprovider?incoming_booking=${notifData.bookingId}`;
   }
-  const targetUrl = new URL(rawLink, self.location.origin).href;
+  const targetUrl = new URL(targetUrlStr, self.location.origin).href;
+
+  if (!self.clients) return;
 
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       for (const client of windowClients) {
         if (client.url.includes(self.location.origin) && 'focus' in client) {
           if ('navigate' in client) {
             client.navigate(targetUrl);
           }
-          client.postMessage({
-            type: 'PLAY_BOOKING_ALERT_SOUND',
-            bookingId: event.notification.data?.bookingId,
-            eventId: event.notification.data?.eventId || event.notification.data?.notificationId,
-            sound: '/alert.mp3',
-          });
+          if (notifData.isBookingAlert) {
+            client.postMessage({
+              type: 'PLAY_BOOKING_ALERT_SOUND',
+              bookingId: notifData.bookingId,
+              eventId: notifData.eventId || notifData.notificationId,
+              sound: '/alert.mp3',
+            });
+          }
           return client.focus();
         }
       }
-      if (clients.openWindow) {
-        return clients.openWindow(targetUrl).then((newClient) => {
-          if (newClient) {
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl).then((newClient) => {
+          if (newClient && notifData.isBookingAlert) {
             setTimeout(() => {
               newClient.postMessage({
                 type: 'PLAY_BOOKING_ALERT_SOUND',
-                bookingId: event.notification.data?.bookingId,
-                eventId: event.notification.data?.eventId || event.notification.data?.notificationId,
+                bookingId: notifData.bookingId,
+                eventId: notifData.eventId || notifData.notificationId,
                 sound: '/alert.mp3',
               });
             }, 800);
