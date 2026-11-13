@@ -10,6 +10,7 @@ import { populateLabourCategories } from '../utils/populateLabourCategories.js'
 import { otpRequestLimiter } from '../utils/rateLimiter.js'
 import { evaluateIdentityRiskSignals, logIdentityAudit } from '../services/identityVerificationService.js'
 import { IDENTITY_AUDIT_ACTIONS } from '../models/IdentityAuditLog.js'
+import { normalizeIndianPhone } from '../utils/phone.js'
 
 function buildAuthPayload(user, token) {
   const safe = user.toSafeObject()
@@ -21,7 +22,16 @@ function buildAuthPayload(user, token) {
 
 /** POST /auth/register/request-otp */
 export const registerRequestOtp = asyncHandler(async (req, res) => {
-  const { phone, role, authGroup } = req.body
+  const { phone: rawPhone, role, authGroup } = req.body
+  const phone = normalizeIndianPhone(rawPhone) || String(rawPhone || '').replace(/\D/g, '').slice(-10)
+
+  if (!phone || phone.length !== 10) {
+    return sendError(res, {
+      message: 'Please enter a valid 10-digit mobile number',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_PHONE',
+    })
+  }
 
   const limitCheck = otpRequestLimiter.isAllowed(phone)
   if (!limitCheck.allowed) {
@@ -70,7 +80,8 @@ export const registerRequestOtp = asyncHandler(async (req, res) => {
 
 /** POST /auth/register/verify */
 export const registerVerify = asyncHandler(async (req, res) => {
-  const { phone, code, role, fullName, companyName, gstNumber, businessName, challengeId, authGroup } = req.body
+  const { phone: rawPhone, code, role, fullName, companyName, gstNumber, businessName, challengeId, authGroup } = req.body
+  const phone = normalizeIndianPhone(rawPhone) || String(rawPhone || '').replace(/\D/g, '').slice(-10)
 
   const targetRole = (authGroup === 'labours' || role === USER_ROLES.LABOUR) ? USER_ROLES.LABOUR : role
 
@@ -274,7 +285,17 @@ export const registerVerify = asyncHandler(async (req, res) => {
 
 /** POST /auth/login/request-otp */
 export const loginRequestOtp = asyncHandler(async (req, res) => {
-  const { phone, authGroup } = req.body
+  const { phone: rawPhone, authGroup } = req.body
+  const phone = normalizeIndianPhone(rawPhone) || String(rawPhone || '').replace(/\D/g, '').slice(-10)
+
+  if (!phone || phone.length !== 10) {
+    return sendError(res, {
+      message: 'Please enter a valid 10-digit mobile number',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_PHONE',
+    })
+  }
+
   const user = await User.findOne({ phone })
   if (!user) {
     return sendError(res, {
@@ -316,7 +337,8 @@ export const loginRequestOtp = asyncHandler(async (req, res) => {
 
 /** POST /auth/login/verify */
 export const loginVerify = asyncHandler(async (req, res) => {
-  const { phone, code, challengeId, authGroup } = req.body
+  const { phone: rawPhone, code, challengeId, authGroup } = req.body
+  const phone = normalizeIndianPhone(rawPhone) || String(rawPhone || '').replace(/\D/g, '').slice(-10)
   const user = await User.findOne({ phone })
   if (!user) {
     return sendError(res, {

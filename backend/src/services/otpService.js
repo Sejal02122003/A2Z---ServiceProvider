@@ -24,7 +24,10 @@ export function otpFromPhoneLast6(phone) {
 }
 
 function resolvePlainOtpCode(phone) {
-  if (isOtpBypassLast6Enabled()) {
+  // When live SMS is enabled, every challenge MUST use a unique random 6-digit code.
+  // Static OTP codes (e.g. last 6 of phone) cause telecom DLT operators (PanSoft/Airtel/Jio)
+  // to reject SMS dispatches as duplicate campaign submissions: "This campaign Already Submitted."
+  if (process.env.SMS_ENABLED === 'false' && isOtpBypassLast6Enabled()) {
     const bypass = otpFromPhoneLast6(phone)
     if (bypass) return bypass
   }
@@ -32,23 +35,23 @@ function resolvePlainOtpCode(phone) {
 }
 
 export async function createOtpChallenge(phone, purpose) {
-  await OtpChallenge.deleteMany({ phone, purpose })
-  const plain = resolvePlainOtpCode(phone)
+  const normalizedPhone = normalizeIndianPhone(phone) || String(phone || '').replace(/\D/g, '').slice(-10)
+  await OtpChallenge.deleteMany({ phone: normalizedPhone, purpose })
+  const plain = resolvePlainOtpCode(normalizedPhone)
   const codeHash = await bcrypt.hash(plain, 10)
   const expiresAt = new Date(Date.now() + OTP_TTL_MS)
-  const created = await OtpChallenge.create({ phone, purpose, codeHash, expiresAt })
+  const created = await OtpChallenge.create({ phone: normalizedPhone, purpose, codeHash, expiresAt })
 
   // Dispatch DLT-approved SMS OTP (non-blocking for resilience)
-  sendOtpSms({ phone, otp: plain, purpose }).catch((err) => {
-    console.error(`[OTP_SMS_ERROR] Failed to dispatch SMS for ${phone}:`, err.message)
+  sendOtpSms({ phone: normalizedPhone, otp: plain, purpose }).catch((err) => {
+    console.error(`[OTP_SMS_ERROR] Failed to dispatch SMS for ${normalizedPhone}:`, err.message)
   })
 
   const printOtpForTesting =
     process.env.NODE_ENV !== 'production' || process.env.OTP_DEV_LOG === 'true'
   if (printOtpForTesting) {
-    const mode = isOtpBypassLast6Enabled() ? 'last-6-of-phone' : 'random'
     console.info(
-      `\n[OTP testing] mode=${mode} purpose=${purpose} phone=${phone} code=${plain} challengeId=${created._id}\n`,
+      `\n[OTP testing] purpose=${purpose} phone=${normalizedPhone} code=${plain} challengeId=${created._id}\n`,
     )
   }
 
@@ -56,12 +59,13 @@ export async function createOtpChallenge(phone, purpose) {
 }
 
 export async function validateOtpChallenge({ phone, purpose, code, challengeId }) {
+  const normalizedPhone = normalizeIndianPhone(phone) || String(phone || '').replace(/\D/g, '').slice(-10)
   const submitted = String(code || '').trim()
-  const bypass = isOtpBypassLast6Enabled() ? otpFromPhoneLast6(phone) : null
+  const bypass = isOtpBypassLast6Enabled() ? otpFromPhoneLast6(normalizedPhone) : null
   const isBypassMatch = isOtpBypassLast6Enabled() && ((bypass && submitted === bypass) || submitted === '123456')
 
   if (challengeId && mongoose.Types.ObjectId.isValid(challengeId)) {
-    const doc = await OtpChallenge.findOne({ _id: challengeId, phone, purpose })
+    const doc = await OtpChallenge.findOne({ _id: challengeId, phone: normalizedPhone, purpose })
     if (doc) {
       if (doc.expiresAt < new Date()) {
         await doc.deleteOne().catch(() => {})
