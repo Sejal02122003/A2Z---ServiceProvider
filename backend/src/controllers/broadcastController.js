@@ -308,7 +308,7 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
         : (booking.subcategoryId && allSubcatIds.includes(String(booking.subcategoryId)))
     } else if (booking.serviceId) {
       offersService = labourServiceIds.length > 0
-        ? (labourServiceIds.includes(String(booking.serviceId)) || (booking.subcategoryId && allSubcatIds.includes(String(booking.subcategoryId))))
+        ? labourServiceIds.includes(String(booking.serviceId))
         : (booking.subcategoryId && allSubcatIds.includes(String(booking.subcategoryId)))
     } else if (booking.subcategoryId) {
       offersService = allSubcatIds.includes(String(booking.subcategoryId))
@@ -639,15 +639,15 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
   }
   allSubcatIds = [...new Set(allSubcatIds)]
 
-  // Build service match conditions so labour receives bookings for their chosen services or registered subcategories/categories
+  // Build service match conditions so labour receives bookings for their chosen services
   const serviceMatchConditions = []
   if (labourServiceIds.length > 0) {
     serviceMatchConditions.push({ serviceId: { $in: labourServiceIds } })
     serviceMatchConditions.push({ 'packageBooking.inclusions.serviceId': { $in: labourServiceIds } })
     serviceMatchConditions.push({ 'multiServiceBooking.items': { $elemMatch: { status: 'PENDING', serviceId: { $in: labourServiceIds } } } })
     serviceMatchConditions.push({ 'contractorInfo.services.serviceId': { $in: labourServiceIds } })
-  }
-  if (allSubcatIds.length > 0) {
+  } else if (allSubcatIds.length > 0) {
+    // Only fall back to subcategories for legacy providers who have no specific services configured
     serviceMatchConditions.push({ subcategoryId: { $in: allSubcatIds } })
     serviceMatchConditions.push({ 'multiServiceBooking.items': { $elemMatch: { status: 'PENDING', subcategoryId: { $in: allSubcatIds } } } })
   }
@@ -823,7 +823,7 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
         : (booking.subcategoryId && allSubcatIds.includes(String(booking.subcategoryId)))
     } else if (booking.serviceId) {
       offersService = labourServiceIds.length > 0
-        ? (labourServiceIds.includes(String(booking.serviceId)) || (booking.subcategoryId && allSubcatIds.includes(String(booking.subcategoryId))))
+        ? labourServiceIds.includes(String(booking.serviceId))
         : (booking.subcategoryId && allSubcatIds.includes(String(booking.subcategoryId)))
     } else if (booking.subcategoryId) {
       offersService = allSubcatIds.includes(String(booking.subcategoryId))

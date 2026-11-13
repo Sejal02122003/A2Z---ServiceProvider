@@ -110,8 +110,15 @@ export async function startBroadcastCycle(bookingId) {
     if (multiServiceIds.length > 0) {
       matchOr.push({ 'labourProfile.serviceIds': { $in: multiServiceIds } })
     }
+    // Only fall back to subcategories for legacy providers who have no specific services configured
     if (multiSubcategoryIds.length > 0) {
-      matchOr.push({ 'labourProfile.subcategoryIds': { $in: multiSubcategoryIds } })
+      matchOr.push({
+        'labourProfile.subcategoryIds': { $in: multiSubcategoryIds },
+        $or: [
+          { 'labourProfile.serviceIds': { $exists: false } },
+          { 'labourProfile.serviceIds': { $size: 0 } },
+        ],
+      })
     }
   } else if (booking.contractorInfo && booking.contractorInfo.services && booking.contractorInfo.services.length > 0) {
     const requestedServiceIds = booking.contractorInfo.services.map(s => s.serviceId).filter(Boolean)
@@ -130,11 +137,15 @@ export async function startBroadcastCycle(bookingId) {
     if (booking.serviceId) {
       matchOr.push({ 'labourProfile.serviceIds': booking.serviceId })
     }
+    // Only fall back to subcategories for legacy providers who have no specific services configured
     if (booking.subcategoryId) {
-      matchOr.push({ 'labourProfile.subcategoryIds': booking.subcategoryId })
-    }
-    if (bookingCategoryId) {
-      matchOr.push({ 'labourProfile.categoryIds': bookingCategoryId })
+      matchOr.push({
+        'labourProfile.subcategoryIds': booking.subcategoryId,
+        $or: [
+          { 'labourProfile.serviceIds': { $exists: false } },
+          { 'labourProfile.serviceIds': { $size: 0 } },
+        ],
+      })
     }
   }
 
@@ -158,16 +169,6 @@ export async function startBroadcastCycle(bookingId) {
     console.log(`[BROADCAST] Skill-matched search found ${potentialLaborersRaw.length} providers`)
   } else {
     console.log('[BROADCAST] No matching criteria could be determined for booking. Skipping broadcast.')
-  }
-
-  // If 0 providers matched exact serviceId, fall back to qualified providers in the same subcategory
-  if (potentialLaborersRaw.length === 0 && booking.subcategoryId) {
-    console.log(`[BROADCAST] 0 providers matched exact serviceId ${booking.serviceId}. Checking qualified providers registered in subcategory ${booking.subcategoryId}...`)
-    potentialLaborersRaw = await User.find({
-      ...baseQuery,
-      'labourProfile.subcategoryIds': booking.subcategoryId,
-    }).lean()
-    console.log(`[BROADCAST] Subcategory fallback search found ${potentialLaborersRaw.length} providers`)
   }
 
   if (potentialLaborersRaw.length === 0) {
@@ -671,13 +672,13 @@ export async function startBroadcastCycle(bookingId) {
             const pkgServiceIds = booking.packageBooking.inclusions.map(inc => String(inc.serviceId)).filter(Boolean)
             offersService = laborServiceIds.length > 0
               ? pkgServiceIds.some(sId => laborServiceIds.includes(sId))
-              : ((booking.subcategoryId && laborSubcatIds.includes(String(booking.subcategoryId))) || (bookingCategoryId && laborCatIds.includes(String(bookingCategoryId))))
+              : (booking.subcategoryId && laborSubcatIds.includes(String(booking.subcategoryId)))
           } else if (booking.serviceId) {
-            offersService = laborServiceIds.includes(String(booking.serviceId))
-              || (booking.subcategoryId && laborSubcatIds.includes(String(booking.subcategoryId)))
-              || (bookingCategoryId && laborCatIds.includes(String(bookingCategoryId)))
+            offersService = laborServiceIds.length > 0
+              ? laborServiceIds.includes(String(booking.serviceId))
+              : (booking.subcategoryId && laborSubcatIds.includes(String(booking.subcategoryId)))
           } else if (booking.subcategoryId) {
-            offersService = laborSubcatIds.includes(String(booking.subcategoryId)) || (bookingCategoryId && laborCatIds.includes(String(bookingCategoryId)))
+            offersService = laborSubcatIds.includes(String(booking.subcategoryId))
           }
 
           if (!offersService) {
