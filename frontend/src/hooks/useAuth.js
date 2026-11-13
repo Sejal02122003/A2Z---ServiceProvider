@@ -4,7 +4,7 @@ import { buildGuestUser, clearBootRole, readBootRole, writeBootRole } from '../l
 import { clearSession, setCredentials } from '../store/slices/authSlice.js'
 import { baseApi } from '../store/api/baseApi.js'
 import { apiRequest } from '../api/http.js'
-import { registerFCMToken } from '../services/pushNotificationService.js'
+import { registerFCMToken, unregisterFCMToken } from '../services/pushNotificationService.js'
 
 export function useAuth() {
   const dispatch = useDispatch()
@@ -30,15 +30,8 @@ export function useAuth() {
 
   const logout = useCallback(async () => {
     try {
-      // Clean up FCM token from backend
-      const fcmToken = localStorage.getItem('fcm_token_web')
-      if (fcmToken) {
-        await apiRequest('/fcm-tokens/remove', {
-          method: 'DELETE',
-          body: { token: fcmToken, platform: 'web' }
-        })
-        localStorage.removeItem('fcm_token_web')
-      }
+      // Disassociate and clean up FCM token from backend
+      await unregisterFCMToken()
       await apiRequest('/auth/logout', { method: 'POST' })
     } catch (e) {
       // Ignore network errors on logout

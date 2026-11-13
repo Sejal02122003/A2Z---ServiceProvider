@@ -51,16 +51,26 @@ export const removeToken = asyncHandler(async (req, res) => {
     return sendError(res, { message: 'Token is required', statusCode: HTTP_STATUS.BAD_REQUEST, code: 'MISSING_TOKEN' });
   }
 
-  const userId = req.user._id;
-  const user = await User.findById(userId);
-
-  if (platform === 'web' && user.fcmTokens) {
-    user.fcmTokens = user.fcmTokens.filter(t => t !== token);
-  } else if (platform === 'mobile' && user.fcmTokenMobile) {
-    user.fcmTokenMobile = user.fcmTokenMobile.filter(t => t !== token);
+  const userId = req.user?._id;
+  if (userId) {
+    const user = await User.findById(userId);
+    if (user) {
+      if (platform === 'web' && user.fcmTokens) {
+        user.fcmTokens = user.fcmTokens.filter(t => t !== token);
+      } else if (platform === 'mobile' && user.fcmTokenMobile) {
+        user.fcmTokenMobile = user.fcmTokenMobile.filter(t => t !== token);
+      }
+      await user.save();
+    }
   }
 
-  await user.save();
+  // Ensure token is completely pulled from any remaining associations
+  await User.updateMany(
+    { $or: [{ fcmTokens: token }, { fcmTokenMobile: token }] },
+    { $pull: { fcmTokens: token, fcmTokenMobile: token } }
+  ).catch(() => {});
+
+  console.log(`[FCM] Invalidation complete: token removed for device logout`);
   return sendSuccess(res, { message: 'FCM token removed' });
 });
 

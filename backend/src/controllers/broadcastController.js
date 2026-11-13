@@ -660,12 +660,22 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
     })
   }
 
+  const requestedBookingId = req.query.bookingId || req.query.incoming_booking;
+
   // Find recent bookings in BROADCASTING or PARTIALLY_ACCEPTED status matching this labour's services
   const query = {
     status: { $in: ['BROADCASTING', 'PARTIALLY_ACCEPTED'] },
     rejectedBy: { $ne: labour._id },
     acceptedLabourIds: { $ne: labour._id },
-    $and: [
+  }
+
+  if (requestedBookingId) {
+    query._id = requestedBookingId;
+    if (serviceMatchConditions.length > 0) {
+      query.$or = serviceMatchConditions;
+    }
+  } else {
+    query.$and = [
       {
         $or: [
           { createdAt: { $gte: cutoff } },
@@ -673,7 +683,7 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
         ],
       },
       { $or: serviceMatchConditions },
-    ],
+    ];
   }
   // In production, avoid matching the user who placed the booking
   if (process.env.NODE_ENV === 'production') {

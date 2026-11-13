@@ -159,6 +159,38 @@ export async function registerFCMToken(forceUpdate = false) {
   }
 }
 
+// Unregister and disassociate FCM token from backend upon logout
+export async function unregisterFCMToken() {
+  try {
+    const savedToken = localStorage.getItem('fcm_token_web');
+    if (savedToken) {
+      await apiRequest('/fcm-tokens/remove', {
+        method: 'DELETE',
+        body: { token: savedToken, platform: 'web' },
+      }).catch((err) => console.warn('[PUSH] Token removal request failed:', err?.message || err));
+    }
+  } catch (err) {
+    console.warn('[PUSH] unregisterFCMToken error:', err?.message || err);
+  } finally {
+    localStorage.removeItem('fcm_token_web');
+    // Clear all cached fcm sync flags
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('fcm_synced_user_')) {
+          localStorage.removeItem(key);
+        }
+      }
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const key = sessionStorage.key(i);
+        if (key && key.startsWith('fcm_synced_')) {
+          sessionStorage.removeItem(key);
+        }
+      }
+    } catch {}
+  }
+}
+
 // Send test push notification to the logged-in user
 export async function sendTestNotification() {
   const token = await registerFCMToken(true);

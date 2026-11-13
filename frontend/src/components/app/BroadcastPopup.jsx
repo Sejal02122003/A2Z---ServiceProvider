@@ -58,7 +58,7 @@ export function BroadcastPopup() {
   // Synchronize audio playback with incoming booking offer
   useEffect(() => {
     if (incoming) {
-      playBookingAlertSound()
+      playBookingAlertSound(incoming.bookingId)
     } else {
       stopBookingAlertSound()
     }
@@ -174,8 +174,8 @@ export function BroadcastPopup() {
     const bookingParam = params.get('incoming_booking')
     if (bookingParam) {
       console.log('[BroadcastPopup] Launched from push notification click for booking:', bookingParam)
-      playBookingAlertSound()
-      broadcastsApi.getActiveBroadcast().then((res) => {
+      playBookingAlertSound(bookingParam)
+      broadcastsApi.getActiveBroadcast(bookingParam).then((res) => {
         if (res?.data?.broadcast) {
           handleBroadcast(res.data.broadcast)
         }

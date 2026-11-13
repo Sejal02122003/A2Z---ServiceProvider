@@ -1,0 +1,19 @@
+{
+  "channels": [
+    {
+      "id": "new_booking_alerts",
+      "name": "New Booking Alerts",
+      "description": "Alerts for newly received service provider bookings.",
+      "importance": "HIGH",
+      "sound": "alert",
+      "vibration": true,
+      "vibratePattern": [500, 200, 500, 200, 500, 200, 800],
+      "lockscreenVisibility": "PUBLIC",
+      "bypassDnd": false,
+      "lightColor": "#015F6C"
+    }
+  ],
+  "androidNativeCodeSnippet": {
+    "kotlin": "val soundUri = Uri.parse(\"android.resource://\" + context.packageName + \"/raw/alert\")\nval audioAttributes = AudioAttributes.Builder()\n    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)\n    .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)\n    .build()\nval channel = NotificationChannel(\"new_booking_alerts\", \"New Booking Alerts\", NotificationManager.IMPORTANCE_HIGH).apply {\n    description = \"Alerts for newly received service provider bookings.\"\n    enableVibration(true)\n    vibrationPattern = longArrayOf(500, 200, 500, 200, 500, 200, 800)\n    setSound(soundUri, audioAttributes)\n    lockscreenVisibility = Notification.VISIBILITY_PUBLIC\n}\nval notificationManager = context.getSystemService(NotificationManager::class.java)\nnotificationManager?.createNotificationChannel(channel)"
+  }
+}

@@ -1,8 +1,65 @@
 import { getFirebaseAdmin } from '../config/firebase.js';
 import { User } from '../models/User.js';
 
+// Server-side dispatch idempotency cache (suppress duplicate push events within 12 seconds)
+const dispatchIdempotencyCache = new Map();
+const IDEMPOTENCY_WINDOW_MS = 12000;
+
+function cleanupIdempotencyCache() {
+  const now = Date.now();
+  for (const [key, timestamp] of dispatchIdempotencyCache.entries()) {
+    if (now - timestamp > IDEMPOTENCY_WINDOW_MS) {
+      dispatchIdempotencyCache.delete(key);
+    }
+  }
+}
+setInterval(cleanupIdempotencyCache, 30000).unref();
+
 export async function sendNotificationToUser(userId, payload, includeMobile = true) {
   try {
+    // Sanitize data payload (FCM multicast data requires all values to be strings)
+    const stringifiedData = {};
+    if (payload.data && typeof payload.data === 'object') {
+      for (const [key, value] of Object.entries(payload.data)) {
+        if (value !== undefined && value !== null) {
+          stringifiedData[key] = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        }
+      }
+    }
+
+    const isBookingOffer =
+      stringifiedData.type === 'NEW_BOOKING' ||
+      stringifiedData.type === 'booking_received' ||
+      stringifiedData.type === 'NEW_BROADCAST_JOB' ||
+      stringifiedData.type === 'booking_rebroadcasting' ||
+      Boolean(stringifiedData.bookingId);
+
+    const notifType = stringifiedData.type || (isBookingOffer ? 'NEW_BOOKING' : 'NOTIFICATION');
+    const bookingId = stringifiedData.bookingId || '';
+    const eventId =
+      stringifiedData.eventId ||
+      stringifiedData.notificationId ||
+      `evt_${bookingId || Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+    // Server-side Idempotency Check for Booking Offers (instant duplicate suppression)
+    if (isBookingOffer && bookingId) {
+      const idempotencyKey = `${userId}_${bookingId}_${notifType}`;
+      const lastSent = dispatchIdempotencyCache.get(idempotencyKey);
+      const now = Date.now();
+      if (lastSent && now - lastSent < IDEMPOTENCY_WINDOW_MS) {
+        console.log(`[FCM Idempotency] Suppressed duplicate push notification for booking ${bookingId} to user ${userId}`);
+        return {
+          success: true,
+          idempotentDuplicate: true,
+          totalTokens: 0,
+          successCount: 1,
+          failureCount: 0,
+          eventId,
+        };
+      }
+      dispatchIdempotencyCache.set(idempotencyKey, now);
+    }
+
     const user = await User.findById(userId);
     if (!user) {
       throw new Error('User not found');
@@ -21,7 +78,7 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
     const uniqueTokens = [...new Set(tokens)];
 
     if (uniqueTokens.length === 0) {
-      console.log(`No FCM tokens found for user ${userId}`);
+      console.log(`[FCM] No registered device tokens found for user ${userId}`);
       return {
         success: false,
         noTokens: true,
@@ -32,41 +89,41 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
       };
     }
 
-    // Sanitize data payload (FCM multicast data requires all values to be strings)
-    const stringifiedData = {};
-    if (payload.data && typeof payload.data === 'object') {
-      for (const [key, value] of Object.entries(payload.data)) {
-        if (value !== undefined && value !== null) {
-          stringifiedData[key] = typeof value === 'object' ? JSON.stringify(value) : String(value);
-        }
-      }
-    }
+    const timestampStr = stringifiedData.timestamp || stringifiedData.createdAt || String(Date.now());
+    const channelId = isBookingOffer ? 'new_booking_alerts' : 'high_importance_channel';
 
-    const linkUrl = payload.link || payload.data?.link || '/';
+    const defaultTitle = isBookingOffer ? 'New Booking Received!' : 'A2Z Service Hub';
+    const defaultBody = isBookingOffer
+      ? 'You have received a new booking. Open the app to view details.'
+      : 'You have a new update';
+    const finalTitle = payload.title || stringifiedData.title || defaultTitle;
+    const finalBody = payload.body || stringifiedData.body || defaultBody;
 
-    const isBookingOffer =
-      stringifiedData.type === 'booking_received' ||
-      stringifiedData.type === 'NEW_BROADCAST_JOB' ||
-      stringifiedData.type === 'booking_rebroadcasting' ||
-      Boolean(stringifiedData.bookingId);
-
-    const targetUrl = stringifiedData.bookingId
-      ? `/serviceprovider?incoming_booking=${stringifiedData.bookingId}`
+    const targetUrl = bookingId
+      ? `/serviceprovider?incoming_booking=${bookingId}`
       : (payload.link || payload.data?.link || '/serviceprovider');
 
     // Prepare message with webpush & android configs for system-level notifications
     const message = {
       notification: {
-        title: payload.title || 'A2Z Service Hub',
-        body: payload.body || '',
+        title: finalTitle,
+        body: finalBody,
       },
       data: {
         ...stringifiedData,
-        title: payload.title || 'A2Z Service Hub',
-        body: payload.body || '',
+        title: finalTitle,
+        body: finalBody,
+        type: notifType,
+        bookingId: bookingId,
+        serviceProviderId: String(userId),
+        providerId: String(userId),
+        eventId: eventId,
+        notificationId: eventId,
+        createdAt: timestampStr,
+        timestamp: timestampStr,
         sound: '/alert.mp3',
-        channelId: 'high_importance_channel',
-        channel_id: 'high_importance_channel',
+        channelId: channelId,
+        channel_id: channelId,
         priority: 'high',
         click_action: targetUrl,
         link: targetUrl,
@@ -76,11 +133,11 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
           Urgency: 'high',
         },
         notification: {
-          title: payload.title || 'A2Z Service Hub',
-          body: payload.body || '',
+          title: finalTitle,
+          body: finalBody,
           icon: payload.icon || '/logo.png',
           badge: '/logo.png',
-          tag: payload.tag || (stringifiedData.bookingId ? `booking-${stringifiedData.bookingId}` : stringifiedData.type || 'a2z-notification'),
+          tag: bookingId ? `booking-${bookingId}` : (payload.tag || channelId),
           renotify: true,
           requireInteraction: isBookingOffer,
           silent: false,
@@ -100,14 +157,15 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
       android: {
         priority: 'high',
         notification: {
-          title: payload.title || 'A2Z Service Hub',
-          body: payload.body || '',
-          channelId: 'high_importance_channel',
-          sound: 'default',
-          defaultSound: true,
+          title: finalTitle,
+          body: finalBody,
+          channelId: channelId,
+          sound: isBookingOffer ? 'alert' : 'default',
+          defaultSound: !isBookingOffer,
           defaultVibrateTimings: true,
           priority: 'max',
           visibility: 'public',
+          clickAction: targetUrl,
         },
       },
       tokens: uniqueTokens,

@@ -174,11 +174,31 @@ export function playWebAudioChime() {
   }
 }
 
+let currentPlayingId = null
+let lastPlayTimestamp = 0
+
 /**
  * Start looping the booking alert sound (in-app and background).
+ * Safe against duplicate rapid calls from simultaneous socket/push/SW events.
  */
-export function playBookingAlertSound() {
+export function playBookingAlertSound(bookingOrEventId = null) {
+  const nowMs = Date.now()
+  if (isPlaying && bookingOrEventId && currentPlayingId === bookingOrEventId) {
+    // Already playing for this specific booking event - resume context if needed and keep running
+    if (audioContext && audioContext.state === 'suspended') {
+      audioContext.resume().catch(() => {})
+    }
+    return
+  }
+
+  if (isPlaying && (nowMs - lastPlayTimestamp < 1500)) {
+    // Suppress rapid re-triggering within 1.5s to avoid audio glitching/doubling
+    return
+  }
+
   isPlaying = true
+  currentPlayingId = bookingOrEventId || currentPlayingId
+  lastPlayTimestamp = nowMs
 
   // 1. Resume AudioContext if suspended
   if (audioContext && audioContext.state === 'suspended') {
@@ -270,6 +290,7 @@ export function playBookingAlertSound() {
  */
 export function stopBookingAlertSound() {
   isPlaying = false
+  currentPlayingId = null
 
   if (activeBufferSource) {
     try {

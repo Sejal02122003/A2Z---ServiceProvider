@@ -46,6 +46,7 @@ self.addEventListener('push', (event) => {
   const dataObj = payload.data || {};
   const notifObj = payload.notification || {};
   const isBookingAlert =
+    dataObj.type === 'NEW_BOOKING' ||
     dataObj.type === 'booking_received' ||
     dataObj.type === 'NEW_BROADCAST_JOB' ||
     dataObj.type === 'booking_rebroadcasting' ||
@@ -60,6 +61,7 @@ self.addEventListener('push', (event) => {
           client.postMessage({
             type: 'PLAY_BOOKING_ALERT_SOUND',
             bookingId: dataObj.bookingId,
+            eventId: dataObj.eventId || dataObj.notificationId,
             sound: '/alert.mp3',
           });
         });
@@ -72,13 +74,13 @@ self.addEventListener('push', (event) => {
   // Display rich notification with vibration, interaction, and action buttons
   const isPlainData = !notifObj.title && (dataObj.title || dataObj.bookingId);
   if (isBookingAlert || isPlainData) {
-    const title = dataObj.title || notifObj.title || (isBookingAlert ? 'New Job Offer! ⚡' : 'A2Z Service Hub');
-    const body = dataObj.body || notifObj.body || 'You have a new booking offer';
+    const title = dataObj.title || notifObj.title || (isBookingAlert ? 'New Booking Received! ⚡' : 'A2Z Service Hub');
+    const body = dataObj.body || notifObj.body || 'You have received a new booking. Open the app to view details.';
     const showPromise = self.registration.showNotification(title, {
       body,
       icon: notifObj.icon || '/logo.png',
       badge: '/logo.png',
-      tag: dataObj.bookingId ? `booking-${dataObj.bookingId}` : (notifObj.tag || 'a2z-push'),
+      tag: dataObj.bookingId ? `booking-${dataObj.bookingId}` : (notifObj.tag || 'new_booking_alerts'),
       renotify: true,
       requireInteraction: isBookingAlert,
       silent: false,
@@ -86,7 +88,8 @@ self.addEventListener('push', (event) => {
       vibrate: isBookingAlert ? [500, 200, 500, 200, 500, 200, 800] : [200, 100, 200],
       data: {
         ...dataObj,
-        link: dataObj.link || '/serviceprovider',
+        channelId: isBookingAlert ? 'new_booking_alerts' : 'high_importance_channel',
+        link: dataObj.link || (dataObj.bookingId ? `/serviceprovider?incoming_booking=${dataObj.bookingId}` : '/serviceprovider'),
       },
       actions: isBookingAlert
         ? [
@@ -104,12 +107,13 @@ self.addEventListener('push', (event) => {
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] onBackgroundMessage received:', payload);
 
-  const title = payload?.notification?.title || payload?.data?.title || 'A2Z Service Hub';
-  const body = payload?.notification?.body || payload?.data?.body || 'You have a new update';
+  const title = payload?.notification?.title || payload?.data?.title || 'New Booking Received! ⚡';
+  const body = payload?.notification?.body || payload?.data?.body || 'You have received a new booking. Open the app to view details.';
   const icon = payload?.notification?.icon || payload?.notification?.imageUrl || '/logo.png';
-  const targetLink = payload?.data?.link || (payload?.data?.bookingId ? `/serviceprovider` : '/');
+  const targetLink = payload?.data?.link || (payload?.data?.bookingId ? `/serviceprovider?incoming_booking=${payload.data.bookingId}` : '/serviceprovider');
 
   const isBookingAlert =
+    payload?.data?.type === 'NEW_BOOKING' ||
     payload?.data?.type === 'booking_received' ||
     payload?.data?.type === 'NEW_BROADCAST_JOB' ||
     payload?.data?.type === 'booking_rebroadcasting' ||
@@ -119,7 +123,7 @@ messaging.onBackgroundMessage((payload) => {
     body,
     icon,
     badge: '/logo.png',
-    tag: payload?.data?.bookingId ? `booking-${payload.data.bookingId}` : (payload?.data?.type || 'a2z-background-notification'),
+    tag: payload?.data?.bookingId ? `booking-${payload.data.bookingId}` : (payload?.data?.type || 'new_booking_alerts'),
     renotify: true,
     requireInteraction: isBookingAlert,
     silent: false,
@@ -127,6 +131,7 @@ messaging.onBackgroundMessage((payload) => {
     vibrate: isBookingAlert ? [500, 200, 500, 200, 500, 200, 800] : [200, 100, 200],
     data: {
       ...payload?.data,
+      channelId: isBookingAlert ? 'new_booking_alerts' : 'high_importance_channel',
       link: targetLink,
       sound: '/alert.mp3',
     },
@@ -145,6 +150,7 @@ messaging.onBackgroundMessage((payload) => {
         client.postMessage({
           type: 'PLAY_BOOKING_ALERT_SOUND',
           bookingId: payload?.data?.bookingId,
+          eventId: payload?.data?.eventId || payload?.data?.notificationId,
           sound: '/alert.mp3',
         });
       });
@@ -156,7 +162,20 @@ messaging.onBackgroundMessage((payload) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  if (event.action === 'dismiss') return;
+
+  // If user tapped 'dismiss', stop audio in any open clients
+  if (event.action === 'dismiss') {
+    if (self.clients) {
+      event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+          windowClients.forEach((client) => {
+            client.postMessage({ type: 'STOP_BOOKING_ALERT_SOUND' });
+          });
+        }).catch(() => {})
+      );
+    }
+    return;
+  }
 
   const bId = event.notification.data?.bookingId;
   let rawLink = event.notification.data?.link || '/serviceprovider';
@@ -175,6 +194,7 @@ self.addEventListener('notificationclick', (event) => {
           client.postMessage({
             type: 'PLAY_BOOKING_ALERT_SOUND',
             bookingId: event.notification.data?.bookingId,
+            eventId: event.notification.data?.eventId || event.notification.data?.notificationId,
             sound: '/alert.mp3',
           });
           return client.focus();
@@ -187,9 +207,10 @@ self.addEventListener('notificationclick', (event) => {
               newClient.postMessage({
                 type: 'PLAY_BOOKING_ALERT_SOUND',
                 bookingId: event.notification.data?.bookingId,
+                eventId: event.notification.data?.eventId || event.notification.data?.notificationId,
                 sound: '/alert.mp3',
               });
-            }, 1000);
+            }, 800);
           }
         });
       }

@@ -571,9 +571,21 @@ export async function startBroadcastCycle(bookingId) {
           })
 
           sendNotificationToUser(labor._id, {
-            title: booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡',
+            title: booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Booking Received! ⚡',
             body: `New multi-service job (${servicesPayload.length} services, ~${formattedBookingDuration}) near you. Estimated earnings: ₹${totalEarnings}`,
-            data: { type: 'booking_received', bookingId: String(booking._id) }
+            data: {
+              type: 'NEW_BOOKING',
+              bookingId: String(booking._id),
+              serviceProviderId: String(labor._id),
+              providerId: String(labor._id),
+              eventId: `evt_${booking._id}_${labor._id}_${Date.now()}`,
+              notificationId: `notif_${booking._id}_${labor._id}_${Date.now()}`,
+              createdAt: String(booking.createdAt || Date.now()),
+              timestamp: String(Date.now()),
+              channelId: 'new_booking_alerts',
+              sound: '/alert.mp3',
+              link: `/serviceprovider?incoming_booking=${booking._id}`,
+            },
           })
         } else if (booking.contractorInfo?.services?.length > 0) {
           // Find open services that match this labourer's skills
@@ -628,13 +640,20 @@ export async function startBroadcastCycle(bookingId) {
           })
           
           sendNotificationToUser(labor._id, {
-            title: booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer!',
+            title: booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Booking Received! ⚡',
             body: `New ${servicesPayload.length === 1 ? servicesPayload[0].name : 'Multiple Services'} job available near you. Estimated earnings: ₹${bestEarning}`,
             data: {
-              type: 'booking_received',
+              type: 'NEW_BOOKING',
               bookingId: String(booking._id),
+              serviceProviderId: String(labor._id),
+              providerId: String(labor._id),
+              eventId: `evt_${booking._id}_${labor._id}_${Date.now()}`,
+              notificationId: `notif_${booking._id}_${labor._id}_${Date.now()}`,
+              createdAt: String(booking.createdAt || Date.now()),
+              timestamp: String(Date.now()),
+              channelId: 'new_booking_alerts',
               sound: '/alert.mp3',
-              link: '/serviceprovider',
+              link: `/serviceprovider?incoming_booking=${booking._id}`,
             },
           })
 
@@ -743,15 +762,22 @@ export async function startBroadcastCycle(bookingId) {
           sendNotificationToUser(labor._id, {
             title: booking.packageBooking?.isPackage
               ? `New Package Booking: ${booking.packageBooking.packageName}! 📦`
-              : (booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡'),
+              : (booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Booking Received! ⚡'),
             body: booking.packageBooking?.isPackage
               ? `Package deal with ${booking.packageBooking.inclusions?.length || 0} services. Package price: ₹${booking.packageBooking.packagePrice}. Your earnings: ₹${singleShare}`
               : `New ${singleServiceName}${singleQty > 1 ? ` (Qty: ${singleQty})` : ''} job · ~${formattedSingleDuration} available near you. Estimated earnings: ₹${singleShare}`,
             data: {
-              type: 'booking_received',
+              type: 'NEW_BOOKING',
               bookingId: String(booking._id),
+              serviceProviderId: String(labor._id),
+              providerId: String(labor._id),
+              eventId: `evt_${booking._id}_${labor._id}_${Date.now()}`,
+              notificationId: `notif_${booking._id}_${labor._id}_${Date.now()}`,
+              createdAt: String(booking.createdAt || Date.now()),
+              timestamp: String(Date.now()),
+              channelId: 'new_booking_alerts',
               sound: '/alert.mp3',
-              link: '/serviceprovider',
+              link: `/serviceprovider?incoming_booking=${booking._id}`,
             },
           })
 

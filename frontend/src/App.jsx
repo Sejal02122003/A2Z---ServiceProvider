@@ -66,7 +66,7 @@ import { USER_ROLES } from './constants/userRoles.js'
 import { useAuth } from './hooks/useAuth.js'
 import { initializePushNotifications, setupForegroundNotificationHandler } from './services/pushNotificationService.js'
 
-import { playBookingAlertSound } from './utils/bookingSound.js'
+import { playBookingAlertSound, stopBookingAlertSound } from './utils/bookingSound.js'
 
 function AppLegacyRedirect() {
   const { user } = useAuth()
@@ -83,20 +83,24 @@ function App() {
       console.log('[PUSH] Foreground notification received:', payload);
       window.dispatchEvent(new CustomEvent('a2z-push-notification', { detail: payload }));
       const isBookingOffer =
+        payload?.data?.type === 'NEW_BOOKING' ||
         payload?.data?.type === 'booking_received' ||
         payload?.data?.type === 'NEW_BROADCAST_JOB' ||
         payload?.data?.type === 'booking_rebroadcasting' ||
         Boolean(payload?.data?.bookingId);
       if (isBookingOffer) {
-        playBookingAlertSound();
+        playBookingAlertSound(payload?.data?.bookingId);
       }
     });
 
     const handleSwMessage = (event) => {
       if (event.data?.type === 'PLAY_BOOKING_ALERT_SOUND') {
         console.log('[PUSH] PLAY_BOOKING_ALERT_SOUND message received from Service Worker', event.data);
-        playBookingAlertSound();
+        playBookingAlertSound(event.data?.bookingId);
         window.dispatchEvent(new CustomEvent('a2z-push-notification', { detail: { data: event.data } }));
+      } else if (event.data?.type === 'STOP_BOOKING_ALERT_SOUND') {
+        console.log('[PUSH] STOP_BOOKING_ALERT_SOUND message received from Service Worker');
+        stopBookingAlertSound();
       }
     };
 

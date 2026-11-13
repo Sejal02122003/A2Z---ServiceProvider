@@ -9,7 +9,8 @@ export const broadcastsApi = {
     return apiRequest(`/broadcasts/${logId}/reject`, { method: 'POST' })
   },
 
-  getActiveBroadcast: () => {
-    return apiRequest('/broadcasts/active')
+  getActiveBroadcast: (bookingId = null) => {
+    const qs = bookingId ? `?bookingId=${encodeURIComponent(bookingId)}` : ''
+    return apiRequest(`/broadcasts/active${qs}`)
   },
 }
