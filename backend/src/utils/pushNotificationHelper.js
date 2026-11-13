@@ -50,6 +50,10 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
       stringifiedData.type === 'booking_rebroadcasting' ||
       Boolean(stringifiedData.bookingId);
 
+    const targetUrl = stringifiedData.bookingId
+      ? `/serviceprovider?incoming_booking=${stringifiedData.bookingId}`
+      : (payload.link || payload.data?.link || '/serviceprovider');
+
     // Prepare message with webpush & android configs for system-level notifications
     const message = {
       notification: {
@@ -61,7 +65,11 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
         title: payload.title || 'A2Z Service Hub',
         body: payload.body || '',
         sound: '/alert.mp3',
-        channelId: isBookingOffer ? 'booking_alerts_channel' : 'high_importance_channel',
+        channelId: 'high_importance_channel',
+        channel_id: 'high_importance_channel',
+        priority: 'high',
+        click_action: targetUrl,
+        link: targetUrl,
       },
       webpush: {
         headers: {
@@ -86,7 +94,7 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
             : [],
         },
         fcmOptions: {
-          link: linkUrl,
+          link: targetUrl,
         },
       },
       android: {
@@ -94,10 +102,12 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
         notification: {
           title: payload.title || 'A2Z Service Hub',
           body: payload.body || '',
-          sound: isBookingOffer ? 'alert' : 'default',
-          channelId: isBookingOffer ? 'booking_alerts_channel' : 'high_importance_channel',
+          channelId: 'high_importance_channel',
+          sound: 'default',
           defaultSound: true,
           defaultVibrateTimings: true,
+          priority: 'max',
+          visibility: 'public',
         },
       },
       tokens: uniqueTokens,

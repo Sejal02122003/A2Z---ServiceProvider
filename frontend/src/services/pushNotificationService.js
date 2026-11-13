@@ -105,9 +105,10 @@ export async function registerFCMToken(forceUpdate = false) {
       }
     }
 
+    const currentUserId = state?.auth?.user?._id;
     const savedToken = localStorage.getItem('fcm_token_web');
-    // If we have saved token and not forcing, check if already synced this session
-    if (savedToken && !forceUpdate && sessionStorage.getItem('fcm_synced_session')) {
+    // If we have saved token and not forcing, check if already synced for this specific user
+    if (savedToken && !forceUpdate && currentUserId && sessionStorage.getItem(`fcm_synced_${currentUserId}`)) {
       return savedToken;
     }
 
@@ -124,7 +125,9 @@ export async function registerFCMToken(forceUpdate = false) {
 
     if (response?.success) {
       localStorage.setItem('fcm_token_web', token);
-      sessionStorage.setItem('fcm_synced_session', 'true');
+      if (currentUserId) {
+        sessionStorage.setItem(`fcm_synced_${currentUserId}`, 'true');
+      }
       console.log('[PUSH] FCM token registered with backend successfully');
       return token;
     } else {

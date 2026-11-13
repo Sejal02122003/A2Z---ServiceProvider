@@ -167,6 +167,24 @@ export function BroadcastPopup() {
     }
   }, [isLabour, incoming, handleBroadcast])
 
+  // If opened directly from push notification click with ?incoming_booking=...
+  useEffect(() => {
+    if (!isLabour) return
+    const params = new URLSearchParams(window.location.search)
+    const bookingParam = params.get('incoming_booking')
+    if (bookingParam) {
+      console.log('[BroadcastPopup] Launched from push notification click for booking:', bookingParam)
+      playBookingAlertSound()
+      broadcastsApi.getActiveBroadcast().then((res) => {
+        if (res?.data?.broadcast) {
+          handleBroadcast(res.data.broadcast)
+        }
+      }).catch(() => {})
+      const cleanUrl = window.location.pathname
+      window.history.replaceState({}, '', cleanUrl)
+    }
+  }, [isLabour, handleBroadcast])
+
   // Countdown timer
   useEffect(() => {
     if (!incoming) return

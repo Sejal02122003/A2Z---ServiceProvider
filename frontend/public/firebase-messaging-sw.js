@@ -158,7 +158,11 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   if (event.action === 'dismiss') return;
 
-  const rawLink = event.notification.data?.link || '/serviceprovider';
+  const bId = event.notification.data?.bookingId;
+  let rawLink = event.notification.data?.link || '/serviceprovider';
+  if (bId && !rawLink.includes('incoming_booking=')) {
+    rawLink = `${rawLink}${rawLink.includes('?') ? '&' : '?'}incoming_booking=${bId}`;
+  }
   const targetUrl = new URL(rawLink, self.location.origin).href;
 
   event.waitUntil(
