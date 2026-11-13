@@ -252,11 +252,13 @@ export function LabourBounceCancelModal({ open, onClose, booking, onCancelled })
                   <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 mt-0.5" />
                   <div className="text-xs text-emerald-950 space-y-1">
                     <p className="font-extrabold text-sm text-emerald-900">
-                      Standard Cancellation (&gt; {cutoffHours}h Notice): ₹0 Penalty
+                      {eligibility?.isInstant ? 'Instant Booking Bounce: ₹0 Penalty' : `Standard Cancellation (> ${cutoffHours}h Notice): ₹0 Penalty`}
                     </p>
                     <p className="font-medium text-emerald-800 leading-relaxed">
                       {isExempt
                         ? 'Reporting fake/unreachable customers or customer-requested cancellations incurs ₹0 penalty.'
+                        : eligibility?.isInstant
+                        ? 'Instant booking bounce allowed with ₹0 penalty. The booking will be re-broadcast to find another nearby partner.'
                         : `You gave more than ${cutoffHours} hours notice. This is classified as a standard cancellation with ₹0 penalty. The booking will be re-broadcast to find another nearby partner.`}
                     </p>
                   </div>

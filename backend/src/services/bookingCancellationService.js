@@ -210,6 +210,62 @@ export async function getCancellationEligibility(bookingId, userId, overrideTime
     }
   }
 
+  const now = overrideTime ? new Date(overrideTime) : new Date()
+  const isInstant =
+    booking.type === 'INSTANT' ||
+    booking.type === 'instant' ||
+    booking.bookingType === 'INSTANT' ||
+    booking.bookingType === 'instant'
+
+  // Handling for Instant Bookings (Immediate dispatch, no future scheduled start time)
+  if (isInstant) {
+    const assignedAt = booking.updatedAt || booking.createdAt || now
+    const elapsedMs = Math.max(0, now.getTime() - new Date(assignedAt).getTime())
+    const elapsedMinutes = Math.floor(elapsedMs / (60 * 1000))
+    // 5-minute grace period from assignment for standard cancellation (0 penalty)
+    const isGracePeriod = elapsedMinutes <= 5
+    const isStandard = !settings.enabled || isGracePeriod
+
+    const baseAmount = Number(
+      booking.laborShare || booking.totalAmount || booking.basePrice || 0
+    )
+    let calculatedPenalty = 0
+
+    if (!isStandard) {
+      if (settings.penaltyType === 'FIXED') {
+        calculatedPenalty = Math.max(0, Number(settings.fixedPenaltyAmount || 200))
+      } else if (settings.penaltyType === 'PERCENTAGE') {
+        const rate = Math.max(0, Math.min(100, Number(settings.percentagePenaltyRate || 20)))
+        calculatedPenalty = Math.round((rate / 100) * baseAmount)
+      }
+    }
+
+    return {
+      isEligible: true,
+      isInstant: true,
+      isLate: !isStandard,
+      timingClassification: isStandard ? TIMING_CLASSIFICATION.STANDARD : TIMING_CLASSIFICATION.LATE,
+      action: 'ALLOW',
+      requiresApproval: false,
+      isBlocked: false,
+      penaltyType: isStandard ? 'NONE' : settings.penaltyType,
+      penaltyAmount: calculatedPenalty,
+      penaltyRateOrAmount:
+        isStandard
+          ? 0
+          : settings.penaltyType === 'FIXED'
+          ? calculatedPenalty
+          : Number(settings.percentagePenaltyRate || 20),
+      cutoffHours: 0,
+      timeRemainingMinutes: 0,
+      timeRemainingHours: 0,
+      serviceStartDateTime: new Date(),
+      message: isStandard
+        ? 'Instant booking bounce allowed. Booking will be re-broadcast to find another nearby partner.'
+        : `Late bounce penalty applies (₹${calculatedPenalty}). Booking will be re-broadcast to find another partner.`,
+    }
+  }
+
   // Calculate Service Start DateTime
   let serviceStartDateTime = null
   if (booking.scheduledAt && !isNaN(new Date(booking.scheduledAt).getTime())) {
@@ -219,7 +275,6 @@ export async function getCancellationEligibility(bookingId, userId, overrideTime
   } else {
     serviceStartDateTime = new Date(booking.createdAt || Date.now())
   }
-  const now = overrideTime ? new Date(overrideTime) : new Date()
   const timeRemainingMs = serviceStartDateTime.getTime() - now.getTime()
   const timeRemainingMinutes = Math.floor(timeRemainingMs / (60 * 1000))
   const timeRemainingHours = Number((timeRemainingMs / (3600 * 1000)).toFixed(2))
@@ -550,15 +605,28 @@ export async function processVendorCancellation({
   }
 
   // Determine if booking should be re-broadcasted:
-  // 1. Standard cancellation (> 2 hours notice): Re-broadcast unconditionally to find another nearby partner.
-  // 2. Late cancellation with penalty: Re-broadcast if service start time has not already passed.
-  const shouldRebroadcast = isStandard || (eligibility.timeRemainingMinutes > 0)
+  // 1. Instant booking: Re-broadcast unconditionally to find another nearby partner for waiting customer.
+  // 2. Standard cancellation (> 2 hours notice): Re-broadcast unconditionally to find another nearby partner.
+  // 3. Late cancellation with penalty: Re-broadcast if service start time has not already passed.
+  const isInstant =
+    booking.type === 'INSTANT' ||
+    booking.type === 'instant' ||
+    booking.bookingType === 'INSTANT' ||
+    booking.bookingType === 'instant' ||
+    Boolean(eligibility.isInstant)
+
+  const shouldRebroadcast = isInstant || isStandard || (eligibility.timeRemainingMinutes > 0)
 
   if (shouldRebroadcast) {
     // Check if there are other assigned partners in a bulk multi-partner booking
     const remainingActiveAssignments = (booking.assignments || []).filter(
       (a) => a.status === 'ACCEPTED' || a.status === 'EN_ROUTE' || a.status === 'STARTED'
     )
+
+    // For single-provider / non-multiService bookings, reset assignments so replacement partner isn't blocked by stale entries
+    if (!booking.multiServiceBooking?.isMultiService) {
+      booking.assignments = remainingActiveAssignments
+    }
 
     if (remainingActiveAssignments.length > 0) {
       booking.status = 'PARTIALLY_ACCEPTED'

@@ -173,21 +173,31 @@ export const submitVendorCancellation = asyncHandler(async (req, res) => {
   const { bookingId } = req.params
   const { reason, reasonCategory, isExempt } = req.body
 
-  const result = await processVendorCancellation({
-    bookingId,
-    vendorId: req.user._id,
-    reason,
-    reasonCategory,
-    isExempt: Boolean(isExempt),
-  })
+  try {
+    const result = await processVendorCancellation({
+      bookingId,
+      vendorId: req.user._id,
+      reason,
+      reasonCategory,
+      isExempt: Boolean(isExempt),
+    })
 
-  return sendSuccess(res, {
-    message:
-      result.status === 'CANCELLATION_REQUESTED'
-        ? 'Late cancellation request submitted for admin approval'
-        : 'Booking cancelled successfully',
-    data: result,
-  })
+    return sendSuccess(res, {
+      message:
+        result.status === 'CANCELLATION_REQUESTED'
+          ? 'Late cancellation request submitted for admin approval'
+          : result.status === 'REBROADCASTED'
+          ? 'Booking bounce processed successfully. Finding replacement partner.'
+          : 'Booking cancelled successfully',
+      data: result,
+    })
+  } catch (err) {
+    return sendError(res, {
+      message: err.message || 'Failed to process cancellation',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'CANCELLATION_FAILED',
+    })
+  }
 })
 
 /**
