@@ -66,6 +66,8 @@ import { USER_ROLES } from './constants/userRoles.js'
 import { useAuth } from './hooks/useAuth.js'
 import { initializePushNotifications, setupForegroundNotificationHandler } from './services/pushNotificationService.js'
 
+import { playBookingAlertSound } from './utils/bookingSound.js'
+
 function AppLegacyRedirect() {
   const { user } = useAuth()
   const location = useLocation()
@@ -80,7 +82,25 @@ function App() {
     setupForegroundNotificationHandler((payload) => {
       console.log('[PUSH] Foreground notification received:', payload);
       window.dispatchEvent(new CustomEvent('a2z-push-notification', { detail: payload }));
+      const isBookingOffer =
+        payload?.data?.type === 'booking_received' ||
+        payload?.data?.type === 'NEW_BROADCAST_JOB';
+      if (isBookingOffer) {
+        playBookingAlertSound();
+      }
     });
+
+    if ('serviceWorker' in navigator) {
+      const handleSwMessage = (event) => {
+        if (event.data?.type === 'PLAY_BOOKING_ALERT_SOUND') {
+          playBookingAlertSound();
+        }
+      };
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      };
+    }
   }, []);
 
   return (

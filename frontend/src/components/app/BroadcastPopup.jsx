@@ -8,7 +8,7 @@ import { walletEligibilityApi } from '../../api/walletEligibilityApi.js'
 import { ApiError } from '../../api/http.js'
 import { useSocket } from '../../context/SocketContext.jsx'
 import { USER_ROLES } from '../../constants/userRoles.js'
-import alertSoundSrc from '../../assets/alert.mp3'
+import { playBookingAlertSound, stopBookingAlertSound, stopAlertSound } from '../../utils/bookingSound.js'
 
 function formatScheduleDate(dateValue) {
   if (!dateValue) return ''
@@ -54,123 +54,18 @@ export function BroadcastPopup() {
   const [selectedServiceId, setSelectedServiceId] = useState(null)
   const [eligibilityData, setEligibilityData] = useState(null)
   const [checkingEligibility, setCheckingEligibility] = useState(false)
-  const audioCtxRef = useRef(null)
-  const audioRef = useRef(null)
-  const unlockHandlerRef = useRef(null)
-
-  // Web Audio chime generator
-  const playAlertChime = useCallback(() => {
-    try {
-      const AudioCtxClass = window.AudioContext || window.webkitAudioContext
-      if (!AudioCtxClass) return
-      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
-        audioCtxRef.current = new AudioCtxClass()
-      }
-      const ctx = audioCtxRef.current
-      if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {})
-      }
-
-      const now = ctx.currentTime
-
-      const osc1 = ctx.createOscillator()
-      const gain1 = ctx.createGain()
-      osc1.type = 'triangle'
-      osc1.frequency.setValueAtTime(880, now) // A5
-      gain1.gain.setValueAtTime(0.35, now)
-      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.22)
-      osc1.connect(gain1)
-      gain1.connect(ctx.destination)
-      osc1.start(now)
-      osc1.stop(now + 0.22)
-
-      const osc2 = ctx.createOscillator()
-      const gain2 = ctx.createGain()
-      osc2.type = 'triangle'
-      osc2.frequency.setValueAtTime(1174.66, now + 0.18) // D6
-      gain2.gain.setValueAtTime(0.4, now + 0.18)
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45)
-      osc2.connect(gain2)
-      gain2.connect(ctx.destination)
-      osc2.start(now + 0.18)
-      osc2.stop(now + 0.45)
-    } catch (e) {
-      console.warn('[Broadcast Chime Error]', e)
-    }
-  }, [])
-
-  // Stop alert mp3 audio immediately
-  const stopAlertSound = useCallback(() => {
-    if (audioRef.current) {
-      try {
-        audioRef.current.pause()
-        audioRef.current.currentTime = 0
-      } catch (err) {
-        console.warn('[Broadcast Audio Pause Error]', err)
-      }
-    }
-    if (unlockHandlerRef.current) {
-      window.removeEventListener('click', unlockHandlerRef.current)
-      window.removeEventListener('touchstart', unlockHandlerRef.current)
-      window.removeEventListener('keydown', unlockHandlerRef.current)
-      unlockHandlerRef.current = null
-    }
-  }, [])
-
-  // Start alert mp3 audio with loop and autoplay policy handling
-  const startAlertSound = useCallback(() => {
-    try {
-      if (!audioRef.current) {
-        const audio = new Audio(alertSoundSrc)
-        audio.loop = true
-        audio.preload = 'auto'
-        audioRef.current = audio
-      }
-      const audio = audioRef.current
-      audio.loop = true
-      audio.currentTime = 0
-
-      const playPromise = audio.play()
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          console.warn('[Broadcast Alert Audio] Autoplay prevented:', err?.message || err)
-          // Register one-time user interaction unlock listener
-          const unlock = () => {
-            if (audioRef.current) {
-              audioRef.current.play().catch(() => {})
-            }
-            if (unlockHandlerRef.current) {
-              window.removeEventListener('click', unlockHandlerRef.current)
-              window.removeEventListener('touchstart', unlockHandlerRef.current)
-              window.removeEventListener('keydown', unlockHandlerRef.current)
-              unlockHandlerRef.current = null
-            }
-          }
-          unlockHandlerRef.current = unlock
-          window.addEventListener('click', unlock, { once: true })
-          window.addEventListener('touchstart', unlock, { once: true })
-          window.addEventListener('keydown', unlock, { once: true })
-        })
-      }
-    } catch (err) {
-      console.warn('[Broadcast Audio Play Error]', err)
-    }
-
-    // Supplemental quick chime
-    playAlertChime()
-  }, [playAlertChime])
 
   // Synchronize audio playback with incoming booking offer
   useEffect(() => {
     if (incoming) {
-      startAlertSound()
+      playBookingAlertSound()
     } else {
-      stopAlertSound()
+      stopBookingAlertSound()
     }
     return () => {
-      stopAlertSound()
+      stopBookingAlertSound()
     }
-  }, [incoming, startAlertSound, stopAlertSound])
+  }, [incoming])
 
   // Only render for labour / contractor / service provider users
   const roleLower = String(user?.role || '').toLowerCase()
@@ -186,14 +81,28 @@ export function BroadcastPopup() {
     setResponding(false)
     setSelectedServiceId(null)
 
-    // Browser notification fallback if granted
+    // Browser notification fallback if granted (OUT-OF-APP notification)
     if (window.Notification && Notification.permission === 'granted') {
       try {
         const title = data.type === 'SCHEDULED' ? 'Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡'
-        new Notification(title, {
+        const notif = new Notification(title, {
           body: `${data.serviceName || 'Service'} · ₹${formatFixedAmount(data.estimatedEarnings || 0)}`,
-          icon: '/favicon.ico'
+          icon: '/logo.png',
+          badge: '/logo.png',
+          sound: '/alert.mp3',
+          vibrate: [500, 200, 500, 200, 500, 200, 800],
+          tag: `booking-${data.bookingId}`,
+          renotify: true,
+          requireInteraction: true,
+          data: {
+            link: '/serviceprovider',
+            bookingId: data.bookingId,
+          },
         })
+        notif.onclick = () => {
+          window.focus()
+          notif.close()
+        }
       } catch { /* ignore */ }
     }
   }, [])
@@ -201,7 +110,7 @@ export function BroadcastPopup() {
   // Listen for real-time WebSocket broadcast events
   useEffect(() => {
     if (!isLabour) {
-      stopAlertSound()
+      stopBookingAlertSound()
       setIncoming(null)
       return
     }
@@ -211,7 +120,7 @@ export function BroadcastPopup() {
     const handleExpired = (data) => {
       setIncoming((prev) => {
         if (prev?.bookingId === data.bookingId) {
-          stopAlertSound()
+          stopBookingAlertSound()
           return null
         }
         return prev
@@ -220,11 +129,11 @@ export function BroadcastPopup() {
     socket.on('BOOKING_EXPIRED', handleExpired)
 
     return () => {
-      stopAlertSound()
+      stopBookingAlertSound()
       socket.off('BOOKING_RECEIVED', handleBroadcast)
       socket.off('BOOKING_EXPIRED', handleExpired)
     }
-  }, [socket, isLabour, handleBroadcast, stopAlertSound])
+  }, [socket, isLabour, handleBroadcast])
 
   // Periodic fallback: Poll for active broadcasts in case of socket reconnection or page refresh
   useEffect(() => {
@@ -259,7 +168,7 @@ export function BroadcastPopup() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timerRef.current)
-          stopAlertSound()
+          stopBookingAlertSound()
           if (incoming?.bookingId) broadcastsApi.rejectBroadcast(incoming.bookingId).catch(() => {})
           setIncoming(null)
           return 0
@@ -271,7 +180,7 @@ export function BroadcastPopup() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
-  }, [incoming, stopAlertSound])
+  }, [incoming])
 
   // Dynamic Wallet Eligibility Check on broadcast receipt
   useEffect(() => {
@@ -317,7 +226,7 @@ export function BroadcastPopup() {
       return
     }
 
-    stopAlertSound()
+    stopBookingAlertSound()
     setResponding(true)
     setError('')
     try {
@@ -361,11 +270,11 @@ export function BroadcastPopup() {
         }, 2500)
       }
     }
-  }, [incoming, navigate, selectedServiceId, services, eligibilityData, stopAlertSound])
+  }, [incoming, navigate, selectedServiceId, services, eligibilityData])
 
   const handleReject = useCallback(async () => {
     if (!incoming) return
-    stopAlertSound()
+    stopBookingAlertSound()
     setResponding(true)
     try {
       await broadcastsApi.rejectBroadcast(incoming.bookingId)
@@ -376,7 +285,7 @@ export function BroadcastPopup() {
       setIncoming(null)
       setResponding(false)
     }
-  }, [incoming, stopAlertSound])
+  }, [incoming])
 
   if (!isLabour) return null
 
@@ -439,7 +348,7 @@ export function BroadcastPopup() {
                   <button
                     type="button"
                     onClick={() => {
-                      stopAlertSound()
+                      stopBookingAlertSound()
                       if (timerRef.current) clearInterval(timerRef.current)
                       setIncoming(null)
                       setError('')
@@ -828,7 +737,7 @@ export function BroadcastPopup() {
                       <button
                         type="button"
                         onClick={() => {
-                          stopAlertSound()
+                          stopBookingAlertSound()
                           if (timerRef.current) clearInterval(timerRef.current)
                           setIncoming(null)
                           navigate('/serviceprovider/wallet')

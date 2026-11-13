@@ -630,7 +630,12 @@ export async function startBroadcastCycle(bookingId) {
           sendNotificationToUser(labor._id, {
             title: booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer!',
             body: `New ${servicesPayload.length === 1 ? servicesPayload[0].name : 'Multiple Services'} job available near you. Estimated earnings: ₹${bestEarning}`,
-            data: { type: 'booking_received', bookingId: String(booking._id) }
+            data: {
+              type: 'booking_received',
+              bookingId: String(booking._id),
+              sound: '/alert.mp3',
+              link: '/serviceprovider',
+            },
           })
 
           // Create In-App Notification record for Labour Notification feed
@@ -742,7 +747,12 @@ export async function startBroadcastCycle(bookingId) {
             body: booking.packageBooking?.isPackage
               ? `Package deal with ${booking.packageBooking.inclusions?.length || 0} services. Package price: ₹${booking.packageBooking.packagePrice}. Your earnings: ₹${singleShare}`
               : `New ${singleServiceName}${singleQty > 1 ? ` (Qty: ${singleQty})` : ''} job · ~${formattedSingleDuration} available near you. Estimated earnings: ₹${singleShare}`,
-            data: { type: 'booking_received', bookingId: String(booking._id) }
+            data: {
+              type: 'booking_received',
+              bookingId: String(booking._id),
+              sound: '/alert.mp3',
+              link: '/serviceprovider',
+            },
           })
 
           // Create In-App Notification record for Labour Notification feed

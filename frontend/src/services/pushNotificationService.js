@@ -151,17 +151,30 @@ export async function sendTestNotification() {
 }
 
 // Display native OS desktop notification directly
-export function showDesktopNotification({ title, body, icon = '/favicon.ico', link = '/', tag = 'a2z-alert' }) {
+export function showDesktopNotification({
+  title,
+  body,
+  icon = '/logo.png',
+  link = '/',
+  tag = 'a2z-alert',
+  sound = '/alert.mp3',
+  vibrate = [500, 200, 500, 200, 500, 200, 800],
+  requireInteraction = true,
+}) {
   if (!('Notification' in window) || Notification.permission !== 'granted') {
     return null;
   }
   try {
     const notif = new Notification(title || 'A2Z Service Hub', {
       body: body || '',
-      icon: icon || '/favicon.ico',
-      badge: '/favicon.ico',
+      icon: icon || '/logo.png',
+      badge: '/logo.png',
       tag,
       renotify: true,
+      sound,
+      vibrate,
+      requireInteraction,
+      data: { link },
     });
     notif.onclick = (e) => {
       e.preventDefault();

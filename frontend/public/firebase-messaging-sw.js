@@ -20,27 +20,57 @@ messaging.onBackgroundMessage((payload) => {
   
   const title = payload?.notification?.title || payload?.data?.title || 'A2Z Service Hub';
   const body = payload?.notification?.body || payload?.data?.body || 'You have a new update';
-  const icon = payload?.notification?.icon || payload?.notification?.imageUrl || '/favicon.ico';
-  const targetLink = payload?.data?.link || (payload?.data?.bookingId ? `/user/tracking/${payload.data.bookingId}` : '/');
+  const icon = payload?.notification?.icon || payload?.notification?.imageUrl || '/logo.png';
+  const targetLink = payload?.data?.link || (payload?.data?.bookingId ? `/serviceprovider` : '/');
+
+  const isBookingAlert =
+    payload?.data?.type === 'booking_received' ||
+    payload?.data?.type === 'NEW_BROADCAST_JOB' ||
+    payload?.data?.type === 'booking_rebroadcasting';
 
   const notificationOptions = {
     body,
     icon,
-    badge: '/favicon.ico',
-    tag: payload?.data?.type || 'a2z-background-notification',
+    badge: '/logo.png',
+    tag: payload?.data?.bookingId ? `booking-${payload.data.bookingId}` : (payload?.data?.type || 'a2z-background-notification'),
     renotify: true,
+    requireInteraction: isBookingAlert,
+    sound: '/alert.mp3',
+    vibrate: isBookingAlert ? [500, 200, 500, 200, 500, 200, 800] : [200, 100, 200],
     data: {
       ...payload?.data,
       link: targetLink,
+      sound: '/alert.mp3',
     },
+    actions: isBookingAlert
+      ? [
+          { action: 'open_booking', title: '⚡ View & Accept Job' },
+          { action: 'dismiss', title: 'Dismiss' },
+        ]
+      : [],
   };
+
+  // If app is open in any background/minimized tab, signal it to play audio
+  if (isBookingAlert && self.clients) {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      windowClients.forEach((client) => {
+        client.postMessage({
+          type: 'PLAY_BOOKING_ALERT_SOUND',
+          bookingId: payload?.data?.bookingId,
+          sound: '/alert.mp3',
+        });
+      });
+    }).catch(() => {});
+  }
 
   return self.registration.showNotification(title, notificationOptions);
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const rawLink = event.notification.data?.link || '/';
+  if (event.action === 'dismiss') return;
+
+  const rawLink = event.notification.data?.link || '/serviceprovider';
   const targetUrl = new URL(rawLink, self.location.origin).href;
 
   event.waitUntil(

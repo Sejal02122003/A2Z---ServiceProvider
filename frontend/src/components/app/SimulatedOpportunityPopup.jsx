@@ -19,7 +19,7 @@ import { simulatedOpportunitiesApi } from '../../api/simulatedOpportunitiesApi.j
 import { ApiError } from '../../api/http.js'
 import { useSocket } from '../../context/SocketContext.jsx'
 import { USER_ROLES } from '../../constants/userRoles.js'
-import alertSoundSrc from '../../assets/alert.mp3'
+import { playBookingAlertSound, stopBookingAlertSound } from '../../utils/bookingSound.js'
 
 function formatInr(amount) {
   return `₹${Number(amount || 0).toLocaleString('en-IN')}`
@@ -90,6 +90,7 @@ export function SimulatedOpportunityPopup() {
   }, [])
 
   const stopAlertSound = useCallback(() => {
+    stopBookingAlertSound()
     if (audioRef.current) {
       try {
         audioRef.current.pause()
@@ -139,14 +140,14 @@ export function SimulatedOpportunityPopup() {
   // Synchronize audio playback with incoming simulated opportunity
   useEffect(() => {
     if (incoming && !resultState) {
-      playAlertSound()
+      playBookingAlertSound()
     } else {
-      stopAlertSound()
+      stopBookingAlertSound()
     }
     return () => {
-      stopAlertSound()
+      stopBookingAlertSound()
     }
-  }, [incoming, resultState, playAlertSound, stopAlertSound])
+  }, [incoming, resultState])
 
   const handleAlert = useCallback((data) => {
     if (!data) return
