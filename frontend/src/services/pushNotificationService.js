@@ -107,12 +107,30 @@ export async function registerFCMToken(forceUpdate = false) {
 
     const currentUserId = state?.auth?.user?._id;
     const savedToken = localStorage.getItem('fcm_token_web');
-    // If we have saved token and not forcing, check if already synced for this specific user
-    if (savedToken && !forceUpdate && currentUserId && sessionStorage.getItem(`fcm_synced_${currentUserId}`)) {
+    
+    // Check if this token was already confirmed synced for THIS specific user
+    if (
+      savedToken &&
+      !forceUpdate &&
+      currentUserId &&
+      localStorage.getItem(`fcm_synced_user_${currentUserId}`) === savedToken &&
+      sessionStorage.getItem(`fcm_synced_${currentUserId}`)
+    ) {
       return savedToken;
     }
 
-    const token = await getFCMToken();
+    let token = null;
+    try {
+      token = await getFCMToken();
+    } catch (swErr) {
+      console.warn('[PUSH] getFCMToken error, checking cached token:', swErr);
+      if (savedToken) token = savedToken;
+    }
+
+    if (!token && savedToken) {
+      token = savedToken;
+    }
+
     if (!token) {
       console.warn('[PUSH] Could not retrieve FCM token from Firebase.');
       return null;
@@ -127,8 +145,9 @@ export async function registerFCMToken(forceUpdate = false) {
       localStorage.setItem('fcm_token_web', token);
       if (currentUserId) {
         sessionStorage.setItem(`fcm_synced_${currentUserId}`, 'true');
+        localStorage.setItem(`fcm_synced_user_${currentUserId}`, token);
       }
-      console.log('[PUSH] FCM token registered with backend successfully');
+      console.log(`[PUSH] FCM token registered with backend successfully for user ${currentUserId}`);
       return token;
     } else {
       console.warn('[PUSH] Failed to register FCM token with backend:', response?.message);

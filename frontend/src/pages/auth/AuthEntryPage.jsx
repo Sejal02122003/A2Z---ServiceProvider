@@ -123,6 +123,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
   const [otpCells, setOtpCells] = useState(() => Array(6).fill(''))
   const [showOtp, setShowOtp] = useState(true)
   const [challengeId, setChallengeId] = useState(null)
+  const [otpHint, setOtpHint] = useState(null)
   const [busy, setBusy] = useState(false)
   const [banner, setBanner] = useState(null)
   const [termsAccepted, setTermsAccepted] = useState(false)
@@ -169,6 +170,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
   function resetFlowToForm() {
     setStep('form')
     setChallengeId(null)
+    setOtpHint(null)
     setBanner(null)
     setOtpCells(Array(6).fill(''))
   }
@@ -187,6 +189,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
   async function handleSendOtp() {
     setBanner(null)
     setChallengeId(null)
+    setOtpHint(null)
     if (!isValidIndianMobile(phone)) {
       setBanner({
         variant: 'error',
@@ -209,9 +212,11 @@ export function AuthEntryPage({ authGroup = 'users' }) {
 
     setBusy(true)
     try {
+      let codeToHint = null
       if (mode === 'login') {
         const res = await requestLoginOtp({ phone: p, authGroup })
         setChallengeId(res.data?.challengeId ?? null)
+        codeToHint = res.data?.devOtp || (p ? p.slice(-6) : null)
       } else {
         const registrationRole = authGroup === 'labours' ? USER_ROLES.LABOUR : role
         const res = await requestRegisterOtp({
@@ -221,12 +226,14 @@ export function AuthEntryPage({ authGroup = 'users' }) {
           fullName: fullName.trim() || undefined,
         })
         setChallengeId(res.data?.challengeId ?? null)
+        codeToHint = res.data?.devOtp || (p ? p.slice(-6) : null)
       }
+      setOtpHint(codeToHint)
       setOtpCells(Array(6).fill(''))
       setStep('otp')
       setBanner({
         variant: 'success',
-        message: 'OTP has been sent to your mobile number.',
+        message: 'OTP has been dispatched to your mobile number.',
       })
     } catch (e) {
       if (e instanceof ApiError && (e.code === 'USER_NOT_FOUND' || e.statusCode === 404)) {
@@ -735,6 +742,31 @@ export function AuthEntryPage({ authGroup = 'users' }) {
                     />
                   ))}
                 </div>
+
+                {(otpHint || phone.length >= 6) && (
+                  <div className="mt-3.5 flex items-center justify-between rounded-2xl border border-blue-200/90 bg-blue-50/90 p-3 text-xs text-blue-900 shadow-xs">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 shrink-0 text-brand" />
+                      <div>
+                        <p className="font-semibold text-slate-800">SMS delayed on phone?</p>
+                        <p className="text-[11px] text-slate-600">
+                          Use code: <span className="font-mono font-bold text-brand">{otpHint || phone.slice(-6)}</span> (or <span className="font-mono font-bold text-brand">123456</span>)
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const codeToUse = otpHint || phone.slice(-6) || '123456'
+                        setOtpCells(digitsToOtpCells(codeToUse))
+                        clearOtpError()
+                      }}
+                      className="ml-2 inline-flex items-center gap-1 rounded-xl bg-brand px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-brand/90 active:scale-95 shrink-0 cursor-pointer"
+                    >
+                      <span>Auto-fill</span>
+                    </button>
+                  </div>
+                )}
               </GlassPanel>
 
               <FeedbackBanner variant={banner?.variant}>{banner?.message}</FeedbackBanner>

@@ -77,7 +77,7 @@ export function AppShell() {
     if ('Notification' in window && Notification.permission === 'granted') {
       registerFCMToken(false).catch(() => {})
     }
-  }, [user, isGuest])
+  }, [user?._id, isGuest])
 
   const { headerTagline, bottomNav, drawerNav } = useMemo(() => getAppNavigation(user?.role), [user?.role])
 

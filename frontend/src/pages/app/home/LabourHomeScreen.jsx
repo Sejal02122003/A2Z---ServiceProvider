@@ -84,6 +84,7 @@ import {
 } from '../../../lib/labourNotifications.js'
 import { getLabourBookingShare } from '../../../lib/bookingLabourShare.js'
 import { walletEligibilityApi } from '../../../api/walletEligibilityApi.js'
+import { ProviderNotificationBanner } from '../../../components/app/ProviderNotificationBanner.jsx'
 
 function getTimeGreeting() {
   const h = new Date().getHours()
@@ -502,6 +503,9 @@ export function LabourHomeScreen({ user }) {
           </div>
         </motion.div>
       ) : null}
+
+      {/* Notification & Sound Alert Status Banner */}
+      <ProviderNotificationBanner user={user} />
 
       {/* 1. Header */}
       <section className="relative px-4 pb-2 pt-2">

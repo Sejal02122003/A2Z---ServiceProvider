@@ -11,27 +11,38 @@ export const saveToken = asyncHandler(async (req, res) => {
   
   const userId = req.user._id;
   const user = await User.findById(userId);
+  if (!user) {
+    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND });
+  }
 
   if (platform === 'web') {
     if (!user.fcmTokens) user.fcmTokens = [];
     if (!user.fcmTokens.includes(token)) {
       user.fcmTokens.push(token);
-      if (user.fcmTokens.length > 10) {
-        user.fcmTokens = user.fcmTokens.slice(-10);
-      }
     }
+    user.fcmTokens = [...new Set(user.fcmTokens)].slice(-10);
+
+    // Disassociate this device token from other users to prevent cross-account alerts
+    await User.updateMany(
+      { _id: { $ne: userId }, fcmTokens: token },
+      { $pull: { fcmTokens: token } }
+    ).catch(() => {});
   } else if (platform === 'mobile') {
     if (!user.fcmTokenMobile) user.fcmTokenMobile = [];
     if (!user.fcmTokenMobile.includes(token)) {
       user.fcmTokenMobile.push(token);
-      if (user.fcmTokenMobile.length > 10) {
-        user.fcmTokenMobile = user.fcmTokenMobile.slice(-10);
-      }
     }
+    user.fcmTokenMobile = [...new Set(user.fcmTokenMobile)].slice(-10);
+
+    await User.updateMany(
+      { _id: { $ne: userId }, fcmTokenMobile: token },
+      { $pull: { fcmTokenMobile: token } }
+    ).catch(() => {});
   }
 
   await user.save();
-  return sendSuccess(res, { message: 'FCM token saved' });
+  console.log(`[FCM] Successfully linked ${platform} token to user ${user.phone} (${user.role})`);
+  return sendSuccess(res, { message: 'FCM token saved', totalTokens: (platform === 'web' ? user.fcmTokens : user.fcmTokenMobile).length });
 });
 
 export const removeToken = asyncHandler(async (req, res) => {
