@@ -19,6 +19,7 @@ import { simulatedOpportunitiesApi } from '../../api/simulatedOpportunitiesApi.j
 import { ApiError } from '../../api/http.js'
 import { useSocket } from '../../context/SocketContext.jsx'
 import { USER_ROLES } from '../../constants/userRoles.js'
+import alertSoundSrc from '../../assets/alert.mp3'
 
 function formatInr(amount) {
   return `₹${Number(amount || 0).toLocaleString('en-IN')}`
@@ -31,6 +32,7 @@ export function SimulatedOpportunityPopup() {
   const timerRef = useRef(null)
   const soundIntervalRef = useRef(null)
   const audioCtxRef = useRef(null)
+  const audioRef = useRef(null)
 
   const [incoming, setIncoming] = useState(null)
   const [timeLeft, setTimeLeft] = useState(15)
@@ -88,6 +90,14 @@ export function SimulatedOpportunityPopup() {
   }, [])
 
   const stopAlertSound = useCallback(() => {
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause()
+        audioRef.current.currentTime = 0
+      } catch (err) {
+        console.warn('[Opportunity Audio Pause Error]', err)
+      }
+    }
     if (soundIntervalRef.current) {
       clearInterval(soundIntervalRef.current)
       soundIntervalRef.current = null
@@ -101,6 +111,42 @@ export function SimulatedOpportunityPopup() {
       audioCtxRef.current = null
     }
   }, [])
+
+  const playAlertSound = useCallback(() => {
+    try {
+      if (!audioRef.current) {
+        const audio = new Audio(alertSoundSrc)
+        audio.loop = true
+        audio.preload = 'auto'
+        audioRef.current = audio
+      }
+      const audio = audioRef.current
+      audio.loop = true
+      audio.currentTime = 0
+      const playPromise = audio.play()
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('[Opportunity Audio Autoplay Blocked]:', err?.message || err)
+        })
+      }
+    } catch (err) {
+      console.warn('[Opportunity Audio Start Error]', err)
+    }
+
+    playAlertChime()
+  }, [playAlertChime])
+
+  // Synchronize audio playback with incoming simulated opportunity
+  useEffect(() => {
+    if (incoming && !resultState) {
+      playAlertSound()
+    } else {
+      stopAlertSound()
+    }
+    return () => {
+      stopAlertSound()
+    }
+  }, [incoming, resultState, playAlertSound, stopAlertSound])
 
   const handleAlert = useCallback((data) => {
     if (!data) return
@@ -118,14 +164,7 @@ export function SimulatedOpportunityPopup() {
     setStatusMessage('')
     setResultState(null)
     setResponding(false)
-
-    // Start ringing sound immediately and repeat every 1.1s
-    stopAlertSound()
-    playAlertChime()
-    soundIntervalRef.current = setInterval(() => {
-      playAlertChime()
-    }, 1100)
-  }, [playAlertChime, stopAlertSound])
+  }, [])
 
   // Socket listeners for Simulated Opportunities
   useEffect(() => {

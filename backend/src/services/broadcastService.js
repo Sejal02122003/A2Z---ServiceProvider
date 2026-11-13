@@ -63,19 +63,42 @@ export async function startBroadcastCycle(bookingId) {
   const bufferLatDiff = latDiff * 1.2
   const bufferLngDiff = lngDiff * 1.2
 
-  // EXCLUDE labourers who are actively executing a job on-site AND the booking customer
+  // EXCLUDE labourers who are actively executing a job on-site right now (updated within last 4 hours)
+  const activeJobCutoff = new Date(Date.now() - 4 * 60 * 60 * 1000)
   const busyBookings = await Booking.find({
     status: { $in: ['EN_ROUTE', 'STARTED'] },
-    acceptedLabourId: { $exists: true, $ne: null }
-  }).select('acceptedLabourId').lean()
-  const busyLabourIds = busyBookings.map(b => b.acceptedLabourId)
+    $or: [
+      { acceptedLabourId: { $exists: true, $ne: null } },
+      { laborId: { $exists: true, $ne: null } },
+      { acceptedLabourIds: { $exists: true, $not: { $size: 0 } } },
+    ],
+    updatedAt: { $gte: activeJobCutoff },
+  }).select('acceptedLabourId acceptedLabourIds laborId').lean()
+
+  const busyLabourIds = []
+  busyBookings.forEach((b) => {
+    if (b.acceptedLabourId) busyLabourIds.push(String(b.acceptedLabourId))
+    if (b.laborId) busyLabourIds.push(String(b.laborId))
+    if (Array.isArray(b.acceptedLabourIds)) {
+      b.acceptedLabourIds.forEach((id) => busyLabourIds.push(String(id)))
+    }
+  })
 
   const customerId = booking.userId?._id || booking.userId
-  const rejectedLaborIds = (booking.rejectedBy || []).map(id => String(id?._id || id))
-  const excludedUserIds = [...busyLabourIds, ...rejectedLaborIds]
+  const rejectedLaborIds = (booking.rejectedBy || []).map((id) => String(id?._id || id))
+  const excludedUserIds = [...new Set([...busyLabourIds, ...rejectedLaborIds])]
   // Only exclude customer in production when customer is not also testing labour role
   if (customerId && process.env.NODE_ENV === 'production') {
-    excludedUserIds.push(customerId)
+    excludedUserIds.push(String(customerId))
+  }
+
+  let bookingCategoryId = null
+  if (booking.subcategoryId) {
+    const { LabourSubcategory } = await import('../models/LabourSubcategory.js')
+    const subcatDoc = await LabourSubcategory.findById(booking.subcategoryId).select('categoryId').lean()
+    if (subcatDoc?.categoryId) {
+      bookingCategoryId = String(subcatDoc.categoryId)
+    }
   }
 
   const matchOr = []
@@ -87,15 +110,8 @@ export async function startBroadcastCycle(bookingId) {
     if (multiServiceIds.length > 0) {
       matchOr.push({ 'labourProfile.serviceIds': { $in: multiServiceIds } })
     }
-    // Only fall back to subcategories for legacy providers who have no specific services configured
     if (multiSubcategoryIds.length > 0) {
-      matchOr.push({
-        'labourProfile.subcategoryIds': { $in: multiSubcategoryIds },
-        $or: [
-          { 'labourProfile.serviceIds': { $exists: false } },
-          { 'labourProfile.serviceIds': { $size: 0 } },
-        ],
-      })
+      matchOr.push({ 'labourProfile.subcategoryIds': { $in: multiSubcategoryIds } })
     }
   } else if (booking.contractorInfo && booking.contractorInfo.services && booking.contractorInfo.services.length > 0) {
     const requestedServiceIds = booking.contractorInfo.services.map(s => s.serviceId).filter(Boolean)
@@ -114,15 +130,11 @@ export async function startBroadcastCycle(bookingId) {
     if (booking.serviceId) {
       matchOr.push({ 'labourProfile.serviceIds': booking.serviceId })
     }
-    // Only fall back to subcategories for legacy providers who have no specific services configured
     if (booking.subcategoryId) {
-      matchOr.push({
-        'labourProfile.subcategoryIds': booking.subcategoryId,
-        $or: [
-          { 'labourProfile.serviceIds': { $exists: false } },
-          { 'labourProfile.serviceIds': { $size: 0 } },
-        ],
-      })
+      matchOr.push({ 'labourProfile.subcategoryIds': booking.subcategoryId })
+    }
+    if (bookingCategoryId) {
+      matchOr.push({ 'labourProfile.categoryIds': bookingCategoryId })
     }
   }
 
@@ -146,6 +158,16 @@ export async function startBroadcastCycle(bookingId) {
     console.log(`[BROADCAST] Skill-matched search found ${potentialLaborersRaw.length} providers`)
   } else {
     console.log('[BROADCAST] No matching criteria could be determined for booking. Skipping broadcast.')
+  }
+
+  // If 0 providers matched exact serviceId, fall back to qualified providers in the same subcategory
+  if (potentialLaborersRaw.length === 0 && booking.subcategoryId) {
+    console.log(`[BROADCAST] 0 providers matched exact serviceId ${booking.serviceId}. Checking qualified providers registered in subcategory ${booking.subcategoryId}...`)
+    potentialLaborersRaw = await User.find({
+      ...baseQuery,
+      'labourProfile.subcategoryIds': booking.subcategoryId,
+    }).lean()
+    console.log(`[BROADCAST] Subcategory fallback search found ${potentialLaborersRaw.length} providers`)
   }
 
   if (potentialLaborersRaw.length === 0) {
@@ -642,19 +664,20 @@ export async function startBroadcastCycle(bookingId) {
         } else {
           // Single-service / package booking: Validate provider actually offers this service
           const laborSubcatIds = (labor.labourProfile?.subcategoryIds || []).map(id => String(id))
+          const laborCatIds = (labor.labourProfile?.categoryIds || []).map(id => String(id))
 
           let offersService = false
           if (booking.packageBooking?.isPackage && Array.isArray(booking.packageBooking.inclusions)) {
             const pkgServiceIds = booking.packageBooking.inclusions.map(inc => String(inc.serviceId)).filter(Boolean)
             offersService = laborServiceIds.length > 0
               ? pkgServiceIds.some(sId => laborServiceIds.includes(sId))
-              : (booking.subcategoryId && laborSubcatIds.includes(String(booking.subcategoryId)))
+              : ((booking.subcategoryId && laborSubcatIds.includes(String(booking.subcategoryId))) || (bookingCategoryId && laborCatIds.includes(String(bookingCategoryId))))
           } else if (booking.serviceId) {
-            offersService = laborServiceIds.length > 0
-              ? laborServiceIds.includes(String(booking.serviceId))
-              : (booking.subcategoryId && laborSubcatIds.includes(String(booking.subcategoryId)))
+            offersService = laborServiceIds.includes(String(booking.serviceId))
+              || (booking.subcategoryId && laborSubcatIds.includes(String(booking.subcategoryId)))
+              || (bookingCategoryId && laborCatIds.includes(String(bookingCategoryId)))
           } else if (booking.subcategoryId) {
-            offersService = laborSubcatIds.includes(String(booking.subcategoryId))
+            offersService = laborSubcatIds.includes(String(booking.subcategoryId)) || (bookingCategoryId && laborCatIds.includes(String(bookingCategoryId)))
           }
 
           if (!offersService) {
