@@ -281,17 +281,10 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
 
     console.log(`[FCM] Dispatched: ${totalSuccessCount} success, ${totalFailureCount} failed (Web: ${webTokens.length}, Mobile: ${mobileTokens.length}) for user ${userId}`);
 
-    // Prune invalid tokens
+    // Preserve all tokens permanently (do not delete or expire tokens)
     let invalidTokensCleaned = 0;
     if (invalidTokens.length > 0) {
-      invalidTokensCleaned = invalidTokens.length;
-      console.log(`[FCM] Deactivating ${invalidTokensCleaned} stale/invalid FCM tokens for user ${userId}`);
-      await User.findByIdAndUpdate(userId, {
-        $pull: {
-          fcmTokens: { $in: invalidTokens },
-          fcmTokenMobile: { $in: invalidTokens },
-        },
-      }).catch((err) => console.warn(`[FCM] Error pruning invalid tokens:`, err.message));
+      console.log(`[FCM] Noted ${invalidTokens.length} unconfirmed FCM response(s) for user ${userId} (preserved permanently, no tokens expired)`);
     }
 
     return {

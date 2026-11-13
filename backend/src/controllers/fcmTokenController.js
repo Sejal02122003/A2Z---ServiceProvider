@@ -20,24 +20,13 @@ export const saveToken = asyncHandler(async (req, res) => {
     if (!user.fcmTokens.includes(token)) {
       user.fcmTokens.push(token);
     }
-    user.fcmTokens = [...new Set(user.fcmTokens)].slice(-10);
-
-    // Disassociate this device token from other users to prevent cross-account alerts
-    await User.updateMany(
-      { _id: { $ne: userId }, fcmTokens: token },
-      { $pull: { fcmTokens: token } }
-    ).catch(() => {});
+    user.fcmTokens = [...new Set(user.fcmTokens)].slice(-30);
   } else if (platform === 'mobile') {
     if (!user.fcmTokenMobile) user.fcmTokenMobile = [];
     if (!user.fcmTokenMobile.includes(token)) {
       user.fcmTokenMobile.push(token);
     }
-    user.fcmTokenMobile = [...new Set(user.fcmTokenMobile)].slice(-10);
-
-    await User.updateMany(
-      { _id: { $ne: userId }, fcmTokenMobile: token },
-      { $pull: { fcmTokenMobile: token } }
-    ).catch(() => {});
+    user.fcmTokenMobile = [...new Set(user.fcmTokenMobile)].slice(-30);
   }
 
   await user.save();
@@ -64,11 +53,7 @@ export const removeToken = asyncHandler(async (req, res) => {
     }
   }
 
-  // Ensure token is completely pulled from any remaining associations
-  await User.updateMany(
-    { $or: [{ fcmTokens: token }, { fcmTokenMobile: token }] },
-    { $pull: { fcmTokens: token, fcmTokenMobile: token } }
-  ).catch(() => {});
+  // Only remove from current user (do not wipe across other test accounts)
 
   console.log(`[FCM] Invalidation complete: token removed for device logout`);
   return sendSuccess(res, { message: 'FCM token removed' });

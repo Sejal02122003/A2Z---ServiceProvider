@@ -120,13 +120,13 @@ export const saveFcmToken = asyncHandler(async (req, res) => {
     if (!user.fcmTokens) user.fcmTokens = []
     if (!user.fcmTokens.includes(token)) {
       user.fcmTokens.push(token)
-      if (user.fcmTokens.length > 10) user.fcmTokens = user.fcmTokens.slice(-10)
+      if (user.fcmTokens.length > 30) user.fcmTokens = user.fcmTokens.slice(-30)
     }
   } else {
     if (!user.fcmTokenMobile) user.fcmTokenMobile = []
     if (!user.fcmTokenMobile.includes(token)) {
       user.fcmTokenMobile.push(token)
-      if (user.fcmTokenMobile.length > 10) user.fcmTokenMobile = user.fcmTokenMobile.slice(-10)
+      if (user.fcmTokenMobile.length > 30) user.fcmTokenMobile = user.fcmTokenMobile.slice(-30)
     }
   }
 
