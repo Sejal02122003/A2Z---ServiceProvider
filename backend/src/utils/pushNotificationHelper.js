@@ -66,19 +66,14 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
       throw new Error('User not found');
     }
 
-    // Collect tokens
-    let tokens = [];
-    if (user.fcmTokens && user.fcmTokens.length > 0) {
-      tokens = [...tokens, ...user.fcmTokens];
-    }
-    if (includeMobile && user.fcmTokenMobile && user.fcmTokenMobile.length > 0) {
-      tokens = [...tokens, ...user.fcmTokenMobile];
-    }
+    // Collect and segregate tokens
+    const rawWebTokens = Array.isArray(user.fcmTokens) ? user.fcmTokens : [];
+    const rawMobileTokens = (includeMobile && Array.isArray(user.fcmTokenMobile)) ? user.fcmTokenMobile : [];
+    const mobileTokens = [...new Set(rawMobileTokens)];
+    const webTokens = [...new Set(rawWebTokens.filter((t) => !mobileTokens.includes(t)))];
+    const totalTokenCount = webTokens.length + mobileTokens.length;
 
-    // Remove duplicates
-    const uniqueTokens = [...new Set(tokens)];
-
-    if (uniqueTokens.length === 0) {
+    if (totalTokenCount === 0) {
       console.log(`[FCM] No registered device tokens found for user ${userId}`);
       return {
         success: false,
@@ -91,7 +86,7 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
     }
 
     const timestampStr = stringifiedData.timestamp || stringifiedData.createdAt || String(Date.now());
-    const channelId = isBookingOffer ? 'new_booking_alerts' : 'high_importance_channel';
+    const channelId = isBookingOffer ? 'new_booking_alerts_v2' : 'high_importance_channel';
 
     const defaultTitle = isBookingOffer ? 'New Booking Received! ⚡' : 'A2Z Service Hub';
     const defaultBody = isBookingOffer
@@ -107,133 +102,205 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
         ? `/serviceprovider?incoming_booking=${bookingId}`
         : (bookingId ? `/booking-details/${bookingId}` : '/'));
 
-    // Prepare message with webpush & android configs for system-level notifications
-    const message = {
-      notification: {
-        title: finalTitle,
-        body: finalBody,
-      },
-      data: {
-        ...stringifiedData,
-        title: finalTitle,
-        body: finalBody,
-        type: notifType,
-        bookingId: bookingId,
-        serviceProviderId: isBookingOffer ? String(userId) : (stringifiedData.serviceProviderId || ''),
-        providerId: isBookingOffer ? String(userId) : (stringifiedData.providerId || ''),
-        eventId: eventId,
-        notificationId: eventId,
-        createdAt: timestampStr,
-        timestamp: timestampStr,
-        sound: isBookingOffer ? '/alert.mp3' : 'default',
-        channelId: channelId,
-        channel_id: channelId,
-        priority: 'high',
-        click_action: targetUrl,
-        link: targetUrl,
-      },
-      webpush: {
-        headers: {
-          Urgency: 'high',
-        },
-        notification: {
-          title: finalTitle,
-          body: finalBody,
-          icon: payload.icon || '/logo.png',
-          badge: '/logo.png',
-          tag: bookingId ? `booking-${bookingId}` : (payload.tag || channelId),
-          renotify: true,
-          requireInteraction: isBookingOffer,
-          silent: false,
-          sound: isBookingOffer ? '/alert.mp3' : undefined,
-          vibrate: isBookingOffer ? [500, 200, 500, 200, 500, 200, 800] : [200, 100, 200],
-          actions: isBookingOffer
-            ? [
-                { action: 'open_booking', title: '⚡ View & Accept Job' },
-                { action: 'dismiss', title: 'Dismiss' },
-              ]
-            : [],
-        },
-        fcmOptions: {
-          link: targetUrl,
-        },
-      },
-      android: {
-        priority: 'high',
-        notification: {
-          title: finalTitle,
-          body: finalBody,
-          channelId: channelId,
-          sound: isBookingOffer ? 'alert' : 'default',
-          defaultSound: !isBookingOffer,
-          defaultVibrateTimings: true,
-          priority: 'max',
-          visibility: 'public',
-          clickAction: targetUrl,
-        },
-      },
-      tokens: uniqueTokens,
-    };
-
-    if (payload.icon) {
-      message.notification.imageUrl = payload.icon;
-    }
-
-    // Send notification
     const admin = getFirebaseAdmin();
     if (!admin || !admin.messaging) {
       throw new Error('Firebase Admin not configured properly');
     }
 
-    const response = await admin.messaging().sendEachForMulticast(message);
-    console.log(`[FCM] Sent: ${response.successCount} success, ${response.failureCount} failed for user ${userId}`);
+    let totalSuccessCount = 0;
+    let totalFailureCount = 0;
+    const invalidTokens = [];
 
-    // Detect and deactivate/clean invalid or expired FCM tokens
-    let invalidTokensCleaned = 0;
-    if (response.failureCount > 0 && Array.isArray(response.responses)) {
-      const invalidTokens = [];
-      response.responses.forEach((resp, index) => {
-        if (!resp.success) {
-          const errCode = String(resp.error?.code || '');
-          const errMsg = String(resp.error?.message || '');
-          if (
-            errCode === 'messaging/invalid-registration-token' ||
-            errCode === 'messaging/registration-token-not-registered' ||
-            errCode === 'messaging/invalid-argument' ||
-            errCode === 'messaging/third-party-auth-error' ||
-            errCode.toLowerCase().includes('unregistered') ||
-            errCode.toLowerCase().includes('permission-denied') ||
-            errCode.toLowerCase().includes('third-party') ||
-            errMsg.includes('401') ||
-            errMsg.includes('403') ||
-            errMsg.includes('404') ||
-            errMsg.toLowerCase().includes('unregistered') ||
-            errMsg.toLowerCase().includes('not found')
-          ) {
-            invalidTokens.push(uniqueTokens[index]);
-          }
-        }
-      });
+    // Common shared data payload (strings only for FCM)
+    const baseDataPayload = {
+      ...stringifiedData,
+      title: finalTitle,
+      body: finalBody,
+      type: notifType,
+      bookingId: bookingId,
+      serviceProviderId: isBookingOffer ? String(userId) : (stringifiedData.serviceProviderId || ''),
+      providerId: isBookingOffer ? String(userId) : (stringifiedData.providerId || ''),
+      eventId: eventId,
+      notificationId: eventId,
+      createdAt: timestampStr,
+      timestamp: timestampStr,
+      sound: isBookingOffer ? 'alert' : 'default',
+      channelId: channelId,
+      channel_id: channelId,
+      priority: 'high',
+      click_action: targetUrl,
+      link: targetUrl,
+      callType: isBookingOffer ? 'INCOMING_BOOKING_CALL' : 'NOTIFICATION',
+      isBookingAlert: String(isBookingOffer),
+      ringtone: isBookingOffer ? 'alert' : 'default',
+      continuousRinging: isBookingOffer ? 'true' : 'false',
+      flagInsistent: isBookingOffer ? 'true' : 'false',
+    };
 
-      if (invalidTokens.length > 0) {
-        invalidTokensCleaned = invalidTokens.length;
-        console.log(`[FCM] Deactivating ${invalidTokensCleaned} stale/invalid FCM tokens for user ${userId}`);
-        await User.findByIdAndUpdate(userId, {
-          $pull: {
-            fcmTokens: { $in: invalidTokens },
-            fcmTokenMobile: { $in: invalidTokens },
+    // 1. Dispatch to Web Tokens (PWA / Browser)
+    if (webTokens.length > 0) {
+      const webMessage = {
+        notification: {
+          title: finalTitle,
+          body: finalBody,
+        },
+        data: baseDataPayload,
+        webpush: {
+          headers: {
+            Urgency: 'high',
           },
-        }).catch((err) => console.warn(`[FCM] Error pruning invalid tokens:`, err.message));
+          notification: {
+            title: finalTitle,
+            body: finalBody,
+            icon: payload.icon || '/logo.png',
+            badge: '/logo.png',
+            tag: bookingId ? `booking-${bookingId}` : (payload.tag || channelId),
+            renotify: true,
+            requireInteraction: isBookingOffer,
+            silent: false,
+            sound: isBookingOffer ? '/alert.mp3' : undefined,
+            vibrate: isBookingOffer ? [500, 200, 500, 200, 500, 200, 800] : [200, 100, 200],
+            actions: isBookingOffer
+              ? [
+                  { action: 'open_booking', title: '⚡ View & Accept Job' },
+                  { action: 'dismiss', title: 'Dismiss' },
+                ]
+              : [],
+          },
+          fcmOptions: {
+            link: targetUrl,
+          },
+        },
+        tokens: webTokens,
+      };
+
+      if (payload.icon) {
+        webMessage.notification.imageUrl = payload.icon;
+      }
+
+      try {
+        const webResp = await admin.messaging().sendEachForMulticast(webMessage);
+        totalSuccessCount += webResp.successCount;
+        totalFailureCount += webResp.failureCount;
+
+        if (webResp.failureCount > 0 && Array.isArray(webResp.responses)) {
+          webResp.responses.forEach((resp, index) => {
+            if (!resp.success) {
+              const errCode = String(resp.error?.code || '');
+              const errMsg = String(resp.error?.message || '');
+              if (
+                errCode.includes('unregistered') ||
+                errCode.includes('invalid') ||
+                errMsg.includes('401') ||
+                errMsg.includes('403') ||
+                errMsg.includes('404') ||
+                errMsg.toLowerCase().includes('not found')
+              ) {
+                invalidTokens.push(webTokens[index]);
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.warn(`[FCM Web] Multicast error:`, err.message);
+        totalFailureCount += webTokens.length;
       }
     }
 
+    // 2. Dispatch to Mobile Tokens (Android Native / APK)
+    if (mobileTokens.length > 0) {
+      let mobileMessage;
+
+      if (isBookingOffer) {
+        // CRITICAL FOR ANDROID CLOSED APP RINGING:
+        // By omitting the top-level 'notification' block for booking alerts,
+        // Google Play Services guarantees delivery directly to MyFirebaseMessagingService.onMessageReceived()
+        // even when the app is completely terminated/closed/screen-off!
+        // This allows Android native code to set FLAG_INSISTENT, trigger full-screen incoming call UI,
+        // turn the screen on, and continuously loop res/raw/alert.mp3 until answered or dismissed.
+        mobileMessage = {
+          data: baseDataPayload,
+          android: {
+            priority: 'high',
+            ttl: 60 * 1000,
+          },
+          tokens: mobileTokens,
+        };
+      } else {
+        // Standard non-call notification
+        mobileMessage = {
+          notification: {
+            title: finalTitle,
+            body: finalBody,
+          },
+          data: baseDataPayload,
+          android: {
+            priority: 'high',
+            ttl: 60 * 1000,
+            notification: {
+              title: finalTitle,
+              body: finalBody,
+              channelId: channelId,
+              sound: 'default',
+              priority: 'high',
+              visibility: 'public',
+              clickAction: targetUrl,
+            },
+          },
+          tokens: mobileTokens,
+        };
+      }
+
+      try {
+        const mobResp = await admin.messaging().sendEachForMulticast(mobileMessage);
+        totalSuccessCount += mobResp.successCount;
+        totalFailureCount += mobResp.failureCount;
+
+        if (mobResp.failureCount > 0 && Array.isArray(mobResp.responses)) {
+          mobResp.responses.forEach((resp, index) => {
+            if (!resp.success) {
+              const errCode = String(resp.error?.code || '');
+              const errMsg = String(resp.error?.message || '');
+              if (
+                errCode.includes('unregistered') ||
+                errCode.includes('invalid') ||
+                errMsg.includes('401') ||
+                errMsg.includes('403') ||
+                errMsg.includes('404') ||
+                errMsg.toLowerCase().includes('not found')
+              ) {
+                invalidTokens.push(mobileTokens[index]);
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.warn(`[FCM Mobile] Multicast error:`, err.message);
+        totalFailureCount += mobileTokens.length;
+      }
+    }
+
+    console.log(`[FCM] Dispatched: ${totalSuccessCount} success, ${totalFailureCount} failed (Web: ${webTokens.length}, Mobile: ${mobileTokens.length}) for user ${userId}`);
+
+    // Prune invalid tokens
+    let invalidTokensCleaned = 0;
+    if (invalidTokens.length > 0) {
+      invalidTokensCleaned = invalidTokens.length;
+      console.log(`[FCM] Deactivating ${invalidTokensCleaned} stale/invalid FCM tokens for user ${userId}`);
+      await User.findByIdAndUpdate(userId, {
+        $pull: {
+          fcmTokens: { $in: invalidTokens },
+          fcmTokenMobile: { $in: invalidTokens },
+        },
+      }).catch((err) => console.warn(`[FCM] Error pruning invalid tokens:`, err.message));
+    }
+
     return {
-      success: response.successCount > 0,
-      totalTokens: uniqueTokens.length,
-      successCount: response.successCount,
-      failureCount: response.failureCount,
+      success: totalSuccessCount > 0,
+      totalTokens: totalTokenCount,
+      successCount: totalSuccessCount,
+      failureCount: totalFailureCount,
       invalidTokensCleaned,
-      rawResponse: response,
     };
   } catch (error) {
     console.warn(`[FCM Warning] Failed to send push notification to user ${userId}:`, error.message || error);

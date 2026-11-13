@@ -100,7 +100,7 @@ self.addEventListener('push', (event) => {
 
   const notificationTag =
     dataObj.tag ||
-    (dataObj.bookingId ? `booking-${dataObj.bookingId}` : (notifObj.tag || (isBookingAlert ? 'new_booking_alerts' : 'a2z-push')));
+    (dataObj.bookingId ? `booking-${dataObj.bookingId}` : (notifObj.tag || (isBookingAlert ? 'new_booking_alerts_v2' : 'a2z-push')));
 
   const notificationOptions = {
     body,

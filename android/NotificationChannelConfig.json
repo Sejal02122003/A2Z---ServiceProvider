@@ -1,19 +1,25 @@
 {
   "channels": [
     {
-      "id": "new_booking_alerts",
-      "name": "New Booking Alerts",
-      "description": "Alerts for newly received service provider bookings.",
+      "id": "new_booking_alerts_v2",
+      "name": "Incoming Booking Calls & Siren",
+      "description": "Continuous siren and ringtone alert for newly received booking requests.",
       "importance": "HIGH",
       "sound": "alert",
+      "soundUri": "android.resource://[PACKAGE_NAME]/raw/alert",
+      "usage": "USAGE_NOTIFICATION_RINGTONE",
+      "contentType": "CONTENT_TYPE_SONIFICATION",
       "vibration": true,
-      "vibratePattern": [500, 200, 500, 200, 500, 200, 800],
+      "vibratePattern": [0, 800, 400, 800, 400, 800, 400, 1200],
       "lockscreenVisibility": "PUBLIC",
-      "bypassDnd": false,
-      "lightColor": "#015F6C"
+      "bypassDnd": true,
+      "lightColor": "#015F6C",
+      "category": "CATEGORY_CALL",
+      "flagInsistent": true,
+      "notes": "flagInsistent causes the audio to repeat continuously like an incoming phone call until accepted or dismissed."
     }
   ],
   "androidNativeCodeSnippet": {
-    "kotlin": "val soundUri = Uri.parse(\"android.resource://\" + context.packageName + \"/raw/alert\")\nval audioAttributes = AudioAttributes.Builder()\n    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)\n    .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)\n    .build()\nval channel = NotificationChannel(\"new_booking_alerts\", \"New Booking Alerts\", NotificationManager.IMPORTANCE_HIGH).apply {\n    description = \"Alerts for newly received service provider bookings.\"\n    enableVibration(true)\n    vibrationPattern = longArrayOf(500, 200, 500, 200, 500, 200, 800)\n    setSound(soundUri, audioAttributes)\n    lockscreenVisibility = Notification.VISIBILITY_PUBLIC\n}\nval notificationManager = context.getSystemService(NotificationManager::class.java)\nnotificationManager?.createNotificationChannel(channel)"
+    "kotlin": "val soundUri = Uri.parse(\"android.resource://\" + context.packageName + \"/raw/alert\")\nval audioAttributes = AudioAttributes.Builder()\n    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)\n    .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)\n    .build()\nval channel = NotificationChannel(\"new_booking_alerts_v2\", \"Incoming Booking Calls & Siren\", NotificationManager.IMPORTANCE_HIGH).apply {\n    description = \"Continuous siren alert for newly received booking requests.\"\n    enableVibration(true)\n    vibrationPattern = longArrayOf(0, 800, 400, 800, 400, 800, 400, 1200)\n    setSound(soundUri, audioAttributes)\n    lockscreenVisibility = Notification.VISIBILITY_PUBLIC\n}\nval notificationManager = context.getSystemService(NotificationManager::class.java)\n// Delete old channel if exists to force sound update\nnotificationManager?.deleteNotificationChannel(\"new_booking_alerts\")\nnotificationManager?.createNotificationChannel(channel)"
   }
 }

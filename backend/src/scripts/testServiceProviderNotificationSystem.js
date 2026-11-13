@@ -66,7 +66,7 @@ async function runTestSuite() {
         serviceProviderId: String(testProvider._id),
         providerId: String(testProvider._id),
         eventId: `evt_${testBookingId}_${testProvider._id}_${Date.now()}`,
-        channelId: 'new_booking_alerts',
+        channelId: 'new_booking_alerts_v2',
         sound: '/alert.mp3',
         link: `/serviceprovider?incoming_booking=${testBookingId}`,
       },
