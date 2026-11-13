@@ -160,11 +160,18 @@ export function showDesktopNotification({
   sound = '/alert.mp3',
   vibrate = [500, 200, 500, 200, 500, 200, 800],
   requireInteraction = true,
+  playAlert = true,
 }) {
   if (!('Notification' in window) || Notification.permission !== 'granted') {
     return null;
   }
   try {
+    if (playAlert) {
+      import('../utils/bookingSound.js').then(({ playBookingAlertSound }) => {
+        playBookingAlertSound();
+      }).catch(() => {});
+    }
+
     const notif = new Notification(title || 'A2Z Service Hub', {
       body: body || '',
       icon: icon || '/logo.png',
@@ -172,6 +179,7 @@ export function showDesktopNotification({
       tag,
       renotify: true,
       sound,
+      silent: false,
       vibrate,
       requireInteraction,
       data: { link },

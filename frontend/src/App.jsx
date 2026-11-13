@@ -84,23 +84,35 @@ function App() {
       window.dispatchEvent(new CustomEvent('a2z-push-notification', { detail: payload }));
       const isBookingOffer =
         payload?.data?.type === 'booking_received' ||
-        payload?.data?.type === 'NEW_BROADCAST_JOB';
+        payload?.data?.type === 'NEW_BROADCAST_JOB' ||
+        payload?.data?.type === 'booking_rebroadcasting' ||
+        Boolean(payload?.data?.bookingId);
       if (isBookingOffer) {
         playBookingAlertSound();
       }
     });
 
+    const handleSwMessage = (event) => {
+      if (event.data?.type === 'PLAY_BOOKING_ALERT_SOUND') {
+        console.log('[PUSH] PLAY_BOOKING_ALERT_SOUND message received from Service Worker', event.data);
+        playBookingAlertSound();
+        window.dispatchEvent(new CustomEvent('a2z-push-notification', { detail: { data: event.data } }));
+      }
+    };
+
     if ('serviceWorker' in navigator) {
-      const handleSwMessage = (event) => {
-        if (event.data?.type === 'PLAY_BOOKING_ALERT_SOUND') {
-          playBookingAlertSound();
-        }
-      };
       navigator.serviceWorker.addEventListener('message', handleSwMessage);
-      return () => {
-        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
-      };
+      navigator.serviceWorker.onmessage = handleSwMessage;
     }
+    window.addEventListener('message', handleSwMessage);
+
+    return () => {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+        navigator.serviceWorker.onmessage = null;
+      }
+      window.removeEventListener('message', handleSwMessage);
+    };
   }, []);
 
   return (

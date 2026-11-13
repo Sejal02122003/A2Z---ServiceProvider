@@ -347,15 +347,21 @@ export function LabourCategorySetup({ variant = 'app', onComplete }) {
 
     const servicesPayload = []
     for (const [id] of selected.entries()) {
-      let subcategoryId = id
+      let foundCategory = null
       for (const group of tradeGroups) {
         for (const cat of group.categories || []) {
           if (String(cat._id) === id) {
-            if (cat.subcategoryId) subcategoryId = String(cat.subcategoryId)
+            foundCategory = cat
+            break
           }
         }
+        if (foundCategory) break
       }
 
+      // If the ID does not belong to any valid category in active trade groups, skip it
+      if (!foundCategory && !tradeCategoryIds.has(id)) continue
+
+      const subcategoryId = foundCategory?.subcategoryId ? String(foundCategory.subcategoryId) : id
       const isSubcatOnly = String(id) === String(subcategoryId)
       servicesPayload.push({
         serviceId: isSubcatOnly ? undefined : id,

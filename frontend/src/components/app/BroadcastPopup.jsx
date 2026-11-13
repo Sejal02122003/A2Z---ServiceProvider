@@ -154,9 +154,16 @@ export function BroadcastPopup() {
 
     fetchActive()
     const interval = setInterval(fetchActive, 4000)
+
+    const handlePushWakeup = () => {
+      fetchActive()
+    }
+    window.addEventListener('a2z-push-notification', handlePushWakeup)
+
     return () => {
       cancelled = true
       clearInterval(interval)
+      window.removeEventListener('a2z-push-notification', handlePushWakeup)
     }
   }, [isLabour, incoming, handleBroadcast])
 

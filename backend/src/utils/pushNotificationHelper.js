@@ -47,7 +47,8 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
     const isBookingOffer =
       stringifiedData.type === 'booking_received' ||
       stringifiedData.type === 'NEW_BROADCAST_JOB' ||
-      stringifiedData.type === 'booking_rebroadcasting';
+      stringifiedData.type === 'booking_rebroadcasting' ||
+      Boolean(stringifiedData.bookingId);
 
     // Prepare message with webpush & android configs for system-level notifications
     const message = {
@@ -57,7 +58,10 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
       },
       data: {
         ...stringifiedData,
+        title: payload.title || 'A2Z Service Hub',
+        body: payload.body || '',
         sound: '/alert.mp3',
+        channelId: isBookingOffer ? 'booking_alerts_channel' : 'high_importance_channel',
       },
       webpush: {
         headers: {
@@ -68,11 +72,18 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
           body: payload.body || '',
           icon: payload.icon || '/logo.png',
           badge: '/logo.png',
-          tag: payload.tag || stringifiedData.type || 'a2z-notification',
+          tag: payload.tag || (stringifiedData.bookingId ? `booking-${stringifiedData.bookingId}` : stringifiedData.type || 'a2z-notification'),
           renotify: true,
           requireInteraction: isBookingOffer,
+          silent: false,
           sound: '/alert.mp3',
           vibrate: isBookingOffer ? [500, 200, 500, 200, 500, 200, 800] : [200, 100, 200],
+          actions: isBookingOffer
+            ? [
+                { action: 'open_booking', title: '⚡ View & Accept Job' },
+                { action: 'dismiss', title: 'Dismiss' },
+              ]
+            : [],
         },
         fcmOptions: {
           link: linkUrl,
@@ -83,7 +94,7 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
         notification: {
           title: payload.title || 'A2Z Service Hub',
           body: payload.body || '',
-          sound: 'default',
+          sound: isBookingOffer ? 'alert' : 'default',
           channelId: isBookingOffer ? 'booking_alerts_channel' : 'high_importance_channel',
           defaultSound: true,
           defaultVibrateTimings: true,
@@ -114,7 +125,8 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
           const errCode = resp.error?.code;
           if (
             errCode === 'messaging/invalid-registration-token' ||
-            errCode === 'messaging/registration-token-not-registered'
+            errCode === 'messaging/registration-token-not-registered' ||
+            errCode === 'messaging/invalid-argument'
           ) {
             invalidTokens.push(uniqueTokens[index]);
           }

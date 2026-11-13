@@ -230,21 +230,14 @@ export const updateLabourCategories = asyncHandler(async (req, res) => {
   const { LabourSubcategory } = await import('../models/LabourSubcategory.js')
   const { LabourService } = await import('../models/LabourService.js')
 
-  const subcatIdArray = Array.from(uniqueSubcategoryIds)
+  const requestedSubcatIds = Array.from(uniqueSubcategoryIds)
   const subcategories = await LabourSubcategory.find({
-    _id: { $in: subcatIdArray },
+    _id: { $in: requestedSubcatIds },
     isActive: true,
   }).populate('categoryId')
 
-  if (subcategories.length !== subcatIdArray.length && subcatIdArray.length > 0) {
-    return sendError(res, {
-      message: 'One or more categories are invalid or inactive',
-      statusCode: HTTP_STATUS.BAD_REQUEST,
-      code: 'INVALID_CATEGORIES',
-    })
-  }
-
   const validSubcatIdSet = new Set(subcategories.map((s) => String(s._id)))
+  const subcatIdArray = Array.from(validSubcatIdSet)
 
   // Remove any ID that is actually a subcategory ID from the candidate service IDs
   const candidateServiceIds = Array.from(rawServiceIds).filter(
@@ -258,14 +251,6 @@ export const updateLabourCategories = asyncHandler(async (req, res) => {
         isActive: true,
       })
     : []
-
-  if (servicesInDb.length !== candidateServiceIds.length && candidateServiceIds.length > 0) {
-    return sendError(res, {
-      message: 'One or more services are invalid or inactive',
-      statusCode: HTTP_STATUS.BAD_REQUEST,
-      code: 'INVALID_SERVICES',
-    })
-  }
 
   const finalServiceIds = servicesInDb.map((s) => String(s._id))
   const finalServiceIdSet = new Set(finalServiceIds)

@@ -91,51 +91,15 @@ export function SimulatedOpportunityPopup() {
 
   const stopAlertSound = useCallback(() => {
     stopBookingAlertSound()
-    if (audioRef.current) {
-      try {
-        audioRef.current.pause()
-        audioRef.current.currentTime = 0
-      } catch (err) {
-        console.warn('[Opportunity Audio Pause Error]', err)
-      }
-    }
     if (soundIntervalRef.current) {
       clearInterval(soundIntervalRef.current)
       soundIntervalRef.current = null
     }
-    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
-      try {
-        audioCtxRef.current.close()
-      } catch {
-        /* ignore */
-      }
-      audioCtxRef.current = null
-    }
   }, [])
 
   const playAlertSound = useCallback(() => {
-    try {
-      if (!audioRef.current) {
-        const audio = new Audio(alertSoundSrc)
-        audio.loop = true
-        audio.preload = 'auto'
-        audioRef.current = audio
-      }
-      const audio = audioRef.current
-      audio.loop = true
-      audio.currentTime = 0
-      const playPromise = audio.play()
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          console.warn('[Opportunity Audio Autoplay Blocked]:', err?.message || err)
-        })
-      }
-    } catch (err) {
-      console.warn('[Opportunity Audio Start Error]', err)
-    }
-
-    playAlertChime()
-  }, [playAlertChime])
+    playBookingAlertSound()
+  }, [])
 
   // Synchronize audio playback with incoming simulated opportunity
   useEffect(() => {
