@@ -3,7 +3,7 @@ import { User } from '../models/User.js';
 
 // Server-side dispatch idempotency cache (suppress duplicate push events within 12 seconds)
 const dispatchIdempotencyCache = new Map();
-const IDEMPOTENCY_WINDOW_MS = 12000;
+const IDEMPOTENCY_WINDOW_MS = 25000;
 
 function cleanupIdempotencyCache() {
   const now = Date.now();
@@ -145,6 +145,20 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
           body: finalBody,
         },
         data: baseDataPayload,
+        android: {
+          priority: 'high',
+          ttl: 60 * 1000,
+          notification: {
+            title: finalTitle,
+            body: finalBody,
+            channelId: channelId,
+            sound: isBookingOffer ? 'alert' : 'default',
+            priority: 'max',
+            visibility: 'public',
+            clickAction: targetUrl,
+            defaultVibrateTimings: true,
+          },
+        },
         webpush: {
           headers: {
             Urgency: 'high',
@@ -209,46 +223,31 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
 
     // 2. Dispatch to Mobile Tokens (Android Native / APK)
     if (mobileTokens.length > 0) {
-      let mobileMessage;
-
-      if (isBookingOffer) {
-        // CRITICAL FOR ANDROID CLOSED APP RINGING:
-        // By omitting the top-level 'notification' block for booking alerts,
-        // Google Play Services guarantees delivery directly to MyFirebaseMessagingService.onMessageReceived()
-        // even when the app is completely terminated/closed/screen-off!
-        // This allows Android native code to set FLAG_INSISTENT, trigger full-screen incoming call UI,
-        // turn the screen on, and continuously loop res/raw/alert.mp3 until answered or dismissed.
-        mobileMessage = {
-          data: baseDataPayload,
-          android: {
-            priority: 'high',
-            ttl: 60 * 1000,
-          },
-          tokens: mobileTokens,
-        };
-      } else {
-        // Standard non-call notification
-        mobileMessage = {
+      const mobileMessage = {
+        notification: {
+          title: finalTitle,
+          body: finalBody,
+        },
+        data: baseDataPayload,
+        android: {
+          priority: 'high',
+          ttl: 60 * 1000,
           notification: {
             title: finalTitle,
             body: finalBody,
+            channelId: channelId,
+            sound: isBookingOffer ? 'alert' : 'default',
+            priority: 'max',
+            visibility: 'public',
+            clickAction: targetUrl,
+            defaultVibrateTimings: true,
           },
-          data: baseDataPayload,
-          android: {
-            priority: 'high',
-            ttl: 60 * 1000,
-            notification: {
-              title: finalTitle,
-              body: finalBody,
-              channelId: channelId,
-              sound: 'default',
-              priority: 'high',
-              visibility: 'public',
-              clickAction: targetUrl,
-            },
-          },
-          tokens: mobileTokens,
-        };
+        },
+        tokens: mobileTokens,
+      };
+
+      if (payload.icon) {
+        mobileMessage.notification.imageUrl = payload.icon;
       }
 
       try {
