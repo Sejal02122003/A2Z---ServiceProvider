@@ -145,20 +145,6 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
           body: finalBody,
         },
         data: baseDataPayload,
-        android: {
-          priority: 'high',
-          ttl: 60 * 1000,
-          notification: {
-            title: finalTitle,
-            body: finalBody,
-            channelId: channelId,
-            sound: isBookingOffer ? 'alert' : 'default',
-            priority: 'max',
-            visibility: 'public',
-            clickAction: targetUrl,
-            defaultVibrateTimings: true,
-          },
-        },
         webpush: {
           headers: {
             Urgency: 'high',
@@ -168,7 +154,7 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
             body: finalBody,
             icon: payload.icon || '/logo.png',
             badge: '/logo.png',
-            tag: bookingId ? `booking-${bookingId}` : (payload.tag || channelId),
+            tag: bookingId ? `booking-${bookingId}` : (payload.tag || (isBookingOffer ? 'new_booking_alerts_v2' : 'a2z-push')),
             renotify: true,
             requireInteraction: isBookingOffer,
             silent: false,
@@ -223,6 +209,29 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
 
     // 2. Dispatch to Mobile Tokens (Android Native / APK)
     if (mobileTokens.length > 0) {
+      // For booking offers, route through high-priority siren channel
+      // For standard notifications (customer updates, etc.), do not force an uncreated channel;
+      // let Android use the app's default channel or fallback channel so it is never dropped.
+      const androidNotificationConfig = {
+        title: finalTitle,
+        body: finalBody,
+        priority: 'max',
+        visibility: 'public',
+        clickAction: targetUrl,
+        defaultVibrateTimings: true,
+      };
+
+      if (isBookingOffer) {
+        androidNotificationConfig.channelId = 'new_booking_alerts_v2';
+        androidNotificationConfig.sound = 'alert';
+      } else {
+        androidNotificationConfig.sound = 'default';
+        androidNotificationConfig.defaultSound = true;
+        if (payload.channelId) {
+          androidNotificationConfig.channelId = payload.channelId;
+        }
+      }
+
       const mobileMessage = {
         notification: {
           title: finalTitle,
@@ -232,16 +241,7 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
         android: {
           priority: 'high',
           ttl: 60 * 1000,
-          notification: {
-            title: finalTitle,
-            body: finalBody,
-            channelId: channelId,
-            sound: isBookingOffer ? 'alert' : 'default',
-            priority: 'max',
-            visibility: 'public',
-            clickAction: targetUrl,
-            defaultVibrateTimings: true,
-          },
+          notification: androidNotificationConfig,
         },
         tokens: mobileTokens,
       };

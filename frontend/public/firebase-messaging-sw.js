@@ -94,7 +94,7 @@ self.addEventListener('push', (event) => {
     if (isBookingAlert && dataObj.bookingId) {
       targetLink = `/serviceprovider?incoming_booking=${dataObj.bookingId}`;
     } else if (dataObj.bookingId) {
-      targetLink = `/booking-details/${dataObj.bookingId}`;
+      targetLink = `/user/tracking/${dataObj.bookingId}`;
     } else {
       targetLink = '/';
     }

@@ -1035,6 +1035,20 @@ export const createBooking = asyncHandler(async (req, res) => {
     startBroadcastCycle(booking._id).catch(err => console.error('[BOOKING_CREATE] Broadcast Error:', err))
   })
 
+  // Immediate push notification to customer confirming booking placement
+  import('../utils/pushNotificationHelper.js').then(({ sendNotificationToUser }) => {
+    sendNotificationToUser(booking.userId, {
+      title: 'Booking Placed Successfully! 🔍',
+      body: `Your booking #${String(booking._id).slice(-6).toUpperCase()} is confirmed. Searching for verified nearby service providers...`,
+      link: `/user/tracking/${booking._id}`,
+      data: {
+        type: 'BOOKING_CREATED',
+        bookingId: String(booking._id),
+        link: `/user/tracking/${booking._id}`,
+      }
+    }).catch(err => console.warn('[BOOKING_CREATE Push Error]', err?.message))
+  }).catch(() => {})
+
   if (isScheduled) {
     import('../socket.js').then(({ emitToUser }) => {
       emitToUser(booking.userId, 'BOOKING_SCHEDULED_QUEUED', { bookingId: booking._id, scheduledAt: booking.scheduledAt })
@@ -1606,12 +1620,33 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
   // Also send Push Notification
   import('../utils/pushNotificationHelper.js').then(({ sendNotificationToUser }) => {
     // To Customer
+    const shortBookingId = String(booking._id).slice(-6).toUpperCase()
+    let customerTitle = 'Booking Update'
+    let customerBody = `Your booking status is now ${status}`
+    if (status === 'EN_ROUTE') {
+      customerTitle = 'Service Partner On The Way! 🚗'
+      customerBody = `Your assigned professional is heading towards your location for booking #${shortBookingId}.`
+    } else if (status === 'STARTED') {
+      customerTitle = 'Service Started! ⏱️'
+      customerBody = `Work on booking #${shortBookingId} has started.`
+    } else if (status === 'COMPLETED') {
+      customerTitle = 'Service Completed! 🎉'
+      customerBody = `Work on booking #${shortBookingId} is complete. Tap to view invoice and rate your provider.`
+    } else if (status === 'CANCELLED') {
+      customerTitle = 'Booking Cancelled'
+      customerBody = `Booking #${shortBookingId} was cancelled: ${booking.cancellationReason || 'Cancelled'}`
+    }
+
     sendNotificationToUser(booking.userId, {
-      title: 'Booking Update',
-      body: status === 'CANCELLED' 
-        ? `Your booking #${String(booking._id).slice(-6).toUpperCase()} was cancelled: ${booking.cancellationReason || 'Cancelled'}`
-        : `Your booking status is now ${status}`,
-      data: { type: 'booking_update', bookingId: String(booking._id) }
+      title: customerTitle,
+      body: customerBody,
+      link: `/user/tracking/${booking._id}`,
+      data: {
+        type: 'BOOKING_STATUS_UPDATE',
+        status: String(status),
+        bookingId: String(booking._id),
+        link: `/user/tracking/${booking._id}`,
+      }
     })
     
     // To Labourers
@@ -1622,9 +1657,15 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
           sendNotificationToUser(lid, {
             title: status === 'CANCELLED' && penaltyDeducted > 0 ? 'Bounce Penalty Applied' : 'Job Status Update',
             body: status === 'CANCELLED' && penaltyDeducted > 0 
-              ? `Bounce penalty of ₹${penaltyDeducted} deducted for cancelling job #${String(booking._id).slice(-6).toUpperCase()}`
-              : `The job status has been updated to ${status}`,
-            data: { type: 'booking_update', bookingId: String(booking._id) }
+              ? `Bounce penalty of ₹${penaltyDeducted} deducted for cancelling job #${shortBookingId}`
+              : `Job #${shortBookingId} status is now ${status}`,
+            link: `/serviceprovider`,
+            data: {
+              type: 'JOB_STATUS_UPDATE',
+              status: String(status),
+              bookingId: String(booking._id),
+              link: `/serviceprovider`,
+            }
           })
         }
       });
@@ -1632,9 +1673,15 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
       sendNotificationToUser(booking.laborId, {
         title: status === 'CANCELLED' && penaltyDeducted > 0 ? 'Bounce Penalty Applied' : 'Job Status Update',
         body: status === 'CANCELLED' && penaltyDeducted > 0 
-          ? `Bounce penalty of ₹${penaltyDeducted} deducted for cancelling job #${String(booking._id).slice(-6).toUpperCase()}`
-          : `The job status has been updated to ${status}`,
-        data: { type: 'booking_update', bookingId: String(booking._id) }
+          ? `Bounce penalty of ₹${penaltyDeducted} deducted for cancelling job #${shortBookingId}`
+          : `Job #${shortBookingId} status is now ${status}`,
+        link: `/serviceprovider`,
+        data: {
+          type: 'JOB_STATUS_UPDATE',
+          status: String(status),
+          bookingId: String(booking._id),
+          link: `/serviceprovider`,
+        }
       })
     }
   }).catch(err => console.error(err))

@@ -15,13 +15,15 @@ export const saveToken = asyncHandler(async (req, res) => {
     return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND });
   }
 
-  if (platform === 'web') {
+  const isWeb = platform === 'web';
+  if (isWeb) {
     if (!user.fcmTokens) user.fcmTokens = [];
     if (!user.fcmTokens.includes(token)) {
       user.fcmTokens.push(token);
     }
     user.fcmTokens = [...new Set(user.fcmTokens)].slice(-30);
-  } else if (platform === 'mobile') {
+  } else {
+    // Treat 'android', 'mobile', 'ios', etc. as mobile tokens
     if (!user.fcmTokenMobile) user.fcmTokenMobile = [];
     if (!user.fcmTokenMobile.includes(token)) {
       user.fcmTokenMobile.push(token);
@@ -31,7 +33,7 @@ export const saveToken = asyncHandler(async (req, res) => {
 
   await user.save();
   console.log(`[FCM] Successfully linked ${platform} token to user ${user.phone} (${user.role})`);
-  return sendSuccess(res, { message: 'FCM token saved', totalTokens: (platform === 'web' ? user.fcmTokens : user.fcmTokenMobile).length });
+  return sendSuccess(res, { message: 'FCM token saved', totalTokens: (isWeb ? user.fcmTokens : user.fcmTokenMobile).length });
 });
 
 export const removeToken = asyncHandler(async (req, res) => {
@@ -46,7 +48,7 @@ export const removeToken = asyncHandler(async (req, res) => {
     if (user) {
       if (platform === 'web' && user.fcmTokens) {
         user.fcmTokens = user.fcmTokens.filter(t => t !== token);
-      } else if (platform === 'mobile' && user.fcmTokenMobile) {
+      } else if (user.fcmTokenMobile) {
         user.fcmTokenMobile = user.fcmTokenMobile.filter(t => t !== token);
       }
       await user.save();
