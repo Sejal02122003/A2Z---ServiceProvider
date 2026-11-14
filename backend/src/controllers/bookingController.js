@@ -1690,7 +1690,7 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
   }).catch(err => console.error(err))
 
   // Also send Push Notification
-  import('../utils/pushNotificationHelper.js').then(({ sendNotificationToUser }) => {
+  import('../utils/pushNotificationHelper.js').then(({ sendNotificationToUser, sendNotificationToAdmins }) => {
     // To Customer
     const shortBookingId = String(booking._id).slice(-6).toUpperCase()
     let customerTitle = 'Booking Update'
@@ -1758,7 +1758,6 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
     }
 
     // To Admins
-    const { sendNotificationToAdmins } = await import('../utils/pushNotificationHelper.js')
     sendNotificationToAdmins({
       title: `📋 Booking #${shortBookingId} Update`,
       body: `Booking #${shortBookingId} status updated to ${status}.`,
