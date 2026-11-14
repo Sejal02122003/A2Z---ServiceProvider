@@ -1,5 +1,5 @@
 import { app, messaging } from '../config/firebase.js';
-import { getToken, onMessage } from 'firebase/messaging';
+import { getToken, onMessage, deleteToken } from 'firebase/messaging';
 import { apiRequest } from '../api/http.js';
 import { store } from '../store/index.js';
 
@@ -45,8 +45,8 @@ export async function registerServiceWorker() {
   }
 }
 
-// Get FCM token
-export async function getFCMToken() {
+// Get FCM token with optional forceRefresh
+export async function getFCMToken(forceRefresh = false) {
   if (!messaging) {
     console.error('[PUSH] Firebase messaging is not initialized');
     return null;
@@ -58,6 +58,15 @@ export async function getFCMToken() {
       await registration.update();
     } catch (e) {
       // SW update failure is non-fatal
+    }
+
+    if (forceRefresh) {
+      try {
+        console.log('[PUSH] Force refresh requested: purging cached FCM token from browser...');
+        await deleteToken(messaging);
+      } catch (delErr) {
+        console.warn('[PUSH] deleteToken non-fatal notice:', delErr?.message);
+      }
     }
 
     const cleanVapidKey = (VAPID_KEY || '').trim();
@@ -119,20 +128,26 @@ export async function registerFCMToken(forceUpdate = false) {
       return savedToken;
     }
 
-    let token = null;
-    try {
-      token = await getFCMToken();
-    } catch (swErr) {
-      console.warn('[PUSH] getFCMToken error, checking cached token:', swErr);
-      if (savedToken) token = savedToken;
+    if (forceUpdate) {
+      localStorage.removeItem('fcm_token_web');
+      if (currentUserId) {
+        sessionStorage.removeItem(`fcm_synced_${currentUserId}`);
+      }
     }
 
-    if (!token && savedToken) {
+    let token = null;
+    try {
+      token = await getFCMToken(forceUpdate);
+    } catch (swErr) {
+      console.warn('[PUSH] getFCMToken error:', swErr?.message || swErr);
+    }
+
+    if (!token && !forceUpdate && savedToken) {
       token = savedToken;
     }
 
     if (!token) {
-      console.warn('[PUSH] Could not retrieve FCM token from Firebase.');
+      console.warn('[PUSH] Could not retrieve fresh FCM token from Firebase.');
       return null;
     }
 

@@ -209,9 +209,7 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
 
     // 2. Dispatch to Mobile Tokens (Android Native / APK)
     if (mobileTokens.length > 0) {
-      // For booking offers, route through high-priority siren channel
-      // For standard notifications (customer updates, etc.), do not force an uncreated channel;
-      // let Android use the app's default channel or fallback channel so it is never dropped.
+      // Configure Android notification payload safely so notifications are never dropped by Android OS
       const androidNotificationConfig = {
         title: finalTitle,
         body: finalBody,
@@ -222,14 +220,15 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
       };
 
       if (isBookingOffer) {
-        androidNotificationConfig.channelId = 'new_booking_alerts_v2';
         androidNotificationConfig.sound = 'alert';
       } else {
         androidNotificationConfig.sound = 'default';
         androidNotificationConfig.defaultSound = true;
-        if (payload.channelId) {
-          androidNotificationConfig.channelId = payload.channelId;
-        }
+      }
+
+      // If an explicit channelId was provided by caller, set it; otherwise omit so FCM uses default fallback channel safely
+      if (payload.channelId) {
+        androidNotificationConfig.channelId = payload.channelId;
       }
 
       const mobileMessage = {
@@ -281,10 +280,17 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
 
     console.log(`[FCM] Dispatched: ${totalSuccessCount} success, ${totalFailureCount} failed (Web: ${webTokens.length}, Mobile: ${mobileTokens.length}) for user ${userId}`);
 
-    // Preserve all tokens permanently (do not delete or expire tokens)
+    // Prune confirmed dead / unregistered tokens from MongoDB so they never block future deliveries
     let invalidTokensCleaned = 0;
     if (invalidTokens.length > 0) {
-      console.log(`[FCM] Noted ${invalidTokens.length} unconfirmed FCM response(s) for user ${userId} (preserved permanently, no tokens expired)`);
+      invalidTokensCleaned = invalidTokens.length;
+      console.log(`[FCM] Deactivating ${invalidTokensCleaned} unregistered/invalid FCM token(s) for user ${userId}`);
+      await User.findByIdAndUpdate(userId, {
+        $pull: {
+          fcmTokens: { $in: invalidTokens },
+          fcmTokenMobile: { $in: invalidTokens },
+        },
+      }).catch((err) => console.warn(`[FCM] Error pruning invalid tokens:`, err.message));
     }
 
     return {

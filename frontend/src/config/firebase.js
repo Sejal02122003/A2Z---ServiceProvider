@@ -37,6 +37,7 @@ export const requestFirebaseToken = async () => {
       }
 
       const currentToken = await getToken(messaging, { 
+        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY || undefined,
         serviceWorkerRegistration: swRegistration 
       });
       
