@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Bell, CheckCircle2, AlertTriangle, Sparkles, Loader2, ShieldCheck, Send } from 'lucide-react'
+import { Bell, CheckCircle2, AlertTriangle, Sparkles, Loader2, ShieldCheck } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { registerFCMToken, sendTestNotification, showDesktopNotification } from '../../services/pushNotificationService.js'
+import { registerFCMToken, showDesktopNotification } from '../../services/pushNotificationService.js'
 
 export function CustomerNotificationBanner({ user }) {
   const [permission, setPermission] = useState(() => {
@@ -9,7 +9,6 @@ export function CustomerNotificationBanner({ user }) {
     return Notification.permission
   })
   const [loading, setLoading] = useState(false)
-  const [testing, setTesting] = useState(false)
   const [message, setMessage] = useState(null) // { type: 'success' | 'error', text: '' }
 
   const syncPermission = () => {
@@ -60,32 +59,6 @@ export function CustomerNotificationBanner({ user }) {
       })
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleTestAlert = async () => {
-    setTesting(true)
-    setMessage(null)
-    try {
-      showDesktopNotification({
-        title: '🔔 A2Z Live Booking Alert',
-        body: 'Your service professional has been assigned and is on the way!',
-        tag: 'a2z-customer-test',
-        link: '/user'
-      })
-
-      await sendTestNotification()
-      setMessage({
-        type: 'success',
-        text: '✅ Test notification sent! Check your device notification bar.'
-      })
-    } catch (err) {
-      setMessage({
-        type: 'error',
-        text: err?.message || 'Failed to trigger test notification.'
-      })
-    } finally {
-      setTimeout(() => setTesting(false), 2000)
     }
   }
 
@@ -186,30 +159,9 @@ export function CustomerNotificationBanner({ user }) {
                     </p>
                   </div>
                   <p className="text-[10px] text-emerald-700 truncate">
-                    Ready for live updates on this device
+                    Ready for real-time booking updates on this device
                   </p>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  disabled={testing}
-                  onClick={handleTestAlert}
-                  className="inline-flex items-center gap-1 rounded-xl bg-white border border-emerald-300 px-3 py-1.5 text-[11px] font-bold text-emerald-800 shadow-2xs transition hover:bg-emerald-50 active:scale-95 disabled:opacity-50 cursor-pointer"
-                >
-                  {testing ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600" />
-                      <span>Sending…</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-3.5 w-3.5 text-emerald-600" />
-                      <span>Test Alert</span>
-                    </>
-                  )}
-                </button>
               </div>
             </div>
           </motion.div>

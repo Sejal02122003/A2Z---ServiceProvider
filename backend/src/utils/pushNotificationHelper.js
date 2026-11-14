@@ -221,14 +221,14 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
 
       if (isBookingOffer) {
         androidNotificationConfig.sound = 'alert';
-        androidNotificationConfig.defaultSound = true;
+        androidNotificationConfig.defaultSound = false;
       } else {
         androidNotificationConfig.sound = 'default';
         androidNotificationConfig.defaultSound = true;
       }
 
-      // Set high importance channel for booking alerts and fallback for others
-      androidNotificationConfig.channelId = payload.channelId || (isBookingOffer ? 'new_booking_alerts_v2' : 'high_importance_channel');
+      // Use valid Android channel new_booking_alerts_v2 so notifications are never dropped by Android OS
+      androidNotificationConfig.channelId = payload.channelId || 'new_booking_alerts_v2';
 
       const mobileMessage = {
         notification: {

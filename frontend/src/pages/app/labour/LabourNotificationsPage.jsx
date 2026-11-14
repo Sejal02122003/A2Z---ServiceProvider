@@ -26,7 +26,6 @@ import { AppBadge } from '../../../components/app-ui/data-display/AppBadge.jsx'
 import { AppEmptyState } from '../../../components/app/AppEmptyState.jsx'
 import { GlassPanel } from '../../../components/ui/GlassPanel.jsx'
 import { AppPillTabs } from '../../../components/app-ui/navigation/AppPillTabs.jsx'
-import { TestPushNotificationCard } from '../../../components/app/TestPushNotificationCard.jsx'
 import {
   buildLabourNotifications,
   dismissNotification,
@@ -265,8 +264,6 @@ export function LabourNotificationsPage() {
           </p>
         ) : null}
 
-        {/* Device Push Notifications (Out of App) */}
-        <TestPushNotificationCard user={user} />
 
         <AppPillTabs items={TABS} value={tab} onChange={setTab} />
 

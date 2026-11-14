@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Bell, CheckCircle2, AlertTriangle, Volume2, Sparkles, Loader2, VolumeX, ShieldCheck } from 'lucide-react'
+import { Bell, CheckCircle2, AlertTriangle, Sparkles, Loader2, ShieldCheck } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { registerFCMToken, sendTestNotification, showDesktopNotification } from '../../services/pushNotificationService.js'
-import { playBookingAlertSound, stopBookingAlertSound, unlockAudioContext } from '../../utils/bookingSound.js'
+import { registerFCMToken, showDesktopNotification } from '../../services/pushNotificationService.js'
+import { unlockAudioContext } from '../../utils/bookingSound.js'
 
 export function ProviderNotificationBanner({ user }) {
   const [permission, setPermission] = useState(() => {
@@ -10,7 +10,6 @@ export function ProviderNotificationBanner({ user }) {
     return Notification.permission
   })
   const [loading, setLoading] = useState(false)
-  const [testingSound, setTestingSound] = useState(false)
   const [message, setMessage] = useState(null) // { type: 'success' | 'error', text: '' }
 
   const syncPermission = () => {
@@ -63,50 +62,6 @@ export function ProviderNotificationBanner({ user }) {
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleTestAlert = async () => {
-    setTestingSound(true)
-    setMessage(null)
-    try {
-      unlockAudioContext()
-      // 1. Play actual booking alert audio chime
-      playBookingAlertSound()
-
-      // 2. Dispatch a local notification so they see the OS toast immediately
-      showDesktopNotification({
-        title: '⚡ Incoming Booking Test Alert',
-        body: '🔔 New Job Offer: ₹450 payout nearby. Tap to view & accept!',
-        tag: 'a2z-test-sound',
-        data: { link: '/serviceprovider' }
-      })
-
-      // 3. Dispatch FCM backend push notification
-      sendTestNotification().catch(() => {})
-
-      setMessage({
-        type: 'success',
-        text: '🔊 Playing alert sound! Test notification sent to your device.'
-      })
-
-      // Auto-stop test sound after 5 seconds
-      setTimeout(() => {
-        stopBookingAlertSound()
-        setTestingSound(false)
-      }, 5000)
-    } catch (err) {
-      stopBookingAlertSound()
-      setTestingSound(false)
-      setMessage({
-        type: 'error',
-        text: err?.message || 'Failed to trigger test alert.'
-      })
-    }
-  }
-
-  const handleStopTest = () => {
-    stopBookingAlertSound()
-    setTestingSound(false)
   }
 
   return (
@@ -206,31 +161,9 @@ export function ProviderNotificationBanner({ user }) {
                     </p>
                   </div>
                   <p className="text-[10px] text-emerald-700 truncate">
-                    Ready for alerts on +91 {user?.phone || 'device'}
+                    Ready for real-time job alerts on +91 {user?.phone || 'device'}
                   </p>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                {testingSound ? (
-                  <button
-                    type="button"
-                    onClick={handleStopTest}
-                    className="inline-flex items-center gap-1 rounded-xl bg-rose-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-xs transition hover:bg-rose-700 active:scale-95"
-                  >
-                    <VolumeX className="h-3.5 w-3.5" />
-                    <span>Stop Sound</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleTestAlert}
-                    className="inline-flex items-center gap-1 rounded-xl bg-white border border-emerald-300 px-3 py-1.5 text-[11px] font-bold text-emerald-800 shadow-2xs transition hover:bg-emerald-50 active:scale-95"
-                  >
-                    <Volume2 className="h-3.5 w-3.5 text-emerald-600" />
-                    <span>Test Sound</span>
-                  </button>
-                )}
               </div>
             </div>
           </motion.div>
