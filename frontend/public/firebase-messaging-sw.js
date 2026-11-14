@@ -51,7 +51,9 @@ self.addEventListener('push', (event) => {
     rawType === 'NEW_BOOKING' ||
     rawType === 'BOOKING_RECEIVED' ||
     rawType === 'NEW_BROADCAST_JOB' ||
-    rawType === 'BOOKING_REBROADCASTING';
+    rawType === 'BOOKING_REBROADCASTING' ||
+    dataObj.isBookingAlert === 'true' ||
+    dataObj.isBookingAlert === true;
 
   // Instantly wake up all open tabs to play the /alert.mp3 chime for service provider booking offers
   if (isBookingAlert && self.clients) {

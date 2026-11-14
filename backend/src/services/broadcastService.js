@@ -215,61 +215,60 @@ export async function startBroadcastCycle(bookingId) {
   console.log(`[BROADCAST] Target context: type=${booking.type}, targetDay=${targetDayName}, targetStartTime=${targetStartTimeStr}, targetEndTime=${targetEndTimeStr || 'none'}, currentIST=${currentIstTimeStr}`)
 
   const potentialLaborers = potentialLaborersRaw.filter(labor => {
-    // If worker explicitly marked themselves as available, trust their live status
-    if (labor.labourProfile?.availabilityStatus === 'available') {
-      return true
+    // 1. If worker's global status is explicitly offline, exclude them immediately
+    if (labor.labourProfile?.availabilityStatus === 'offline') {
+      console.log(`[BROADCAST] Excluding provider ${labor.fullName || labor.phone} - availabilityStatus is 'offline'`)
+      return false
     }
 
     const schedule = labor.labourProfile?.schedule || []
-    if (schedule.length === 0) {
-      return true
-    }
+    if (schedule.length > 0) {
+      const dayEntry = schedule.find(s => s.day === targetDayName)
+      if (dayEntry) {
+        // 2. If the toggle for this day is turned off in Time Management, they are OFFLINE
+        if (dayEntry.isAvailable === false) {
+          console.log(`[BROADCAST] Excluding provider ${labor.fullName || labor.phone} - offline on ${targetDayName} (Time Management toggle is OFF)`)
+          return false
+        }
+        
+        const sTime = to24Hour(dayEntry.startTime || '00:00')
+        const eTime = to24Hour(dayEntry.endTime || '23:59')
+        
+        if (booking.type === 'INSTANT') {
+          // 3. For instant booking, if current IST time is outside working hours, they are OFFLINE
+          if (currentIstTimeStr < sTime || currentIstTimeStr > eTime) {
+            console.log(`[BROADCAST] Excluding provider ${labor.fullName || labor.phone} - outside working hours ${sTime}-${eTime} on ${targetDayName} (current IST: ${currentIstTimeStr})`)
+            return false
+          }
+        } else {
+          // 4. For scheduled jobs, check target booking time against working hours
+          let effectiveEndTime = eTime
+          if (eTime === '17:00' && targetStartTimeStr > '17:00' && targetStartTimeStr <= '23:00') {
+            effectiveEndTime = '23:00'
+          }
 
-    const dayEntry = schedule.find(s => s.day === targetDayName)
-    if (!dayEntry) {
-      return true
-    }
-    if (dayEntry.isAvailable === false) {
-      return false
-    }
-    
-    const sTime = to24Hour(dayEntry.startTime || '00:00')
-    const eTime = to24Hour(dayEntry.endTime || '23:59')
-    
-    if (booking.type === 'INSTANT') {
-      if (currentIstTimeStr < sTime || currentIstTimeStr > eTime) {
-        return false
+          if (targetStartTimeStr && (targetStartTimeStr < sTime || targetStartTimeStr > effectiveEndTime)) {
+            console.log(`[BROADCAST] Excluding provider ${labor.fullName || labor.phone} - target start time ${targetStartTimeStr} outside working hours ${sTime}-${effectiveEndTime}`)
+            return false
+          }
+          if (targetEndTimeStr && targetEndTimeStr > effectiveEndTime) {
+            console.log(`[BROADCAST] Excluding provider ${labor.fullName || labor.phone} - target end time ${targetEndTimeStr} outside ${effectiveEndTime}`)
+            return false
+          }
+        }
       }
-      return true
-    }
-
-    // For scheduled jobs
-    let effectiveEndTime = eTime
-    if (eTime === '17:00' && targetStartTimeStr > '17:00' && targetStartTimeStr <= '23:00') {
-      effectiveEndTime = '23:00'
-    }
-
-    if (targetStartTimeStr && (targetStartTimeStr < sTime || targetStartTimeStr > effectiveEndTime)) {
-      return false
-    }
-    if (targetEndTimeStr && targetEndTimeStr > effectiveEndTime) {
-      return false
     }
 
     return true
   })
 
-  console.log(`[BROADCAST] Potential labourers after schedule filter: ${potentialLaborers.length}`)
+  console.log(`[BROADCAST] Potential online labourers after schedule filter: ${potentialLaborers.length}`)
 
   let eligibleToConsider = potentialLaborers
-  if (eligibleToConsider.length === 0 && potentialLaborersRaw.length > 0) {
-    console.log(`[BROADCAST] Schedule filter was too restrictive for ${targetDayName}. Falling back to available raw labourers to ensure job is broadcast.`)
-    eligibleToConsider = potentialLaborersRaw
-  }
 
   if (eligibleToConsider.length === 0) {
-    console.warn(`[BROADCAST] Booking ${booking._id} FAILED: No active service providers registered in system`)
-    await markBookingFailed(booking, `No laborers available in area`)
+    console.warn(`[BROADCAST] Booking ${booking._id}: No online/available service providers found for ${targetDayName} at current time. Providers are offline or outside schedule.`)
+    await markBookingFailed(booking, `No available service providers online right now`)
     return
   }
 
@@ -573,6 +572,7 @@ export async function startBroadcastCycle(bookingId) {
           sendNotificationToUser(labor._id, {
             title: booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Booking Received! ⚡',
             body: `New multi-service job (${servicesPayload.length} services, ~${formattedBookingDuration}) near you. Estimated earnings: ₹${totalEarnings}`,
+            isBookingOffer: true,
             data: {
               type: 'NEW_BOOKING',
               bookingId: String(booking._id),
@@ -583,8 +583,9 @@ export async function startBroadcastCycle(bookingId) {
               createdAt: String(booking.createdAt || Date.now()),
               timestamp: String(Date.now()),
               channelId: 'new_booking_alerts_v2',
-              sound: '/alert.mp3',
+              sound: 'alert',
               link: `/serviceprovider?incoming_booking=${booking._id}`,
+              isBookingAlert: 'true',
             },
           })
         } else if (booking.contractorInfo?.services?.length > 0) {
@@ -642,6 +643,7 @@ export async function startBroadcastCycle(bookingId) {
           sendNotificationToUser(labor._id, {
             title: booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Booking Received! ⚡',
             body: `New ${servicesPayload.length === 1 ? servicesPayload[0].name : 'Multiple Services'} job available near you. Estimated earnings: ₹${bestEarning}`,
+            isBookingOffer: true,
             data: {
               type: 'NEW_BOOKING',
               bookingId: String(booking._id),
@@ -652,8 +654,9 @@ export async function startBroadcastCycle(bookingId) {
               createdAt: String(booking.createdAt || Date.now()),
               timestamp: String(Date.now()),
               channelId: 'new_booking_alerts_v2',
-              sound: '/alert.mp3',
+              sound: 'alert',
               link: `/serviceprovider?incoming_booking=${booking._id}`,
+              isBookingAlert: 'true',
             },
           })
 
@@ -766,6 +769,7 @@ export async function startBroadcastCycle(bookingId) {
             body: booking.packageBooking?.isPackage
               ? `Package deal with ${booking.packageBooking.inclusions?.length || 0} services. Package price: ₹${booking.packageBooking.packagePrice}. Your earnings: ₹${singleShare}`
               : `New ${singleServiceName}${singleQty > 1 ? ` (Qty: ${singleQty})` : ''} job · ~${formattedSingleDuration} available near you. Estimated earnings: ₹${singleShare}`,
+            isBookingOffer: true,
             data: {
               type: 'NEW_BOOKING',
               bookingId: String(booking._id),
@@ -776,8 +780,9 @@ export async function startBroadcastCycle(bookingId) {
               createdAt: String(booking.createdAt || Date.now()),
               timestamp: String(Date.now()),
               channelId: 'new_booking_alerts_v2',
-              sound: '/alert.mp3',
+              sound: 'alert',
               link: `/serviceprovider?incoming_booking=${booking._id}`,
+              isBookingAlert: 'true',
             },
           })
 

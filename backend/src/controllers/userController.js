@@ -1181,6 +1181,15 @@ export const updateLabourSchedule = asyncHandler(async (req, res) => {
   req.user.labourProfile = req.user.labourProfile || {}
   req.user.labourProfile.schedule = schedule
 
+  // If today's day in IST is marked unavailable in the schedule, automatically set availabilityStatus to 'offline'
+  const todayName = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', weekday: 'long' }).format(new Date())
+  const todayEntry = schedule.find(s => s.day === todayName)
+  if (todayEntry && todayEntry.isAvailable === false) {
+    req.user.labourProfile.availabilityStatus = 'offline'
+  } else if (todayEntry && todayEntry.isAvailable === true && req.user.labourProfile.availabilityStatus === 'offline') {
+    req.user.labourProfile.availabilityStatus = 'available'
+  }
+
   await req.user.save()
   
   return sendSuccess(res, {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { updateLabourStatus } from '../api/locationApi.js'
 
 const PRESENCE_KEY = 'lc-labour-presence'
 const EVENT = 'lc-labour-presence'
@@ -12,6 +13,7 @@ export function writeLabourPresenceOnline(online) {
   if (typeof window === 'undefined') return
   localStorage.setItem(PRESENCE_KEY, online ? 'online' : 'offline')
   window.dispatchEvent(new CustomEvent(EVENT))
+  updateLabourStatus(online ? 'available' : 'offline').catch(() => {})
 }
 
 /** Online / offline for worker availability (local until presence API exists). */

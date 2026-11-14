@@ -253,32 +253,6 @@ export function LabourHomeScreen({ user }) {
     return () => { cancelled = true }
   }, [user])
 
-  // Automatically sync provider coordinates and mark available on home screen mount
-  useEffect(() => {
-    if (!user || user.id === 'guest' || user._id === 'guest') return
-    const loc = readAppUserLocation()
-    if (loc?.lat && loc?.lng) {
-      import('../../../api/locationApi.js').then(({ updateLabourLocation, updateLabourStatus }) => {
-        updateLabourLocation(loc.lat, loc.lng).catch(() => {})
-        updateLabourStatus('available').catch(() => {})
-      })
-    } else if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          import('../../../api/locationApi.js').then(({ updateLabourLocation, updateLabourStatus }) => {
-            updateLabourLocation(pos.coords.latitude, pos.coords.longitude).catch(() => {})
-            updateLabourStatus('available').catch(() => {})
-          })
-        },
-        () => {
-          import('../../../api/locationApi.js').then(({ updateLabourStatus }) => {
-            updateLabourStatus('available').catch(() => {})
-          })
-        }
-      )
-    }
-  }, [user])
-
   const isConfirmedPartner = useMemo(() => {
     return user?.vendorStatus === 'CONFIRMED' || trialData?.trial?.status === 'CONFIRMED'
   }, [user, trialData])
@@ -323,6 +297,33 @@ export function LabourHomeScreen({ user }) {
     }
     return false
   }, [online, schedule])
+
+  // Automatically sync provider coordinates and online/offline status on mount & presence change
+  useEffect(() => {
+    if (!user || user.id === 'guest' || user._id === 'guest') return
+    const targetStatus = (!online || isScheduleOffline) ? 'offline' : 'available'
+    const loc = readAppUserLocation()
+    if (loc?.lat && loc?.lng) {
+      import('../../../api/locationApi.js').then(({ updateLabourLocation, updateLabourStatus }) => {
+        updateLabourLocation(loc.lat, loc.lng).catch(() => {})
+        updateLabourStatus(targetStatus).catch(() => {})
+      })
+    } else if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          import('../../../api/locationApi.js').then(({ updateLabourLocation, updateLabourStatus }) => {
+            updateLabourLocation(pos.coords.latitude, pos.coords.longitude).catch(() => {})
+            updateLabourStatus(targetStatus).catch(() => {})
+          })
+        },
+        () => {
+          import('../../../api/locationApi.js').then(({ updateLabourStatus }) => {
+            updateLabourStatus(targetStatus).catch(() => {})
+          })
+        }
+      )
+    }
+  }, [user, online, isScheduleOffline])
 
   const firstName = user?.fullName?.split(/\s/)?.[0]
   const greeting = getTimeGreeting()
@@ -647,6 +648,71 @@ export function LabourHomeScreen({ user }) {
                   Withdraw
                 </Link>
               </div>
+            </div>
+
+            {/* Quick Online / Offline Duty Status Card */}
+            <div className="mt-4 flex items-center justify-between rounded-xl border border-white/20 bg-white/10 px-3.5 py-2.5 backdrop-blur-md">
+              <div className="flex items-center gap-2.5">
+                <span className="relative flex h-3 w-3">
+                  {online && !isScheduleOffline ? (
+                    <>
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500"></span>
+                    </>
+                  ) : (
+                    <span className={`inline-flex h-3 w-3 rounded-full ${isScheduleOffline ? 'bg-amber-400' : 'bg-slate-400'}`}></span>
+                  )}
+                </span>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-white">
+                      {!online ? 'You are Offline' : isScheduleOffline ? 'Offline (Schedule)' : 'You are Online'}
+                    </span>
+                    <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${
+                      !online 
+                        ? 'bg-slate-700/80 text-slate-300' 
+                        : isScheduleOffline 
+                        ? 'bg-amber-500/30 text-amber-200 border border-amber-400/40' 
+                        : 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/40'
+                    }`}>
+                      {!online ? 'Off Duty' : isScheduleOffline ? 'Schedule Off' : 'On Duty'}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-white/70">
+                    {!online 
+                      ? 'Offline — will not receive broadcast bookings or sound' 
+                      : isScheduleOffline 
+                      ? 'Outside working hours in Time Management' 
+                      : 'Receiving broadcasts & alert sound (open or closed)'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !online
+                  setOnline(next)
+                  import('../../../api/locationApi.js').then(({ updateLabourStatus }) => {
+                    updateLabourStatus(next ? 'available' : 'offline').catch(() => {})
+                  })
+                  showToast(next ? 'Status set to ONLINE: Ready for broadcasts' : 'Status set to OFFLINE: Broadcasts paused')
+                }}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  online ? 'bg-emerald-500 ring-2 ring-emerald-400/40' : 'bg-slate-600'
+                }`}
+                role="switch"
+                aria-checked={online}
+                title="Toggle Online / Offline status"
+              >
+                <span className="sr-only">Toggle duty status</span>
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    online ? 'translate-x-2.5' : '-translate-x-2.5'
+                  }`}
+                />
+              </button>
             </div>
 
             <button
@@ -1024,7 +1090,14 @@ export function LabourHomeScreen({ user }) {
                     onClick={async () => {
                       try {
                         await updateLabourSchedule(schedule)
-                        showToast('Time schedule saved successfully')
+                        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+                        const currentDay = days[new Date().getDay()]
+                        const todayEntry = schedule.find(s => s.day === currentDay)
+                        const isOff = !todayEntry || !todayEntry.isAvailable
+                        import('../../../api/locationApi.js').then(({ updateLabourStatus }) => {
+                          updateLabourStatus(isOff || !online ? 'offline' : 'available').catch(() => {})
+                        })
+                        showToast(isOff ? 'Schedule saved. You are OFFLINE for today.' : 'Time schedule saved successfully')
                         setTimeManagementOpen(false)
                       } catch (err) {
                         showToast(err?.message || 'Failed to save schedule')
