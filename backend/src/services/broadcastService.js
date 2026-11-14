@@ -38,8 +38,8 @@ export async function startBroadcastCycle(bookingId) {
   booking.broadcastRadius = radiusKm
 
   // Validate coordinates
-  const bookingLng = booking.address?.coordinates?.coordinates[0]
-  const bookingLat = booking.address?.coordinates?.coordinates[1]
+  let bookingLng = booking.address?.coordinates?.coordinates?.[0] ?? booking.address?.lng ?? booking.address?.longitude
+  let bookingLat = booking.address?.coordinates?.coordinates?.[1] ?? booking.address?.lat ?? booking.address?.latitude
 
   if (!bookingLng || !bookingLat) {
     console.error(`Booking ${bookingId} FAILED: Invalid coordinates for zone broadcast.`)
