@@ -1028,26 +1028,98 @@ export const createBooking = asyncHandler(async (req, res) => {
   const nowMs = Date.now()
   const minutesUntilScheduled = scheduledAtDate ? Math.round((scheduledAtDate.getTime() - nowMs) / 60000) : 0
 
-  console.log(`[BOOKING_CREATE] Booking ${booking._id} created: type=${booking.type}, scheduledAt=${booking.scheduledAt}, timeSlot="${booking.timeSlot}", minutesUntilJob=${minutesUntilScheduled} mins`)
+  console.log(`[FLOW: 1_USER_CREATE_BOOKING] Booking ${booking._id} created: type=${booking.type}, scheduledAt=${booking.scheduledAt}, timeSlot="${booking.timeSlot}", minutesUntilJob=${minutesUntilScheduled} mins, amount=₹${booking.totalAmount}`)
 
-  console.log(`[BOOKING_CREATE] Triggering immediate broadcast for booking ${booking._id} (type=${booking.type})`)
+  const shortBookingId = String(booking._id).slice(-6).toUpperCase()
+  const customerName = req.user?.fullName || req.user?.phone || 'Customer'
+  const bookingServiceTitle = booking.packageBooking?.packageName || booking.subServiceName || 'Service'
+
+  // Phase 3: Trigger the Broadcast Engine asynchronously
+  console.log(`[FLOW: 1_BROADCAST_TRIGGERED] Triggering immediate broadcast for booking ${booking._id} (type=${booking.type})`)
   import('../services/broadcastService.js').then(({ startBroadcastCycle }) => {
-    startBroadcastCycle(booking._id).catch(err => console.error('[BOOKING_CREATE] Broadcast Error:', err))
+    startBroadcastCycle(booking._id).catch(err => console.error('[FLOW: BROADCAST_ERROR]', err))
   })
 
-  // Immediate push notification to customer confirming booking placement
-  import('../utils/pushNotificationHelper.js').then(({ sendNotificationToUser }) => {
+  // 1. Immediate Push Notification & In-App Notification to Customer
+  import('../utils/pushNotificationHelper.js').then(async ({ sendNotificationToUser, sendNotificationToAdmins }) => {
+    // Customer In-App Notification
+    try {
+      const { InAppNotification } = await import('../models/InAppNotification.js')
+      await InAppNotification.create({
+        userId: booking.userId,
+        title: 'Booking Placed Successfully! 🔍',
+        body: `Your booking #${shortBookingId} is confirmed. Searching for verified nearby service providers...`,
+        type: 'BOOKING_STATUS',
+        bookingId: booking._id,
+        deliveryStatus: 'SENT',
+        metadata: {
+          bookingId: booking._id,
+          link: `/user/tracking/${booking._id}`,
+          status: 'CREATED',
+        }
+      })
+    } catch (inAppErr) {
+      console.warn('[FLOW: Customer InAppNotification Warning]', inAppErr?.message)
+    }
+
+    // Customer Push Notification
     sendNotificationToUser(booking.userId, {
       title: 'Booking Placed Successfully! 🔍',
-      body: `Your booking #${String(booking._id).slice(-6).toUpperCase()} is confirmed. Searching for verified nearby service providers...`,
+      body: `Your booking #${shortBookingId} is confirmed. Searching for verified nearby service providers...`,
       link: `/user/tracking/${booking._id}`,
       data: {
         type: 'BOOKING_CREATED',
         bookingId: String(booking._id),
         link: `/user/tracking/${booking._id}`,
       }
+    }).then(res => {
+      console.log(`[FLOW: 1_CUSTOMER_PUSH_DISPATCHED] Booking #${shortBookingId} push sent to customer ${booking.userId}: success=${res?.success}, successCount=${res?.successCount}`)
     }).catch(err => console.warn('[BOOKING_CREATE Push Error]', err?.message))
-  }).catch(() => {})
+
+    // 2. Immediate Push Notification to Admin Panel
+    sendNotificationToAdmins({
+      title: `🚨 New Booking Alert: #${shortBookingId}`,
+      body: `${customerName} booked ${bookingServiceTitle} for ₹${booking.totalAmount}. Tap to view in Admin Panel.`,
+      link: '/admin/bookings',
+      data: {
+        type: 'NEW_BOOKING_ADMIN',
+        bookingId: String(booking._id),
+        customerName: String(customerName),
+        serviceTitle: String(bookingServiceTitle),
+        amount: String(booking.totalAmount),
+        link: '/admin/bookings',
+      }
+    }).then(adminRes => {
+      console.log(`[FLOW: 1_ADMIN_PUSH_DISPATCHED] Booking #${shortBookingId} push sent to admins: success=${adminRes?.success}, successCount=${adminRes?.successCount}/${adminRes?.totalAdmins}`)
+    }).catch(err => console.warn('[BOOKING_CREATE Admin Push Error]', err?.message))
+
+  }).catch((err) => console.error('[BOOKING_CREATE Push Import Error]', err))
+
+  // 3. Socket Emits to Customer and Admins
+  import('../socket.js').then(({ emitToUser, emitToAdmins }) => {
+    emitToUser(booking.userId, 'BOOKING_CREATED', {
+      bookingId: booking._id,
+      shortBookingId,
+      status: 'CREATED',
+      type: booking.type,
+      totalAmount: booking.totalAmount,
+    })
+
+    emitToAdmins('NEW_BOOKING_ALERT', {
+      bookingId: booking._id,
+      shortBookingId,
+      customerName,
+      customerPhone: req.user?.phone,
+      serviceTitle: bookingServiceTitle,
+      amount: booking.totalAmount,
+      type: booking.type,
+      scheduledAt: booking.scheduledAt,
+      address: booking.address?.locationText,
+      createdAt: booking.createdAt,
+    })
+    console.log(`[FLOW: 1_ADMIN_SOCKET_ALERT] Emitted NEW_BOOKING_ALERT to admins for #${shortBookingId}`)
+  }).catch(err => console.error('[Socket Alert Error on Create]', err))
+
 
   if (isScheduled) {
     import('../socket.js').then(({ emitToUser }) => {
@@ -1684,6 +1756,29 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
         }
       })
     }
+
+    // To Admins
+    const { sendNotificationToAdmins } = await import('../utils/pushNotificationHelper.js')
+    sendNotificationToAdmins({
+      title: `📋 Booking #${shortBookingId} Update`,
+      body: `Booking #${shortBookingId} status updated to ${status}.`,
+      link: '/admin/bookings',
+      data: {
+        type: 'BOOKING_STATUS_UPDATE_ADMIN',
+        status: String(status),
+        bookingId: String(booking._id),
+        link: '/admin/bookings',
+      }
+    }).catch(err => console.warn('[Admin Status Push Error]', err?.message))
+
+    // Socket alert to Admins
+    import('../socket.js').then(({ emitToAdmins }) => {
+      emitToAdmins('BOOKING_STATUS_UPDATE_ADMIN', {
+        bookingId: booking._id,
+        shortBookingId,
+        status,
+      })
+    }).catch(() => {})
   }).catch(err => console.error(err))
 
   return sendSuccess(res, { 

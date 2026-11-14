@@ -227,10 +227,8 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
         androidNotificationConfig.defaultSound = true;
       }
 
-      // If an explicit channelId was provided by caller, set it; otherwise omit so FCM uses default fallback channel safely
-      if (payload.channelId) {
-        androidNotificationConfig.channelId = payload.channelId;
-      }
+      // Set high importance channel for booking alerts and fallback for others
+      androidNotificationConfig.channelId = payload.channelId || (isBookingOffer ? 'new_booking_alerts_v2' : 'high_importance_channel');
 
       const mobileMessage = {
         notification: {
@@ -279,7 +277,7 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
       }
     }
 
-    console.log(`[FCM] Dispatched: ${totalSuccessCount} success, ${totalFailureCount} failed (Web: ${webTokens.length}, Mobile: ${mobileTokens.length}) for user ${userId}`);
+    console.log(`[FLOW: PUSH_DISPATCH_RESULT] user=${userId} | Success=${totalSuccessCount}, Failed=${totalFailureCount} (Web=${webTokens.length}, Mobile=${mobileTokens.length}) | Title="${finalTitle}"`);
 
     // Prune confirmed dead / unregistered tokens from MongoDB so they never block future deliveries
     let invalidTokensCleaned = 0;
@@ -312,4 +310,63 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
     };
   }
 }
+
+/**
+ * Dispatches push notification and creates in-app notification for ALL system administrators
+ */
+export async function sendNotificationToAdmins(payload) {
+  try {
+    const admins = await User.find({ role: 'admin' }, '_id fullName email fcmTokens fcmTokenMobile');
+    if (!admins || admins.length === 0) {
+      console.log('[FLOW: FCM_ADMIN_DISPATCH] No admin users found in database');
+      return { success: false, reason: 'NO_ADMINS_FOUND' };
+    }
+
+    console.log(`[FLOW: FCM_ADMIN_DISPATCH] Dispatching push notification to ${admins.length} admin account(s): "${payload.title}"`);
+    
+    // Save InAppNotification for each admin so it renders in the Admin notifications dropdown
+    try {
+      const { InAppNotification } = await import('../models/InAppNotification.js');
+      const inAppPromises = admins.map(admin => {
+        return InAppNotification.create({
+          userId: admin._id,
+          title: payload.title || 'Admin Alert',
+          body: payload.body || '',
+          type: payload.data?.type || 'ADMIN_ALERT',
+          bookingId: payload.data?.bookingId || undefined,
+          deliveryStatus: 'SENT',
+          metadata: {
+            ...payload.data,
+            link: payload.link || '/admin/bookings',
+          }
+        }).catch(err => console.warn('[FLOW: InAppNotification Admin Save Warning]', err.message));
+      });
+      await Promise.allSettled(inAppPromises);
+    } catch (inAppErr) {
+      console.warn('[FLOW: InAppNotification Admin Import/Save Warning]', inAppErr.message);
+    }
+
+    const dispatchPromises = admins.map(admin =>
+      sendNotificationToUser(admin._id, {
+        ...payload,
+        link: payload.link || '/admin/bookings',
+      })
+    );
+
+    const results = await Promise.allSettled(dispatchPromises);
+    const successCount = results.filter(r => r.status === 'fulfilled' && r.value?.success).length;
+
+    console.log(`[FLOW: FCM_ADMIN_DISPATCH] Successfully dispatched push to ${successCount}/${admins.length} admin account(s)`);
+    return {
+      success: successCount > 0,
+      totalAdmins: admins.length,
+      successCount,
+      results: results.map(r => r.status === 'fulfilled' ? r.value : { success: false, error: r.reason?.message }),
+    };
+  } catch (err) {
+    console.error('[FLOW: FCM_ADMIN_DISPATCH_ERROR]', err);
+    return { success: false, error: err.message || String(err) };
+  }
+}
+
 

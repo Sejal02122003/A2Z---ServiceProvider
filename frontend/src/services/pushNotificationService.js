@@ -268,7 +268,8 @@ export function setupForegroundNotificationHandler(handler) {
       rawType === 'NEW_BOOKING' ||
       rawType === 'BOOKING_RECEIVED' ||
       rawType === 'NEW_BROADCAST_JOB' ||
-      rawType === 'BOOKING_REBROADCASTING';
+      rawType === 'BOOKING_REBROADCASTING' ||
+      rawType === 'NEW_BOOKING_ADMIN';
 
     // Show system notification banner even in foreground if user is in another tab or minimized
     if ('Notification' in window && Notification.permission === 'granted') {
@@ -276,7 +277,7 @@ export function setupForegroundNotificationHandler(handler) {
         const title = payload?.notification?.title || payload?.data?.title || (isBookingAlert ? 'New Booking Received! ⚡' : 'A2Z Service Hub');
         const body = payload?.notification?.body || payload?.data?.body || (isBookingAlert ? 'You have received a new booking.' : 'You have a new update.');
         const icon = payload?.notification?.icon || payload?.notification?.imageUrl || '/logo.png';
-        const link = payload?.data?.link || (isBookingAlert && payload?.data?.bookingId ? `/serviceprovider?incoming_booking=${payload.data.bookingId}` : '/');
+        const link = payload?.data?.link || (isBookingAlert && payload?.data?.bookingId ? `/serviceprovider?incoming_booking=${payload.data.bookingId}` : (payload?.data?.bookingId ? `/user/tracking/${payload.data.bookingId}` : '/'));
 
         showDesktopNotification({
           title,

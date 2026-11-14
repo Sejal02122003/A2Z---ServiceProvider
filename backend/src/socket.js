@@ -57,6 +57,12 @@ export const initSocket = (httpServer) => {
       socket.join('workforce_vendors')
     }
 
+    // Join admins room for instant real-time admin panel alerts
+    if (socket.user.role === 'admin') {
+      socket.join('admins')
+      console.log(`[SOCKET] Admin ${socket.user._id} joined "admins" room`)
+    }
+
     socket.on('disconnect', () => {
       console.log(`Socket disconnected: ${socket.id}`)
     })
@@ -94,4 +100,14 @@ export const emitToUser = (userId, eventName, payload) => {
     io.to(strId).emit(eventName, payload)
   }
 }
+
+export const emitToAdmins = (eventName, payload) => {
+  if (io) {
+    const room = io.sockets.adapter.rooms.get('admins')
+    const activeSockets = room ? room.size : 0
+    console.log(`[FLOW: SOCKET_EMIT_ADMIN] event="${eventName}" (active sockets in "admins" room: ${activeSockets})`)
+    io.to('admins').emit(eventName, payload)
+  }
+}
+
 

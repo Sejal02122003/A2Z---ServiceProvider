@@ -426,7 +426,7 @@ export async function startBroadcastCycle(bookingId) {
   await booking.save()
 
   // 6. Flash Broadcast via WebSockets
-  console.log(`Flash broadcasting Booking ${booking._id} to ${eligibleLaborers.length} laborers`)
+  console.log(`[FLOW: 2_BROADCAST_MATCHING] Flash broadcasting Booking ${booking._id} to ${eligibleLaborers.length} laborers (radius=${radiusKm}km)`)
 
   // Notify customer
   import('../socket.js').then(({ emitToUser }) => {
@@ -762,6 +762,7 @@ export async function startBroadcastCycle(bookingId) {
             })
           })
           
+          console.log(`[FLOW: 2_DISPATCH_PROVIDER_PUSH] Sending flash broadcast offer to provider ${labor.fullName || labor.phone} (${labor._id}) for booking #${String(booking._id).slice(-6)} (earnings=₹${singleShare})`)
           sendNotificationToUser(labor._id, {
             title: booking.packageBooking?.isPackage
               ? `New Package Booking: ${booking.packageBooking.packageName}! 📦`

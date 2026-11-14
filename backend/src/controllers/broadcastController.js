@@ -543,6 +543,48 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     })
     .catch((err) => console.error('Failed to notify sockets:', err))
 
+  // Notify Admin Panel via Push Notification & Socket
+  import('../utils/pushNotificationHelper.js')
+    .then(({ sendNotificationToAdmins }) => {
+      const shortId = String(booking._id).slice(-6).toUpperCase()
+      sendNotificationToAdmins({
+        title: `✅ Booking #${shortId} Accepted!`,
+        body: `${labour.fullName || 'Service Provider'} accepted booking #${shortId} (${assignedServiceName || 'Service'}) for ₹${booking.totalAmount}.`,
+        link: '/admin/bookings',
+        data: {
+          type: 'BOOKING_ACCEPTED_ADMIN',
+          bookingId: String(booking._id),
+          providerId: String(labour._id),
+          providerName: String(labour.fullName || ''),
+          serviceName: String(assignedServiceName || 'Service'),
+          amount: String(booking.totalAmount),
+          link: '/admin/bookings',
+        }
+      }).then(res => {
+        console.log(`[FLOW: 2_PROVIDER_ACCEPT_BOOKING] Admin push sent for #${shortId}: success=${res?.success}, count=${res?.successCount}`)
+      }).catch(err => console.warn('[Admin Accept Push Error]', err?.message))
+    })
+    .catch(() => {})
+
+  import('../socket.js')
+    .then(({ emitToAdmins }) => {
+      const shortId = String(booking._id).slice(-6).toUpperCase()
+      emitToAdmins('BOOKING_ACCEPTED_ADMIN', {
+        bookingId: booking._id,
+        shortBookingId: shortId,
+        status: booking.status,
+        provider: {
+          id: labour._id,
+          name: labour.fullName,
+          phone: labour.phone,
+        },
+        serviceName: assignedServiceName,
+        totalAmount: booking.totalAmount,
+      })
+      console.log(`[FLOW: 2_PROVIDER_ACCEPT_BOOKING] Admin socket emitted for #${shortId}`)
+    })
+    .catch(() => {})
+
   // Schedule automated reminders for assigned vendor & customer
   import('../services/bookingReminderService.js')
     .then(({ scheduleRemindersForBooking }) => {

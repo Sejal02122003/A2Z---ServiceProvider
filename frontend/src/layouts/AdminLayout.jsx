@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   Bell,
+  CheckCheck,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -13,13 +14,19 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeft,
+  Sparkles,
   User,
+  Volume2,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth.js'
+import { useSocket } from '../context/SocketContext.jsx'
 import { ADMIN_NAV_SECTIONS, getAdminTitle } from '../config/adminNavigation.js'
 import { appSpring } from '../components/app/appMotion.js'
 import { GlassPanel } from '../components/ui/GlassPanel.jsx'
 import { adminInitials, formatLastLoginDisplay, formatLastLoginRelative } from '../lib/formatAdminLastLogin.js'
+import { registerFCMToken, showDesktopNotification } from '../services/pushNotificationService.js'
+import { playBookingAlertSound } from '../utils/bookingSound.js'
+import { notificationApi } from '../api/notificationApi.js'
 
 const STORAGE_KEY = 'lc-admin-sidebar-collapsed'
 
@@ -27,6 +34,7 @@ export function AdminLayout() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const socket = useSocket()
   const reduce = useReducedMotion()
 
   const [collapsed, setCollapsed] = useState(() => {
@@ -39,9 +47,14 @@ export function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
+  const [permission, setPermission] = useState(() => (typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'))
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [notifications, setNotifications] = useState([])
+  const [enablingPush, setEnablingPush] = useState(false)
 
   const profileRef = useRef(null)
   const notifRef = useRef(null)
+
 
   useEffect(() => {
     try {
@@ -75,6 +88,168 @@ export function AdminLayout() {
       document.removeEventListener('keydown', handleKey)
     }
   }, [])
+
+  // Auto-sync FCM token on load if permission is already granted
+  useEffect(() => {
+    if (user?._id && permission === 'granted') {
+      registerFCMToken(false).catch((err) => console.warn('[Admin PUSH] Token auto-sync skipped:', err))
+    }
+  }, [user?._id, permission])
+
+  // Fetch initial notifications
+  const loadNotifications = () => {
+    notificationApi.getUnreadCount()
+      .then((res) => {
+        if (res?.data?.unreadCount !== undefined) {
+          setUnreadCount(res.data.unreadCount)
+        }
+      })
+      .catch(() => {})
+
+    notificationApi.getMyNotifications({ limit: 10 })
+      .then((res) => {
+        if (Array.isArray(res?.data?.notifications)) {
+          setNotifications(res.data.notifications)
+        }
+      })
+      .catch(() => {})
+  }
+
+  useEffect(() => {
+    loadNotifications()
+  }, [])
+
+  // Handle incoming live alerts from Sockets and FCM foreground events
+  useEffect(() => {
+    const handleNewAlert = (data, defaultTitle, defaultBody) => {
+      console.log('[Admin FLOW] Live alert received in Admin Panel:', data)
+      playBookingAlertSound(data?.bookingId)
+
+      const title = data?.title || defaultTitle || '🚨 Admin Notification'
+      const body = data?.body || defaultBody || 'New booking activity received.'
+      const link = data?.link || '/admin/bookings'
+
+      if ('Notification' in window && Notification.permission === 'granted') {
+        showDesktopNotification({
+          title,
+          body,
+          link,
+          tag: data?.bookingId ? `admin-booking-${data.bookingId}` : 'admin-alert',
+          playAlert: true,
+        })
+      }
+
+      setUnreadCount((c) => c + 1)
+      setNotifications((prev) => [
+        {
+          _id: `live_${Date.now()}_${Math.random()}`,
+          title,
+          body,
+          createdAt: new Date().toISOString(),
+          isRead: false,
+          metadata: { link, bookingId: data?.bookingId },
+        },
+        ...prev.slice(0, 19),
+      ])
+    }
+
+    if (socket) {
+      const onBookingAlert = (data) => {
+        const shortId = data?.shortBookingId || (data?.bookingId ? String(data.bookingId).slice(-6).toUpperCase() : '')
+        handleNewAlert(
+          data,
+          `🚨 New Booking Alert: #${shortId}`,
+          `${data?.customerName || 'Customer'} placed a booking for ${data?.serviceTitle || 'Service'} (₹${data?.amount || 0})`
+        )
+      }
+
+      const onAcceptedAlert = (data) => {
+        const shortId = data?.shortBookingId || (data?.bookingId ? String(data.bookingId).slice(-6).toUpperCase() : '')
+        handleNewAlert(
+          data,
+          `✅ Booking #${shortId} Accepted!`,
+          `${data?.provider?.name || 'Service Partner'} accepted booking #${shortId} (₹${data?.totalAmount || 0})`
+        )
+      }
+
+      const onStatusAlert = (data) => {
+        const shortId = data?.shortBookingId || (data?.bookingId ? String(data.bookingId).slice(-6).toUpperCase() : '')
+        handleNewAlert(
+          data,
+          `📋 Booking #${shortId} Status: ${data?.status}`,
+          `Status updated to ${data?.status}`
+        )
+      }
+
+      socket.on('NEW_BOOKING_ALERT', onBookingAlert)
+      socket.on('BOOKING_ACCEPTED_ADMIN', onAcceptedAlert)
+      socket.on('BOOKING_STATUS_UPDATE_ADMIN', onStatusAlert)
+
+      return () => {
+        socket.off('NEW_BOOKING_ALERT', onBookingAlert)
+        socket.off('BOOKING_ACCEPTED_ADMIN', onAcceptedAlert)
+        socket.off('BOOKING_STATUS_UPDATE_ADMIN', onStatusAlert)
+      }
+    }
+  }, [socket])
+
+  // Also listen for FCM window notifications
+  useEffect(() => {
+    const handlePushEvent = (e) => {
+      const payload = e.detail
+      console.log('[Admin FLOW] a2z-push-notification event received in Admin Panel:', payload)
+      const data = payload?.data || {}
+      const notif = payload?.notification || {}
+      const title = notif.title || data.title || '🚨 A2Z Admin Alert'
+      const body = notif.body || data.body || 'New update received.'
+
+      playBookingAlertSound(data?.bookingId)
+      setUnreadCount((c) => c + 1)
+      setNotifications((prev) => [
+        {
+          _id: `fcm_${Date.now()}`,
+          title,
+          body,
+          createdAt: new Date().toISOString(),
+          isRead: false,
+          metadata: { link: data?.link || '/admin/bookings', bookingId: data?.bookingId },
+        },
+        ...prev.slice(0, 19),
+      ])
+    }
+
+    window.addEventListener('a2z-push-notification', handlePushEvent)
+    return () => window.removeEventListener('a2z-push-notification', handlePushEvent)
+  }, [])
+
+  const handleEnablePush = async () => {
+    setEnablingPush(true)
+    try {
+      const token = await registerFCMToken(true)
+      if ('Notification' in window) {
+        setPermission(Notification.permission)
+      }
+      if (token) {
+        showDesktopNotification({
+          title: '🚨 Admin Notifications Enabled',
+          body: 'You will now receive instant push alerts and audio notifications for all incoming bookings!',
+          tag: 'admin-enabled',
+        })
+      }
+    } catch (err) {
+      console.warn('Failed to enable admin push notifications:', err)
+    } finally {
+      setEnablingPush(false)
+    }
+  }
+
+  const handleMarkAllRead = async () => {
+    try {
+      await notificationApi.markAllNotificationsRead()
+      setUnreadCount(0)
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
+    } catch {}
+  }
 
   const title = getAdminTitle(pathname)
 
@@ -211,6 +386,28 @@ export function AdminLayout() {
       <aside className={`${sidebarClassName} hide-on-print`}>{sidebarInner}</aside>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {permission !== 'granted' && permission !== 'unsupported' && (
+          <div className="hide-on-print flex items-center justify-between gap-3 border-b border-brand/20 bg-linear-to-r from-brand/15 via-brand/10 to-transparent px-4 py-2 text-xs font-medium text-slate-800">
+            <div className="flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-brand text-white shadow-sm">
+                <Volume2 className="h-3.5 w-3.5 animate-bounce" />
+              </span>
+              <span>
+                <strong>Enable Push Notifications:</strong> Receive real-time audio chimes & desktop alerts for incoming customer bookings!
+              </span>
+            </div>
+            <button
+              type="button"
+              disabled={enablingPush}
+              onClick={handleEnablePush}
+              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-brand px-3 py-1 font-bold text-white shadow-sm transition hover:bg-brand-dark active:scale-95 disabled:opacity-50"
+            >
+              <Sparkles className="h-3 w-3" />
+              {enablingPush ? 'Enabling...' : 'Enable Notifications'}
+            </button>
+          </div>
+        )}
+
         <header className="hide-on-print relative z-30 flex h-17 shrink-0 items-center gap-3 border-b border-slate-200/70 bg-white/80 px-3 shadow-[0_8px_30px_-18px_rgba(15,23,42,0.12)] backdrop-blur-xl md:gap-4 md:px-6">
           <button
             type="button"
@@ -258,6 +455,11 @@ export function AdminLayout() {
                 aria-label="Notifications"
               >
                 <Bell className="h-5 w-5" aria-hidden />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white shadow-sm ring-2 ring-white animate-pulse">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </button>
               <AnimatePresence>
                 {notifOpen ? (
@@ -266,13 +468,83 @@ export function AdminLayout() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={reduce ? undefined : { opacity: 0, y: 4, scale: 0.98 }}
                     transition={{ duration: 0.18 }}
-                    className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(calc(100vw-2rem),20rem)] origin-top-right"
+                    className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(calc(100vw-2rem),24rem)] origin-top-right"
                   >
-                    <GlassPanel className="p-4 shadow-xl ring-1 ring-slate-200/60">
-                      <p className="text-sm font-bold text-slate-900">Notifications</p>
-                      <p className="mt-2 text-xs leading-relaxed text-slate-600">
-                        No new alerts. Booking approvals, KYC queues, and payment events will appear here.
-                      </p>
+                    <GlassPanel className="p-0 shadow-2xl ring-1 ring-slate-200/80 overflow-hidden rounded-2xl bg-white/95 backdrop-blur-xl">
+                      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-extrabold text-slate-900">Notifications</p>
+                          {unreadCount > 0 && (
+                            <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand">
+                              {unreadCount} new
+                            </span>
+                          )}
+                        </div>
+                        {notifications.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleMarkAllRead}
+                            className="flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline"
+                          >
+                            <CheckCheck className="h-3.5 w-3.5" />
+                            Mark all read
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                        {notifications.length === 0 ? (
+                          <div className="p-6 text-center">
+                            <Bell className="mx-auto h-8 w-8 text-slate-300" />
+                            <p className="mt-2 text-xs font-semibold text-slate-600">No new alerts</p>
+                            <p className="text-[11px] text-slate-400">Live booking alerts and provider updates will appear here.</p>
+                          </div>
+                        ) : (
+                          notifications.map((n) => (
+                            <div
+                              key={n._id}
+                              onClick={() => {
+                                if (!n.isRead && n._id && !n._id.startsWith('live_') && !n._id.startsWith('fcm_')) {
+                                  notificationApi.markNotificationRead(n._id).catch(() => {})
+                                }
+                                setNotifOpen(false)
+                                if (n.metadata?.link) {
+                                  navigate(n.metadata.link)
+                                } else {
+                                  navigate('/admin/bookings')
+                                }
+                              }}
+                              className={`flex cursor-pointer items-start gap-3 p-3.5 transition hover:bg-slate-50 ${!n.isRead ? 'bg-amber-50/40' : ''}`}
+                            >
+                              <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${!n.isRead ? 'bg-brand/15 text-brand' : 'bg-slate-100 text-slate-500'}`}>
+                                <Bell className="h-3.5 w-3.5" />
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-1">
+                                  <p className="truncate text-xs font-bold text-slate-900">{n.title}</p>
+                                  {!n.isRead && (
+                                    <span className="h-2 w-2 shrink-0 rounded-full bg-brand" />
+                                  )}
+                                </div>
+                                <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-slate-600">{n.body}</p>
+                                <span className="mt-1 block text-[10px] text-slate-400">
+                                  {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      <div className="border-t border-slate-100 bg-slate-50/50 p-2 text-center">
+                        <Link
+                          to="/admin/bookings"
+                          onClick={() => setNotifOpen(false)}
+                          className="text-xs font-bold text-brand hover:underline"
+                        >
+                          View all Bookings & Alerts →
+                        </Link>
+                      </div>
                     </GlassPanel>
                   </motion.div>
                 ) : null}

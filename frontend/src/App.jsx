@@ -87,7 +87,8 @@ function App() {
         rawType === 'NEW_BOOKING' ||
         rawType === 'BOOKING_RECEIVED' ||
         rawType === 'NEW_BROADCAST_JOB' ||
-        rawType === 'BOOKING_REBROADCASTING';
+        rawType === 'BOOKING_REBROADCASTING' ||
+        rawType === 'NEW_BOOKING_ADMIN';
       if (isBookingOffer) {
         playBookingAlertSound(payload?.data?.bookingId);
       }
