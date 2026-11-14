@@ -493,6 +493,50 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     })
     .catch((err) => console.error('[Import Error bookingNotificationService]', err))
 
+  // Dispatch reliable assignment confirmation notification to Service Provider (Push + In-App)
+  import('../utils/pushNotificationHelper.js')
+    .then(async ({ sendNotificationToUser }) => {
+      const shortBookingId = String(booking._id).slice(-6).toUpperCase()
+      const customerName = booking.userId?.fullName || 'Customer'
+      const provTitle = `Job Assigned! 🛠️ - #${shortBookingId}`
+      const provBody = `You are confirmed for booking #${shortBookingId} (${customerName}). Tap to view address & navigate.`
+
+      try {
+        const { InAppNotification } = await import('../models/InAppNotification.js')
+        const inAppRecord = await InAppNotification.create({
+          userId: labour._id,
+          title: provTitle,
+          body: provBody,
+          type: 'BOOKING_STATUS',
+          bookingId: booking._id,
+          deliveryStatus: 'SENT',
+          metadata: {
+            bookingId: booking._id,
+            status: booking.status,
+            link: '/serviceprovider',
+            startOtp: newAssignments[0]?.startOtp || booking.startOtp,
+          },
+        })
+        const { emitToUser } = await import('../socket.js')
+        emitToUser(labour._id, 'NEW_IN_APP_NOTIFICATION', inAppRecord)
+      } catch (inAppErr) {
+        console.warn('[PROVIDER_ACCEPT_INAPP_ERROR]', inAppErr?.message)
+      }
+
+      sendNotificationToUser(labour._id, {
+        title: provTitle,
+        body: provBody,
+        link: '/serviceprovider',
+        data: {
+          type: 'JOB_ASSIGNED',
+          bookingId: String(booking._id),
+          status: String(booking.status),
+          link: '/serviceprovider',
+        },
+      }).catch((pushErr) => console.warn('[PROVIDER_ACCEPT_PUSH_ERROR]', pushErr?.message))
+    })
+    .catch((err) => console.error('[Import Error pushNotificationHelper for provider accept]', err))
+
   // Notify customer and expire broadcast for other partners if fully accepted
   import('../socket.js')
     .then(async ({ emitToUser, getIo }) => {

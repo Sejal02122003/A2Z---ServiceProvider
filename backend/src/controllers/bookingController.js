@@ -1689,8 +1689,8 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
     }
   }).catch(err => console.error(err))
 
-  // Also send Push Notification
-  import('../utils/pushNotificationHelper.js').then(({ sendNotificationToUser, sendNotificationToAdmins }) => {
+  // Also send Push Notification & In-App Notification
+  import('../utils/pushNotificationHelper.js').then(async ({ sendNotificationToUser, sendNotificationToAdmins }) => {
     // To Customer
     const shortBookingId = String(booking._id).slice(-6).toUpperCase()
     let customerTitle = 'Booking Update'
@@ -1709,6 +1709,28 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
       customerBody = `Booking #${shortBookingId} was cancelled: ${booking.cancellationReason || 'Cancelled'}`
     }
 
+    // Customer In-App Notification Feed
+    try {
+      const { InAppNotification } = await import('../models/InAppNotification.js')
+      const customerInApp = await InAppNotification.create({
+        userId: booking.userId,
+        title: customerTitle,
+        body: customerBody,
+        type: 'BOOKING_STATUS',
+        bookingId: booking._id,
+        deliveryStatus: 'SENT',
+        metadata: {
+          bookingId: booking._id,
+          status: String(status),
+          link: `/user/tracking/${booking._id}`,
+        },
+      })
+      const { emitToUser } = await import('../socket.js')
+      emitToUser(booking.userId, 'NEW_IN_APP_NOTIFICATION', customerInApp)
+    } catch (inAppErr) {
+      console.warn('[Customer InAppNotification status update error]', inAppErr?.message)
+    }
+
     sendNotificationToUser(booking.userId, {
       title: customerTitle,
       body: customerBody,
@@ -1718,43 +1740,60 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
         status: String(status),
         bookingId: String(booking._id),
         link: `/user/tracking/${booking._id}`,
-      }
-    })
-    
-    // To Labourers
-    if (booking.assignments && booking.assignments.length > 0) {
-      booking.assignments.forEach(a => {
-        const lid = typeof a.labourId === 'object' ? a.labourId._id : a.labourId;
-        if (lid) {
-          sendNotificationToUser(lid, {
-            title: status === 'CANCELLED' && penaltyDeducted > 0 ? 'Bounce Penalty Applied' : 'Job Status Update',
-            body: status === 'CANCELLED' && penaltyDeducted > 0 
-              ? `Bounce penalty of ₹${penaltyDeducted} deducted for cancelling job #${shortBookingId}`
-              : `Job #${shortBookingId} status is now ${status}`,
-            link: `/serviceprovider`,
-            data: {
-              type: 'JOB_STATUS_UPDATE',
-              status: String(status),
-              bookingId: String(booking._id),
-              link: `/serviceprovider`,
-            }
-          })
-        }
-      });
-    } else if (booking.laborId) {
-      sendNotificationToUser(booking.laborId, {
-        title: status === 'CANCELLED' && penaltyDeducted > 0 ? 'Bounce Penalty Applied' : 'Job Status Update',
-        body: status === 'CANCELLED' && penaltyDeducted > 0 
+      },
+    }).catch((pushErr) => console.warn('[Customer status push error]', pushErr?.message))
+
+    // Helper to notify assigned labourers (Push + InAppNotification)
+    const notifyAssignedLabour = async (lid) => {
+      if (!lid) return
+      const provTitle = status === 'CANCELLED' && penaltyDeducted > 0 ? 'Bounce Penalty Applied' : 'Job Status Update'
+      const provBody =
+        status === 'CANCELLED' && penaltyDeducted > 0
           ? `Bounce penalty of ₹${penaltyDeducted} deducted for cancelling job #${shortBookingId}`
-          : `Job #${shortBookingId} status is now ${status}`,
-        link: `/serviceprovider`,
+          : `Job #${shortBookingId} status is now ${status}`
+
+      try {
+        const { InAppNotification } = await import('../models/InAppNotification.js')
+        const labourInApp = await InAppNotification.create({
+          userId: lid,
+          title: provTitle,
+          body: provBody,
+          type: 'BOOKING_STATUS',
+          bookingId: booking._id,
+          deliveryStatus: 'SENT',
+          metadata: {
+            bookingId: booking._id,
+            status: String(status),
+            link: '/serviceprovider',
+          },
+        })
+        const { emitToUser } = await import('../socket.js')
+        emitToUser(lid, 'NEW_IN_APP_NOTIFICATION', labourInApp)
+      } catch (provInAppErr) {
+        console.warn('[Provider InAppNotification status update error]', provInAppErr?.message)
+      }
+
+      sendNotificationToUser(lid, {
+        title: provTitle,
+        body: provBody,
+        link: '/serviceprovider',
         data: {
           type: 'JOB_STATUS_UPDATE',
           status: String(status),
           bookingId: String(booking._id),
-          link: `/serviceprovider`,
-        }
-      })
+          link: '/serviceprovider',
+        },
+      }).catch((provPushErr) => console.warn('[Provider status push error]', provPushErr?.message))
+    }
+
+    // To Labourers
+    if (booking.assignments && booking.assignments.length > 0) {
+      for (const a of booking.assignments) {
+        const lid = typeof a.labourId === 'object' ? a.labourId._id : a.labourId
+        if (lid) await notifyAssignedLabour(lid)
+      }
+    } else if (booking.laborId) {
+      await notifyAssignedLabour(booking.laborId)
     }
 
     // To Admins

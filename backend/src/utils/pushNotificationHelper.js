@@ -86,7 +86,18 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
     }
 
     const timestampStr = stringifiedData.timestamp || stringifiedData.createdAt || String(Date.now());
-    const channelId = isBookingOffer ? 'new_booking_alerts_v2' : 'high_importance_channel';
+    const userRole = user.role || 'customer';
+    const isCustomer = userRole === 'customer';
+    // Customer app uses 'high_importance_channel'
+    // Provider app uses 'new_booking_alerts_v2' for booking offers, and 'high_importance_channel' for general updates
+    let channelId;
+    if (payload.channelId) {
+      channelId = payload.channelId;
+    } else if (isCustomer) {
+      channelId = 'high_importance_channel';
+    } else {
+      channelId = 'new_booking_alerts_v2';
+    }
 
     const defaultTitle = isBookingOffer ? 'New Booking Received! ⚡' : 'A2Z Service Hub';
     const defaultBody = isBookingOffer
@@ -215,7 +226,7 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
         body: finalBody,
         priority: 'max',
         visibility: 'public',
-        clickAction: targetUrl,
+        channelId: channelId,
         defaultVibrateTimings: true,
       };
 
@@ -226,9 +237,6 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
         androidNotificationConfig.sound = 'default';
         androidNotificationConfig.defaultSound = true;
       }
-
-      // Use valid Android channel new_booking_alerts_v2 so notifications are never dropped by Android OS
-      androidNotificationConfig.channelId = payload.channelId || 'new_booking_alerts_v2';
 
       const mobileMessage = {
         notification: {

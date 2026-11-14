@@ -588,6 +588,36 @@ export async function startBroadcastCycle(bookingId) {
               isBookingAlert: 'true',
             },
           })
+
+          // Create In-App Notification record for Labour Notification feed
+          const isMultiScheduled = booking.type === 'SCHEDULED' || booking.type === 'scheduled'
+          const multiNotifTitle = isMultiScheduled ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡'
+          const multiNotifBody = isMultiScheduled
+            ? `New multi-service job (${servicesPayload.length} services) scheduled for ${booking.timeSlot || 'Scheduled Time'}. Estimated earnings: ₹${totalEarnings}. Tap to accept!`
+            : `New multi-service job (${servicesPayload.length} services, ~${formattedBookingDuration}) near you. Estimated earnings: ₹${totalEarnings}. Tap to accept!`
+
+          import('../models/InAppNotification.js').then(({ InAppNotification }) => {
+            InAppNotification.create({
+              userId: labor._id,
+              title: multiNotifTitle,
+              body: multiNotifBody,
+              type: 'BOOKING_STATUS',
+              bookingId: booking._id,
+              deliveryStatus: 'SENT',
+              metadata: {
+                bookingId: booking._id,
+                bookingType: booking.type,
+                scheduledAt: booking.scheduledAt,
+                timeSlot: booking.timeSlot,
+                earnings: totalEarnings,
+                link: '/serviceprovider',
+              },
+            }).then((inAppRecord) => {
+              import('../socket.js').then(({ emitToUser }) => {
+                emitToUser(labor._id, 'NEW_IN_APP_NOTIFICATION', inAppRecord)
+              }).catch(err => console.error(err))
+            }).catch(err => console.error('[InAppNotification Create Error]', err))
+          }).catch(err => console.error(err))
         } else if (booking.contractorInfo?.services?.length > 0) {
           // Find open services that match this labourer's skills
           const matchingOpenServices = booking.contractorInfo.services
