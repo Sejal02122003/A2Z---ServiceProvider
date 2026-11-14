@@ -221,6 +221,7 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
 
       if (isBookingOffer) {
         androidNotificationConfig.sound = 'alert';
+        androidNotificationConfig.defaultSound = true;
       } else {
         androidNotificationConfig.sound = 'default';
         androidNotificationConfig.defaultSound = true;
@@ -239,7 +240,7 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
         data: baseDataPayload,
         android: {
           priority: 'high',
-          ttl: 60 * 1000,
+          ttl: 86400 * 1000, // 24 hours TTL so sleeping/locked phones receive it without timeout drop
           notification: androidNotificationConfig,
         },
         tokens: mobileTokens,

@@ -117,16 +117,6 @@ export async function registerFCMToken(forceUpdate = false) {
 
     const currentUserId = state?.auth?.user?._id;
     const savedToken = localStorage.getItem('fcm_token_web');
-    
-    // Check if this token was already confirmed synced for THIS specific user in this tab session
-    if (
-      savedToken &&
-      !forceUpdate &&
-      currentUserId &&
-      sessionStorage.getItem(`fcm_synced_${currentUserId}`) === savedToken
-    ) {
-      return savedToken;
-    }
 
     if (forceUpdate) {
       localStorage.removeItem('fcm_token_web');
