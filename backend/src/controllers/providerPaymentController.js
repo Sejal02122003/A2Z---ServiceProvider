@@ -715,11 +715,17 @@ export const reviewPayment = asyncHandler(async (req, res) => {
 
     // Push notification
     try {
-      sendNotificationToUser(
-        updatedPayment.providerId,
-        'Payment Approved',
-        `Your UPI payment of ₹${finalAmount} has been verified and processed.`
-      ).catch(() => {})
+      sendNotificationToUser(updatedPayment.providerId, {
+        title: 'Payment Approved! 💰',
+        body: `Your UPI payment of ₹${finalAmount} has been verified and processed.`,
+        link: '/serviceprovider/wallet',
+        data: {
+          type: 'PAYMENT_APPROVED',
+          paymentId: String(updatedPayment._id),
+          amount: String(finalAmount),
+          link: '/serviceprovider/wallet',
+        },
+      }).catch(() => {})
     } catch {
       // safe fallback
     }

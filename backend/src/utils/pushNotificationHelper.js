@@ -17,6 +17,11 @@ setInterval(cleanupIdempotencyCache, 30000).unref();
 
 export async function sendNotificationToUser(userId, payload, includeMobile = true) {
   try {
+    if (typeof payload === 'string') {
+      payload = { title: payload, body: arguments[2] || payload };
+    }
+    payload = payload || {};
+
     // Sanitize data payload (FCM multicast data requires all values to be strings)
     const stringifiedData = {};
     if (payload.data && typeof payload.data === 'object') {
