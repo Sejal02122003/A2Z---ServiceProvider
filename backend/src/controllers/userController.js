@@ -157,6 +157,21 @@ export const updateMe = asyncHandler(async (req, res) => {
     }
   }
 
+  // Allow mobile or web to sync FCM token via updateMe
+  const rawFcmToken = req.body.fcmToken ?? req.body.token ?? req.body.deviceToken ?? req.body.fcm_token
+  if (rawFcmToken) {
+    const fcmStr = typeof rawFcmToken === 'string' ? rawFcmToken.trim() : (rawFcmToken && typeof rawFcmToken === 'object' ? String(rawFcmToken.token || rawFcmToken.fcmToken || '').trim() : '')
+    if (fcmStr) {
+      const platform = String(req.body.platform || 'mobile').toLowerCase()
+      const tokenField = platform === 'web' ? 'fcmTokens' : 'fcmTokenMobile'
+      if (!Array.isArray(user[tokenField])) user[tokenField] = []
+      if (!user[tokenField].includes(fcmStr)) {
+        user[tokenField].push(fcmStr)
+        console.log(`[USER UPDATE] Added ${platform} FCM token to user ${user.phone || user._id}`)
+      }
+    }
+  }
+
   try {
     await user.save()
   } catch (err) {
@@ -1200,35 +1215,130 @@ export const updateLabourSchedule = asyncHandler(async (req, res) => {
 
 /** POST /users/test-notification — Send a test Firebase push notification */
 export const testNotification = asyncHandler(async (req, res) => {
-  const { token, title, body } = req.body;
-  if (!token) {
-    return sendError(res, { message: 'Device token is required', statusCode: HTTP_STATUS.BAD_REQUEST, code: 'MISSING_TOKEN' });
+  const reqBody = req.body || {}
+  const rawToken =
+    reqBody.token ??
+    reqBody.fcmToken ??
+    reqBody.fcm_token ??
+    reqBody.deviceToken ??
+    reqBody.device_token ??
+    reqBody.registrationToken
+
+  let explicitToken =
+    typeof rawToken === 'string'
+      ? rawToken.trim()
+      : rawToken && typeof rawToken === 'object'
+      ? String(rawToken.token || rawToken.fcmToken || rawToken.deviceToken || '').trim()
+      : ''
+
+  const finalTitle = reqBody.title || 'A2Z Service Hub'
+  const finalBody = reqBody.body || '🔔 Push notification test! Your device is successfully linked to receive alerts.'
+
+  console.log(`[Notification Auth] Request: user=${req.user?._id || 'anonymous'}, role=${req.user?.role || 'none'}, explicitTokenProvided=${Boolean(explicitToken)}`)
+
+  // If no explicit token provided, attempt fallback to authenticated user's stored tokens
+  if (!explicitToken) {
+    const targetUserId = req.user?._id || reqBody.userId
+    if (targetUserId) {
+      console.log(`[Notification Token] No explicit token passed. Attempting dispatch to stored tokens for user ${targetUserId}`)
+      const { sendNotificationToUser } = await import('../utils/pushNotificationHelper.js')
+      const result = await sendNotificationToUser(targetUserId, {
+        title: finalTitle,
+        body: finalBody,
+        data: { type: 'test', link: '/' },
+      })
+
+      if (!result?.success) {
+        console.warn(`[Notification Firebase] Dispatch to stored tokens failed:`, result)
+        return sendError(res, {
+          message: result?.noTokens
+            ? 'No registered device tokens found for this user in DB. Please open the app/browser and allow notifications.'
+            : (result?.error || 'Failed to dispatch push notification through FCM'),
+          statusCode: HTTP_STATUS.BAD_REQUEST,
+          code: result?.noTokens ? 'NO_STORED_TOKENS' : 'NOTIFICATION_FAILED',
+          data: result,
+        })
+      }
+
+      console.log(`[Notification Firebase] Successfully dispatched to stored tokens (${result.successCount} delivered)`)
+      return sendSuccess(res, {
+        message: `Notification sent successfully to user devices (${result.successCount} delivered)`,
+        data: result,
+      })
+    }
+
+    console.warn('[Notification Token] Token validation failed: No token provided and caller not authenticated')
+    return sendError(res, {
+      message: 'Device token is required (pass "token" or "fcmToken" in request body, or log in)',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'MISSING_TOKEN',
+    })
   }
 
-  const { getFirebaseAdmin } = await import('../config/firebase.js');
-  const admin = getFirebaseAdmin();
-  if (!admin) {
-    return sendError(res, { message: 'Firebase Admin not configured', statusCode: HTTP_STATUS.SERVICE_UNAVAILABLE, code: 'FIREBASE_NOT_CONFIGURED' });
+  // Explicit token dispatch via Firebase Admin
+  const { getFirebaseAdmin } = await import('../config/firebase.js')
+  const admin = getFirebaseAdmin()
+  if (!admin || !admin.messaging) {
+    console.error('[Notification Firebase] Firebase Admin SDK is not configured')
+    return sendError(res, {
+      message: 'Firebase Admin not configured. Please ensure service account credentials exist in backend/src/config.',
+      statusCode: HTTP_STATUS.SERVICE_UNAVAILABLE,
+      code: 'FIREBASE_NOT_CONFIGURED',
+    })
   }
 
   try {
+    console.log(`[Notification Firebase] Dispatching directly to token: ${explicitToken.substring(0, 18)}...`)
     const response = await admin.messaging().send({
-      token,
+      token: explicitToken,
       notification: {
-        title: title || 'Test Notification',
-        body: body || 'This is a test notification from A2Z backend.',
+        title: finalTitle,
+        body: finalBody,
       },
-    });
-    return sendSuccess(res, { message: 'Notification sent successfully', data: { messageId: response } });
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'high_importance_channel',
+          sound: 'default',
+          priority: 'high',
+        },
+      },
+      webpush: {
+        headers: { Urgency: 'high' },
+        notification: {
+          title: finalTitle,
+          body: finalBody,
+          icon: '/logo.png',
+        },
+      },
+      data: {
+        type: 'test',
+        title: finalTitle,
+        body: finalBody,
+        timestamp: String(Date.now()),
+      },
+    })
+
+    console.log(`[Notification Firebase] Direct dispatch successful. MessageId: ${response}`)
+    return sendSuccess(res, {
+      message: 'Notification sent successfully',
+      data: { messageId: response, token: explicitToken.substring(0, 18) + '...' },
+    })
   } catch (error) {
-    console.error('Error sending test notification:', error);
-    return sendError(res, { 
-      message: error.message || 'Failed to send notification', 
-      statusCode: HTTP_STATUS.SERVER_ERROR, 
-      code: error.code || 'NOTIFICATION_FAILED' 
-    });
+    console.error('[Notification Firebase] Direct dispatch error:', error.code || error.message || error)
+    const isUnregistered = error.code === 'messaging/registration-token-not-registered'
+    const isInvalid = error.code === 'messaging/invalid-argument'
+    return sendError(res, {
+      message: isUnregistered
+        ? 'The provided FCM token is expired or not registered with Firebase.'
+        : isInvalid
+        ? 'The provided FCM registration token is malformed.'
+        : (error.message || 'Failed to send notification'),
+      statusCode: isUnregistered || isInvalid ? HTTP_STATUS.BAD_REQUEST : HTTP_STATUS.SERVER_ERROR,
+      code: error.code || 'NOTIFICATION_FAILED',
+    })
   }
-});
+})
 
 export const updateUserStatus = asyncHandler(async (req, res) => {
   const { id } = req.params

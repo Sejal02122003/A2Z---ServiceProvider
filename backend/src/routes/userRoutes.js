@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { body, param, query } from 'express-validator'
-import { protect, restrictTo } from '../middleware/auth.js'
+import { protect, optionalAuth, restrictTo } from '../middleware/auth.js'
 import { validateRequest } from '../middleware/validateRequest.js'
 import * as user from '../controllers/userController.js'
 import { USER_ROLES } from '../constants/roles.js'
@@ -26,7 +26,16 @@ router.get(
   user.getDiscoverLabour,
 )
 
-router.post('/test-notification', user.testNotification)
+router
+  .route('/test-notification')
+  .get((_req, res) => {
+    return res.status(400).json({
+      success: false,
+      message: 'Method Not Allowed. Please use POST to send test notifications.',
+      code: 'METHOD_NOT_ALLOWED',
+    })
+  })
+  .post(optionalAuth, user.testNotification)
 
 // Publicly available trial slots and evaluation hub address (used during onboarding & registration)
 router.get(
@@ -276,16 +285,16 @@ router.patch(
   user.evaluatePartnerTrialAdmin,
 )
 
-router.get('/:id', restrictTo(USER_ROLES.ADMIN), validateUserIdParam, validateRequest, user.getUserById)
+router.get('/:id', validateUserIdParam, validateRequest, restrictTo(USER_ROLES.ADMIN), user.getUserById)
 
 router.patch(
   '/:id/status',
-  restrictTo(USER_ROLES.ADMIN),
   validateUserIdParam,
   validateRequest,
+  restrictTo(USER_ROLES.ADMIN),
   user.updateUserStatus,
 )
 
-router.delete('/:id', restrictTo(USER_ROLES.ADMIN), validateUserIdParam, validateRequest, user.deleteUser)
+router.delete('/:id', validateUserIdParam, validateRequest, restrictTo(USER_ROLES.ADMIN), user.deleteUser)
 
 export default router

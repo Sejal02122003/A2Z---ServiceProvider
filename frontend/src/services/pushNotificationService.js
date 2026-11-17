@@ -147,9 +147,10 @@ export async function registerFCMToken(forceUpdate = false) {
 
     token = token.trim();
 
+    console.log(`[PUSH] Syncing FCM token to backend for user ${currentUserId || 'unknown'}...`);
     const response = await apiRequest('/fcm-tokens/save', {
       method: 'POST',
-      body: { token, platform: 'web' },
+      body: { token, platform: 'web', userId: currentUserId },
     });
 
     if (response?.success) {

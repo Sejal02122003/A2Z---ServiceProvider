@@ -2,20 +2,31 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { sendSuccess, sendError, HTTP_STATUS } from '../utils/apiResponse.js'
 import { User } from '../models/User.js'
 import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
+import { normalizeIndianPhone } from '../utils/phone.js'
 
 export const saveToken = asyncHandler(async (req, res) => {
   const body = req.body || {}
   const platform = String(body.platform || 'web').toLowerCase()
-  const rawToken = body.token
+  
+  // Extract token from multiple common property names
+  const rawToken =
+    body.token ??
+    body.fcmToken ??
+    body.fcm_token ??
+    body.deviceToken ??
+    body.device_token ??
+    body.registrationToken ??
+    body.registration_token
 
   const token =
     typeof rawToken === 'string'
       ? rawToken.trim()
-      : rawToken && typeof rawToken.token === 'string'
-      ? rawToken.token.trim()
+      : rawToken && typeof rawToken === 'object'
+      ? String(rawToken.token || rawToken.fcmToken || rawToken.deviceToken || '').trim()
       : ''
 
   if (!token) {
+    console.warn('[FCM Save] Missing token in payload:', Object.keys(body))
     return sendError(res, {
       message: 'Token is required and must be a valid non-empty string',
       statusCode: HTTP_STATUS.BAD_REQUEST,
@@ -23,15 +34,30 @@ export const saveToken = asyncHandler(async (req, res) => {
     })
   }
 
-  const userId = req.user?._id
+  // Resolve user: from authenticated session, or explicit userId/phone in payload
+  let userId = req.user?._id
+  if (!userId && body.userId) {
+    userId = body.userId
+  }
+  if (!userId && body.phone) {
+    const cleanPhone = normalizeIndianPhone(body.phone) || String(body.phone).replace(/\D/g, '').slice(-10)
+    const foundUser = await User.findOne({ phone: cleanPhone })
+    if (foundUser) userId = foundUser._id
+  }
+
   if (!userId) {
-    return sendError(res, { message: 'Authentication required', statusCode: HTTP_STATUS.UNAUTHORIZED })
+    console.warn('[FCM Save] No authenticated user or valid user identifier provided')
+    return sendError(res, {
+      message: 'Authentication required. Please log in or provide a valid userId/phone.',
+      statusCode: HTTP_STATUS.UNAUTHORIZED,
+      code: 'UNAUTHORIZED',
+    })
   }
 
   const isWeb = platform === 'web'
   const tokenField = isWeb ? 'fcmTokens' : 'fcmTokenMobile'
 
-  // Atomically append token into array if not present (prevents VersionError and full document validation failures)
+  // Atomically append token into array if not present
   const updatedUser = await User.findByIdAndUpdate(
     userId,
     { $addToSet: { [tokenField]: token } },
@@ -49,10 +75,14 @@ export const saveToken = asyncHandler(async (req, res) => {
     await User.findByIdAndUpdate(userId, { $set: { [tokenField]: trimmed } })
   }
 
-  console.log(`[FCM] Successfully linked ${platform} token to user ${updatedUser.phone || userId} (${updatedUser.role})`)
+  console.log(`[FCM Save] Successfully saved ${platform} token for user ${updatedUser.phone || userId} (${updatedUser.role}). Total tokens: ${tokens.length}`)
   return sendSuccess(res, {
-    message: 'FCM token saved',
-    totalTokens: Math.min(tokens.length, 30),
+    message: 'FCM token saved successfully',
+    data: {
+      platform,
+      totalTokens: Math.min(tokens.length, 30),
+      tokenField,
+    },
   })
 })
 

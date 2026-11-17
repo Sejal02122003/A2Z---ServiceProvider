@@ -20,6 +20,19 @@ function buildAuthPayload(user, token) {
   }
 }
 
+async function saveAuthFcmToken(user, body) {
+  if (!user?._id || !body) return
+  const rawToken = body.fcmToken ?? body.token ?? body.deviceToken ?? body.fcm_token
+  const platform = String(body.platform || 'mobile').toLowerCase()
+  const token = typeof rawToken === 'string' ? rawToken.trim() : (rawToken && typeof rawToken === 'object' ? String(rawToken.token || rawToken.fcmToken || '').trim() : '')
+  if (token) {
+    const isWeb = platform === 'web'
+    const tokenField = isWeb ? 'fcmTokens' : 'fcmTokenMobile'
+    await User.findByIdAndUpdate(user._id, { $addToSet: { [tokenField]: token } })
+    console.log(`[AUTH] Automatically linked ${platform} FCM token to user ${user.phone || user._id}`)
+  }
+}
+
 /** POST /auth/register/request-otp */
 export const registerRequestOtp = asyncHandler(async (req, res) => {
   const { phone: rawPhone, role, authGroup } = req.body
@@ -103,6 +116,7 @@ export const registerVerify = asyncHandler(async (req, res) => {
         existing.fullName = fullName.trim()
       }
       await existing.save()
+      await saveAuthFcmToken(existing, req.body)
       const token = signAccessToken(existing)
 
       let welcomeBonus = null
@@ -193,6 +207,7 @@ export const registerVerify = asyncHandler(async (req, res) => {
         }
         fallback.lastLoginAt = new Date()
         await fallback.save()
+        await saveAuthFcmToken(fallback, req.body)
 
         let welcomeBonus = null
         if (fallback.role === USER_ROLES.CUSTOMER) {
@@ -272,6 +287,7 @@ export const registerVerify = asyncHandler(async (req, res) => {
     }
   }
 
+  await saveAuthFcmToken(user, req.body)
   const token = signAccessToken(user)
   return sendSuccess(res, {
     message: 'Account created',
@@ -409,6 +425,7 @@ export const loginVerify = asyncHandler(async (req, res) => {
     }
   }
 
+  await saveAuthFcmToken(user, req.body)
   const token = signAccessToken(user)
   return sendSuccess(res, {
     message: 'Login successful',
@@ -447,6 +464,7 @@ export const adminLogin = asyncHandler(async (req, res) => {
   }
   user.lastLoginAt = new Date()
   await user.save()
+  await saveAuthFcmToken(user, { ...req.body, platform: 'web' })
   const token = signAccessToken(user)
   return sendSuccess(res, {
     message: 'Admin login successful',

@@ -103,13 +103,20 @@ export const markAllNotificationsRead = asyncHandler(async (req, res) => {
 export const saveFcmToken = asyncHandler(async (req, res) => {
   const body = req.body || {}
   const platform = String(body.platform || 'web').toLowerCase()
-  const rawToken = body.token
+  const rawToken =
+    body.token ??
+    body.fcmToken ??
+    body.fcm_token ??
+    body.deviceToken ??
+    body.device_token ??
+    body.registrationToken ??
+    body.registration_token
 
   const token =
     typeof rawToken === 'string'
       ? rawToken.trim()
-      : rawToken && typeof rawToken.token === 'string'
-      ? rawToken.token.trim()
+      : rawToken && typeof rawToken === 'object'
+      ? String(rawToken.token || rawToken.fcmToken || rawToken.deviceToken || '').trim()
       : ''
 
   if (!token) {
@@ -120,9 +127,19 @@ export const saveFcmToken = asyncHandler(async (req, res) => {
     })
   }
 
-  const userId = req.user?._id
+  let userId = req.user?._id
+  if (!userId && body.userId) {
+    userId = body.userId
+  }
+  if (!userId && body.phone) {
+    const { normalizeIndianPhone } = await import('../utils/phone.js')
+    const cleanPhone = normalizeIndianPhone(body.phone) || String(body.phone).replace(/\D/g, '').slice(-10)
+    const foundUser = await User.findOne({ phone: cleanPhone })
+    if (foundUser) userId = foundUser._id
+  }
+
   if (!userId) {
-    return sendError(res, { message: 'Authentication required', statusCode: HTTP_STATUS.UNAUTHORIZED })
+    return sendError(res, { message: 'Authentication required. Please log in or provide userId/phone.', statusCode: HTTP_STATUS.UNAUTHORIZED })
   }
 
   const isWeb = platform === 'web'
@@ -144,6 +161,7 @@ export const saveFcmToken = asyncHandler(async (req, res) => {
     await User.findByIdAndUpdate(userId, { $set: { [tokenField]: trimmed } })
   }
 
+  console.log(`[FCM Notification Save] Saved ${platform} token for user ${updatedUser.phone || userId}`)
   return sendSuccess(res, { message: 'FCM token registered successfully' })
 })
 
