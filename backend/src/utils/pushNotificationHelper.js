@@ -155,7 +155,7 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
       channelId: channelId,
       defaultVibrateTimings: true,
       sound: isBookingOffer ? 'alert' : 'default',
-      defaultSound: !isBookingOffer,
+      defaultSound: true,
     };
 
     // 1. Dispatch to Web Tokens (PWA / Browser / Mobile WebViews)
