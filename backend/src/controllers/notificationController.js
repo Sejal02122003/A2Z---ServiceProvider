@@ -101,36 +101,49 @@ export const markAllNotificationsRead = asyncHandler(async (req, res) => {
  * Save FCM registration token for Web or Mobile
  */
 export const saveFcmToken = asyncHandler(async (req, res) => {
-  const { token, platform = 'web' } = req.body
+  const body = req.body || {}
+  const platform = String(body.platform || 'web').toLowerCase()
+  const rawToken = body.token
+
+  const token =
+    typeof rawToken === 'string'
+      ? rawToken.trim()
+      : rawToken && typeof rawToken.token === 'string'
+      ? rawToken.token.trim()
+      : ''
+
   if (!token) {
     return sendError(res, {
-      message: 'Token is required',
+      message: 'Token is required and must be a valid non-empty string',
       statusCode: HTTP_STATUS.BAD_REQUEST,
       code: 'MISSING_TOKEN',
     })
   }
 
-  const userId = req.user._id
-  const user = await User.findById(userId)
-  if (!user) {
+  const userId = req.user?._id
+  if (!userId) {
+    return sendError(res, { message: 'Authentication required', statusCode: HTTP_STATUS.UNAUTHORIZED })
+  }
+
+  const isWeb = platform === 'web'
+  const tokenField = isWeb ? 'fcmTokens' : 'fcmTokenMobile'
+
+  const updatedUser = await User.findByIdAndUpdate(
+    userId,
+    { $addToSet: { [tokenField]: token } },
+    { new: true, select: `phone role ${tokenField}` },
+  )
+
+  if (!updatedUser) {
     return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
   }
 
-  if (platform === 'web') {
-    if (!user.fcmTokens) user.fcmTokens = []
-    if (!user.fcmTokens.includes(token)) {
-      user.fcmTokens.push(token)
-      if (user.fcmTokens.length > 30) user.fcmTokens = user.fcmTokens.slice(-30)
-    }
-  } else {
-    if (!user.fcmTokenMobile) user.fcmTokenMobile = []
-    if (!user.fcmTokenMobile.includes(token)) {
-      user.fcmTokenMobile.push(token)
-      if (user.fcmTokenMobile.length > 30) user.fcmTokenMobile = user.fcmTokenMobile.slice(-30)
-    }
+  const tokens = Array.isArray(updatedUser[tokenField]) ? updatedUser[tokenField] : []
+  if (tokens.length > 30) {
+    const trimmed = tokens.slice(-30)
+    await User.findByIdAndUpdate(userId, { $set: { [tokenField]: trimmed } })
   }
 
-  await user.save()
   return sendSuccess(res, { message: 'FCM token registered successfully' })
 })
 
@@ -139,28 +152,37 @@ export const saveFcmToken = asyncHandler(async (req, res) => {
  * De-register FCM token on logout
  */
 export const removeFcmToken = asyncHandler(async (req, res) => {
-  const { token, platform = 'web' } = req.body
+  const body = req.body || {}
+  const platform = String(body.platform || 'web').toLowerCase()
+  const rawToken = body.token
+
+  const token =
+    typeof rawToken === 'string'
+      ? rawToken.trim()
+      : rawToken && typeof rawToken.token === 'string'
+      ? rawToken.token.trim()
+      : ''
+
   if (!token) {
     return sendError(res, {
-      message: 'Token is required',
+      message: 'Token is required and must be a valid non-empty string',
       statusCode: HTTP_STATUS.BAD_REQUEST,
       code: 'MISSING_TOKEN',
     })
   }
 
-  const userId = req.user._id
-  const user = await User.findById(userId)
-  if (!user) {
-    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  const userId = req.user?._id
+  if (!userId) {
+    return sendSuccess(res, { message: 'FCM token removed successfully' })
   }
 
-  if (platform === 'web' && user.fcmTokens) {
-    user.fcmTokens = user.fcmTokens.filter((t) => t !== token)
-  } else if (platform === 'mobile' && user.fcmTokenMobile) {
-    user.fcmTokenMobile = user.fcmTokenMobile.filter((t) => t !== token)
-  }
+  const isWeb = platform === 'web'
+  const tokenField = isWeb ? 'fcmTokens' : 'fcmTokenMobile'
 
-  await user.save()
+  await User.findByIdAndUpdate(userId, {
+    $pull: { [tokenField]: token },
+  })
+
   return sendSuccess(res, { message: 'FCM token removed successfully' })
 })
 

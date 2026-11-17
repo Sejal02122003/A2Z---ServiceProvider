@@ -20,6 +20,22 @@ export function errorHandler(err, req, res, _next) {
     })
   }
 
+  if (err instanceof mongoose.Error.CastError) {
+    return sendError(res, {
+      message: `Invalid format for field '${err.path}'`,
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'INVALID_ID_FORMAT',
+    })
+  }
+
+  if (err instanceof mongoose.Error.VersionError) {
+    return sendError(res, {
+      message: 'Concurrent update conflict. Please retry the operation.',
+      statusCode: HTTP_STATUS.CONFLICT,
+      code: 'VERSION_CONFLICT',
+    })
+  }
+
   if (err.code === 11000) {
     return sendError(res, {
       message: 'Duplicate entry',

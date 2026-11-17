@@ -184,7 +184,7 @@ export async function startBroadcastCycle(bookingId) {
     const cleanStr = s.split(/[–\-]/)[0].trim()
     const match = cleanStr.match(/(\d+):(\d+)\s?(AM|PM)?/i)
     if (!match) return timeStr
-    let [ , h, m, ampm ] = match
+    let [, h, m, ampm] = match
     h = parseInt(h, 10)
     if (ampm) {
       if (ampm.toUpperCase() === 'PM' && h < 12) h += 12
@@ -230,10 +230,10 @@ export async function startBroadcastCycle(bookingId) {
           console.log(`[BROADCAST] Excluding provider ${labor.fullName || labor.phone} - offline on ${targetDayName} (Time Management toggle is OFF)`)
           return false
         }
-        
+
         const sTime = to24Hour(dayEntry.startTime || '00:00')
         const eTime = to24Hour(dayEntry.endTime || '23:59')
-        
+
         if (booking.type === 'INSTANT') {
           // 3. For instant booking, if current IST time is outside working hours, they are OFFLINE
           if (currentIstTimeStr < sTime || currentIstTimeStr > eTime) {
@@ -298,7 +298,7 @@ export async function startBroadcastCycle(bookingId) {
         endDate: { $gte: today },
         status: 'active'
       })
-      
+
       if (activeSub) {
         subEligible.push(labor)
         activeSubsMap[labor._id] = activeSub
@@ -345,7 +345,7 @@ export async function startBroadcastCycle(bookingId) {
     // Worker has not reported GPS yet: assign a nominal 2.5 km proximity so they receive the popup
     return { id: d.id, distanceKm: 2.5, isApproximate: true }
   })
-  
+
   let eligibleLaborers = subEligible.filter(labor => {
     const distData = finalDistances.find(d => d.id === String(labor._id))
     const inRadius = distData && distData.distanceKm <= radiusKm
@@ -392,28 +392,28 @@ export async function startBroadcastCycle(bookingId) {
     const dist = (distData && typeof distData.distanceKm === 'number' && !isNaN(distData.distanceKm))
       ? distData.distanceKm
       : 2.5
-    
+
     // Distance (closer is better)
-    const distScore = Math.max(0, radiusKm - dist) * 2 
-    
+    const distScore = Math.max(0, radiusKm - dist) * 2
+
     // Experience
     const exp = labor.labourProfile?.experienceYears || 0
-    const expScore = exp * 1.5 
-    
+    const expScore = exp * 1.5
+
     // Rating
     const rating = ratingMap[idStr] || 0
     const ratingScore = rating * 3
-    
+
     // Completed Bookings
     const completed = completedMap[idStr] || 0
     const completedScore = Math.min(completed, 100) * 0.1
-    
+
     // Response Rate
     const received = labor.labourProfile?.lifetimeBroadcastsReceived || 0
     const accepted = labor.labourProfile?.lifetimeBroadcastsAccepted || 0
     const responseRate = received > 0 ? (accepted / received) : 0
     const responseScore = responseRate * 10
-    
+
     labor.matchScore = distScore + expScore + ratingScore + completedScore + responseScore
     labor.approximateDistance = dist
   })
@@ -430,7 +430,7 @@ export async function startBroadcastCycle(bookingId) {
 
   // Notify customer
   import('../socket.js').then(({ emitToUser }) => {
-    emitToUser(booking.userId, 'BOOKING_BROADCAST_STARTED', { 
+    emitToUser(booking.userId, 'BOOKING_BROADCAST_STARTED', {
       bookingId: booking._id,
       radiusKm: radiusKm,
       eligibleCount: eligibleLaborers.length
@@ -669,7 +669,7 @@ export async function startBroadcastCycle(bookingId) {
               timeoutMs: BROADCAST_TIMEOUT_MS
             })
           })
-          
+
           sendNotificationToUser(labor._id, {
             title: booking.type === 'SCHEDULED' ? 'New Scheduled Job Offer! ⏰' : 'New Booking Received! ⚡',
             body: `New ${servicesPayload.length === 1 ? servicesPayload[0].name : 'Multiple Services'} job available near you. Estimated earnings: ₹${bestEarning}`,
@@ -791,7 +791,7 @@ export async function startBroadcastCycle(bookingId) {
               timeoutMs: BROADCAST_TIMEOUT_MS
             })
           })
-          
+
           console.log(`[FLOW: 2_DISPATCH_PROVIDER_PUSH] Sending flash broadcast offer to provider ${labor.fullName || labor.phone} (${labor._id}) for booking #${String(booking._id).slice(-6)} (earnings=₹${singleShare})`)
           sendNotificationToUser(labor._id, {
             title: booking.packageBooking?.isPackage
@@ -856,7 +856,7 @@ export async function startBroadcastCycle(bookingId) {
             }).catch(err => console.error('[InAppNotification Create Error]', err))
           }).catch(err => console.error(err))
         }
-        
+
         const sub = activeSubsMap[labor._id]
         if (sub) {
           sub.bookingsReceived += 1
@@ -883,10 +883,10 @@ export async function startBroadcastCycle(bookingId) {
         currentBooking.status = 'ACCEPTED'
         await currentBooking.save()
         console.log(`Booking ${booking._id} EXPIRED with partial acceptance (${currentBooking.acceptedLabourIds.length}/${currentBooking.quantity || 1}).`)
-        
+
         import('../socket.js').then(({ emitToUser, getIo }) => {
           emitToUser(currentBooking.userId, 'BOOKING_ACCEPTED', { bookingId: currentBooking._id, partial: true, acceptedCount: currentBooking.acceptedLabourIds.length })
-          
+
           const io = getIo()
           if (io) {
             io.emit('BOOKING_EXPIRED', { bookingId: currentBooking._id })
@@ -896,11 +896,11 @@ export async function startBroadcastCycle(bookingId) {
         currentBooking.status = 'FAILED'
         await currentBooking.save()
         console.log(`Booking ${booking._id} EXPIRED without acceptance.`)
-        
+
         // Notify customer
         import('../socket.js').then(({ emitToUser }) => {
           emitToUser(currentBooking.userId, 'BOOKING_FAILED', { bookingId: currentBooking._id, reason: 'Expired' })
-          
+
           // Notify laborers that it expired
           eligibleLaborers.forEach(labor => {
             emitToUser(labor._id, 'BOOKING_EXPIRED', { bookingId: currentBooking._id })

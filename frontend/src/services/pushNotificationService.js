@@ -117,12 +117,16 @@ export async function registerFCMToken(forceUpdate = false) {
 
     const currentUserId = state?.auth?.user?._id;
     const savedToken = localStorage.getItem('fcm_token_web');
+    const isAlreadySynced = currentUserId && sessionStorage.getItem(`fcm_synced_${currentUserId}`);
 
     if (forceUpdate) {
       localStorage.removeItem('fcm_token_web');
       if (currentUserId) {
         sessionStorage.removeItem(`fcm_synced_${currentUserId}`);
       }
+    } else if (isAlreadySynced && savedToken) {
+      // Already verified and linked to backend in this browser session
+      return savedToken;
     }
 
     let token = null;
@@ -136,14 +140,16 @@ export async function registerFCMToken(forceUpdate = false) {
       token = savedToken;
     }
 
-    if (!token) {
-      console.warn('[PUSH] Could not retrieve fresh FCM token from Firebase.');
+    if (!token || typeof token !== 'string' || !token.trim()) {
+      console.warn('[PUSH] Could not retrieve valid FCM token from Firebase.');
       return null;
     }
 
+    token = token.trim();
+
     const response = await apiRequest('/fcm-tokens/save', {
       method: 'POST',
-      body: { token, platform: 'web' }
+      body: { token, platform: 'web' },
     });
 
     if (response?.success) {

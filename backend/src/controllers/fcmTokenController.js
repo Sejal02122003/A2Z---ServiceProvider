@@ -4,62 +4,94 @@ import { User } from '../models/User.js'
 import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
 
 export const saveToken = asyncHandler(async (req, res) => {
-  const { token, platform = 'web' } = req.body;
+  const body = req.body || {}
+  const platform = String(body.platform || 'web').toLowerCase()
+  const rawToken = body.token
+
+  const token =
+    typeof rawToken === 'string'
+      ? rawToken.trim()
+      : rawToken && typeof rawToken.token === 'string'
+      ? rawToken.token.trim()
+      : ''
+
   if (!token) {
-    return sendError(res, { message: 'Token is required', statusCode: HTTP_STATUS.BAD_REQUEST, code: 'MISSING_TOKEN' });
-  }
-  
-  const userId = req.user._id;
-  const user = await User.findById(userId);
-  if (!user) {
-    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND });
+    return sendError(res, {
+      message: 'Token is required and must be a valid non-empty string',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'MISSING_TOKEN',
+    })
   }
 
-  const isWeb = platform === 'web';
-  if (isWeb) {
-    if (!user.fcmTokens) user.fcmTokens = [];
-    if (!user.fcmTokens.includes(token)) {
-      user.fcmTokens.push(token);
-    }
-    user.fcmTokens = [...new Set(user.fcmTokens)].slice(-30);
-  } else {
-    // Treat 'android', 'mobile', 'ios', etc. as mobile tokens
-    if (!user.fcmTokenMobile) user.fcmTokenMobile = [];
-    if (!user.fcmTokenMobile.includes(token)) {
-      user.fcmTokenMobile.push(token);
-    }
-    user.fcmTokenMobile = [...new Set(user.fcmTokenMobile)].slice(-30);
+  const userId = req.user?._id
+  if (!userId) {
+    return sendError(res, { message: 'Authentication required', statusCode: HTTP_STATUS.UNAUTHORIZED })
   }
 
-  await user.save();
-  console.log(`[FCM] Successfully linked ${platform} token to user ${user.phone} (${user.role})`);
-  return sendSuccess(res, { message: 'FCM token saved', totalTokens: (isWeb ? user.fcmTokens : user.fcmTokenMobile).length });
-});
+  const isWeb = platform === 'web'
+  const tokenField = isWeb ? 'fcmTokens' : 'fcmTokenMobile'
+
+  // Atomically append token into array if not present (prevents VersionError and full document validation failures)
+  const updatedUser = await User.findByIdAndUpdate(
+    userId,
+    { $addToSet: { [tokenField]: token } },
+    { new: true, select: `phone role ${tokenField}` },
+  )
+
+  if (!updatedUser) {
+    return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  // Cap token list at 30 devices per user
+  const tokens = Array.isArray(updatedUser[tokenField]) ? updatedUser[tokenField] : []
+  if (tokens.length > 30) {
+    const trimmed = tokens.slice(-30)
+    await User.findByIdAndUpdate(userId, { $set: { [tokenField]: trimmed } })
+  }
+
+  console.log(`[FCM] Successfully linked ${platform} token to user ${updatedUser.phone || userId} (${updatedUser.role})`)
+  return sendSuccess(res, {
+    message: 'FCM token saved',
+    totalTokens: Math.min(tokens.length, 30),
+  })
+})
 
 export const removeToken = asyncHandler(async (req, res) => {
-  const { token, platform = 'web' } = req.body;
+  const body = req.body || {}
+  const platform = String(body.platform || 'web').toLowerCase()
+  const rawToken = body.token
+
+  const token =
+    typeof rawToken === 'string'
+      ? rawToken.trim()
+      : rawToken && typeof rawToken.token === 'string'
+      ? rawToken.token.trim()
+      : ''
+
   if (!token) {
-    return sendError(res, { message: 'Token is required', statusCode: HTTP_STATUS.BAD_REQUEST, code: 'MISSING_TOKEN' });
+    return sendError(res, {
+      message: 'Token is required and must be a valid non-empty string',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'MISSING_TOKEN',
+    })
   }
 
-  const userId = req.user?._id;
-  if (userId) {
-    const user = await User.findById(userId);
-    if (user) {
-      if (platform === 'web' && user.fcmTokens) {
-        user.fcmTokens = user.fcmTokens.filter(t => t !== token);
-      } else if (user.fcmTokenMobile) {
-        user.fcmTokenMobile = user.fcmTokenMobile.filter(t => t !== token);
-      }
-      await user.save();
-    }
+  const userId = req.user?._id
+  if (!userId) {
+    return sendSuccess(res, { message: 'FCM token removed' })
   }
 
-  // Only remove from current user (do not wipe across other test accounts)
+  const isWeb = platform === 'web'
+  const tokenField = isWeb ? 'fcmTokens' : 'fcmTokenMobile'
 
-  console.log(`[FCM] Invalidation complete: token removed for device logout`);
-  return sendSuccess(res, { message: 'FCM token removed' });
-});
+  // Atomically pull token from array
+  await User.findByIdAndUpdate(userId, {
+    $pull: { [tokenField]: token },
+  })
+
+  console.log(`[FCM] Invalidation complete: token removed for device logout`)
+  return sendSuccess(res, { message: 'FCM token removed' })
+})
 
 export const testNotification = asyncHandler(async (req, res) => {
   const userId = req.user._id;
