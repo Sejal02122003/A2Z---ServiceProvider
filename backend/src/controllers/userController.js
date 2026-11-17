@@ -1238,7 +1238,12 @@ export const testNotification = asyncHandler(async (req, res) => {
 
   // If no explicit token provided, attempt fallback to authenticated user's stored tokens
   if (!explicitToken) {
-    const targetUserId = req.user?._id || reqBody.userId
+    let targetUserId = req.user?._id || reqBody.userId
+    if (!targetUserId && reqBody.phone) {
+      const cleanPhone = String(reqBody.phone).replace(/\D/g, '').slice(-10)
+      const foundUser = await User.findOne({ phone: cleanPhone })
+      if (foundUser) targetUserId = foundUser._id
+    }
     if (targetUserId) {
       console.log(`[Notification Token] No explicit token passed. Attempting dispatch to stored tokens for user ${targetUserId}`)
       const { sendNotificationToUser } = await import('../utils/pushNotificationHelper.js')
