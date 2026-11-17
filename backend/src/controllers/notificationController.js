@@ -142,13 +142,17 @@ export const saveFcmToken = asyncHandler(async (req, res) => {
     return sendError(res, { message: 'Authentication required. Please log in or provide userId/phone.', statusCode: HTTP_STATUS.UNAUTHORIZED })
   }
 
-  const isWeb = platform === 'web'
-  const tokenField = isWeb ? 'fcmTokens' : 'fcmTokenMobile'
+  const userAgent = String(req.headers['user-agent'] || '')
+  const isMobileClient = platform === 'mobile' || platform === 'android' || /Android|Mobile|wv/i.test(userAgent)
+
+  const updateQuery = isMobileClient
+    ? { $addToSet: { fcmTokenMobile: token, fcmTokens: token } }
+    : { $addToSet: { fcmTokens: token } }
 
   const updatedUser = await User.findByIdAndUpdate(
     userId,
-    { $addToSet: { [tokenField]: token } },
-    { new: true, select: `phone role ${tokenField}` },
+    updateQuery,
+    { new: true, select: 'phone role fcmTokens fcmTokenMobile' },
   )
 
   if (!updatedUser) {

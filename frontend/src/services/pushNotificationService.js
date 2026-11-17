@@ -147,19 +147,28 @@ export async function registerFCMToken(forceUpdate = false) {
 
     token = token.trim();
 
-    console.log(`[PUSH] Syncing FCM token to backend for user ${currentUserId || 'unknown'}...`);
+    // Detect if running inside Android WebView, Flutter wrapper, or mobile device
+    const isMobileClient =
+      typeof navigator !== 'undefined' &&
+      (/Android|wv|Mobile/i.test(navigator.userAgent) ||
+       Boolean(window.flutter_inappwebview) ||
+       Boolean(window.Flutter));
+    const detectedPlatform = isMobileClient ? 'mobile' : 'web';
+
+    console.log(`[PUSH] Syncing FCM token to backend for user ${currentUserId || 'unknown'} (platform: ${detectedPlatform})...`);
     const response = await apiRequest('/fcm-tokens/save', {
       method: 'POST',
-      body: { token, platform: 'web', userId: currentUserId },
+      body: { token, platform: detectedPlatform, userId: currentUserId },
     });
 
     if (response?.success) {
       localStorage.setItem('fcm_token_web', token);
+      localStorage.setItem('fcm_token_platform', detectedPlatform);
       if (currentUserId) {
         sessionStorage.setItem(`fcm_synced_${currentUserId}`, token);
         localStorage.setItem(`fcm_synced_user_${currentUserId}`, token);
       }
-      console.log(`[PUSH] FCM token registered with backend successfully for user ${currentUserId}`);
+      console.log(`[PUSH] FCM token registered with backend successfully for user ${currentUserId} (${detectedPlatform})`);
       return token;
     } else {
       console.warn('[PUSH] Failed to register FCM token with backend:', response?.message);

@@ -93,16 +93,8 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
     const timestampStr = stringifiedData.timestamp || stringifiedData.createdAt || String(Date.now());
     const userRole = user.role || 'customer';
     const isCustomer = userRole === 'customer';
-    // Customer app uses 'high_importance_channel'
-    // Provider app uses 'new_booking_alerts_v2' for booking offers, and 'high_importance_channel' for general updates
-    let channelId;
-    if (payload.channelId) {
-      channelId = payload.channelId;
-    } else if (isCustomer) {
-      channelId = 'high_importance_channel';
-    } else {
-      channelId = 'new_booking_alerts_v2';
-    }
+    // Use explicit channel if supplied, otherwise use 'new_booking_alerts_v2' which is the registered Android channel
+    const channelId = payload.channelId || 'new_booking_alerts_v2';
 
     const defaultTitle = isBookingOffer ? 'New Booking Received! ⚡' : 'A2Z Service Hub';
     const defaultBody = isBookingOffer
@@ -143,6 +135,7 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
       sound: isBookingOffer ? 'alert' : 'default',
       channelId: channelId,
       channel_id: channelId,
+      android_channel_id: channelId,
       priority: 'high',
       click_action: targetUrl,
       link: targetUrl,
@@ -153,7 +146,19 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
       flagInsistent: isBookingOffer ? 'true' : 'false',
     };
 
-    // 1. Dispatch to Web Tokens (PWA / Browser)
+    // Shared Android notification configuration (ensures notifications display on Android status bar & lockscreen outside the app)
+    const androidNotificationConfig = {
+      title: finalTitle,
+      body: finalBody,
+      priority: 'max',
+      visibility: 'public',
+      channelId: channelId,
+      defaultVibrateTimings: true,
+      sound: isBookingOffer ? 'alert' : 'default',
+      defaultSound: !isBookingOffer,
+    };
+
+    // 1. Dispatch to Web Tokens (PWA / Browser / Mobile WebViews)
     if (webTokens.length > 0) {
       const webMessage = {
         notification: {
@@ -161,6 +166,11 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
           body: finalBody,
         },
         data: baseDataPayload,
+        android: {
+          priority: 'high',
+          ttl: 86400 * 1000, // 24 hours TTL so sleeping/locked phones receive it without timeout drop
+          notification: androidNotificationConfig,
+        },
         webpush: {
           headers: {
             Urgency: 'high',
@@ -225,23 +235,6 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
 
     // 2. Dispatch to Mobile Tokens (Android Native / APK)
     if (mobileTokens.length > 0) {
-      // Configure Android notification payload safely so notifications are never dropped by Android OS
-      const androidNotificationConfig = {
-        title: finalTitle,
-        body: finalBody,
-        priority: 'max',
-        visibility: 'public',
-        channelId: channelId,
-        defaultVibrateTimings: true,
-      };
-
-      if (isBookingOffer) {
-        androidNotificationConfig.sound = 'alert';
-        androidNotificationConfig.defaultSound = false;
-      } else {
-        androidNotificationConfig.sound = 'default';
-        androidNotificationConfig.defaultSound = true;
-      }
 
       const mobileMessage = {
         notification: {
