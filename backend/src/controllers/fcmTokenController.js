@@ -117,12 +117,10 @@ export const removeToken = asyncHandler(async (req, res) => {
     return sendSuccess(res, { message: 'FCM token removed' })
   }
 
-  const isWeb = platform === 'web'
-  const tokenField = isWeb ? 'fcmTokens' : 'fcmTokenMobile'
-
-  // Atomically pull token from array
+  // Mobile/native tokens are saved into BOTH fcmTokenMobile and fcmTokens (see saveToken),
+  // so pull from both — otherwise a logged-out phone keeps receiving pushes as a "web" token.
   await User.findByIdAndUpdate(userId, {
-    $pull: { [tokenField]: token },
+    $pull: { fcmTokens: token, fcmTokenMobile: token },
   })
 
   console.log(`[FCM] Invalidation complete: token removed for device logout`)

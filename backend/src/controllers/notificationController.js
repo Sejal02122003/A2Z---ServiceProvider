@@ -145,6 +145,7 @@ export const saveFcmToken = asyncHandler(async (req, res) => {
   const userAgent = String(req.headers['user-agent'] || '')
   const isMobileClient = platform === 'mobile' || platform === 'android' || /Android|Mobile|wv/i.test(userAgent)
 
+  const tokenField = isMobileClient ? 'fcmTokenMobile' : 'fcmTokens'
   const updateQuery = isMobileClient
     ? { $addToSet: { fcmTokenMobile: token, fcmTokens: token } }
     : { $addToSet: { fcmTokens: token } }
@@ -198,11 +199,10 @@ export const removeFcmToken = asyncHandler(async (req, res) => {
     return sendSuccess(res, { message: 'FCM token removed successfully' })
   }
 
-  const isWeb = platform === 'web'
-  const tokenField = isWeb ? 'fcmTokens' : 'fcmTokenMobile'
-
+  // Mobile tokens are saved into BOTH fcmTokenMobile and fcmTokens, so pull from both;
+  // otherwise a logged-out phone keeps receiving pushes.
   await User.findByIdAndUpdate(userId, {
-    $pull: { [tokenField]: token },
+    $pull: { fcmTokens: token, fcmTokenMobile: token },
   })
 
   return sendSuccess(res, { message: 'FCM token removed successfully' })

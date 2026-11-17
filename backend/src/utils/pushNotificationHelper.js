@@ -93,8 +93,10 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
     const timestampStr = stringifiedData.timestamp || stringifiedData.createdAt || String(Date.now());
     const userRole = user.role || 'customer';
     const isCustomer = userRole === 'customer';
-    // Use explicit channel if supplied, otherwise use 'new_booking_alerts_v2' which is the registered Android channel
-    const channelId = payload.channelId || 'new_booking_alerts_v2';
+    // Android notification channels (created natively by the Flutter wrapper):
+    //   new_booking_alerts_v2 -> provider booking offers (siren sound res/raw/alert)
+    //   a2z_general           -> everything else (default sound)
+    const channelId = payload.channelId || stringifiedData.channelId || (isBookingOffer ? 'new_booking_alerts_v2' : 'a2z_general');
 
     const defaultTitle = isBookingOffer ? 'New Booking Received! ⚡' : 'A2Z Service Hub';
     const defaultBody = isBookingOffer

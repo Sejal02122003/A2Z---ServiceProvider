@@ -24,7 +24,7 @@ import { notificationApi } from '../api/notificationApi.js'
 import { useSocket } from '../context/SocketContext.jsx'
 import { FloatingCartBar } from '../components/app/booking/FloatingCartBar.jsx'
 import { useBookingCart } from '../context/BookingCartContext.jsx'
-import { showDesktopNotification, registerFCMToken } from '../services/pushNotificationService.js'
+import { showDesktopNotification, registerFCMToken, canAutoSyncPushToken } from '../services/pushNotificationService.js'
 import { PushNotificationPrompt } from '../components/app/PushNotificationPrompt.jsx'
 
 export function AppShell() {
@@ -74,7 +74,7 @@ export function AppShell() {
 
   useEffect(() => {
     if (!user || isGuest) return
-    if ('Notification' in window && Notification.permission === 'granted') {
+    if (canAutoSyncPushToken()) {
       registerFCMToken(false).catch(() => {})
     }
   }, [user?._id, isGuest])

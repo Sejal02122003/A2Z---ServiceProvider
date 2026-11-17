@@ -5,6 +5,114 @@ import { store } from '../store/index.js';
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
+// ---------------------------------------------------------------------------
+// Flutter wrapper (flutter_inappwebview) native push bridge
+//
+// Android WebView has no Web Push support, so a web FCM token can never wake a
+// closed app. Inside the Flutter wrapper we instead ask the native side for its
+// firebase_messaging token (handler "getFcmToken") and register that with the
+// backend as an "android" token. Native FCM delivers even when the app is killed.
+// ---------------------------------------------------------------------------
+const NATIVE_TOKEN_KEY = 'fcm_token_native';
+const FLUTTER_UA_MARKER = /A2ZFlutterApp/i;
+
+let flutterBridgeReady = false;
+if (typeof window !== 'undefined') {
+  window.addEventListener('flutterInAppWebViewPlatformReady', () => {
+    flutterBridgeReady = true;
+  });
+}
+
+export function isFlutterWrapper() {
+  if (typeof window === 'undefined') return false;
+  return (
+    Boolean(window.flutter_inappwebview) ||
+    (typeof navigator !== 'undefined' && FLUTTER_UA_MARKER.test(navigator.userAgent || ''))
+  );
+}
+
+/** True when it is safe to sync a push token without prompting the user. */
+export function canAutoSyncPushToken() {
+  if (isFlutterWrapper()) return true;
+  return typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted';
+}
+
+function waitForFlutterBridge(timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    const hasHandler = () => Boolean(window.flutter_inappwebview?.callHandler);
+    if (flutterBridgeReady && hasHandler()) return resolve(true);
+
+    let timer = null;
+    const onReady = () => {
+      flutterBridgeReady = true;
+      cleanup();
+      resolve(hasHandler());
+    };
+    const cleanup = () => {
+      window.removeEventListener('flutterInAppWebViewPlatformReady', onReady);
+      if (timer) clearTimeout(timer);
+    };
+    window.addEventListener('flutterInAppWebViewPlatformReady', onReady);
+    // The ready event may already have fired before this module loaded.
+    timer = setTimeout(() => {
+      cleanup();
+      resolve(hasHandler());
+    }, hasHandler() ? 300 : timeoutMs);
+  });
+}
+
+async function getNativeFcmToken() {
+  const ready = await waitForFlutterBridge();
+  if (!ready) {
+    console.warn('[PUSH][Flutter] Native bridge not available; cannot fetch native FCM token.');
+    return null;
+  }
+  try {
+    const token = await window.flutter_inappwebview.callHandler('getFcmToken');
+    return typeof token === 'string' && token.trim() ? token.trim() : null;
+  } catch (err) {
+    console.warn('[PUSH][Flutter] getFcmToken handler failed:', err?.message || err);
+    return null;
+  }
+}
+
+async function registerNativeFCMToken(forceUpdate = false) {
+  const state = store.getState();
+  const currentUserId = state?.auth?.user?._id;
+  const syncedKey = `fcm_synced_native_${currentUserId || 'anon'}`;
+
+  const token = await getNativeFcmToken();
+  if (!token) return null;
+
+  if (!forceUpdate && sessionStorage.getItem(syncedKey) === token) {
+    return token;
+  }
+
+  // If the native token rotated, drop the old one from this account first.
+  const previousToken = localStorage.getItem(NATIVE_TOKEN_KEY);
+  if (previousToken && previousToken !== token) {
+    await apiRequest('/fcm-tokens/remove', {
+      method: 'DELETE',
+      body: { token: previousToken, platform: 'android' },
+    }).catch(() => {});
+  }
+
+  console.log(`[PUSH][Flutter] Syncing native FCM token for user ${currentUserId || 'unknown'}...`);
+  const response = await apiRequest('/fcm-tokens/save', {
+    method: 'POST',
+    body: { token, platform: 'android', userId: currentUserId },
+  });
+
+  if (response?.success) {
+    localStorage.setItem(NATIVE_TOKEN_KEY, token);
+    sessionStorage.setItem(syncedKey, token);
+    console.log('[PUSH][Flutter] Native FCM token registered with backend.');
+    return token;
+  }
+  console.warn('[PUSH][Flutter] Failed to register native FCM token:', response?.message);
+  return null;
+}
+
 // Check current notification permission status
 export function getNotificationPermissionStatus() {
   if (!('Notification' in window)) return 'unsupported';
@@ -97,6 +205,11 @@ export async function registerFCMToken(forceUpdate = false) {
       return null;
     }
 
+    // Inside the Flutter wrapper, use the native firebase_messaging token instead of Web Push.
+    if (isFlutterWrapper()) {
+      return await registerNativeFCMToken(forceUpdate);
+    }
+
     if (!('Notification' in window)) {
       console.warn('[PUSH] Notifications not supported in this browser');
       return null;
@@ -182,6 +295,26 @@ export async function registerFCMToken(forceUpdate = false) {
 
 // Unregister and disassociate FCM token from backend upon logout
 export async function unregisterFCMToken() {
+  try {
+    const nativeToken = localStorage.getItem(NATIVE_TOKEN_KEY);
+    if (nativeToken) {
+      await apiRequest('/fcm-tokens/remove', {
+        method: 'DELETE',
+        body: { token: nativeToken, platform: 'android' },
+      }).catch((err) => console.warn('[PUSH][Flutter] Native token removal failed:', err?.message || err));
+    }
+  } catch (err) {
+    console.warn('[PUSH][Flutter] unregister native token error:', err?.message || err);
+  } finally {
+    localStorage.removeItem(NATIVE_TOKEN_KEY);
+    try {
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const key = sessionStorage.key(i);
+        if (key && key.startsWith('fcm_synced_native_')) sessionStorage.removeItem(key);
+      }
+    } catch {}
+  }
+
   try {
     const savedToken = localStorage.getItem('fcm_token_web');
     if (savedToken) {
@@ -315,7 +448,22 @@ export function setupForegroundNotificationHandler(handler) {
 }
 
 // Initialize push notifications (call this on app load)
+let nativeTokenListenerAttached = false;
+
 export async function initializePushNotifications() {
+  if (isFlutterWrapper()) {
+    // Service-worker Web Push cannot work inside Android WebView; use the native bridge.
+    if (!nativeTokenListenerAttached) {
+      nativeTokenListenerAttached = true;
+      // Flutter dispatches this when firebase_messaging rotates the token (onTokenRefresh).
+      window.addEventListener('a2z-native-fcm-token', () => {
+        registerNativeFCMToken(true).catch((e) => console.warn('[PUSH][Flutter] Token refresh sync failed:', e));
+      });
+    }
+    registerFCMToken(false).catch((e) => console.warn('[PUSH][Flutter] Auto-sync skipped:', e));
+    return;
+  }
+
   try {
     await registerServiceWorker();
     // If permission was already granted previously, auto-sync token with backend

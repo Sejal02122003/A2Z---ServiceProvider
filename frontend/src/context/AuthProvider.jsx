@@ -34,11 +34,11 @@ export function AuthProvider({ children }) {
       .then((res) => {
         if (!cancelled && res.data?.user) {
           dispatch(setUser(res.data.user))
-          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-            import('../services/pushNotificationService.js')
-              .then(({ registerFCMToken }) => registerFCMToken(false).catch(() => {}))
-              .catch(() => {})
-          }
+          import('../services/pushNotificationService.js')
+            .then(({ canAutoSyncPushToken, registerFCMToken }) => {
+              if (canAutoSyncPushToken()) registerFCMToken(false).catch(() => {})
+            })
+            .catch(() => {})
         }
       })
       .catch((err) => {
