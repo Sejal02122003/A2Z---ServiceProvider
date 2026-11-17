@@ -58,6 +58,7 @@ export const saveToken = asyncHandler(async (req, res) => {
   const isMobileClient = platform === 'mobile' || platform === 'android' || /Android|Mobile|wv/i.test(userAgent)
 
   // If mobile or Android WebView, save into fcmTokenMobile so native Android push payload is dispatched
+  const tokenField = isMobileClient ? 'fcmTokenMobile' : 'fcmTokens'
   const updateQuery = isMobileClient
     ? { $addToSet: { fcmTokenMobile: token, fcmTokens: token } }
     : { $addToSet: { fcmTokens: token } }
