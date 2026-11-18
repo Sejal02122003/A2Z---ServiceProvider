@@ -227,6 +227,8 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
               const errMsg = String(resp.error?.message || '');
               if (
                 errCode.includes('unregistered') ||
+                errCode.includes('not-registered') ||
+                errMsg.toLowerCase().includes('notregistered') ||
                 errCode.includes('invalid') ||
                 errMsg.includes('401') ||
                 errMsg.includes('403') ||
@@ -280,6 +282,8 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
               const errMsg = String(resp.error?.message || '');
               if (
                 errCode.includes('unregistered') ||
+                errCode.includes('not-registered') ||
+                errMsg.toLowerCase().includes('notregistered') ||
                 errCode.includes('invalid') ||
                 errMsg.includes('401') ||
                 errMsg.includes('403') ||
