@@ -194,7 +194,10 @@ export function BroadcastPopup() {
         if (prev <= 1) {
           clearInterval(timerRef.current)
           stopBookingAlertSound()
-          if (incoming?.bookingId) broadcastsApi.rejectBroadcast(incoming.bookingId).catch(() => {})
+          // Do NOT auto-reject on countdown end. The server expires the broadcast on its own
+          // (BROADCAST_TIMEOUT_MS). Auto-rejecting here marked providers as "rejected" whenever
+          // the app/WebView was in the background and the provider never saw the offer, and with
+          // a single eligible provider it failed the booking immediately.
           setIncoming(null)
           return 0
         }
