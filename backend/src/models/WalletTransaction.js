@@ -18,6 +18,11 @@ const walletTransactionSchema = new mongoose.Schema(
       ref: 'User',
       index: true,
     },
+    accountType: {
+      type: String,
+      enum: ['USER', 'WORKER'],
+      index: true,
+    },
     bookingId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Booking',
@@ -93,7 +98,7 @@ const walletTransactionSchema = new mongoose.Schema(
     },
     referenceType: {
       type: String,
-      enum: ['BOOKING', 'WELCOME_BONUS', 'ADMIN', 'MANUAL', 'WITHDRAWAL', 'REFUND', 'REVERSAL', 'PAYMENT', 'SERVICE_CREDIT', 'OTHER'],
+      enum: ['BOOKING', 'WELCOME_BONUS', 'ADMIN', 'MANUAL', 'WITHDRAWAL', 'REFUND', 'REVERSAL', 'PAYMENT', 'SERVICE_CREDIT', 'WALLET_RECHARGE', 'OTHER'],
       default: 'OTHER',
     },
     referenceId: {

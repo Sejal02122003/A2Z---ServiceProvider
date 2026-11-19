@@ -1,6 +1,30 @@
-import { apiRequest } from './http.js'
+import { apiClient, apiRequest } from './http.js'
 
 export const walletsApi = {
+  // Centralized Wallet Recharge Request APIs
+  submitRechargeRequest: (payload) => {
+    if (typeof FormData !== 'undefined' && payload instanceof FormData) {
+      return apiClient
+        .post('/wallets/recharge-request', payload, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        .then((res) => res.data)
+    }
+    return apiRequest('/wallets/recharge-request', {
+      method: 'POST',
+      body: payload,
+    })
+  },
+
+  getMyRechargeRequests: (params = {}) => {
+    const q = new URLSearchParams()
+    if (params.status) q.set('status', params.status)
+    if (params.page) q.set('page', params.page)
+    if (params.limit) q.set('limit', params.limit)
+    const qs = q.toString() ? `?${q.toString()}` : ''
+    return apiRequest(`/wallets/recharge-requests/my${qs}`, { method: 'GET' })
+  },
+
   // Labour wallet APIs
   getMyWallet: () => {
     return apiRequest('/wallets/me', { method: 'GET' })

@@ -26,6 +26,7 @@ import { AdminBookingsPage } from './pages/admin/AdminBookingsPage.jsx'
 
 import { AdminBillingPage } from './pages/admin/AdminBillingPage.jsx'
 import { AdminQRPaymentsPage } from './pages/admin/AdminQRPaymentsPage.jsx'
+import { AdminWalletManagementPage } from './pages/admin/AdminWalletManagementPage.jsx'
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage.jsx'
 import { AdminReportsPage } from './pages/admin/AdminReportsPage.jsx'
 import { AdminZoneManagementPage } from './pages/admin/AdminZoneManagementPage.jsx'
@@ -216,6 +217,8 @@ function App() {
 
 
             <Route path="billing" element={<AdminBillingPage />} />
+            <Route path="wallet-management" element={<AdminWalletManagementPage />} />
+            <Route path="wallet-management/:tab" element={<AdminWalletManagementPage />} />
             <Route path="qr-payments" element={<AdminQRPaymentsPage />} />
             <Route path="rewards" element={<AdminRewardsHubPage />} />
             <Route path="rewards/:tab" element={<AdminRewardsHubPage />} />

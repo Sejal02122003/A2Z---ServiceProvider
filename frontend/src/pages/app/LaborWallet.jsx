@@ -123,8 +123,32 @@ export function LaborWallet() {
   const fetchQrPayments = useCallback(async () => {
     try {
       setLoadingQrPayments(true)
-      const res = await adminQrPaymentsApi.fetchMyProviderPayments()
-      setQrPayments(res.data?.payments || [])
+      const [qrRes, rechargeRes] = await Promise.all([
+        adminQrPaymentsApi.fetchMyProviderPayments().catch(() => ({ data: { payments: [] } })),
+        walletsApi.getMyRechargeRequests().catch(() => ({ data: { requests: [] } })),
+      ])
+
+      const providerPayments = (qrRes.data?.payments || []).map((p) => ({
+        ...p,
+        itemType: 'provider_payment',
+      }))
+
+      const unifiedRecharges = (rechargeRes.data?.requests || []).map((r) => ({
+        _id: r._id,
+        amount: r.amount,
+        status: String(r.status).toLowerCase(),
+        purpose: 'WALLET_TOPUP',
+        utr: r.utrNumber,
+        receiptUrl: r.paymentScreenshot,
+        createdAt: r.createdAt,
+        rejectionReason: r.rejectionReason,
+        itemType: 'recharge_request',
+      }))
+
+      const combined = [...unifiedRecharges, ...providerPayments].sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      )
+      setQrPayments(combined)
     } catch {
       // safe fallback
     } finally {

@@ -127,6 +127,15 @@ export const ADMIN_NAV_SECTIONS = [
     ],
   },
   {
+    title: 'Wallet Management',
+    items: [
+      { to: '/admin/wallet-management/all', label: 'All Recharge Requests', icon: Wallet },
+      { to: '/admin/wallet-management/users', label: 'User Recharge Requests', icon: Users },
+      { to: '/admin/wallet-management/workers', label: 'Worker Recharge Requests', icon: Wrench },
+      { to: '/admin/wallet-management/transactions', label: 'Wallet Transaction History', icon: BarChart3 },
+    ],
+  },
+  {
     title: 'Finance & Incentives',
     items: [
       { to: '/admin/rewards', label: 'Rewards & Incentives', icon: Award },
@@ -171,6 +180,11 @@ export const ADMIN_NAV_SECTIONS = [
 ]
 
 const ROUTE_TITLES = [
+  { prefix: '/admin/wallet-management/all', title: 'Wallet Management — All Recharge Requests' },
+  { prefix: '/admin/wallet-management/users', title: 'Wallet Management — User Recharge Requests' },
+  { prefix: '/admin/wallet-management/workers', title: 'Wallet Management — Worker Recharge Requests' },
+  { prefix: '/admin/wallet-management/transactions', title: 'Wallet Management — Wallet Transaction History' },
+  { prefix: '/admin/wallet-management', title: 'Centralized Wallet Recharge Management' },
   { prefix: '/admin/inventory/products', title: 'Inventory — Products' },
   { prefix: '/admin/inventory/service-materials', title: 'Inventory — Service Materials' },
   { prefix: '/admin/inventory/material-requests', title: 'Inventory — Material Requests' },

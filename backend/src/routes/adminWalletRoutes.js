@@ -4,6 +4,7 @@ import { protect, restrictTo } from '../middleware/auth.js'
 import { validateRequest } from '../middleware/validateRequest.js'
 import { USER_ROLES } from '../constants/roles.js'
 import * as adminWallet from '../controllers/adminWalletController.js'
+import * as adminRecharge from '../controllers/adminWalletRechargeController.js'
 
 const router = Router()
 
@@ -102,6 +103,34 @@ router.post(
 
 router.get('/labour-stats', adminWallet.getLabourWalletStats)
 router.get('/transactions', adminWallet.getAllWalletTransactions)
+
+// ==========================================
+// CENTRALIZED WALLET RECHARGE APPROVAL ROUTES
+// ==========================================
+router.get('/recharge-requests', adminRecharge.getRechargeRequests)
+router.get(
+  '/recharge-requests/:requestId',
+  [param('requestId').isMongoId().withMessage('Invalid requestId')],
+  validateRequest,
+  adminRecharge.getRechargeRequestById,
+)
+router.patch(
+  '/recharge-requests/:requestId/approve',
+  [param('requestId').isMongoId().withMessage('Invalid requestId')],
+  validateRequest,
+  adminRecharge.approveRequest,
+)
+router.patch(
+  '/recharge-requests/:requestId/reject',
+  [
+    param('requestId').isMongoId().withMessage('Invalid requestId'),
+    body('rejectionReason').isString().trim().notEmpty().withMessage('Rejection reason is mandatory'),
+  ],
+  validateRequest,
+  adminRecharge.rejectRequest,
+)
+router.get('/statistics', adminRecharge.getWalletStatistics)
+
 router.post(
   '/reconcile-settlement/:bookingId',
   [param('bookingId').isMongoId().withMessage('Invalid bookingId')],

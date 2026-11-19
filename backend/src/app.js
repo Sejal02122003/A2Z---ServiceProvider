@@ -22,6 +22,7 @@ app.get('/health', (_req, res) => {
 })
 
 app.use('/api/v1', routes)
+app.use('/api', routes)
 
 app.use(errorHandler)
 

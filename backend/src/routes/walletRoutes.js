@@ -5,6 +5,13 @@ import { validateRequest } from '../middleware/validateRequest.js'
 import { USER_ROLES } from '../constants/roles.js'
 import * as wallet from '../controllers/walletController.js'
 import * as userWallet from '../controllers/userWalletController.js'
+import * as userRecharge from '../controllers/userWalletRechargeController.js'
+import multer from 'multer'
+
+const uploadScreenshot = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+}).any()
 
 const router = Router()
 
@@ -12,6 +19,22 @@ const router = Router()
 router.get('/public-settings', userWallet.getPublicWalletSettings)
 
 router.use(protect)
+
+// Centralized Recharge Requests for both Users and Workers
+router.post(
+  '/recharge-request',
+  (req, res, next) => {
+    uploadScreenshot(req, res, (err) => {
+      if (err) return next(err)
+      if (req.files && req.files.length > 0) {
+        req.file = req.files[0]
+      }
+      next()
+    })
+  },
+  userRecharge.submitRechargeRequest
+)
+router.get('/recharge-requests/my', userRecharge.getMyRechargeRequests)
 
 // Customer / General user wallet endpoints
 router.get('/user/me', userWallet.getMyUserWallet)
