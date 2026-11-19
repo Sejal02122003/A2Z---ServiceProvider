@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Wallet,
   ArrowUpRight,
@@ -538,23 +539,25 @@ export default function UserWalletPage() {
       />
 
       {/* Screenshot Preview Zoom */}
-      {previewScreenshot && (
-        <div
-          className="fixed inset-0 z-60 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setPreviewScreenshot(null)}
-        >
-          <div className="relative max-w-lg w-full bg-black rounded-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <img src={previewScreenshot} alt="Payment Receipt" className="w-full max-h-[80vh] object-contain mx-auto" />
-            <button
-              type="button"
-              onClick={() => setPreviewScreenshot(null)}
-              className="absolute top-3 right-3 p-2 rounded-xl bg-black/60 text-white hover:bg-black transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      )}
+      {previewScreenshot && typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[10000] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setPreviewScreenshot(null)}
+          >
+            <div className="relative max-w-lg w-full bg-black rounded-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <img src={previewScreenshot} alt="Payment Receipt" className="w-full max-h-[80vh] object-contain mx-auto" />
+              <button
+                type="button"
+                onClick={() => setPreviewScreenshot(null)}
+                className="absolute top-3 right-3 p-2 rounded-xl bg-black/60 text-white hover:bg-black transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
