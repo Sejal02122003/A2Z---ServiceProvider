@@ -574,7 +574,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
                       autoComplete="tel-national"
                       maxLength={10}
                       placeholder="9876543210"
-                      className="min-w-0 flex-1 border-0 bg-transparent px-4 py-3 text-[15px] font-semibold tracking-wide text-slate-900 outline-none placeholder:text-slate-400"
+                      className="min-w-0 flex-1 border-0 bg-transparent px-4 py-3 text-[15px] font-semibold tracking-wide text-slate-900 outline-none placeholder:text-slate-400 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
                       value={phone}
                       onChange={(e) => setPhoneDigits(e.target.value)}
                       onKeyDown={(e) => {
@@ -687,7 +687,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
                       autoComplete={i === 0 ? 'one-time-code' : 'off'}
                       maxLength={1}
                       aria-label={`OTP digit ${i + 1} of 6`}
-                      className="min-w-0 flex-1 rounded-2xl border border-slate-100 bg-slate-50 py-4 text-center font-mono text-xl font-bold tabular-nums text-slate-900 outline-none focus:ring-2 focus:ring-brand/25 focus:border-brand/30"
+                      className="min-w-0 flex-1 rounded-2xl border border-slate-100 bg-slate-50 py-4 text-center font-mono text-xl font-bold tabular-nums text-slate-900 outline-none focus:ring-2 focus:ring-brand/25 focus:border-brand/30 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
                       value={digit}
                       onPaste={handleOtpPaste}
                       onChange={(e) => {
