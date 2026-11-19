@@ -46,6 +46,8 @@ export function BroadcastPopup() {
   const reduce = useReducedMotion()
   const user = useSelector((s) => s.auth.user)
   const timerRef = useRef(null)
+  const activeNotificationRef = useRef(null)
+  const dismissedBookingsRef = useRef(new Set())
 
   const [incoming, setIncoming] = useState(null)
   const [timeLeft, setTimeLeft] = useState(90)
@@ -61,9 +63,17 @@ export function BroadcastPopup() {
       playBookingAlertSound(incoming.bookingId)
     } else {
       stopBookingAlertSound()
+      if (activeNotificationRef.current) {
+        try { activeNotificationRef.current.close() } catch {}
+        activeNotificationRef.current = null
+      }
     }
     return () => {
       stopBookingAlertSound()
+      if (activeNotificationRef.current) {
+        try { activeNotificationRef.current.close() } catch {}
+        activeNotificationRef.current = null
+      }
     }
   }, [incoming])
 
@@ -72,7 +82,11 @@ export function BroadcastPopup() {
   const isLabour = roleLower === 'labour' || roleLower === 'contractor' || roleLower === 'serviceprovider' || roleLower === 'provider'
 
   const handleBroadcast = useCallback((data) => {
-    if (!data) return
+    if (!data || !data.bookingId) return
+    if (dismissedBookingsRef.current.has(data.bookingId)) {
+      console.log('[BroadcastPopup] Ignoring already dismissed booking:', data.bookingId)
+      return
+    }
     console.log('--- BOOKING_RECEIVED EVENT ---', data)
     const timeout = Math.max(5, Math.floor((data.timeoutMs || 90000) / 1000))
     setIncoming(data)
@@ -84,6 +98,9 @@ export function BroadcastPopup() {
     // Browser notification fallback if granted (OUT-OF-APP notification)
     if (window.Notification && Notification.permission === 'granted') {
       try {
+        if (activeNotificationRef.current) {
+          try { activeNotificationRef.current.close() } catch {}
+        }
         const title = data.type === 'SCHEDULED' ? 'Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡'
         const notif = new Notification(title, {
           body: `${data.serviceName || 'Service'} · ₹${formatFixedAmount(data.estimatedEarnings || 0)}`,
@@ -103,6 +120,7 @@ export function BroadcastPopup() {
           window.focus()
           notif.close()
         }
+        activeNotificationRef.current = notif
       } catch { /* ignore */ }
     }
   }, [])
@@ -144,8 +162,9 @@ export function BroadcastPopup() {
       if (incoming) return // already displaying an offer
       try {
         const res = await broadcastsApi.getActiveBroadcast()
-        if (!cancelled && res?.data?.broadcast && !incoming) {
-          handleBroadcast(res.data.broadcast)
+        const b = res?.data?.broadcast
+        if (!cancelled && b && !incoming && !dismissedBookingsRef.current.has(b.bookingId)) {
+          handleBroadcast(b)
         }
       } catch {
         // ignore background poll errors
@@ -172,11 +191,11 @@ export function BroadcastPopup() {
     if (!isLabour) return
     const params = new URLSearchParams(window.location.search)
     const bookingParam = params.get('incoming_booking')
-    if (bookingParam) {
+    if (bookingParam && !dismissedBookingsRef.current.has(bookingParam)) {
       console.log('[BroadcastPopup] Launched from push notification click for booking:', bookingParam)
       playBookingAlertSound(bookingParam)
       broadcastsApi.getActiveBroadcast(bookingParam).then((res) => {
-        if (res?.data?.broadcast) {
+        if (res?.data?.broadcast && !dismissedBookingsRef.current.has(res.data.broadcast.bookingId)) {
           handleBroadcast(res.data.broadcast)
         }
       }).catch(() => {})
@@ -192,12 +211,18 @@ export function BroadcastPopup() {
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          clearInterval(timerRef.current)
+          if (timerRef.current) {
+            clearInterval(timerRef.current)
+            timerRef.current = null
+          }
           stopBookingAlertSound()
-          // Do NOT auto-reject on countdown end. The server expires the broadcast on its own
-          // (BROADCAST_TIMEOUT_MS). Auto-rejecting here marked providers as "rejected" whenever
-          // the app/WebView was in the background and the provider never saw the offer, and with
-          // a single eligible provider it failed the booking immediately.
+          if (activeNotificationRef.current) {
+            try { activeNotificationRef.current.close() } catch {}
+            activeNotificationRef.current = null
+          }
+          if (incoming?.bookingId) {
+            dismissedBookingsRef.current.add(incoming.bookingId)
+          }
           setIncoming(null)
           return 0
         }
@@ -206,7 +231,10 @@ export function BroadcastPopup() {
     }, 1000)
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
     }
   }, [incoming])
 
@@ -254,7 +282,22 @@ export function BroadcastPopup() {
       return
     }
 
+    // Immediately kill sound, timer, and notifications upon user tapping Accept
     stopBookingAlertSound()
+    if (activeNotificationRef.current) {
+      try { activeNotificationRef.current.close() } catch {}
+      activeNotificationRef.current = null
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+
+    const currentBookingId = incoming.bookingId
+    if (currentBookingId) {
+      dismissedBookingsRef.current.add(currentBookingId)
+    }
+
     setResponding(true)
     setError('')
     try {
@@ -262,11 +305,9 @@ export function BroadcastPopup() {
       const payload = chosen
         ? { serviceId: chosen.serviceId, itemId: chosen.itemId }
         : (selectedServiceId ? { serviceId: selectedServiceId } : {})
-      await broadcastsApi.acceptBroadcast(incoming.bookingId, payload)
-      if (timerRef.current) clearInterval(timerRef.current)
-      const bookingId = incoming.bookingId
+      await broadcastsApi.acceptBroadcast(currentBookingId, payload)
       setIncoming(null)
-      navigate(`/serviceprovider/active-job/${bookingId}`)
+      navigate(`/serviceprovider/active-job/${currentBookingId}`)
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : 'Failed to accept'
       setError(msg)
@@ -281,10 +322,8 @@ export function BroadcastPopup() {
         msg.includes('Current status is STARTED')
       ) {
         setTimeout(() => {
-          if (timerRef.current) clearInterval(timerRef.current)
-          const bId = incoming.bookingId
           setIncoming(null)
-          navigate(`/serviceprovider/active-job/${bId}`)
+          navigate(`/serviceprovider/active-job/${currentBookingId}`)
         }, 1200)
       } else if (
         msg.includes('another service provider') ||
@@ -292,7 +331,6 @@ export function BroadcastPopup() {
         msg.includes('cancelled')
       ) {
         setTimeout(() => {
-          if (timerRef.current) clearInterval(timerRef.current)
           setIncoming(null)
           setError('')
         }, 2500)
@@ -302,16 +340,28 @@ export function BroadcastPopup() {
 
   const handleReject = useCallback(async () => {
     if (!incoming) return
+
+    // Immediately kill sound, timer, and notifications upon user tapping Reject
     stopBookingAlertSound()
-    setResponding(true)
-    try {
-      await broadcastsApi.rejectBroadcast(incoming.bookingId)
-    } catch {
-      /* ignore */
-    } finally {
-      if (timerRef.current) clearInterval(timerRef.current)
-      setIncoming(null)
-      setResponding(false)
+    if (activeNotificationRef.current) {
+      try { activeNotificationRef.current.close() } catch {}
+      activeNotificationRef.current = null
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+
+    const bId = incoming.bookingId
+    if (bId) {
+      dismissedBookingsRef.current.add(bId)
+    }
+
+    setIncoming(null)
+    setResponding(false)
+
+    if (bId) {
+      broadcastsApi.rejectBroadcast(bId).catch(() => {})
     }
   }, [incoming])
 

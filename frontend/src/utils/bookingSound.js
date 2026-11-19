@@ -1,6 +1,7 @@
 import alertSoundSrc from '../assets/alert.mp3'
 
 let audioElement = null
+let activePlayPromise = null
 let audioContext = null
 let isPlaying = false
 let isUnlocked = false
@@ -131,12 +132,18 @@ if (typeof window !== 'undefined') {
       }
     })
   }
+
+  // Listen for global sound stop event
+  window.addEventListener('a2z-stop-booking-sound', () => {
+    stopBookingAlertSound()
+  })
 }
 
 /**
  * Play synthesizer backup chime using Web Audio API
  */
 export function playWebAudioChime() {
+  if (!isPlaying) return
   try {
     const AudioCtxClass = window.AudioContext || window.webkitAudioContext
     if (!AudioCtxClass) return
@@ -209,7 +216,8 @@ export function playBookingAlertSound(bookingOrEventId = null) {
   if (audioContext && audioContext.state !== 'closed') {
     try {
       if (activeBufferSource) {
-        try { activeBufferSource.stop() } catch {}
+        try { activeBufferSource.stop(0) } catch {}
+        try { activeBufferSource.disconnect() } catch {}
         activeBufferSource = null
       }
 
@@ -230,7 +238,7 @@ export function playBookingAlertSound(bookingOrEventId = null) {
       } else {
         // If buffer not decoded yet, load it now and play
         loadAndDecodeAlertBuffer(audioContext).then((buf) => {
-          if (buf && isPlaying && !activeBufferSource) {
+          if (buf && isPlaying && !activeBufferSource && audioContext && audioContext.state !== 'closed') {
             const source = audioContext.createBufferSource()
             source.buffer = buf
             source.loop = true
@@ -258,10 +266,10 @@ export function playBookingAlertSound(bookingOrEventId = null) {
     }
     audioElement.loop = true
     audioElement.currentTime = 0
-    const playPromise = audioElement.play()
-    if (playPromise !== undefined) {
-      playPromise.catch((err) => {
-        console.warn('[BookingSound] HTML5 Audio play prevented:', err?.message || err)
+    activePlayPromise = audioElement.play()
+    if (activePlayPromise !== undefined) {
+      activePlayPromise.catch((err) => {
+        // Expected when paused or stopped quickly
       })
     }
   } catch (err) {
@@ -286,38 +294,92 @@ export function playBookingAlertSound(bookingOrEventId = null) {
 }
 
 /**
- * Stop looping the booking alert sound immediately when dismissed or accepted.
+ * Stop looping the booking alert sound immediately when dismissed, accepted, or rejected.
+ * Completely shuts down Web Audio, HTML5 Audio, Chime intervals, Vibrations, and SW notifications.
  */
 export function stopBookingAlertSound() {
   isPlaying = false
   currentPlayingId = null
 
+  // 1. Disconnect and stop Web Audio buffer source
   if (activeBufferSource) {
     try {
-      activeBufferSource.stop()
+      activeBufferSource.stop(0)
       activeBufferSource.disconnect()
     } catch {}
     activeBufferSource = null
   }
 
+  // 2. Mute and disconnect gain node immediately
   if (activeGainNode) {
-    try { activeGainNode.disconnect() } catch {}
+    try {
+      if (audioContext && audioContext.currentTime) {
+        activeGainNode.gain.setValueAtTime(0, audioContext.currentTime)
+      }
+      activeGainNode.disconnect()
+    } catch {}
     activeGainNode = null
   }
 
-  if (audioElement) {
-    try {
-      audioElement.pause()
-      audioElement.currentTime = 0
-    } catch {}
-  }
-
+  // 3. Clear synthesizer chime interval
   if (chimeInterval) {
     clearInterval(chimeInterval)
     chimeInterval = null
   }
 
+  // 4. Force HTML5 audio to pause and cancel loop
+  if (audioElement) {
+    try {
+      audioElement.pause()
+      audioElement.currentTime = 0
+      audioElement.loop = false
+    } catch {}
+    if (activePlayPromise) {
+      activePlayPromise
+        .then(() => {
+          if (!isPlaying && audioElement) {
+            audioElement.pause()
+            audioElement.currentTime = 0
+          }
+        })
+        .catch(() => {})
+      activePlayPromise = null
+    }
+  }
+
+  // 5. Stop vibrations
   safeVibrate(0)
+
+  // 6. Notify Service Worker to stop alert sound and dismiss notification across all clients
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    try {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'STOP_BOOKING_ALERT_SOUND',
+      })
+    } catch {}
+  }
+
+  // 7. Close all active browser notifications for bookings
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      registrations.forEach((reg) => {
+        reg.getNotifications?.().then((notifs) => {
+          notifs.forEach((n) => {
+            if (n.tag?.startsWith('booking-') || n.tag === 'new_booking_alerts_v2') {
+              n.close()
+            }
+          })
+        }).catch(() => {})
+      })
+    }).catch(() => {})
+  }
+
+  // 8. Notify Flutter native wrapper if running in app
+  if (typeof window !== 'undefined' && window.flutter_inappwebview?.callHandler) {
+    try {
+      window.flutter_inappwebview.callHandler('stopBookingAlertSound').catch(() => {})
+    } catch {}
+  }
 }
 
 // Aliases for convenience across components

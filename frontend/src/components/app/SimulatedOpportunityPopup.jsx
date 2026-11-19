@@ -247,11 +247,14 @@ export function SimulatedOpportunityPopup() {
     const oppId = incoming.opportunityId || incoming.alertId
 
     stopAlertSound()
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
     setResponding(true)
     setStatusMessage('')
     try {
       await simulatedOpportunitiesApi.acceptOpportunity(oppId)
-      if (timerRef.current) clearInterval(timerRef.current)
       setResultState('WON')
       setStatusMessage('Opportunity Secured! Great job staying active and responsive.')
     } catch (err) {
@@ -272,17 +275,18 @@ export function SimulatedOpportunityPopup() {
   const handleReject = useCallback(async () => {
     if (!incoming) return
     stopAlertSound()
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
     const oppId = incoming.opportunityId || incoming.alertId
-    setResponding(true)
+    setIncoming(null)
+    setResultState(null)
+    setResponding(false)
     try {
       await simulatedOpportunitiesApi.rejectOpportunity(oppId)
     } catch {
       /* ignore */
-    } finally {
-      if (timerRef.current) clearInterval(timerRef.current)
-      setIncoming(null)
-      setResultState(null)
-      setResponding(false)
     }
   }, [incoming, stopAlertSound])
 

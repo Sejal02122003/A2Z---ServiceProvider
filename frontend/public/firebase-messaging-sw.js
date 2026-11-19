@@ -151,6 +151,31 @@ messaging.onBackgroundMessage((payload) => {
   return Promise.resolve();
 });
 
+// Listen for messages from client tabs (e.g. stop audio request)
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'STOP_BOOKING_ALERT_SOUND') {
+    // 1. Close all active booking alert notifications
+    if (self.registration && self.registration.getNotifications) {
+      self.registration.getNotifications().then((notifications) => {
+        notifications.forEach((n) => {
+          if (n.tag && (n.tag.startsWith('booking-') || n.tag === 'new_booking_alerts_v2')) {
+            n.close();
+          }
+        });
+      }).catch(() => {});
+    }
+
+    // 2. Broadcast stop command to all client tabs
+    if (self.clients) {
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+        windowClients.forEach((client) => {
+          client.postMessage({ type: 'STOP_BOOKING_ALERT_SOUND' });
+        });
+      }).catch(() => {});
+    }
+  }
+});
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 

@@ -182,7 +182,7 @@ export function WalletRechargeModal({ isOpen, onClose, onSuccess, defaultAmount 
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-[9999] bg-slate-950/80 backdrop-blur-xs flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 overflow-hidden"
+      className="fixed inset-0 z-[99999] bg-slate-950/80 backdrop-blur-xs flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 overflow-hidden pointer-events-auto"
       role="dialog"
       aria-modal="true"
     >
@@ -190,7 +190,7 @@ export function WalletRechargeModal({ isOpen, onClose, onSuccess, defaultAmount 
       <div className="absolute inset-0 -z-10" onClick={onClose} aria-hidden />
 
       {/* Dialog Card */}
-      <div className="relative flex flex-col w-full sm:max-w-lg max-h-[92dvh] sm:max-h-[88vh] bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200">
+      <div className="relative flex flex-col w-full sm:max-w-lg h-[90dvh] max-h-[90dvh] sm:h-auto sm:max-h-[88vh] bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200">
         {/* Header - Fixed at Top */}
         <div className="shrink-0 p-4 sm:p-5 bg-gradient-to-r from-teal-800 to-teal-900 text-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -214,8 +214,11 @@ export function WalletRechargeModal({ isOpen, onClose, onSuccess, defaultAmount 
 
         {/* Form Body - Fully Scrollable */}
         {step === 'details' ? (
-          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4 overscroll-contain">
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 h-full overflow-hidden">
+            <div
+              className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4 overscroll-contain touch-pan-y"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
               {/* Step 1: Amount input */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
@@ -433,7 +436,7 @@ export function WalletRechargeModal({ isOpen, onClose, onSuccess, defaultAmount 
             </div>
 
             {/* Bottom Actions - Fixed and Always Visible Above Mobile Nav */}
-            <div className="shrink-0 p-3 sm:p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-end gap-2.5 z-10">
+            <div className="shrink-0 p-3 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-end gap-2.5 z-20 shadow-lg">
               <button
                 type="button"
                 onClick={onClose}
