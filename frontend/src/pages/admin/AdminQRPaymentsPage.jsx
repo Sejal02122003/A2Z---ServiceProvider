@@ -32,6 +32,7 @@ import {
 import { adminQrPaymentsApi } from '../../api/adminQrPaymentsApi.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { useAuth } from '../../hooks/useAuth.js'
+import { stopBookingAlertSound } from '../../utils/bookingSound.js'
 
 function formatInr(val) {
   return `₹${Number(val || 0).toLocaleString('en-IN')}`
@@ -286,8 +287,15 @@ export function AdminQRPaymentsPage() {
     }
   }
 
+  // Stop any lingering audio alerts on mount / unmount
+  useEffect(() => {
+    stopBookingAlertSound()
+    return () => stopBookingAlertSound()
+  }, [])
+
   // Open Review Dialog
   const handleOpenReview = (payment, action = 'approve') => {
+    stopBookingAlertSound()
     setSelectedPayment(payment)
     setReviewAction(action)
     setVerifiedAmount(String(payment.amount || ''))
@@ -300,6 +308,7 @@ export function AdminQRPaymentsPage() {
   // Submit Review Decision
   const handleExecuteReview = async () => {
     if (!selectedPayment) return
+    stopBookingAlertSound()
 
     if (reviewAction === 'reject' && !rejectionReason.trim()) {
       setReviewFeedback({ type: 'error', message: 'A rejection reason is required so the provider knows what to correct.' })

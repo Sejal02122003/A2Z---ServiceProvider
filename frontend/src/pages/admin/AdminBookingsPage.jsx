@@ -17,6 +17,7 @@ import {
   usePatchAdminBookingStatusMutation,
   useDeleteAdminBookingMutation
 } from '../../store/api/adminBookingApi.js'
+import { stopBookingAlertSound } from '../../utils/bookingSound.js'
 
 const REQUEST_STATUS_FILTERS = [
   { value: '', label: 'All' },
@@ -1026,6 +1027,13 @@ function BookingsListTab({ type }) {
 
 export function AdminBookingsPage() {
   const [activeTab, setActiveTab] = useState('customer')
+
+  React.useEffect(() => {
+    stopBookingAlertSound()
+    return () => {
+      stopBookingAlertSound()
+    }
+  }, [])
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 md:px-6">

@@ -28,6 +28,7 @@ import {
 import { adminBookingsApi } from '../../api/adminBookingsApi.js'
 import { adminWalletsApi } from '../../api/adminWalletsApi.js'
 import { adminSettingsApi } from '../../api/adminSettingsApi.js'
+import { stopBookingAlertSound } from '../../utils/bookingSound.js'
 import { walletsApi } from '../../api/walletsApi.js'
 
 export function AdminLabourWalletPage() {
@@ -247,6 +248,7 @@ export function AdminLabourWalletPage() {
 
   // Action Handlers for Payouts
   const handleUpdateStatus = async (id, status, remarks = '') => {
+    stopBookingAlertSound()
     setWithdrawals((prev) =>
       prev.map((w) => (w._id === id ? { ...w, status, adminRemarks: remarks } : w))
     )

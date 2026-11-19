@@ -17,6 +17,7 @@ import {
   Sparkles,
   User,
   Volume2,
+  VolumeX,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth.js'
 import { useSocket } from '../context/SocketContext.jsx'
@@ -25,7 +26,7 @@ import { appSpring } from '../components/app/appMotion.js'
 import { GlassPanel } from '../components/ui/GlassPanel.jsx'
 import { adminInitials, formatLastLoginDisplay, formatLastLoginRelative } from '../lib/formatAdminLastLogin.js'
 import { registerFCMToken, showDesktopNotification } from '../services/pushNotificationService.js'
-import { playBookingAlertSound } from '../utils/bookingSound.js'
+import { playBookingAlertSound, stopBookingAlertSound, isBookingAlertPlaying } from '../utils/bookingSound.js'
 import { notificationApi } from '../api/notificationApi.js'
 
 const STORAGE_KEY = 'lc-admin-sidebar-collapsed'
@@ -51,9 +52,20 @@ export function AdminLayout() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [notifications, setNotifications] = useState([])
   const [enablingPush, setEnablingPush] = useState(false)
+  const [isAudioAlerting, setIsAudioAlerting] = useState(false)
 
   const profileRef = useRef(null)
   const notifRef = useRef(null)
+  const soundTimeoutRef = useRef(null)
+
+  const silenceAudioAlert = useCallback(() => {
+    stopBookingAlertSound()
+    setIsAudioAlerting(false)
+    if (soundTimeoutRef.current) {
+      clearTimeout(soundTimeoutRef.current)
+      soundTimeoutRef.current = null
+    }
+  }, [])
 
 
   useEffect(() => {
@@ -68,7 +80,8 @@ export function AdminLayout() {
     setMobileOpen(false)
     setProfileOpen(false)
     setNotifOpen(false)
-  }, [pathname])
+    silenceAudioAlert()
+  }, [pathname, silenceAudioAlert])
 
   useEffect(() => {
     function handlePointerDown(e) {
@@ -121,21 +134,33 @@ export function AdminLayout() {
 
   // Handle incoming live alerts from Sockets and FCM foreground events
   useEffect(() => {
-    const handleNewAlert = (data, defaultTitle, defaultBody) => {
+    const handleNewAlert = (data, defaultTitle, defaultBody, customLink) => {
       console.log('[Admin FLOW] Live alert received in Admin Panel:', data)
       playBookingAlertSound(data?.bookingId)
+      setIsAudioAlerting(true)
+
+      // Auto-silence admin chime after 10 seconds so it never loops indefinitely
+      if (soundTimeoutRef.current) clearTimeout(soundTimeoutRef.current)
+      soundTimeoutRef.current = setTimeout(() => {
+        stopBookingAlertSound()
+        setIsAudioAlerting(false)
+      }, 10000)
 
       const title = data?.title || defaultTitle || '🚨 Admin Notification'
-      const body = data?.body || defaultBody || 'New booking activity received.'
-      const link = data?.link || '/admin/bookings'
+      const body = data?.body || defaultBody || 'New activity received.'
+      const link = data?.link || customLink || '/admin/bookings'
 
       if ('Notification' in window && Notification.permission === 'granted') {
         showDesktopNotification({
           title,
           body,
           link,
-          tag: data?.bookingId ? `admin-booking-${data.bookingId}` : 'admin-alert',
-          playAlert: true,
+          tag: data?.bookingId
+            ? `admin-booking-${data.bookingId}`
+            : data?.requestId
+            ? `admin-recharge-${data.requestId}`
+            : 'admin-alert',
+          playAlert: false, // already triggered playBookingAlertSound above
         })
       }
 
@@ -147,7 +172,7 @@ export function AdminLayout() {
           body,
           createdAt: new Date().toISOString(),
           isRead: false,
-          metadata: { link, bookingId: data?.bookingId },
+          metadata: { link, bookingId: data?.bookingId, requestId: data?.requestId },
         },
         ...prev.slice(0, 19),
       ])
@@ -159,7 +184,8 @@ export function AdminLayout() {
         handleNewAlert(
           data,
           `🚨 New Booking Alert: #${shortId}`,
-          `${data?.customerName || 'Customer'} placed a booking for ${data?.serviceTitle || 'Service'} (₹${data?.amount || 0})`
+          `${data?.customerName || 'Customer'} placed a booking for ${data?.serviceTitle || 'Service'} (₹${data?.amount || 0})`,
+          '/admin/bookings'
         )
       }
 
@@ -168,7 +194,8 @@ export function AdminLayout() {
         handleNewAlert(
           data,
           `✅ Booking #${shortId} Accepted!`,
-          `${data?.provider?.name || 'Service Partner'} accepted booking #${shortId} (₹${data?.totalAmount || 0})`
+          `${data?.provider?.name || 'Service Partner'} accepted booking #${shortId} (₹${data?.totalAmount || 0})`,
+          '/admin/bookings'
         )
       }
 
@@ -177,18 +204,41 @@ export function AdminLayout() {
         handleNewAlert(
           data,
           `📋 Booking #${shortId} Status: ${data?.status}`,
-          `Status updated to ${data?.status}`
+          `Status updated to ${data?.status}`,
+          '/admin/bookings'
+        )
+      }
+
+      const onRechargeAlert = (data) => {
+        handleNewAlert(
+          data,
+          `💰 Wallet Recharge Request: ₹${data?.amount || 0}`,
+          `${data?.userName || 'User'} (${data?.accountType || 'USER'}) submitted a recharge of ₹${data?.amount || 0}`,
+          '/admin/wallet-recharge-requests'
+        )
+      }
+
+      const onProviderPaymentAlert = (data) => {
+        handleNewAlert(
+          data,
+          `💳 Worker Payment Proof: ₹${data?.amount || 0}`,
+          `${data?.userName || 'Worker'} submitted a payment proof of ₹${data?.amount || 0}`,
+          '/admin/qr-payments'
         )
       }
 
       socket.on('NEW_BOOKING_ALERT', onBookingAlert)
       socket.on('BOOKING_ACCEPTED_ADMIN', onAcceptedAlert)
       socket.on('BOOKING_STATUS_UPDATE_ADMIN', onStatusAlert)
+      socket.on('WALLET_RECHARGE_REQUEST_SUBMITTED', onRechargeAlert)
+      socket.on('PROVIDER_PAYMENT_SUBMITTED', onProviderPaymentAlert)
 
       return () => {
         socket.off('NEW_BOOKING_ALERT', onBookingAlert)
         socket.off('BOOKING_ACCEPTED_ADMIN', onAcceptedAlert)
         socket.off('BOOKING_STATUS_UPDATE_ADMIN', onStatusAlert)
+        socket.off('WALLET_RECHARGE_REQUEST_SUBMITTED', onRechargeAlert)
+        socket.off('PROVIDER_PAYMENT_SUBMITTED', onProviderPaymentAlert)
       }
     }
   }, [socket])
@@ -204,6 +254,13 @@ export function AdminLayout() {
       const body = notif.body || data.body || 'New update received.'
 
       playBookingAlertSound(data?.bookingId)
+      setIsAudioAlerting(true)
+      if (soundTimeoutRef.current) clearTimeout(soundTimeoutRef.current)
+      soundTimeoutRef.current = setTimeout(() => {
+        stopBookingAlertSound()
+        setIsAudioAlerting(false)
+      }, 10000)
+
       setUnreadCount((c) => c + 1)
       setNotifications((prev) => [
         {
@@ -244,6 +301,7 @@ export function AdminLayout() {
   }
 
   const handleMarkAllRead = async () => {
+    silenceAudioAlert()
     try {
       await notificationApi.markAllNotificationsRead()
       setUnreadCount(0)
@@ -442,10 +500,24 @@ export function AdminLayout() {
           </div>
 
           <div className="flex shrink-0 items-center gap-2 md:gap-3">
+            {isAudioAlerting && (
+              <button
+                type="button"
+                onClick={silenceAudioAlert}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-md animate-pulse transition active:scale-95"
+                title="Click to silence active alert sound"
+                aria-label="Silence audio alert"
+              >
+                <VolumeX className="h-4 w-4" />
+                <span className="hidden sm:inline">Silence Alert</span>
+              </button>
+            )}
+
             <div className="relative" ref={notifRef}>
               <button
                 type="button"
                 onClick={() => {
+                  silenceAudioAlert()
                   setNotifOpen((o) => !o)
                   setProfileOpen(false)
                 }}
@@ -504,6 +576,7 @@ export function AdminLayout() {
                             <div
                               key={n._id}
                               onClick={() => {
+                                silenceAudioAlert()
                                 if (!n.isRead && n._id && !n._id.startsWith('live_') && !n._id.startsWith('fcm_')) {
                                   notificationApi.markNotificationRead(n._id).catch(() => {})
                                 }

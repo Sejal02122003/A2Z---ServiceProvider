@@ -35,6 +35,7 @@ import {
 import { adminWalletApprovalApi } from '../../api/adminWalletApprovalApi.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { useSocket } from '../../context/SocketContext.jsx'
+import { stopBookingAlertSound } from '../../utils/bookingSound.js'
 
 function formatInr(val) {
   return `₹${Number(val || 0).toLocaleString('en-IN')}`
@@ -307,8 +308,17 @@ export function AdminWalletManagementPage() {
     }
   }, [socket, activeTab, loadStats, loadRequests, loadTransactions])
 
+  // Stop any active alert sound when admin enters or leaves the wallet management screen
+  useEffect(() => {
+    stopBookingAlertSound()
+    return () => {
+      stopBookingAlertSound()
+    }
+  }, [])
+
   // View Details
   const handleViewDetails = async (reqItem) => {
+    stopBookingAlertSound()
     try {
       setSelectedRequest(reqItem)
       setShowDetailsModal(true)
@@ -328,6 +338,7 @@ export function AdminWalletManagementPage() {
   // Handle Approve
   const executeApprove = async () => {
     if (!approveConfirmRequest) return
+    stopBookingAlertSound()
     try {
       setApproving(true)
       const res = await adminWalletApprovalApi.approveRechargeRequest(approveConfirmRequest._id, {
@@ -355,6 +366,7 @@ export function AdminWalletManagementPage() {
   // Handle Reject
   const executeReject = async () => {
     if (!rejectModalRequest) return
+    stopBookingAlertSound()
     const cleanReason = String(rejectionReason || '').trim()
     if (!cleanReason) {
       setRejectionError('Please enter a rejection reason.')
@@ -386,6 +398,16 @@ export function AdminWalletManagementPage() {
     } finally {
       setRejecting(false)
     }
+  }
+
+  const handleOpenApprove = (req) => {
+    stopBookingAlertSound()
+    setApproveConfirmRequest(req)
+  }
+
+  const handleOpenReject = (req) => {
+    stopBookingAlertSound()
+    setRejectModalRequest(req)
   }
 
   return (
@@ -864,14 +886,14 @@ export function AdminWalletManagementPage() {
                                 <>
                                   <button
                                     type="button"
-                                    onClick={() => setApproveConfirmRequest(r)}
+                                    onClick={() => handleOpenApprove(r)}
                                     className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-2xs"
                                   >
                                     Approve
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => setRejectModalRequest(r)}
+                                    onClick={() => handleOpenReject(r)}
                                     className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition shadow-2xs"
                                   >
                                     Reject
@@ -1270,7 +1292,7 @@ export function AdminWalletManagementPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setRejectModalRequest(selectedRequest)
+                      handleOpenReject(selectedRequest)
                       setShowDetailsModal(false)
                     }}
                     className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition shadow-xs"
@@ -1280,7 +1302,7 @@ export function AdminWalletManagementPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setApproveConfirmRequest(selectedRequest)
+                      handleOpenApprove(selectedRequest)
                       setShowDetailsModal(false)
                     }}
                     className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition shadow-xs"
