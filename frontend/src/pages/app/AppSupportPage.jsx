@@ -112,30 +112,31 @@ function supportIntro(role) {
 
 function SupportScreenHeader({ title, subtitle, homePath = '/user' }) {
   return (
-    <div className="pb-1">
-      <div className="flex items-start gap-2 sm:gap-3">
-        <Link
-          to={homePath}
-          className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200/90 bg-white text-slate-800 shadow-sm transition hover:border-brand/35 hover:text-brand"
-          aria-label="Back to home"
-        >
-          <ArrowLeft className="h-5 w-5" aria-hidden />
-        </Link>
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand">Support</p>
-          <h1 className="mt-0.5 text-xl font-black tracking-tight text-slate-900">{title}</h1>
-          {subtitle ? (
-            <p className="mt-1 text-xs font-medium leading-relaxed text-slate-600 sm:text-sm">{subtitle}</p>
-          ) : null}
+    <div className="sticky top-0 z-40 -mx-4 px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-1 bg-slate-50/95 backdrop-blur-md">
+      <div className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link
+            to={homePath}
+            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[14px] border border-slate-200 text-slate-700 shadow-sm transition-colors hover:bg-slate-50 active:scale-95"
+            aria-label="Back to home"
+          >
+            <ArrowLeft className="h-5 w-5" aria-hidden />
+          </Link>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[20px] font-bold tracking-tight text-slate-900 leading-none truncate">{title}</h1>
+            {subtitle ? (
+              <p className="mt-1 text-xs font-medium text-slate-500 truncate">{subtitle}</p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={openAppDrawer}
+            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[14px] border border-slate-200 bg-white text-slate-800 shadow-sm transition-colors hover:bg-slate-50 active:scale-95"
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" aria-hidden />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={openAppDrawer}
-          className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200/90 bg-white text-slate-700 shadow-sm transition hover:border-brand/35 hover:text-brand"
-          aria-label="Open menu"
-        >
-          <Menu className="h-5 w-5" aria-hidden />
-        </button>
       </div>
     </div>
   )

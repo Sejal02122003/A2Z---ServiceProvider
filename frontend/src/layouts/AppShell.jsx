@@ -37,8 +37,18 @@ export function AppShell() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [locationModalOpen, setLocationModalOpen] = useState(false)
   const [appLocation, setAppLocation] = useState(() => readAppUserLocation())
+  const [isScrolled, setIsScrolled] = useState(false)
   const headerRef = useRef(null)
   const reduce = useReducedMotion()
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 15)
+    }
+    handleScroll()
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   useEffect(() => {
     if (!user || isGuest) return
@@ -392,8 +402,13 @@ export function AppShell() {
         {!hideShellHeader ? (
           <header
             ref={headerRef}
-            className={`sticky top-0 z-30 hide-on-print ${isIndividualAppHome ? 'bg-transparent px-4 pb-1 pt-3' : 'px-3 pt-3'
-              }`}
+            className={`sticky top-0 z-40 hide-on-print transition-colors duration-200 ${
+              isIndividualAppHome
+                ? isScrolled
+                  ? 'bg-[#012227]/95 backdrop-blur-md px-4 py-2.5 shadow-md border-b border-white/10'
+                  : 'bg-transparent px-4 pb-1 pt-3'
+                : 'px-3 pt-3 bg-white/95 backdrop-blur-md shadow-xs'
+            }`}
           >
             {isIndividualAppHome ? (
               <div className="flex items-center gap-2 text-white">

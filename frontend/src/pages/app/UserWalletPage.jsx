@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Wallet,
+  ArrowLeft,
   ArrowUpRight,
   ArrowDownLeft,
   Gift,
@@ -144,21 +145,33 @@ export default function UserWalletPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-      {/* Top Bar */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Wallet</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Save instantly on service bookings with your balance</p>
+    <div className="max-w-2xl mx-auto px-4 pb-6 space-y-6">
+      {/* Top Bar - Sticky Header */}
+      <div className="sticky top-0 z-30 -mx-4 px-4 pt-2 pb-2 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md">
+        <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 shadow-sm flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
+            <button
+              type="button"
+              onClick={() => navigate('/user')}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 shadow-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-95"
+              aria-label="Back to home"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div>
+              <h1 className="text-lg font-black tracking-tight text-slate-900 dark:text-white leading-tight">My Wallet</h1>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Save instantly on service bookings</p>
+            </div>
+          </div>
+          <button
+            onClick={() => loadData(true)}
+            disabled={refreshing}
+            className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-primary-600 rounded-xl transition-all disabled:opacity-50"
+            title="Refresh Balance"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-primary-600' : ''}`} />
+          </button>
         </div>
-        <button
-          onClick={() => loadData(true)}
-          disabled={refreshing}
-          className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-primary-600 rounded-xl transition-all disabled:opacity-50"
-          title="Refresh Balance"
-        >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-primary-600' : ''}`} />
-        </button>
       </div>
 
       {/* Welcome Bonus Celebration Alert */}

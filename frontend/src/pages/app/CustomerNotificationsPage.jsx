@@ -172,27 +172,28 @@ export function CustomerNotificationsPage() {
   return (
     <div className="space-y-4 pb-12 max-w-xl mx-auto">
       {/* Header Bar */}
-      <div className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate('/user')}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 transition active:scale-95"
-            aria-label="Back to home"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div>
-            <h1 className="text-lg font-black tracking-tight text-slate-900 leading-tight">
-              Notifications
-            </h1>
-            <p className="text-xs font-semibold text-slate-500">
-              {unreadCount > 0 ? `${unreadCount} unread update${unreadCount > 1 ? 's' : ''}` : 'All caught up'}
-            </p>
+      <div className="sticky top-0 z-30 pt-1 pb-1.5 bg-slate-50/95 backdrop-blur-md">
+        <div className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate('/user')}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 transition active:scale-95 cursor-pointer"
+              aria-label="Back to home"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div>
+              <h1 className="text-lg font-black tracking-tight text-slate-900 leading-tight">
+                Notifications
+              </h1>
+              <p className="text-xs font-semibold text-slate-500">
+                {unreadCount > 0 ? `${unreadCount} unread update${unreadCount > 1 ? 's' : ''}` : 'All caught up'}
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
           {unreadCount > 0 && (
             <button
               type="button"
@@ -216,6 +217,7 @@ export function CustomerNotificationsPage() {
               Clear read
             </button>
           )}
+          </div>
         </div>
       </div>
 
