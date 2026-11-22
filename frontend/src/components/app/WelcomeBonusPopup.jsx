@@ -159,6 +159,40 @@ export function WelcomeBonusPopup() {
     } catch {}
   }, [user, triggerOpen])
 
+  // Prevent background scrolling when Welcome Bonus popup is active
+  useEffect(() => {
+    if (!isOpen) return
+
+    const prevBodyOverflow = document.body.style.overflow
+    const prevHtmlOverflow = document.documentElement.style.overflow
+    const prevTouchAction = document.body.style.touchAction
+
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+    document.body.style.touchAction = 'none'
+
+    const handleTouchMove = (e) => {
+      const modalCard = document.getElementById('welcome-bonus-modal-card')
+      if (modalCard && modalCard.contains(e.target)) {
+        if (modalCard.scrollHeight > modalCard.clientHeight) {
+          return // allow scrolling modal card if needed
+        }
+      }
+      if (e.cancelable) {
+        e.preventDefault()
+      }
+    }
+
+    window.addEventListener('touchmove', handleTouchMove, { passive: false })
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow
+      document.documentElement.style.overflow = prevHtmlOverflow
+      document.body.style.touchAction = prevTouchAction
+      window.removeEventListener('touchmove', handleTouchMove)
+    }
+  }, [isOpen])
+
   if (!isOpen) return null
 
   // Confetti particles for celebration effect
@@ -175,24 +209,31 @@ export function WelcomeBonusPopup() {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      <div 
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto overscroll-none"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) handleDismiss()
+        }}
+      >
         {/* Backdrop Blur */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={handleDismiss}
-          className="fixed inset-0 bg-slate-950/70 backdrop-blur-md transition-opacity"
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-md transition-opacity overscroll-none touch-none"
           aria-hidden="true"
         />
 
         {/* Modal Card */}
         <motion.div
+          id="welcome-bonus-modal-card"
           initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.85, y: 20 }}
           animate={reduce ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
           exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.9, y: 15 }}
           transition={{ type: 'spring', damping: 24, stiffness: 300 }}
-          className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-900/10 text-center z-10"
+          className="relative w-full max-w-md max-h-[90vh] overflow-y-auto overscroll-contain rounded-3xl bg-white shadow-2xl ring-1 ring-slate-900/10 text-center z-10 touch-pan-y"
+          style={{ WebkitOverflowScrolling: 'touch' }}
           role="dialog"
           aria-modal="true"
           aria-labelledby="welcome-bonus-title"
