@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   AlertTriangle,
@@ -52,6 +52,13 @@ const TOPICS_BY_ROLE = {
   ],
 }
 
+const ONBOARDING_TOPICS = [
+  { id: 'onboarding_steps', label: 'Registration & Steps', desc: 'Personal info, trade experience, address details' },
+  { id: 'kyc_docs', label: 'KYC & Aadhaar OTP', desc: 'Aadhaar verification, document upload issues' },
+  { id: 'work_categories', label: 'Work Types & Trade Skills', desc: 'Selecting service categories and tools' },
+  { id: 'welcome_kit', label: 'Welcome Kit & Uniform', desc: 'Kit delivery status, uniform, bag, ID card' },
+]
+
 const TOPIC_ICONS = {
   booking: CalendarClock,
   pricing: Banknote,
@@ -67,6 +74,10 @@ const TOPIC_ICONS = {
   supply: ClipboardList,
   workforce: HardHat,
   client: Building2,
+  onboarding_steps: Sparkles,
+  kyc_docs: FileText,
+  work_categories: HardHat,
+  welcome_kit: ShieldCheck,
 }
 
 const WORKFLOW_STEPS = [
@@ -81,7 +92,14 @@ function openAppDrawer() {
   window.dispatchEvent(new Event('lc-open-app-drawer'))
 }
 
-function supportIntro(role) {
+function supportIntro(role, isFromOnboarding = false) {
+  if (isFromOnboarding) {
+    return {
+      title: 'Partner Registration Support',
+      subtitle: 'Need help with onboarding, KYC, or document verification?',
+      body: 'Our onboarding desk is here to assist you with registration steps, Aadhaar KYC, kit delivery, and partner account activation.',
+    }
+  }
   if (role === USER_ROLES.CONTRACTOR) {
     return {
       title: 'Enterprise support',
@@ -110,32 +128,44 @@ function supportIntro(role) {
   }
 }
 
-function SupportScreenHeader({ title, subtitle, homePath = '/user' }) {
+function SupportScreenHeader({ title, subtitle, homePath = '/user', isFromOnboarding = false, onBack }) {
+  const navigate = useNavigate()
   return (
     <div className="sticky top-0 z-40 -mx-4 px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-1 bg-slate-50/95 backdrop-blur-md">
       <div className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
         <div className="flex items-center gap-2 sm:gap-3">
-          <Link
-            to={homePath}
-            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[14px] border border-slate-200 text-slate-700 shadow-sm transition-colors hover:bg-slate-50 active:scale-95"
-            aria-label="Back to home"
+          <button
+            type="button"
+            onClick={() => {
+              if (onBack) {
+                onBack()
+              } else if (isFromOnboarding) {
+                navigate('/serviceprovider/partner-onboarding', { replace: true })
+              } else {
+                navigate(homePath)
+              }
+            }}
+            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[14px] border border-slate-200 text-slate-700 shadow-sm transition-colors hover:bg-slate-50 active:scale-95 cursor-pointer"
+            aria-label="Back"
           >
             <ArrowLeft className="h-5 w-5" aria-hidden />
-          </Link>
+          </button>
           <div className="min-w-0 flex-1">
             <h1 className="text-[20px] font-bold tracking-tight text-slate-900 leading-none truncate">{title}</h1>
             {subtitle ? (
               <p className="mt-1 text-xs font-medium text-slate-500 truncate">{subtitle}</p>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={openAppDrawer}
-            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[14px] border border-slate-200 bg-white text-slate-800 shadow-sm transition-colors hover:bg-slate-50 active:scale-95"
-            aria-label="Open menu"
-          >
-            <Menu className="h-5 w-5" aria-hidden />
-          </button>
+          {!isFromOnboarding ? (
+            <button
+              type="button"
+              onClick={openAppDrawer}
+              className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[14px] border border-slate-200 bg-white text-slate-800 shadow-sm transition-colors hover:bg-slate-50 active:scale-95 cursor-pointer"
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" aria-hidden />
+            </button>
+          ) : null}
         </div>
       </div>
     </div>
@@ -241,13 +271,28 @@ function FieldLabel({ children }) {
 }
 
 export function AppSupportPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const { user } = useAuth()
   const role = user?.role ?? USER_ROLES.CUSTOMER
   const reduce = useReducedMotion()
-  const intro = supportIntro(role)
-  const topics = TOPICS_BY_ROLE[role] ?? TOPICS_BY_ROLE[USER_ROLES.CUSTOMER]
 
-  const [topicId, setTopicId] = useState(topics[0]?.id ?? 'booking')
+  const kitReceived = Boolean(
+    user?.welcomeKit?.isReceived ||
+    user?.welcomeKit?.status === 'DELIVERED' ||
+    (user?.welcomeKit?.uniformIssued && user?.welcomeKit?.idCardIssued && user?.welcomeKit?.bagIssued)
+  )
+  const labourCategories = user?.labourProfile?.categoryIds
+  const hasCategories = Array.isArray(labourCategories) && labourCategories.length > 0
+  const isLabourOnboardingIncomplete = user?.role === USER_ROLES.LABOUR && (!kitReceived || !hasCategories)
+  const isFromOnboarding = location.search.includes('from=onboarding') || (user?.role === USER_ROLES.LABOUR && isLabourOnboardingIncomplete)
+
+  const intro = supportIntro(role, isFromOnboarding)
+  const topics = isFromOnboarding
+    ? ONBOARDING_TOPICS
+    : (TOPICS_BY_ROLE[role] ?? TOPICS_BY_ROLE[USER_ROLES.CUSTOMER])
+
+  const [topicId, setTopicId] = useState(topics[0]?.id ?? (isFromOnboarding ? 'onboarding_steps' : 'booking'))
   const [subject, setSubject] = useState('')
   const [details, setDetails] = useState('')
   const [sent, setSent] = useState(false)
@@ -327,11 +372,25 @@ export function AppSupportPage() {
 
   return (
     <motion.div
-      className="w-full min-w-0 max-w-full space-y-5 overflow-x-hidden bg-linear-to-b from-slate-50/95 via-white to-blue-50/15 pb-28 pt-1"
+      className={`w-full min-w-0 max-w-full space-y-5 overflow-x-hidden bg-linear-to-b from-slate-50/95 via-white to-blue-50/15 ${
+        isFromOnboarding ? 'pb-10' : 'pb-28'
+      } pt-1`}
       initial={reduce ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
     >
-      <SupportScreenHeader title={intro.title} subtitle={intro.subtitle} homePath={homePath} />
+      <SupportScreenHeader
+        title={intro.title}
+        subtitle={intro.subtitle}
+        homePath={homePath}
+        isFromOnboarding={isFromOnboarding}
+        onBack={() => {
+          if (isFromOnboarding) {
+            navigate('/serviceprovider/partner-onboarding', { replace: true })
+          } else {
+            navigate(homePath)
+          }
+        }}
+      />
 
       <motion.section
         initial={reduce ? false : { opacity: 0, y: 10 }}
@@ -598,16 +657,18 @@ export function AppSupportPage() {
         </div>
       </section>
 
-      <section>
-        <AppSectionHeader title="Quick links" className="mb-3 px-0.5" />
-        <ul className="space-y-2">
-          {quickLinks.map((link) => (
-            <li key={link.to}>
-              <QuickLinkCard to={link.to} icon={link.icon} label={link.label} />
-            </li>
-          ))}
-        </ul>
-      </section>
+      {!isFromOnboarding && quickLinks.length > 0 ? (
+        <section>
+          <AppSectionHeader title="Quick links" className="mb-3 px-0.5" />
+          <ul className="space-y-2">
+            {quickLinks.map((link) => (
+              <li key={link.to}>
+                <QuickLinkCard to={link.to} icon={link.icon} label={link.label} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <p className="flex items-center justify-center gap-2 pb-2 text-center text-[11px] font-medium text-slate-400">
         <Headphones className="h-3.5 w-3.5" aria-hidden />

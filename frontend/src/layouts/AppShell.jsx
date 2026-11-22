@@ -91,6 +91,16 @@ export function AppShell() {
 
   const { headerTagline, bottomNav, drawerNav } = useMemo(() => getAppNavigation(user?.role), [user?.role])
 
+  const kitReceived = Boolean(
+    user?.welcomeKit?.isReceived ||
+    user?.welcomeKit?.status === 'DELIVERED' ||
+    (user?.welcomeKit?.uniformIssued && user?.welcomeKit?.idCardIssued && user?.welcomeKit?.bagIssued)
+  )
+  const labourCategories = user?.labourProfile?.categoryIds
+  const hasCategories = Array.isArray(labourCategories) && labourCategories.length > 0
+  const isLabourOnboardingIncomplete = user?.role === USER_ROLES.LABOUR && (!kitReceived || !hasCategories)
+  const isFromOnboardingSupport = pathname.includes('/support') && (search.includes('from=onboarding') || isLabourOnboardingIncomplete)
+
   const isIndividualAppHome = (user?.role === USER_ROLES.CUSTOMER || user?.role === USER_ROLES.CONTRACTOR) && (pathname === '/user' || pathname === '/app')
   const isLabourAppHome = user?.role === USER_ROLES.LABOUR && (pathname === '/serviceprovider' || pathname === '/app')
   const isNotifications = pathname.endsWith('/notifications')
@@ -500,8 +510,9 @@ export function AppShell() {
           className={`relative z-10 flex-1 ${
             pathname.includes('/partner-onboarding') ||
             pathname.includes('/onboarding') ||
+            isFromOnboardingSupport ||
             pathname.includes('/sub-category')
-              ? `p-0 ${cartCount > 0 ? 'pb-36' : 'pb-28'}`
+              ? `p-0 ${cartCount > 0 ? 'pb-36' : isFromOnboardingSupport ? 'pb-8' : 'pb-28'}`
               : `px-4 ${cartCount > 0 ? 'pb-48' : 'pb-32'} ${hideShellHeader
                   ? 'pt-[max(0.5rem,env(safe-area-inset-top,0px))]'
                   : isIndividualAppHome
@@ -516,6 +527,8 @@ export function AppShell() {
 
       {!pathname.includes('/partner-onboarding') &&
       !pathname.includes('/onboarding') &&
+      !isFromOnboardingSupport &&
+      !isLabourOnboardingIncomplete &&
       !pathname.includes('/booking/flow') &&
       !pathname.includes('/active-job') &&
       !pathname.includes('/sub-category') &&

@@ -65,11 +65,11 @@ export function PartnerOnboardingPage() {
 
         <button
           type="button"
-          onClick={() => navigate('/serviceprovider/support')}
-          className="flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-200 transition"
+          onClick={() => navigate('/serviceprovider/support?from=onboarding')}
+          className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200 transition cursor-pointer"
         >
-          <Headphones className="h-3.5 w-3.5 text-brand" />
-          <span className="hidden sm:inline">Help Desk</span>
+          <Headphones className="h-4 w-4 text-brand" />
+          <span>Support</span>
         </button>
       </div>
 
