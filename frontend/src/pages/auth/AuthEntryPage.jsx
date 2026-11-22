@@ -446,7 +446,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
       }
 
       // Route Service Partners directly to the onboarding pipeline or labour home
-      if (authGroup === 'labours') {
+      if (authGroup === 'labours' && signedInUser.role === USER_ROLES.LABOUR) {
         const kitReceived = Boolean(
           signedInUser.welcomeKit?.isReceived ||
           signedInUser.welcomeKit?.status === 'DELIVERED' ||
@@ -480,7 +480,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
               window.dispatchEvent(new CustomEvent('a2z-show-welcome-bonus', { detail: welcomeBonus }))
             } catch { }
           }
-          if (authGroup === 'labours') {
+          if (authGroup === 'labours' && user.role === USER_ROLES.LABOUR) {
             const kitReceived = Boolean(
               user.welcomeKit?.isReceived ||
               user.welcomeKit?.status === 'DELIVERED' ||

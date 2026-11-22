@@ -335,9 +335,24 @@ export const loginRequestOtp = asyncHandler(async (req, res) => {
       code: 'USE_ADMIN_LOGIN',
     })
   }
-  const effectiveRole = authGroup === 'labours'
-    ? USER_ROLES.LABOUR
-    : (user.role === USER_ROLES.LABOUR ? USER_ROLES.CUSTOMER : user.role)
+
+  // Prevent cross-portal login (Customer trying to log in on Service Provider app or vice versa)
+  if (authGroup === 'labours' && user.role !== USER_ROLES.LABOUR) {
+    return sendError(res, {
+      message: 'This mobile number is registered as a Customer account. Please log in using the User app.',
+      statusCode: HTTP_STATUS.FORBIDDEN,
+      code: 'WRONG_PORTAL',
+    })
+  }
+  if (authGroup === 'users' && user.role === USER_ROLES.LABOUR) {
+    return sendError(res, {
+      message: 'This mobile number is registered as a Service Partner account. Please log in using the Service Provider app.',
+      statusCode: HTTP_STATUS.FORBIDDEN,
+      code: 'WRONG_PORTAL',
+    })
+  }
+
+  const effectiveRole = user.role
   const { challengeId, plainOtp } = await createOtpChallenge(phone, 'login')
   const includeDevOtp = isOtpBypassLast6Enabled()
   return sendSuccess(res, {
@@ -372,6 +387,21 @@ export const loginVerify = asyncHandler(async (req, res) => {
     })
   }
 
+  if (authGroup === 'labours' && user.role !== USER_ROLES.LABOUR) {
+    return sendError(res, {
+      message: 'This mobile number is registered as a Customer account. Please log in using the User app.',
+      statusCode: HTTP_STATUS.FORBIDDEN,
+      code: 'WRONG_PORTAL',
+    })
+  }
+  if (authGroup === 'users' && user.role === USER_ROLES.LABOUR) {
+    return sendError(res, {
+      message: 'This mobile number is registered as a Service Partner account. Please log in using the Service Provider app.',
+      statusCode: HTTP_STATUS.FORBIDDEN,
+      code: 'WRONG_PORTAL',
+    })
+  }
+
   const otp = await validateOtpChallenge({ phone, purpose: 'login', code, challengeId })
   if (!otp.ok) {
     const map = {
@@ -392,13 +422,6 @@ export const loginVerify = asyncHandler(async (req, res) => {
   user.lastLoginAt = new Date()
   if (!user.identityStatus || user.identityStatus === IDENTITY_STATUS.UNVERIFIED) {
     user.identityStatus = IDENTITY_STATUS.CONTACT_VERIFIED
-  }
-
-  if (authGroup === 'labours' && user.role !== USER_ROLES.LABOUR) {
-    user.role = USER_ROLES.LABOUR
-    if (!user.labourProfile) user.labourProfile = {}
-  } else if (authGroup === 'users' && user.role === USER_ROLES.LABOUR) {
-    user.role = USER_ROLES.CUSTOMER
   }
 
   await user.save()
