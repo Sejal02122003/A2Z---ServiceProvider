@@ -276,7 +276,7 @@ function ZoneModal({ open, zone, onClose, onSaved }) {
                   onChange={() => setIsActive(true)}
                   className="h-4 w-4 text-brand focus:ring-brand border-slate-300"
                 />
-                <span className="text-sm font-semibold text-slate-700">● Active</span>
+                <span className="text-sm font-semibold text-slate-700">Active</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -286,7 +286,7 @@ function ZoneModal({ open, zone, onClose, onSaved }) {
                   onChange={() => setIsActive(false)}
                   className="h-4 w-4 text-brand focus:ring-brand border-slate-300"
                 />
-                <span className="text-sm font-semibold text-slate-700">○ Inactive</span>
+                <span className="text-sm font-semibold text-slate-700">Inactive</span>
               </label>
             </div>
           </div>
