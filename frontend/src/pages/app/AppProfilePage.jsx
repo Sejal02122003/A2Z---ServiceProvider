@@ -158,6 +158,16 @@ export function AppProfilePage() {
   const [deleteErr, setDeleteErr] = useState('')
   const [showIdCardModal, setShowIdCardModal] = useState(false)
 
+  // Hide bottom footer navigation when editing details or viewing modals
+  useEffect(() => {
+    if (editProfileOpen || addressSheetOpen || deleteOpen || showIdCardModal) {
+      window.dispatchEvent(new CustomEvent('app-toggle-bottom-nav', { detail: { hide: true } }))
+      return () => {
+        window.dispatchEvent(new CustomEvent('app-toggle-bottom-nav', { detail: { hide: false } }))
+      }
+    }
+  }, [editProfileOpen, addressSheetOpen, deleteOpen, showIdCardModal])
+
   useEffect(() => {
     if (!editProfileOpen) return
     

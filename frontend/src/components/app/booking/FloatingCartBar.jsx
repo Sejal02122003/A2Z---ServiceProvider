@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ChevronRight, Trash2 } from 'lucide-react'
@@ -9,11 +9,50 @@ export function FloatingCartBar() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { cartCount, cartSubtotal, clearCart } = useBookingCart()
+  const [hideCartBar, setHideCartBar] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleCustomToggle = (e) => {
+      if (e.detail?.hide !== undefined) {
+        setHideCartBar(Boolean(e.detail.hide))
+      }
+    }
+
+    const handleFocusIn = (e) => {
+      if ((e.target && ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) || e.target?.isContentEditable) {
+        if (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches) {
+          setHideCartBar(true)
+        }
+      }
+    }
+
+    const handleFocusOut = () => {
+      setTimeout(() => {
+        const active = document.activeElement
+        if (!active || (!['INPUT', 'TEXTAREA'].includes(active.tagName) && !active.isContentEditable)) {
+          setHideCartBar(false)
+        }
+      }, 120)
+    }
+
+    window.addEventListener('app-toggle-bottom-nav', handleCustomToggle)
+    window.addEventListener('focusin', handleFocusIn)
+    window.addEventListener('focusout', handleFocusOut)
+
+    return () => {
+      window.removeEventListener('app-toggle-bottom-nav', handleCustomToggle)
+      window.removeEventListener('focusin', handleFocusIn)
+      window.removeEventListener('focusout', handleFocusOut)
+    }
+  }, [])
 
   if (typeof document === 'undefined') return null
 
   // Hide on cart review and checkout screens to avoid blocking action buttons
   const isCartPage =
+    hideCartBar ||
     pathname.includes('/cart') ||
     pathname.includes('/booking/cart') ||
     pathname.includes('/checkout')
