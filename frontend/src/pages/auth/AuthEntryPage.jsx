@@ -7,6 +7,7 @@ import {
   ClipboardList,
   HardHat,
   Home,
+  LogOut,
   Phone,
   ShieldCheck,
   Sparkles,
@@ -140,6 +141,42 @@ export function AuthEntryPage({ authGroup = 'users' }) {
   const [busy, setBusy] = useState(false)
   const [banner, setBanner] = useState(null)
   const [termsAccepted, setTermsAccepted] = useState(false)
+  const [showExitModal, setShowExitModal] = useState(false)
+
+  // Intercept hardware back button on service provider auth
+  useEffect(() => {
+    if (authGroup !== 'labours') return
+
+    window.history.pushState({ laboursAuthGuard: true }, '')
+
+    const handlePopState = () => {
+      if (step === 'otp') {
+        resetFlowToForm()
+      } else {
+        setShowExitModal(true)
+      }
+      window.history.pushState({ laboursAuthGuard: true }, '')
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [authGroup, step])
+
+  const handleExitApp = () => {
+    setShowExitModal(false)
+    if (window.navigator?.app?.exitApp) {
+      window.navigator.app.exitApp()
+    } else if (window.Capacitor?.App?.exitApp) {
+      window.Capacitor.App.exitApp()
+    } else {
+      try {
+        window.close()
+      } catch {}
+      navigate('/', { replace: true })
+    }
+  }
   const [policyModal, setPolicyModal] = useState({
     open: false,
     type: 'terms',
@@ -530,6 +567,24 @@ export function AuthEntryPage({ authGroup = 'users' }) {
     <div className="fixed inset-0 flex flex-col bg-white selection:bg-brand/20 overflow-hidden">
       {/* Top Header Section with Wave */}
       <div className="relative flex flex-col pt-10 pb-10 text-white bg-linear-to-b from-brand to-brand-bright overflow-hidden shrink-0">
+        {/* Back Button for Service Provider portal */}
+        {authGroup === 'labours' && (
+          <button
+            type="button"
+            onClick={() => {
+              if (step === 'otp') {
+                resetFlowToForm()
+              } else {
+                setShowExitModal(true)
+              }
+            }}
+            className="absolute left-4 top-[max(1rem,env(safe-area-inset-top))] z-20 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/20 text-white backdrop-blur-md transition hover:bg-white/30 active:scale-95 cursor-pointer shadow-sm border border-white/20"
+            aria-label="Back / Exit"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+        )}
+
         {/* Wave SVG */}
         <div className="absolute -bottom-1 left-0 right-0 w-full overflow-hidden leading-[0]">
           <svg viewBox="0 0 1440 320" className="relative block w-[120%] h-[50px] sm:h-[70px] left-[-10%]" preserveAspectRatio="none">
@@ -1013,6 +1068,54 @@ export function AuthEntryPage({ authGroup = 'users' }) {
                 >
                   <Check className="h-3.5 w-3.5" />
                   I Agree & Accept
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Exit App Confirmation Modal for Service Provider Registration */}
+      <AnimatePresence>
+        {showExitModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowExitModal(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl z-10 text-center"
+            >
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 ring-8 ring-rose-50/50">
+                <LogOut className="h-7 w-7 stroke-[2.25]" />
+              </div>
+              <h3 className="text-lg font-black text-slate-900">
+                Exit Service Provider App?
+              </h3>
+              <p className="mt-2 text-xs font-medium leading-relaxed text-slate-500">
+                Are you sure you want to exit the application?
+              </p>
+              <div className="mt-6 flex flex-col gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleExitApp}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 py-3 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-rose-600/25 transition active:scale-95 hover:bg-rose-700 cursor-pointer"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Exit App
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowExitModal(false)}
+                  className="flex w-full items-center justify-center rounded-2xl border border-slate-200 bg-white py-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 active:scale-95 cursor-pointer"
+                >
+                  Stay in App
                 </button>
               </div>
             </motion.div>
