@@ -527,498 +527,498 @@ export function AuthEntryPage({ authGroup = 'users' }) {
   }
 
   return (
-      <div className="fixed inset-0 flex flex-col bg-white selection:bg-brand/20 overflow-hidden">
-        {/* Top Header Section with Wave */}
-        <div className="relative flex flex-col pt-10 pb-10 text-white bg-linear-to-b from-brand to-brand-bright overflow-hidden shrink-0">
-          {/* Wave SVG */}
-          <div className="absolute -bottom-1 left-0 right-0 w-full overflow-hidden leading-[0]">
-            <svg viewBox="0 0 1440 320" className="relative block w-[120%] h-[50px] sm:h-[70px] left-[-10%]" preserveAspectRatio="none">
-              <path fill="#ffffff" d="M0,160L48,138.7C96,117,192,75,288,69.3C384,64,480,96,576,128C672,160,768,192,864,186.7C960,181,1056,139,1152,122.7C1248,107,1344,117,1392,122.7L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
-            </svg>
-          </div>
+    <div className="fixed inset-0 flex flex-col bg-white selection:bg-brand/20 overflow-hidden">
+      {/* Top Header Section with Wave */}
+      <div className="relative flex flex-col pt-10 pb-10 text-white bg-linear-to-b from-brand to-brand-bright overflow-hidden shrink-0">
+        {/* Wave SVG */}
+        <div className="absolute -bottom-1 left-0 right-0 w-full overflow-hidden leading-[0]">
+          <svg viewBox="0 0 1440 320" className="relative block w-[120%] h-[50px] sm:h-[70px] left-[-10%]" preserveAspectRatio="none">
+            <path fill="#ffffff" d="M0,160L48,138.7C96,117,192,75,288,69.3C384,64,480,96,576,128C672,160,768,192,864,186.7C960,181,1056,139,1152,122.7C1248,107,1344,117,1392,122.7L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+          </svg>
+        </div>
 
-          <div className="mt-2 flex flex-col items-center relative z-10">
-            <div className="flex justify-center mb-0">
-              <div className="rounded-3xl bg-white p-2 shadow-xl shadow-cyan-950/20 ring-4 ring-white/40">
-                <img src="/logo.png" alt="A2Z Services Hub" className="h-28 sm:h-32 w-auto object-contain" />
-              </div>
+        <div className="mt-2 flex flex-col items-center relative z-10">
+          <div className="flex justify-center mb-0">
+            <div className="rounded-3xl bg-white p-2 shadow-xl shadow-cyan-950/20 ring-4 ring-white/40">
+              <img src="/logo.png" alt="A2Z Services Hub" className="h-28 sm:h-32 w-auto object-contain" />
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="px-6 pt-2 pb-6 text-center shrink-0">
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-800">
-            {step === 'otp'
-              ? 'Verify OTP'
-              : mode === 'login'
-                ? (authGroup === 'labours' ? 'Welcome back Service Providers !' : 'Welcome back !')
-                : (authGroup === 'labours' ? 'Welcome Service Providers !' : 'Welcome !')}
-          </h1>
-          <p className="mt-1.5 text-sm font-medium text-slate-500">
-            {step === 'otp'
-              ? 'Secure verification'
-              : mode === 'login'
-                ? (authGroup === 'labours' ? 'Sign in to access your jobs & earnings' : 'Sign in to continue')
-                : (authGroup === 'labours' ? 'Join A2Z Service Provider Network' : 'Join A2Z today')}
-          </p>
-        </div>
+      <div className="px-6 pt-2 pb-6 text-center shrink-0">
+        <h1 className="text-2xl font-extrabold tracking-tight text-slate-800">
+          {step === 'otp'
+            ? 'Verify OTP'
+            : mode === 'login'
+              ? (authGroup === 'labours' ? 'Welcome back Service Providers !' : 'Welcome back !')
+              : (authGroup === 'labours' ? 'Welcome Service Providers !' : 'Welcome !')}
+        </h1>
+        <p className="mt-1.5 text-sm font-medium text-slate-500">
+          {step === 'otp'
+            ? 'Secure verification'
+            : mode === 'login'
+              ? (authGroup === 'labours' ? 'Sign in to access your jobs & earnings' : 'Sign in to continue')
+              : (authGroup === 'labours' ? 'Join A2Z Service Provider Network' : 'Join A2Z today')}
+        </p>
+      </div>
 
-        {/* Bottom Form Section */}
-            <div
-              ref={scrollContainerRef}
-              className="flex-1 bg-white px-6 pb-24 overflow-y-auto overscroll-y-contain touch-pan-y"
-              style={{ WebkitOverflowScrolling: 'touch' }}
-            >
-              <div className="mx-auto max-w-lg min-h-full flex flex-col">
+      {/* Bottom Form Section */}
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 bg-white px-6 pb-24 overflow-y-auto overscroll-y-contain touch-pan-y"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+        <div className="mx-auto max-w-lg min-h-full flex flex-col">
 
 
-                {step === 'form' ? (
-                  <div className="mb-6 flex gap-1 rounded-full bg-slate-100 p-1 shrink-0">
-                    <button
-                      type="button"
-                      className={`flex-1 rounded-full py-3 text-[14px] font-bold transition ${mode === 'login' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                      onClick={() => switchMode('login')}
-                    >
-                      Login
-                    </button>
-                    <button
-                      type="button"
-                      className={`flex-1 rounded-full py-3 text-[14px] font-bold transition ${mode === 'register'
-                        ? 'bg-white text-brand shadow-sm'
-                        : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                      onClick={() => switchMode('register')}
-                    >
-                      Register
-                    </button>
-                  </div>
-                ) : null}
+          {step === 'form' ? (
+            <div className="mb-6 flex gap-1 rounded-full bg-slate-100 p-1 shrink-0">
+              <button
+                type="button"
+                className={`flex-1 rounded-full py-3 text-[14px] font-bold transition ${mode === 'login' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                onClick={() => switchMode('login')}
+              >
+                Login
+              </button>
+              <button
+                type="button"
+                className={`flex-1 rounded-full py-3 text-[14px] font-bold transition ${mode === 'register'
+                  ? 'bg-white text-brand shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                onClick={() => switchMode('register')}
+              >
+                Register
+              </button>
+            </div>
+          ) : null}
 
-                <AnimatePresence mode="wait">
-                  {step === 'form' ? (
-                    <motion.div
-                      key="form"
-                      initial={reduce ? false : { opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={reduce ? false : { opacity: 0, y: -8 }}
-                      className="flex flex-col"
-                    >
-                      {mode === 'register' ? (
-                        <div className="shrink-0 mb-4">
-                          <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">I am a</p>
-                          {authGroup === 'users' && (
-                            <div className="space-y-3">
-                              {ROLE_OPTIONS.filter(r => allowedRoles.includes(r.role)).map((r) => (
-                                <label
-                                  key={r.role}
-                                  className={`flex cursor-pointer items-start gap-4 rounded-2xl border p-4 transition-all ${role === r.role
-                                      ? 'border-brand bg-brand/5 shadow-[0_4px_12px_rgba(0,0,0,0.05)] ring-1 ring-brand'
-                                      : 'border-slate-200 bg-white hover:border-slate-300'
-                                    }`}
-                                >
-                                  <div className="pt-1">
-                                    <div
-                                      className={`flex h-5 w-5 items-center justify-center rounded-full border ${role === r.role ? 'border-brand bg-brand' : 'border-slate-300'
-                                        }`}
-                                    >
-                                      {role === r.role && <div className="h-2 w-2 rounded-full bg-white" />}
-                                    </div>
-                                  </div>
-                                  <input
-                                    type="radio"
-                                    className="hidden"
-                                    name="role"
-                                    value={r.role}
-                                    checked={role === r.role}
-                                    onChange={() => setRole(r.role)}
-                                  />
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
-                                      <r.icon className="h-4 w-4 text-brand" />
-                                      {ROLE_LABELS[r.role]}
-                                    </div>
-                                    <p className="mt-1 text-xs text-slate-500">{r.desc}</p>
-                                  </div>
-                                </label>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ) : null}
-
-                      <div className="space-y-4 shrink-0">
-                        <AuthField
-                          label="Mobile number"
-                          hint={
-                            mode === 'register' ? (
-                              <span className={`text-xs tabular-nums ${phoneComplete ? 'font-bold text-brand' : 'text-slate-400'}`}>
-                                {phone.length}/10
-                              </span>
-                            ) : null
-                          }
-                        >
-                          <div
-                            className={`flex overflow-hidden rounded-full border border-slate-100 bg-slate-50 transition focus-within:ring-2 ${banner?.variant === 'error' && phone.length > 0 && !phoneComplete
-                              ? 'ring-amber-300'
-                              : 'focus-within:ring-brand/20 focus-within:border-brand/30'
+          <AnimatePresence mode="wait">
+            {step === 'form' ? (
+              <motion.div
+                key="form"
+                initial={reduce ? false : { opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduce ? false : { opacity: 0, y: -8 }}
+                className="flex flex-col"
+              >
+                {mode === 'register' ? (
+                  <div className="shrink-0 mb-4">
+                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">I am a</p>
+                    {authGroup === 'users' && (
+                      <div className="space-y-3">
+                        {ROLE_OPTIONS.filter(r => allowedRoles.includes(r.role)).map((r) => (
+                          <label
+                            key={r.role}
+                            className={`flex cursor-pointer items-start gap-4 rounded-2xl border p-4 transition-all ${role === r.role
+                              ? 'border-brand bg-brand/5 shadow-[0_4px_12px_rgba(0,0,0,0.05)] ring-1 ring-brand'
+                              : 'border-slate-200 bg-white hover:border-slate-300'
                               }`}
                           >
-                            <span className="flex items-center border-r border-slate-200/60 bg-transparent px-5 text-[15px] font-bold text-slate-500">
-                              +91
-                            </span>
-                            <input
-                              id="auth-phone"
-                              type={showPhone ? 'tel' : 'password'}
-                              inputMode="numeric"
-                              autoComplete="tel-national"
-                              maxLength={10}
-                              placeholder="9876543210"
-                              className="min-w-0 flex-1 border-0 bg-transparent px-4 py-3 text-[15px] font-semibold tracking-wide text-slate-900 outline-none placeholder:text-slate-400 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
-                              value={phone}
-                              onChange={(e) => setPhoneDigits(e.target.value)}
-                              onKeyDown={(e) => {
-                                const allowed = ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End']
-                                if (allowed.includes(e.key)) return
-                                if (e.ctrlKey || e.metaKey) return
-                                if (!/^\d$/.test(e.key)) e.preventDefault()
-                              }}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPhone((s) => !s)}
-                              className="flex items-center pr-4 pl-2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
-                              aria-label={showPhone ? 'Hide mobile number' : 'Show mobile number'}
-                              title={showPhone ? 'Hide mobile number' : 'Show mobile number'}
-                            >
-                              {showPhone ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
-                          </div>
-                        </AuthField>
-
-                        {mode === 'register' ? (
-                          <>
-                            <AuthField label="Full name">
-                              <input
-                                ref={fullNameInputRef}
-                                type="text"
-                                className={inputClass}
-                                value={fullName}
-                                onChange={handleFullNameChange}
-                                onFocus={handleFullNameFocus}
-                                onKeyDown={handleFullNameKeyDown}
-                                placeholder="As on your ID"
-                                autoComplete="name"
-                              />
-                            </AuthField>
-                          </>
-                        ) : null}
-                      </div>
-
-                      {mode === 'login' ? null : (
-                        <div className="mt-4 mb-2 flex items-center px-1">
-                          <div className="flex items-start gap-2.5 text-[13px] font-medium text-slate-500">
-                            <input
-                              id="terms-checkbox"
-                              type="checkbox"
-                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-brand focus:ring-brand accent-brand cursor-pointer"
-                              checked={termsAccepted}
-                              onChange={(e) => {
-                                setTermsAccepted(e.target.checked)
-                                if (e.target.checked && banner?.variant === 'error') setBanner(null)
-                              }}
-                            />
-                            <label htmlFor="terms-checkbox" className="cursor-pointer select-none">
-                              I agree to the{' '}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  e.stopPropagation()
-                                  void openPolicyModal('terms')
-                                }}
-                                className="font-bold text-brand hover:underline cursor-pointer inline focus:outline-none"
+                            <div className="pt-1">
+                              <div
+                                className={`flex h-5 w-5 items-center justify-center rounded-full border ${role === r.role ? 'border-brand bg-brand' : 'border-slate-300'
+                                  }`}
                               >
-                                Terms of Service
-                              </button>{' '}
-                              and{' '}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  e.stopPropagation()
-                                  void openPolicyModal('privacy')
-                                }}
-                                className="font-bold text-brand hover:underline cursor-pointer inline focus:outline-none"
-                              >
-                                Privacy Policy
-                              </button>
-                            </label>
-                          </div>
-                        </div>
-                      )}
-
-                        <div ref={submitAreaRef} className="mt-6 pt-2 pb-6">
-                          <FeedbackBanner variant={banner?.variant}>{banner?.message}</FeedbackBanner>
-                          <AppPrimaryButton type="button" disabled={busy} className="w-full !rounded-full py-3.5 text-[14px] font-bold shadow-lg shadow-brand/20 mt-3" onClick={() => void handleSendOtp()}>
-                            {busy ? 'Please wait…' : 'Send OTP'}
-                            <Phone className="h-4 w-4" aria-hidden />
-                          </AppPrimaryButton>
-
-                          {mode === 'login' ? (
-                            <p className="mt-4 text-center text-[12px] font-medium text-slate-500">
-                              New user? <button type="button" onClick={() => switchMode('register')} className="font-bold text-brand hover:underline">Sign Up</button>
-                            </p>
-                          ) : (
-                            <p className="mt-4 text-center text-[12px] font-medium text-slate-500">
-                              Already have an account? <button type="button" onClick={() => switchMode('login')} className="font-bold text-brand hover:underline">Login</button>
-                            </p>
-                          )}
-                        </div>
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="otp"
-                      initial={reduce ? false : { opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={reduce ? false : { opacity: 0, y: -8 }}
-                      className="space-y-4"
-                    >
-                      <GlassPanel className="border-slate-200/90 p-4 ring-1 ring-slate-100/90">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm text-slate-600">
-                            Code sent to{' '}
-                            <span className="font-bold tabular-nums text-slate-900">+91 {phone}</span>
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => setShowOtp((prev) => !prev)}
-                            className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-900 transition-colors shadow-2xs"
-                            aria-label={showOtp ? 'Hide OTP digits' : 'Show OTP digits'}
-                            title={showOtp ? 'Hide OTP' : 'Show OTP'}
-                          >
-                            {showOtp ? <EyeOff className="h-3.5 w-3.5 text-slate-500" /> : <Eye className="h-3.5 w-3.5 text-slate-500" />}
-                            <span>{showOtp ? 'Hide' : 'Show'}</span>
-                          </button>
-                        </div>
-                        <p className="mt-4 mb-3 text-[11px] font-bold uppercase tracking-wide text-slate-500">Enter OTP</p>
-                        <div className="flex gap-2" onPaste={handleOtpPaste}>
-                          {otpCells.map((digit, i) => (
-                            <input
-                              key={i}
-                              ref={(el) => {
-                                otpInputRefs.current[i] = el
-                              }}
-                              type={showOtp ? 'text' : 'password'}
-                              inputMode="numeric"
-                              autoComplete={i === 0 ? 'one-time-code' : 'off'}
-                              maxLength={1}
-                              aria-label={`OTP digit ${i + 1} of 6`}
-                              className="min-w-0 flex-1 rounded-2xl border border-slate-100 bg-slate-50 py-4 text-center font-mono text-xl font-bold tabular-nums text-slate-900 outline-none focus:ring-2 focus:ring-brand/25 focus:border-brand/30 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
-                              value={digit}
-                              onPaste={handleOtpPaste}
-                              onChange={(e) => {
-                                const d = e.target.value.replace(/\D/g, '').slice(-1)
-                                const next = [...otpCells]
-                                if (d) {
-                                  next[i] = d
-                                  setOtpCells(next)
-                                  clearOtpError()
-                                  if (i < 5) otpInputRefs.current[i + 1]?.focus()
-                                } else {
-                                  next[i] = ''
-                                  setOtpCells(next)
-                                  clearOtpError()
-                                }
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault()
-                                  if (!busy) void handleVerifyOtp()
-                                  return
-                                }
-                                if (e.key === 'Backspace') {
-                                  e.preventDefault()
-                                  if (otpCells[i]) {
-                                    const next = [...otpCells]
-                                    next[i] = ''
-                                    setOtpCells(next)
-                                    clearOtpError()
-                                  } else if (i > 0) {
-                                    const next = [...otpCells]
-                                    next[i - 1] = ''
-                                    setOtpCells(next)
-                                    clearOtpError()
-                                    otpInputRefs.current[i - 1]?.focus()
-                                  }
-                                  return
-                                }
-                                if (e.key === 'ArrowLeft' && i > 0) {
-                                  e.preventDefault()
-                                  otpInputRefs.current[i - 1]?.focus()
-                                  return
-                                }
-                                if (e.key === 'ArrowRight' && i < 5) {
-                                  e.preventDefault()
-                                  otpInputRefs.current[i + 1]?.focus()
-                                  return
-                                }
-                                if (e.ctrlKey || e.metaKey) return
-                                if (!/^\d$/.test(e.key) && e.key.length === 1) e.preventDefault()
-                              }}
-                            />
-                          ))}
-                        </div>
-
-                        {(otpHint || phone.length >= 6) && (
-                          <div className="mt-3.5 flex items-center justify-between rounded-2xl border border-blue-200/90 bg-blue-50/90 p-3 text-xs text-blue-900 shadow-xs">
-                            <div className="flex items-center gap-2">
-                              <Sparkles className="h-4 w-4 shrink-0 text-brand" />
-                              <div>
-                                <p className="font-semibold text-slate-800">SMS delayed on phone?</p>
-                                <p className="text-[11px] text-slate-600">
-                                  Use code: <span className="font-mono font-bold text-brand">{otpHint || phone.slice(-6)}</span> (or <span className="font-mono font-bold text-brand">123456</span>)
-                                </p>
+                                {role === r.role && <div className="h-2 w-2 rounded-full bg-white" />}
                               </div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const codeToUse = otpHint || phone.slice(-6) || '123456'
-                                setOtpCells(digitsToOtpCells(codeToUse))
-                                clearOtpError()
-                              }}
-                              className="ml-2 inline-flex items-center gap-1 rounded-xl bg-brand px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-brand/90 active:scale-95 shrink-0 cursor-pointer"
-                            >
-                              <span>Auto-fill</span>
-                            </button>
-                          </div>
-                        )}
-                      </GlassPanel>
-
-                      <FeedbackBanner variant={banner?.variant}>{banner?.message}</FeedbackBanner>
-                      <AppPrimaryButton
-                        type="button"
-                        disabled={busy}
-                        className="w-full !rounded-full py-4 text-[15px] font-bold shadow-lg shadow-brand/20 mt-4"
-                        onClick={() => void handleVerifyOtp()}
-                      >
-                        {busy ? 'Verifying…' : mode === 'login' ? 'Verify & login' : 'Verify & continue'}
-                        <User className="h-4 w-4" aria-hidden />
-                      </AppPrimaryButton>
-                      <button
-                        type="button"
-                        className="w-full py-3 text-[13px] font-bold text-slate-500 hover:text-slate-800 transition mt-2"
-                        onClick={resetFlowToForm}
-                      >
-                        Edit mobile number
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-              </div>
-            </div>
-
-          {/* Policy Modal for Terms of Service & Privacy Policy */}
-          <AnimatePresence>
-            {policyModal.open && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                {/* Backdrop */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={closePolicyModal}
-                  className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs"
-                />
-
-                {/* Modal Card */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: 15 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: 15 }}
-                  transition={{ duration: 0.2 }}
-                  className="relative w-full max-w-lg max-h-[85vh] flex flex-col rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden z-10"
-                >
-                  {/* Header */}
-                  <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/80">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand/10 text-brand">
-                        <FileText className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h3 className="text-base font-bold text-slate-900">{policyModal.title}</h3>
-                        <p className="text-xs text-slate-500 capitalize">
-                          {authGroup === 'labours' ? 'Service Provider' : (role === USER_ROLES.CONTRACTOR ? 'Contractor' : 'Customer')} Agreement
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={closePolicyModal}
-                      className="rounded-full p-2 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition cursor-pointer"
-                      aria-label="Close"
-                    >
-                      <X className="h-5 w-5" />
-                    </button>
-                  </div>
-
-                  {/* Scrollable Content */}
-                  <div className="flex-1 overflow-y-auto px-6 py-5 overscroll-contain touch-pan-y" style={{ WebkitOverflowScrolling: 'touch' }}>
-                    {policyModal.loading ? (
-                      <div className="flex h-48 flex-col items-center justify-center gap-3">
-                        <div className="h-8 w-8 animate-spin rounded-full border-3 border-brand border-r-transparent" />
-                        <p className="text-xs font-medium text-slate-500">Loading {policyModal.title}…</p>
-                      </div>
-                    ) : policyModal.error ? (
-                      <div className="rounded-2xl bg-rose-50 p-4 text-center">
-                        <p className="text-sm font-semibold text-rose-600">{policyModal.error}</p>
-                        <button
-                          type="button"
-                          onClick={() => void openPolicyModal(policyModal.type)}
-                          className="mt-3 text-xs font-bold text-brand hover:underline cursor-pointer"
-                        >
-                          Try Again
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {policyModal.content.split('\n').map((para, idx) => {
-                          const trimmed = para.trim()
-                          if (!trimmed) return null
-                          return (
-                            <p key={idx} className="text-[13px] leading-relaxed text-slate-600 whitespace-pre-wrap">
-                              {trimmed}
-                            </p>
-                          )
-                        })}
+                            <input
+                              type="radio"
+                              className="hidden"
+                              name="role"
+                              value={r.role}
+                              checked={role === r.role}
+                              onChange={() => setRole(r.role)}
+                            />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
+                                <r.icon className="h-4 w-4 text-brand" />
+                                {ROLE_LABELS[r.role]}
+                              </div>
+                              <p className="mt-1 text-xs text-slate-500">{r.desc}</p>
+                            </div>
+                          </label>
+                        ))}
                       </div>
                     )}
                   </div>
+                ) : null}
 
-                  {/* Footer */}
-                  <div className="border-t border-slate-100 bg-slate-50/60 px-6 py-3.5 flex items-center justify-between gap-3">
+                <div className="space-y-4 shrink-0">
+                  <AuthField
+                    label="Mobile number"
+                    hint={
+                      mode === 'register' ? (
+                        <span className={`text-xs tabular-nums ${phoneComplete ? 'font-bold text-brand' : 'text-slate-400'}`}>
+                          {phone.length}/10
+                        </span>
+                      ) : null
+                    }
+                  >
+                    <div
+                      className={`flex overflow-hidden rounded-full border border-slate-100 bg-slate-50 transition focus-within:ring-2 ${banner?.variant === 'error' && phone.length > 0 && !phoneComplete
+                        ? 'ring-amber-300'
+                        : 'focus-within:ring-brand/20 focus-within:border-brand/30'
+                        }`}
+                    >
+                      <span className="flex items-center border-r border-slate-200/60 bg-transparent px-5 text-[15px] font-bold text-slate-500">
+                        +91
+                      </span>
+                      <input
+                        id="auth-phone"
+                        type={showPhone ? 'tel' : 'password'}
+                        inputMode="numeric"
+                        autoComplete="tel-national"
+                        maxLength={10}
+                        placeholder="9876543210"
+                        className="min-w-0 flex-1 border-0 bg-transparent px-4 py-3 text-[15px] font-semibold tracking-wide text-slate-900 outline-none placeholder:text-slate-400"
+                        value={phone}
+                        onChange={(e) => setPhoneDigits(e.target.value)}
+                        onKeyDown={(e) => {
+                          const allowed = ['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End']
+                          if (allowed.includes(e.key)) return
+                          if (e.ctrlKey || e.metaKey) return
+                          if (!/^\d$/.test(e.key)) e.preventDefault()
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPhone((s) => !s)}
+                        className="flex items-center pr-4 pl-2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                        aria-label={showPhone ? 'Hide mobile number' : 'Show mobile number'}
+                        title={showPhone ? 'Hide mobile number' : 'Show mobile number'}
+                      >
+                        {showPhone ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </AuthField>
+
+                  {mode === 'register' ? (
+                    <>
+                      <AuthField label="Full name">
+                        <input
+                          ref={fullNameInputRef}
+                          type="text"
+                          className={inputClass}
+                          value={fullName}
+                          onChange={handleFullNameChange}
+                          onFocus={handleFullNameFocus}
+                          onKeyDown={handleFullNameKeyDown}
+                          placeholder="As on your ID"
+                          autoComplete="name"
+                        />
+                      </AuthField>
+                    </>
+                  ) : null}
+                </div>
+
+                {mode === 'login' ? null : (
+                  <div className="mt-4 mb-2 flex items-center px-1">
+                    <div className="flex items-start gap-2.5 text-[13px] font-medium text-slate-500">
+                      <input
+                        id="terms-checkbox"
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-brand focus:ring-brand accent-brand cursor-pointer"
+                        checked={termsAccepted}
+                        onChange={(e) => {
+                          setTermsAccepted(e.target.checked)
+                          if (e.target.checked && banner?.variant === 'error') setBanner(null)
+                        }}
+                      />
+                      <label htmlFor="terms-checkbox" className="cursor-pointer select-none">
+                        I agree to the{' '}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            void openPolicyModal('terms')
+                          }}
+                          className="font-bold text-brand hover:underline cursor-pointer inline focus:outline-none"
+                        >
+                          Terms of Service
+                        </button>{' '}
+                        and{' '}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            void openPolicyModal('privacy')
+                          }}
+                          className="font-bold text-brand hover:underline cursor-pointer inline focus:outline-none"
+                        >
+                          Privacy Policy
+                        </button>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-6 pt-2 pb-6">
+                  <FeedbackBanner variant={banner?.variant}>{banner?.message}</FeedbackBanner>
+                  <AppPrimaryButton type="button" disabled={busy} className="w-full !rounded-full py-3.5 text-[14px] font-bold shadow-lg shadow-brand/20 mt-3" onClick={() => void handleSendOtp()}>
+                    {busy ? 'Please wait…' : 'Send OTP'}
+                    <Phone className="h-4 w-4" aria-hidden />
+                  </AppPrimaryButton>
+
+                  {mode === 'login' ? (
+                    <p className="mt-4 text-center text-[12px] font-medium text-slate-500">
+                      New user? <button type="button" onClick={() => switchMode('register')} className="font-bold text-brand hover:underline">Sign Up</button>
+                    </p>
+                  ) : (
+                    <p className="mt-4 text-center text-[12px] font-medium text-slate-500">
+                      Already have an account? <button type="button" onClick={() => switchMode('login')} className="font-bold text-brand hover:underline">Login</button>
+                    </p>
+                  )}
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="otp"
+                initial={reduce ? false : { opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduce ? false : { opacity: 0, y: -8 }}
+                className="space-y-4"
+              >
+                <GlassPanel className="border-slate-200/90 p-4 ring-1 ring-slate-100/90">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-slate-600">
+                      Code sent to{' '}
+                      <span className="font-bold tabular-nums text-slate-900">+91 {phone}</span>
+                    </p>
                     <button
                       type="button"
-                      onClick={closePolicyModal}
-                      className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                      onClick={() => setShowOtp((prev) => !prev)}
+                      className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-900 transition-colors shadow-2xs"
+                      aria-label={showOtp ? 'Hide OTP digits' : 'Show OTP digits'}
+                      title={showOtp ? 'Hide OTP' : 'Show OTP'}
                     >
-                      Close
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleAcceptPolicyAndClose}
-                      className="rounded-full bg-brand px-5 py-2 text-xs font-bold text-white shadow-md shadow-brand/20 hover:bg-brand/90 transition flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                      I Agree & Accept
+                      {showOtp ? <EyeOff className="h-3.5 w-3.5 text-slate-500" /> : <Eye className="h-3.5 w-3.5 text-slate-500" />}
+                      <span>{showOtp ? 'Hide' : 'Show'}</span>
                     </button>
                   </div>
-                </motion.div>
-              </div>
+                  <p className="mt-4 mb-3 text-[11px] font-bold uppercase tracking-wide text-slate-500">Enter OTP</p>
+                  <div className="flex gap-2" onPaste={handleOtpPaste}>
+                    {otpCells.map((digit, i) => (
+                      <input
+                        key={i}
+                        ref={(el) => {
+                          otpInputRefs.current[i] = el
+                        }}
+                        type={showOtp ? 'text' : 'password'}
+                        inputMode="numeric"
+                        autoComplete={i === 0 ? 'one-time-code' : 'off'}
+                        maxLength={1}
+                        aria-label={`OTP digit ${i + 1} of 6`}
+                        className="min-w-0 flex-1 rounded-2xl border border-slate-100 bg-slate-50 py-4 text-center font-mono text-xl font-bold tabular-nums text-slate-900 outline-none focus:ring-2 focus:ring-brand/25 focus:border-brand/30"
+                        value={digit}
+                        onPaste={handleOtpPaste}
+                        onChange={(e) => {
+                          const d = e.target.value.replace(/\D/g, '').slice(-1)
+                          const next = [...otpCells]
+                          if (d) {
+                            next[i] = d
+                            setOtpCells(next)
+                            clearOtpError()
+                            if (i < 5) otpInputRefs.current[i + 1]?.focus()
+                          } else {
+                            next[i] = ''
+                            setOtpCells(next)
+                            clearOtpError()
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            if (!busy) void handleVerifyOtp()
+                            return
+                          }
+                          if (e.key === 'Backspace') {
+                            e.preventDefault()
+                            if (otpCells[i]) {
+                              const next = [...otpCells]
+                              next[i] = ''
+                              setOtpCells(next)
+                              clearOtpError()
+                            } else if (i > 0) {
+                              const next = [...otpCells]
+                              next[i - 1] = ''
+                              setOtpCells(next)
+                              clearOtpError()
+                              otpInputRefs.current[i - 1]?.focus()
+                            }
+                            return
+                          }
+                          if (e.key === 'ArrowLeft' && i > 0) {
+                            e.preventDefault()
+                            otpInputRefs.current[i - 1]?.focus()
+                            return
+                          }
+                          if (e.key === 'ArrowRight' && i < 5) {
+                            e.preventDefault()
+                            otpInputRefs.current[i + 1]?.focus()
+                            return
+                          }
+                          if (e.ctrlKey || e.metaKey) return
+                          if (!/^\d$/.test(e.key) && e.key.length === 1) e.preventDefault()
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  {(otpHint || phone.length >= 6) && (
+                    <div className="mt-3.5 flex items-center justify-between rounded-2xl border border-blue-200/90 bg-blue-50/90 p-3 text-xs text-blue-900 shadow-xs">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 shrink-0 text-brand" />
+                        <div>
+                          <p className="font-semibold text-slate-800">SMS delayed on phone?</p>
+                          <p className="text-[11px] text-slate-600">
+                            Use code: <span className="font-mono font-bold text-brand">{otpHint || phone.slice(-6)}</span> (or <span className="font-mono font-bold text-brand">123456</span>)
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const codeToUse = otpHint || phone.slice(-6) || '123456'
+                          setOtpCells(digitsToOtpCells(codeToUse))
+                          clearOtpError()
+                        }}
+                        className="ml-2 inline-flex items-center gap-1 rounded-xl bg-brand px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-brand/90 active:scale-95 shrink-0 cursor-pointer"
+                      >
+                        <span>Auto-fill</span>
+                      </button>
+                    </div>
+                  )}
+                </GlassPanel>
+
+                <FeedbackBanner variant={banner?.variant}>{banner?.message}</FeedbackBanner>
+                <AppPrimaryButton
+                  type="button"
+                  disabled={busy}
+                  className="w-full !rounded-full py-4 text-[15px] font-bold shadow-lg shadow-brand/20 mt-4"
+                  onClick={() => void handleVerifyOtp()}
+                >
+                  {busy ? 'Verifying…' : mode === 'login' ? 'Verify & login' : 'Verify & continue'}
+                  <User className="h-4 w-4" aria-hidden />
+                </AppPrimaryButton>
+                <button
+                  type="button"
+                  className="w-full py-3 text-[13px] font-bold text-slate-500 hover:text-slate-800 transition mt-2"
+                  onClick={resetFlowToForm}
+                >
+                  Edit mobile number
+                </button>
+              </motion.div>
             )}
           </AnimatePresence>
+
         </div>
-      )
+      </div>
+
+      {/* Policy Modal for Terms of Service & Privacy Policy */}
+      <AnimatePresence>
+        {policyModal.open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closePolicyModal}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs"
+            />
+
+            {/* Modal Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ duration: 0.2 }}
+              className="relative w-full max-w-lg max-h-[85vh] flex flex-col rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden z-10"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/80">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand/10 text-brand">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">{policyModal.title}</h3>
+                    <p className="text-xs text-slate-500 capitalize">
+                      {authGroup === 'labours' ? 'Service Provider' : (role === USER_ROLES.CONTRACTOR ? 'Contractor' : 'Customer')} Agreement
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closePolicyModal}
+                  className="rounded-full p-2 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition cursor-pointer"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Scrollable Content */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 overscroll-contain touch-pan-y" style={{ WebkitOverflowScrolling: 'touch' }}>
+                {policyModal.loading ? (
+                  <div className="flex h-48 flex-col items-center justify-center gap-3">
+                    <div className="h-8 w-8 animate-spin rounded-full border-3 border-brand border-r-transparent" />
+                    <p className="text-xs font-medium text-slate-500">Loading {policyModal.title}…</p>
+                  </div>
+                ) : policyModal.error ? (
+                  <div className="rounded-2xl bg-rose-50 p-4 text-center">
+                    <p className="text-sm font-semibold text-rose-600">{policyModal.error}</p>
+                    <button
+                      type="button"
+                      onClick={() => void openPolicyModal(policyModal.type)}
+                      className="mt-3 text-xs font-bold text-brand hover:underline cursor-pointer"
+                    >
+                      Try Again
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {policyModal.content.split('\n').map((para, idx) => {
+                      const trimmed = para.trim()
+                      if (!trimmed) return null
+                      return (
+                        <p key={idx} className="text-[13px] leading-relaxed text-slate-600 whitespace-pre-wrap">
+                          {trimmed}
+                        </p>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="border-t border-slate-100 bg-slate-50/60 px-6 py-3.5 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={closePolicyModal}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAcceptPolicyAndClose}
+                  className="rounded-full bg-brand px-5 py-2 text-xs font-bold text-white shadow-md shadow-brand/20 hover:bg-brand/90 transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  I Agree & Accept
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
 }
