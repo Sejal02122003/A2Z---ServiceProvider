@@ -16,31 +16,36 @@ export function AppBottomNav({ items }) {
 
     let initialInnerHeight = window.innerHeight
 
+    const isInputActive = () => {
+      const activeEl = document.activeElement
+      return Boolean(
+        activeEl && (
+          activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.isContentEditable
+        )
+      )
+    }
+
     const evaluateKeyboard = () => {
-      // 1. visualViewport check (Chrome Android, Safari iOS)
+      // 1. If any input/textarea is active/focused, soft keyboard is up
+      if (isInputActive()) {
+        setIsKeyboardVisible(true)
+        return
+      }
+
+      // 2. visualViewport check (Chrome Android, Safari iOS)
       if (window.visualViewport) {
         const diff = window.innerHeight - window.visualViewport.height
-        if (diff > 120) {
+        if (diff > 100) {
           setIsKeyboardVisible(true)
           return
         }
       }
 
-      // 2. innerHeight shrink check compared to initial baseline
+      // 3. innerHeight shrink check compared to initial baseline
       const heightDiff = initialInnerHeight - window.innerHeight
-      if (heightDiff > 140) {
-        setIsKeyboardVisible(true)
-        return
-      }
-
-      // 3. activeElement check on mobile / touch screen
-      const activeEl = document.activeElement
-      const isInput = activeEl && (
-        activeEl.tagName === 'INPUT' ||
-        activeEl.tagName === 'TEXTAREA' ||
-        activeEl.isContentEditable
-      )
-      if (isInput && (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches)) {
+      if (heightDiff > 120) {
         setIsKeyboardVisible(true)
         return
       }
@@ -53,19 +58,14 @@ export function AppBottomNav({ items }) {
         (e.target && ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) ||
         e.target?.isContentEditable
       ) {
-        if (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches) {
-          setIsKeyboardVisible(true)
-        }
+        setIsKeyboardVisible(true)
       }
     }
 
     const handleFocusOut = () => {
       setTimeout(() => {
-        const active = document.activeElement
-        if (!active || (!['INPUT', 'TEXTAREA'].includes(active.tagName) && !active.isContentEditable)) {
-          evaluateKeyboard()
-        }
-      }, 120)
+        evaluateKeyboard()
+      }, 100)
     }
 
     const handleResize = () => {
@@ -80,6 +80,9 @@ export function AppBottomNav({ items }) {
         setIsCustomHidden(Boolean(e.detail.hide))
       }
     }
+
+    // Check on initial mount
+    evaluateKeyboard()
 
     window.addEventListener('focusin', handleFocusIn)
     window.addEventListener('focusout', handleFocusOut)
@@ -105,13 +108,14 @@ export function AppBottomNav({ items }) {
 
   const shouldHide = isKeyboardVisible || isCustomHidden
 
+  if (shouldHide) {
+    return null
+  }
+
   return (
     <nav
-      className={`fixed inset-x-0 bottom-0 z-30 pointer-events-none px-3 sm:px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] print:hidden transition-all duration-200 ease-out ${
-        shouldHide ? 'translate-y-28 opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
-      }`}
+      className="fixed inset-x-0 bottom-0 z-30 pointer-events-none px-3 sm:px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] print:hidden transition-all duration-200 ease-out"
       aria-label="Bottom navigation"
-      aria-hidden={shouldHide}
     >
       <div className="pointer-events-auto mx-auto flex w-full max-w-lg items-stretch justify-around rounded-3xl border border-[#E2E8EA] bg-white/95 px-2 py-1.5 shadow-[0_10px_30px_-5px_rgba(0,0,0,0.12),0_4px_12px_rgba(0,0,0,0.06)] backdrop-blur-md">
         {items.map(({ id, to, end, label, icon: Icon, premium, center }) => (

@@ -81,6 +81,23 @@ export function IndividualCategorySearchPanel({ tradeGroups, groupsLoading }) {
   const [query, setQuery] = useState('')
   const [groupId, setGroupId] = useState(searchParams.get('groupId') || null)
   const [categoryId, setCategoryId] = useState(null)
+  const [isSearchFocused, setIsSearchFocused] = useState(false)
+
+  // Hide bottom footer menu when searching or search input is focused
+  useEffect(() => {
+    if (isSearchFocused || query.trim()) {
+      window.dispatchEvent(new CustomEvent('app-toggle-bottom-nav', { detail: { hide: true } }))
+      return () => {
+        window.dispatchEvent(new CustomEvent('app-toggle-bottom-nav', { detail: { hide: false } }))
+      }
+    }
+  }, [isSearchFocused, query])
+
+  useEffect(() => {
+    return () => {
+      window.dispatchEvent(new CustomEvent('app-toggle-bottom-nav', { detail: { hide: false } }))
+    }
+  }, [])
 
   const allCategories = useMemo(() => flattenTradeSubcategories(tradeGroups), [tradeGroups])
 
@@ -194,6 +211,8 @@ export function IndividualCategorySearchPanel({ tradeGroups, groupsLoading }) {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => setIsSearchFocused(false)}
             placeholder="Plumber, electrician, mason…"
             autoComplete="off"
             enterKeyHint="search"
