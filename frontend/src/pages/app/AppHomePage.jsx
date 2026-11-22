@@ -39,6 +39,11 @@ export function AppHomePage() {
     return <LabourGate user={user} />
   }
 
+  // If visiting /user (always render User App Home, even if user is registered as a partner)
+  if (location.pathname.startsWith('/user')) {
+    return <IndividualHomeScreen user={user} />
+  }
+
   if (!user || !user.role || user.role === USER_ROLES.CUSTOMER) {
     return <IndividualHomeScreen user={user} />
   }

@@ -1,4 +1,4 @@
-import { Navigate, Route } from 'react-router-dom'
+import { Navigate, Route, useLocation } from 'react-router-dom'
 import { RoleRoute } from '../components/auth/RoleRoute.jsx'
 import { AppHomePage } from '../pages/app/AppHomePage.jsx'
 import { AppBookingsPage } from '../pages/app/AppBookingsPage.jsx'
@@ -41,16 +41,16 @@ import { USER_ROLES } from '../constants/userRoles.js'
 
 
 function AppRoleWalletWrapper() {
-  const { user } = useAuth()
-  if (user?.role === USER_ROLES.LABOUR) {
+  const location = useLocation()
+  if (location.pathname.startsWith('/serviceprovider')) {
     return <LaborWallet />
   }
   return <UserWalletPage />
 }
 
 function AppRoleNotificationsWrapper() {
-  const { user } = useAuth()
-  if (user?.role === USER_ROLES.LABOUR) {
+  const location = useLocation()
+  if (location.pathname.startsWith('/serviceprovider')) {
     return <LabourNotificationsPage />
   }
   return <CustomerNotificationsPage />
@@ -98,7 +98,7 @@ export const appShellChildRoutes = (
     <Route
       path="search"
       element={
-        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR]} allowGuest>
+        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR, USER_ROLES.LABOUR]} allowGuest>
           <AppIndividualSearchPage />
         </RoleRoute>
       }
@@ -107,7 +107,7 @@ export const appShellChildRoutes = (
     <Route
       path="services"
       element={
-        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR]} allowGuest>
+        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR, USER_ROLES.LABOUR]} allowGuest>
           <ServiceCatalog />
         </RoleRoute>
       }
@@ -116,7 +116,7 @@ export const appShellChildRoutes = (
     <Route
       path="packages"
       element={
-        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR]} allowGuest>
+        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR, USER_ROLES.LABOUR]} allowGuest>
           <ServicePackagesPage />
         </RoleRoute>
       }
@@ -124,7 +124,7 @@ export const appShellChildRoutes = (
     <Route
       path="packages/:idOrSlug"
       element={
-        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR]} allowGuest>
+        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR, USER_ROLES.LABOUR]} allowGuest>
           <PackageDetailsPage />
         </RoleRoute>
       }
@@ -133,7 +133,7 @@ export const appShellChildRoutes = (
     <Route
       path="sub-category/:id"
       element={
-        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR]} allowGuest>
+        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR, USER_ROLES.LABOUR]} allowGuest>
           <AppSubCategoryServicePage />
         </RoleRoute>
       }
@@ -142,7 +142,7 @@ export const appShellChildRoutes = (
     <Route
       path="checkout"
       element={
-        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR]} allowGuest>
+        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR, USER_ROLES.LABOUR]} allowGuest>
           <Checkout />
         </RoleRoute>
       }
@@ -151,7 +151,7 @@ export const appShellChildRoutes = (
     <Route
       path="tracking/:bookingId"
       element={
-        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR]}>
+        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR, USER_ROLES.LABOUR]}>
           <JobTracking />
         </RoleRoute>
       }
@@ -159,7 +159,7 @@ export const appShellChildRoutes = (
     <Route
       path="billing"
       element={
-        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR]}>
+        <RoleRoute allow={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR, USER_ROLES.LABOUR]}>
           <AppBillingPage />
         </RoleRoute>
       }

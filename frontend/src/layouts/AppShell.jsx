@@ -89,7 +89,12 @@ export function AppShell() {
     }
   }, [user?._id, isGuest])
 
-  const { headerTagline, bottomNav, drawerNav } = useMemo(() => getAppNavigation(user?.role), [user?.role])
+  const isServiceProviderPortal = pathname.startsWith('/serviceprovider')
+  const activePortalRole = isServiceProviderPortal ? USER_ROLES.LABOUR : USER_ROLES.CUSTOMER
+  const { headerTagline, bottomNav, drawerNav } = useMemo(
+    () => getAppNavigation(activePortalRole),
+    [activePortalRole]
+  )
 
   const kitReceived = Boolean(
     user?.welcomeKit?.isReceived ||
@@ -98,16 +103,16 @@ export function AppShell() {
   )
   const labourCategories = user?.labourProfile?.categoryIds
   const hasCategories = Array.isArray(labourCategories) && labourCategories.length > 0
-  const isLabourOnboardingIncomplete = user?.role === USER_ROLES.LABOUR && (!kitReceived || !hasCategories)
-  const isFromOnboardingSupport = pathname.includes('/support') && (search.includes('from=onboarding') || isLabourOnboardingIncomplete)
+  const isLabourOnboardingIncomplete = isServiceProviderPortal && (!kitReceived || !hasCategories)
+  const isFromOnboardingSupport = isServiceProviderPortal && pathname.includes('/support') && (search.includes('from=onboarding') || isLabourOnboardingIncomplete)
 
-  const isIndividualAppHome = (user?.role === USER_ROLES.CUSTOMER || user?.role === USER_ROLES.CONTRACTOR) && (pathname === '/user' || pathname === '/app')
-  const isLabourAppHome = user?.role === USER_ROLES.LABOUR && (pathname === '/serviceprovider' || pathname === '/app')
+  const isIndividualAppHome = !isServiceProviderPortal && (pathname === '/user' || pathname === '/app')
+  const isLabourAppHome = isServiceProviderPortal && (pathname === '/serviceprovider' || pathname === '/app')
   const isNotifications = pathname.endsWith('/notifications')
-  const isLabourNotifications = user?.role === USER_ROLES.LABOUR && pathname.endsWith('/notifications')
-  const isLabourJobs = user?.role === USER_ROLES.LABOUR && pathname.endsWith('/jobs')
-  const isLabourEarnings = user?.role === USER_ROLES.LABOUR && pathname.endsWith('/earnings')
-  const isLabourKyc = user?.role === USER_ROLES.LABOUR && pathname.endsWith('/kyc')
+  const isLabourNotifications = isServiceProviderPortal && pathname.endsWith('/notifications')
+  const isLabourJobs = isServiceProviderPortal && pathname.endsWith('/jobs')
+  const isLabourEarnings = isServiceProviderPortal && pathname.endsWith('/earnings')
+  const isLabourKyc = isServiceProviderPortal && pathname.endsWith('/kyc')
   const hideShellHeader = (pathname !== '/user' && pathname !== '/serviceprovider' && pathname !== '/app') || isLabourAppHome
   const title = getAppShellTitle(pathname)
   const drawerInitials = adminInitials(user)
@@ -369,7 +374,7 @@ export function AppShell() {
               <div className="border-t border-slate-200/70 bg-linear-to-t from-slate-50/50 to-white p-3">
                 {isGuest ? (
                   <Link
-                    to={user?.role === USER_ROLES.LABOUR ? '/labours/auth' : '/users/auth'}
+                    to={isServiceProviderPortal ? '/labours/auth' : '/users/auth'}
                     onClick={() => setDrawerOpen(false)}
                     className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-brand/30 bg-brand/5 py-3 text-sm font-semibold text-brand shadow-sm transition hover:bg-brand/10"
                   >
@@ -380,11 +385,10 @@ export function AppShell() {
                   <button
                     type="button"
                     onClick={() => {
-                      const role = user?.role
                       logout()
-                      navigate(role === USER_ROLES.LABOUR ? '/labours/auth' : '/users/auth', { replace: true })
+                      navigate(isServiceProviderPortal ? '/labours/auth' : '/users/auth', { replace: true })
                     }}
-                    className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200/90 bg-rose-50 py-3 text-sm font-semibold text-rose-800 shadow-sm transition hover:bg-rose-50/90"
+                    className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200/90 bg-rose-50 py-3 text-sm font-semibold text-rose-800 shadow-sm transition hover:bg-rose-50/90 cursor-pointer"
                   >
                     <LogOut className="h-4 w-4" aria-hidden />
                     Sign out
@@ -451,7 +455,7 @@ export function AppShell() {
                   </div>
                 </button>
                 <Link
-                  to={user?.role === USER_ROLES.LABOUR ? '/serviceprovider/notifications' : '/user/notifications'}
+                  to={isServiceProviderPortal ? '/serviceprovider/notifications' : '/user/notifications'}
                   className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition active:scale-95 hover:bg-white/25"
                   aria-label="Notifications"
                 >
@@ -463,7 +467,7 @@ export function AppShell() {
                   )}
                 </Link>
                 <Link
-                  to={user?.role === USER_ROLES.LABOUR ? '/serviceprovider/profile' : '/user/profile'}
+                  to={isServiceProviderPortal ? '/serviceprovider/profile' : '/user/profile'}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition active:scale-95 hover:bg-white/25 overflow-hidden"
                   aria-label="Open profile"
                 >

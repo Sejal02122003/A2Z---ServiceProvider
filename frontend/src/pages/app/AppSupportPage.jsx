@@ -351,7 +351,7 @@ export function AppSupportPage() {
           ? ClipboardList
           : Sparkles
 
-  const isLabour = role === USER_ROLES.LABOUR
+  const isLabour = location.pathname.startsWith('/serviceprovider')
   const homePath = isLabour ? '/serviceprovider' : '/user'
 
   const quickLinks = useMemo(() => {

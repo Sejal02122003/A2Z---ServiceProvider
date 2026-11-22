@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Calendar, CheckCircle2, Clock, Loader2, MapPin, Sparkles, User, CreditCard, Menu } from 'lucide-react'
 import { B2cBookingCard } from '../../components/app/B2cBookingCard.jsx'
@@ -22,7 +22,8 @@ const STATUS_STYLES = {
 
 export function MyBookings() {
   const { user } = useAuth()
-  const isLabour = user?.role === USER_ROLES.LABOUR
+  const location = useLocation()
+  const isLabour = location.pathname.startsWith('/serviceprovider')
   const navigate = useNavigate()
   const reduce = useReducedMotion()
   const [bookings, setBookings] = useState([])

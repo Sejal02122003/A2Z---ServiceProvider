@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
@@ -476,28 +476,27 @@ export function AppProfilePage() {
     }
   }, [user, dispatch])
 
+  const location = useLocation()
+  const isLabour = location.pathname.startsWith('/serviceprovider')
+  const homePath = isLabour ? '/serviceprovider' : '/user'
+
   const handleSignOut = async () => {
-    const role = user?.role
     await logout()
-    navigate(role === USER_ROLES.LABOUR ? '/labours/auth' : '/users/auth', { replace: true })
+    navigate(isLabour ? '/labours/auth' : '/users/auth', { replace: true })
   }
 
   const handleDeleteAccount = useCallback(async () => {
     setDeletingAccount(true)
     setDeleteErr('')
     try {
-      const role = user?.role
       await deleteCurrentUser()
       await logout()
-      navigate(role === USER_ROLES.LABOUR ? '/labours/auth' : '/users/auth', { replace: true })
+      navigate(isLabour ? '/labours/auth' : '/users/auth', { replace: true })
     } catch (err) {
       setDeleteErr(err instanceof ApiError ? err.message : 'Could not delete account')
       setDeletingAccount(false)
     }
-  }, [logout, navigate, user?.role])
-
-  const isLabour = user?.role === USER_ROLES.LABOUR
-  const homePath = isLabour ? '/serviceprovider' : '/user'
+  }, [logout, navigate, isLabour])
   const quickLinks = []
   quickLinks.push({ to: homePath, icon: Home, label: 'Home' })
   if (isLabour) {
@@ -655,7 +654,7 @@ export function AppProfilePage() {
         </div>
       </motion.section>
 
-      {user?.role === USER_ROLES.LABOUR ? (
+      {isLabour ? (
         <Link
           to="/serviceprovider/partner-onboarding"
           className="flex items-center justify-between gap-3 rounded-2xl border border-brand/30 bg-gradient-to-r from-brand/10 via-white to-blue-50/50 p-4 shadow-sm transition hover:border-brand/50 active:scale-[0.99]"
@@ -677,7 +676,7 @@ export function AppProfilePage() {
         </Link>
       ) : null}
 
-      {user?.role === USER_ROLES.LABOUR ? (
+      {isLabour ? (
         <Link
           to="/serviceprovider/kyc"
           className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3.5 shadow-sm transition active:scale-[0.99] ${
@@ -707,9 +706,9 @@ export function AppProfilePage() {
         </Link>
       ) : null}
 
-      {user?.role === USER_ROLES.LABOUR || user?.role === USER_ROLES.CONTRACTOR ? (
+      {isLabour || (location.pathname.startsWith('/user') && user?.role === USER_ROLES.CONTRACTOR) ? (
         <Link
-          to={user?.role === USER_ROLES.LABOUR ? "/serviceprovider/trial" : "/user/trial"}
+          to={isLabour ? "/serviceprovider/trial" : "/user/trial"}
           className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200/80 bg-amber-50/70 px-4 py-3.5 shadow-sm transition active:scale-[0.99]"
         >
           <span className="flex items-center gap-2.5">
@@ -725,7 +724,7 @@ export function AppProfilePage() {
         </Link>
       ) : null}
 
-      {user?.role === USER_ROLES.LABOUR ? (
+      {isLabour ? (
         <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
             <div className="flex items-center gap-2">
@@ -767,7 +766,7 @@ export function AppProfilePage() {
       ) : null}
 
       {/* Official Service Provider Digital ID Card */}
-      {(user?.role === USER_ROLES.LABOUR || user?.role === USER_ROLES.CONTRACTOR) && (
+      {isLabour && (
         <div className="rounded-3xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50 via-teal-50/60 to-white p-4 text-slate-900 shadow-md shadow-emerald-950/5 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -941,7 +940,7 @@ export function AppProfilePage() {
                 disabled={savingProfile}
               />
             </div>
-            {user?.role === USER_ROLES.LABOUR ? (
+            {isLabour ? (
               <div>
                 <label htmlFor="edit-experience" className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">
                   Experience (Years)
@@ -1060,7 +1059,7 @@ export function AppProfilePage() {
                 </span>
               } 
             />
-            {user?.role === USER_ROLES.LABOUR ? (
+            {isLabour ? (
               <DetailRow 
                 icon={Wrench} 
                 label="Experience" 
@@ -1126,7 +1125,7 @@ export function AppProfilePage() {
       )}
 
 
-      {user?.role === USER_ROLES.LABOUR ? (
+      {isLabour ? (
         <GlassPanel className="border-slate-200/90 p-4 ring-1 ring-slate-100/90">
           <AppSectionHeader title="Service Provider profile" className="mb-3" />
           {labourCategories?.length ? (

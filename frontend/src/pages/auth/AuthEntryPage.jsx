@@ -120,7 +120,8 @@ export function AuthEntryPage({ authGroup = 'users' }) {
       }
       const targetFrom = location.state?.from
       const safeFrom = (authGroup === 'users' && targetFrom?.startsWith('/serviceprovider')) ? null : targetFrom
-      navigate(safeFrom || getRoleHomePath(user.role), { replace: true })
+      const defaultPath = authGroup === 'users' ? '/user' : getRoleHomePath(user.role)
+      navigate(safeFrom || defaultPath, { replace: true })
     }
   }, [isAuthenticated, user, loading, authGroup, navigate, location.state])
 
@@ -499,7 +500,8 @@ export function AuthEntryPage({ authGroup = 'users' }) {
 
       const rawFrom = location.state?.from
       const safeFrom = (authGroup === 'users' && rawFrom?.startsWith('/serviceprovider')) ? null : rawFrom
-      let returnPath = safeFrom || getRoleHomePath(signedInUser.role)
+      const defaultPath = authGroup === 'users' ? '/user' : getRoleHomePath(signedInUser.role)
+      let returnPath = safeFrom || defaultPath
       if (mode === 'register' && (signedInUser.role === USER_ROLES.CUSTOMER || signedInUser.role === USER_ROLES.CONTRACTOR)) {
         returnPath = '/user/profile'
       }
@@ -529,7 +531,8 @@ export function AuthEntryPage({ authGroup = 'users' }) {
           }
           const rawFrom = location.state?.from
           const safeFrom = (authGroup === 'users' && rawFrom?.startsWith('/serviceprovider')) ? null : rawFrom
-          const returnPath = safeFrom || getRoleHomePath(user.role)
+          const fallbackPath = authGroup === 'users' ? '/user' : getRoleHomePath(user.role)
+          const returnPath = safeFrom || fallbackPath
           navigate(returnPath, { replace: true, state: { welcomeBonus: user.welcomeBonus } })
           return
         } catch {

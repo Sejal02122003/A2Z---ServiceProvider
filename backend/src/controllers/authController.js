@@ -336,17 +336,10 @@ export const loginRequestOtp = asyncHandler(async (req, res) => {
     })
   }
 
-  // Prevent cross-portal login (Customer trying to log in on Service Provider app or vice versa)
+  // If trying to log into Service Provider app with an un-registered customer account
   if (authGroup === 'labours' && user.role !== USER_ROLES.LABOUR) {
     return sendError(res, {
-      message: 'This mobile number is registered as a Customer account. Please log in using the User app.',
-      statusCode: HTTP_STATUS.FORBIDDEN,
-      code: 'WRONG_PORTAL',
-    })
-  }
-  if (authGroup === 'users' && user.role === USER_ROLES.LABOUR) {
-    return sendError(res, {
-      message: 'This mobile number is registered as a Service Partner account. Please log in using the Service Provider app.',
+      message: 'This mobile number is not registered as a Service Partner. Please register as a partner to continue.',
       statusCode: HTTP_STATUS.FORBIDDEN,
       code: 'WRONG_PORTAL',
     })
@@ -389,14 +382,7 @@ export const loginVerify = asyncHandler(async (req, res) => {
 
   if (authGroup === 'labours' && user.role !== USER_ROLES.LABOUR) {
     return sendError(res, {
-      message: 'This mobile number is registered as a Customer account. Please log in using the User app.',
-      statusCode: HTTP_STATUS.FORBIDDEN,
-      code: 'WRONG_PORTAL',
-    })
-  }
-  if (authGroup === 'users' && user.role === USER_ROLES.LABOUR) {
-    return sendError(res, {
-      message: 'This mobile number is registered as a Service Partner account. Please log in using the Service Provider app.',
+      message: 'This mobile number is not registered as a Service Partner. Please register as a partner to continue.',
       statusCode: HTTP_STATUS.FORBIDDEN,
       code: 'WRONG_PORTAL',
     })
