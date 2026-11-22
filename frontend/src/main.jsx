@@ -5,6 +5,7 @@ import { HelmetProvider } from 'react-helmet-async'
 import { store } from './store/index.js'
 import { SocketProvider } from './context/SocketContext.jsx'
 import './index.css'
+import './utils/disableZoom.js'
 import App from './App.jsx'
 
 createRoot(document.getElementById('root')).render(
