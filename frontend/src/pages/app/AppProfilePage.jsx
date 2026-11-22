@@ -52,7 +52,7 @@ import { AppButton } from '../../components/app-ui/buttons/AppButton.jsx'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { patchCurrentUser, deleteCurrentUser } from '../../api/userProfileApi.js'
 import { ApiError } from '../../api/http.js'
-import { writeAppUserLocation } from '../../lib/appUserLocationStorage.js'
+import { writeAppUserLocation, readAppUserLocation } from '../../lib/appUserLocationStorage.js'
 import { setUser } from '../../store/slices/authSlice.js'
 
 function openAppDrawer() {
@@ -92,17 +92,19 @@ function StatTile({ icon: Icon, label, value, tone = 'slate' }) {
 
 function DetailRow({ icon: Icon, label, value, sub }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-slate-100/90 py-3.5 last:border-0">
-      <div className="flex min-w-0 items-start gap-2.5 text-slate-500">
+    <div className="flex items-start justify-between gap-3 border-b border-slate-100/90 py-3.5 last:border-0">
+      <div className="flex min-w-0 items-start gap-2.5 text-slate-500 shrink-0 max-w-[40%]">
         <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-500 ring-1 ring-slate-200/80">
           <Icon className="h-4 w-4" aria-hidden />
         </span>
-        <div>
-          <span className="block text-[11px] font-bold uppercase tracking-wide">{label}</span>
+        <div className="min-w-0">
+          <span className="block text-[11px] font-bold uppercase tracking-wide leading-tight">{label}</span>
           {sub ? <span className="mt-0.5 block text-[10px] font-medium normal-case text-slate-400">{sub}</span> : null}
         </div>
       </div>
-      <span className="max-w-[58%] shrink-0 text-right text-sm font-semibold text-slate-900">{value}</span>
+      <div className="min-w-0 flex-1 text-right text-sm font-semibold text-slate-900 break-words leading-relaxed pl-2">
+        {value}
+      </div>
     </div>
   )
 }
@@ -376,14 +378,27 @@ export function AppProfilePage() {
     setEditNameValue(user?.fullName || '')
     setEditPhoneValue(user?.phone || '')
     setEditEmailValue(user?.email || '')
-    setEditPermanentAddress(user?.permanentAddress || '')
-    setEditCurrentLocation(user?.currentLocation || '')
+    setEditPermanentAddress(
+      user?.permanentAddress ||
+      user?.savedAddresses?.find((a) => a.isDefault)?.addressLine ||
+      user?.savedAddresses?.[0]?.addressLine ||
+      user?.savedAddress?.text ||
+      ''
+    )
+    setEditCurrentLocation(
+      user?.currentLocation ||
+      readAppUserLocation()?.address ||
+      user?.savedAddress?.text ||
+      user?.savedAddresses?.[0]?.landmark ||
+      ''
+    )
     setEditCity(
       user?.city ||
       user?.welcomeKit?.confirmedAddressSnapshot?.city ||
       user?.welcomeKit?.address?.city ||
       user?.welcomeKit?.deliveryCity ||
       user?.savedAddresses?.[0]?.city ||
+      readAppUserLocation()?.city ||
       ''
     )
     setEditState(
@@ -995,28 +1010,52 @@ export function AppProfilePage() {
             <DetailRow 
               icon={Mail} 
               label="Email" 
-              value={<span className="truncate">{user?.email?.trim() || '—'}</span>} 
+              value={<span className="break-all">{user?.email?.trim() || '—'}</span>} 
               sub="Optional on your account" 
             />
             <DetailRow 
               icon={Home} 
               label="Permanent Address" 
-              value={<span className="truncate max-w-[200px]">{user?.permanentAddress?.trim() || '—'}</span>} 
+              value={
+                <span className="break-words">
+                  {user?.permanentAddress?.trim() ||
+                    user?.savedAddresses?.find((a) => a.isDefault)?.addressLine?.trim() ||
+                    user?.savedAddresses?.[0]?.addressLine?.trim() ||
+                    user?.savedAddress?.text?.trim() ||
+                    '—'}
+                </span>
+              } 
             />
             <DetailRow 
               icon={Building2} 
               label="Location/Zone" 
-              value={<span className="truncate max-w-[200px]">{user?.currentLocation?.trim() || '—'}</span>} 
+              value={
+                <span className="break-words">
+                  {user?.currentLocation?.trim() ||
+                    readAppUserLocation()?.address?.trim() ||
+                    user?.savedAddress?.text?.trim() ||
+                    user?.savedAddresses?.[0]?.landmark?.trim() ||
+                    '—'}
+                </span>
+              } 
             />
             <DetailRow 
               icon={Building2} 
               label="City, State, Country" 
               value={
-                <span className="truncate max-w-[200px]">
+                <span className="break-words">
                   {[
-                    user?.city || user?.welcomeKit?.confirmedAddressSnapshot?.city || user?.welcomeKit?.address?.city || user?.welcomeKit?.deliveryCity || user?.savedAddresses?.[0]?.city,
-                    user?.state || user?.welcomeKit?.confirmedAddressSnapshot?.state || user?.welcomeKit?.address?.state,
-                    user?.country || 'India',
+                    user?.city?.trim() ||
+                      user?.welcomeKit?.confirmedAddressSnapshot?.city?.trim() ||
+                      user?.welcomeKit?.address?.city?.trim() ||
+                      user?.welcomeKit?.deliveryCity?.trim() ||
+                      user?.savedAddresses?.[0]?.city?.trim() ||
+                      readAppUserLocation()?.city?.trim(),
+                    user?.state?.trim() ||
+                      user?.welcomeKit?.confirmedAddressSnapshot?.state?.trim() ||
+                      user?.welcomeKit?.address?.state?.trim() ||
+                      user?.savedAddresses?.[0]?.state?.trim(),
+                    user?.country?.trim() || 'India',
                   ].filter(Boolean).join(', ') || '—'}
                 </span>
               } 
