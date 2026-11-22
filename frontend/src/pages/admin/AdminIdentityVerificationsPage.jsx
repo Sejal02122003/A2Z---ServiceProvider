@@ -20,6 +20,8 @@ import {
   UserX,
   X,
   ExternalLink,
+  Download,
+  Loader2,
 } from 'lucide-react'
 import {
   fetchAdminVerificationById,
@@ -103,6 +105,79 @@ export function AdminIdentityVerificationsPage() {
   const [verifiedNameInput, setVerifiedNameInput] = useState('')
   const [actionBusy, setActionBusy] = useState(false)
   const [actionSuccess, setActionSuccess] = useState('')
+  const [downloadingDoc, setDownloadingDoc] = useState(null)
+
+  const handleDownloadDoc = async (e, url, label = 'document') => {
+    e?.preventDefault?.()
+    e?.stopPropagation?.()
+    if (!url || downloadingDoc === url) return
+
+    setDownloadingDoc(url)
+
+    const safeUserName = (selectedRecord?.submittedName || selectedRecord?.userId?.fullName || 'user')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+    const isPdf = url.toLowerCase().endsWith('.pdf') || url.includes('application/pdf')
+    const ext = isPdf ? 'pdf' : (url.match(/\.(png|webp|gif|jpeg|jpg)(\?|$)/i)?.[1] || 'jpg')
+    const filename = `${safeUserName}-${label}.${ext}`
+
+    try {
+      if (url.startsWith('data:')) {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        return
+      }
+
+      if (url.includes('cloudinary.com') && url.includes('/upload/')) {
+        const safeNameClean = encodeURIComponent(`${safeUserName}-${label}`)
+        const downloadUrl = url.includes('fl_attachment')
+          ? url
+          : url.replace('/upload/', `/upload/fl_attachment:${safeNameClean}/`)
+
+        const a = document.createElement('a')
+        a.href = downloadUrl
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        return
+      }
+
+      try {
+        const response = await fetch(url, { mode: 'cors' })
+        if (response.ok) {
+          const blob = await response.blob()
+          const blobUrl = window.URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = blobUrl
+          a.download = filename
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1500)
+          return
+        }
+      } catch (fetchErr) {
+        console.warn('[Fetch blob failed, trying fallback]:', fetchErr)
+      }
+
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    } finally {
+      setDownloadingDoc(null)
+    }
+  }
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -524,18 +599,37 @@ export function AdminIdentityVerificationsPage() {
             {selectedRecord.documentUrls?.length > 0 ? (
               <div className="space-y-2">
                 <span className="text-xs font-bold text-slate-700">Uploaded Verification Evidence</span>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {selectedRecord.documentUrls.map((url, idx) => (
-                    <a
+                    <div
                       key={idx}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-brand hover:bg-slate-100 transition"
+                      className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs font-semibold"
                     >
-                      <ExternalLink className="h-4 w-4" />
-                      <span>View Document #{idx + 1}</span>
-                    </a>
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-brand hover:underline truncate"
+                        title="View document in new tab"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">Doc #{idx + 1}</span>
+                      </a>
+                      <button
+                        type="button"
+                        disabled={downloadingDoc === url}
+                        onClick={(e) => handleDownloadDoc(e, url, `doc-${idx + 1}`)}
+                        className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-100 hover:text-brand transition cursor-pointer disabled:opacity-50 shrink-0"
+                        title="Save / download file to computer"
+                      >
+                        {downloadingDoc === url ? (
+                          <Loader2 className="h-3 w-3 animate-spin text-brand" />
+                        ) : (
+                          <Download className="h-3 w-3 text-slate-500" />
+                        )}
+                        <span>{downloadingDoc === url ? 'Saving…' : 'Save'}</span>
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>

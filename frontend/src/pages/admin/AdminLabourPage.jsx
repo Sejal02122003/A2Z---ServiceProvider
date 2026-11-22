@@ -333,6 +333,137 @@ export function AdminLabourPage() {
     setRotation(0)
   }
 
+  // Document Save / Download State & Handler
+  const [downloadingDoc, setDownloadingDoc] = useState(null)
+
+  const handleDownloadDoc = async (e, doc) => {
+    e?.preventDefault?.()
+    e?.stopPropagation?.()
+    if (!doc?.url || downloadingDoc === doc.url) return
+
+    setDownloadingDoc(doc.url)
+
+    const rawUrl = doc.url
+    const safePartnerName = (detailUser?.fullName || 'partner')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+    const safeDocLabel = (doc.label || 'kyc-doc')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+    const isPdf = doc.isPdf || rawUrl.toLowerCase().endsWith('.pdf') || rawUrl.includes('application/pdf')
+    const ext = isPdf ? 'pdf' : (rawUrl.match(/\.(png|webp|gif|jpeg|jpg)(\?|$)/i)?.[1] || 'jpg')
+    const filename = `${safePartnerName}-${safeDocLabel}.${ext}`
+
+    try {
+      // 1. Data URL (Base64) - direct trigger
+      if (rawUrl.startsWith('data:')) {
+        const a = document.createElement('a')
+        a.href = rawUrl
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        return
+      }
+
+      // 2. Cloudinary URL with fl_attachment transformation (Forces direct attachment download header)
+      if (rawUrl.includes('cloudinary.com') && rawUrl.includes('/upload/')) {
+        const safeNameClean = encodeURIComponent(`${safePartnerName}-${safeDocLabel}`)
+        const downloadUrl = rawUrl.includes('fl_attachment')
+          ? rawUrl
+          : rawUrl.replace('/upload/', `/upload/fl_attachment:${safeNameClean}/`)
+
+        const a = document.createElement('a')
+        a.href = downloadUrl
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        return
+      }
+
+      // 3. Blob fetch for cross-origin or local assets
+      try {
+        const response = await fetch(rawUrl, { mode: 'cors' })
+        if (response.ok) {
+          const blob = await response.blob()
+          const blobUrl = window.URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = blobUrl
+          a.download = filename
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1500)
+          return
+        }
+      } catch (fetchErr) {
+        console.warn('[Fetch blob failed, trying canvas fallback]:', fetchErr)
+      }
+
+      // 4. Canvas fallback for images
+      if (!isPdf) {
+        await new Promise((resolve, reject) => {
+          const img = new Image()
+          img.crossOrigin = 'anonymous'
+          img.onload = () => {
+            try {
+              const canvas = document.createElement('canvas')
+              canvas.width = img.naturalWidth || img.width
+              canvas.height = img.naturalHeight || img.height
+              const ctx = canvas.getContext('2d')
+              ctx.drawImage(img, 0, 0)
+              canvas.toBlob((blob) => {
+                if (blob) {
+                  const blobUrl = window.URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = blobUrl
+                  a.download = filename
+                  document.body.appendChild(a)
+                  a.click()
+                  document.body.removeChild(a)
+                  setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1500)
+                  resolve()
+                } else {
+                  reject(new Error('Canvas toBlob failed'))
+                }
+              }, `image/${ext === 'png' ? 'png' : 'jpeg'}`, 0.95)
+            } catch (canvasErr) {
+              reject(canvasErr)
+            }
+          }
+          img.onerror = reject
+          img.src = rawUrl
+        }).catch((err) => {
+          console.warn('[Canvas fallback failed]:', err)
+          const a = document.createElement('a')
+          a.href = rawUrl
+          a.download = filename
+          a.target = '_blank'
+          a.rel = 'noopener noreferrer'
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+        })
+        return
+      }
+
+      // 5. Fallback for PDF or other formats
+      const a = document.createElement('a')
+      a.href = rawUrl
+      a.download = filename
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    } finally {
+      setDownloadingDoc(null)
+    }
+  }
+
   // Practical Trial Evaluation Modal State
   const [trialModalUser, setTrialModalUser] = useState(null)
   const [evalDecision, setEvalDecision] = useState('passed')
@@ -1511,16 +1642,20 @@ export function AdminLabourPage() {
                                       <ZoomIn className="h-3.5 w-3.5" />
                                       <span>Zoom & Inspect</span>
                                     </button>
-                                    <a
-                                      href={doc.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      download
-                                      className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
+                                    <button
+                                      type="button"
+                                      disabled={downloadingDoc === doc.url}
+                                      onClick={(e) => handleDownloadDoc(e, doc)}
+                                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-bold text-slate-700 hover:bg-slate-100 hover:text-brand hover:border-brand/40 transition cursor-pointer disabled:opacity-50"
+                                      title="Save / download file to computer"
                                     >
-                                      <Download className="h-3.5 w-3.5" />
-                                      <span>Save</span>
-                                    </a>
+                                      {downloadingDoc === doc.url ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" />
+                                      ) : (
+                                        <Download className="h-3.5 w-3.5 text-slate-500" />
+                                      )}
+                                      <span>{downloadingDoc === doc.url ? 'Saving…' : 'Save'}</span>
+                                    </button>
                                   </div>
                                 </div>
                               ))}
@@ -1693,6 +1828,20 @@ export function AdminLabourPage() {
                 title="Rotate 90 degrees"
               >
                 <RotateCw className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                disabled={downloadingDoc === lightboxMedia.url}
+                onClick={(e) => handleDownloadDoc(e, lightboxMedia)}
+                className="flex h-9 items-center gap-1.5 rounded-xl bg-white/10 px-3 hover:bg-white/20 transition cursor-pointer text-xs font-bold text-white disabled:opacity-50"
+                title="Save / download document to computer"
+              >
+                {downloadingDoc === lightboxMedia.url ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-brand" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                <span>{downloadingDoc === lightboxMedia.url ? 'Saving…' : 'Save'}</span>
               </button>
               <a
                 href={lightboxMedia.url}
