@@ -25,6 +25,10 @@ import {
   notifyWelcomeKitDispatched,
   notifyWelcomeKitDelivered,
 } from '../services/welcomeKitNotificationService.js'
+import {
+  notifyAdminProviderApprovalRequest,
+  notifyAdminWelcomeKitPaymentSubmitted,
+} from '../services/adminNotificationService.js'
 
 const MAX_KYC_IMAGE_CHARS = 750_000
 
@@ -533,6 +537,13 @@ export const submitLabourKycDocuments = asyncHandler(async (req, res) => {
   if (req.user.role === USER_ROLES.LABOUR) {
     await populateLabourCategories(req.user)
   }
+
+  // Real-time alert to all admins (Socket.IO + In-App Notification + FCM Push)
+  notifyAdminProviderApprovalRequest({
+    provider: req.user,
+    documentType: hasPanInput && !hasAadhaarInput ? 'PAN Card' : 'Aadhaar / PAN',
+    documentUrls: docUrlsToSave,
+  }).catch((err) => console.warn('[KYC Admin Notification Error]:', err?.message))
 
   return sendSuccess(res, {
     message: 'KYC documents submitted — an admin will review your Aadhaar and PAN shortly.',
@@ -1984,6 +1995,15 @@ export const submitPartnerWelcomeKitPayment = asyncHandler(async (req, res) => {
   })
 
   await user.save()
+
+  // If offline payment slip uploaded, notify admins in real-time
+  if (!isOnline) {
+    notifyAdminWelcomeKitPaymentSubmitted({
+      provider: user,
+      amount: 999,
+      paymentReceiptUrl: user.welcomeKit?.paymentReceiptUrl || '',
+    }).catch((err) => console.warn('[WelcomeKit Admin Notification Error]:', err?.message))
+  }
 
   return sendSuccess(res, {
     message: isOnline ? 'Payment completed successfully!' : 'Payment bill submitted! Verification in progress.',

@@ -10,6 +10,7 @@ import {
 } from '../constants/identityConstants.js'
 import { KYC_STATUS, USER_ROLES } from '../constants/roles.js'
 import { calculateNameSimilarity, normalizeName, validateName } from '../utils/nameNormalization.js'
+import { notifyAdminProviderApprovalRequest } from './adminNotificationService.js'
 
 // Cache processed webhook event IDs to prevent replay attacks (in-memory with 24h TTL)
 const processedWebhookEvents = new Map()
@@ -206,6 +207,13 @@ export async function submitIdentityVerification({
       riskScore: risk.riskScore,
     },
   })
+
+  // Real-time alert to all admins (Socket.IO + In-App Notification + FCM Push)
+  notifyAdminProviderApprovalRequest({
+    provider: user,
+    documentType: verification.documentType || 'Identity Documents',
+    documentUrls: verification.documentUrls || [],
+  }).catch((err) => console.warn('[IdentityVerification Admin Notification Error]:', err?.message))
 
   return { verification, nameComparison }
 }

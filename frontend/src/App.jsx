@@ -91,9 +91,11 @@ function App() {
         rawType === 'BOOKING_RECEIVED' ||
         rawType === 'NEW_BROADCAST_JOB' ||
         rawType === 'BOOKING_REBROADCASTING' ||
-        rawType === 'NEW_BOOKING_ADMIN';
+      rawType === 'NEW_BOOKING_ADMIN' ||
+        rawType === 'PROVIDER_APPROVAL_REQUEST' ||
+        rawType === 'WELCOME_KIT_PAYMENT_SUBMITTED';
       if (isBookingOffer) {
-        playBookingAlertSound(payload?.data?.bookingId);
+        playBookingAlertSound(payload?.data?.bookingId || payload?.data?.partnerId);
       }
     });
 
@@ -128,150 +130,150 @@ function App() {
       <BrandingProvider>
         <AuthProvider>
           <BookingCartProvider>
-          <Routes>
-          <Route path="/" element={<LandingPage />} />
-          {bootRoutes}
-          <Route path="/auth" element={<Navigate to="/users/auth" replace />} />
-          <Route path="/users/auth" element={<AuthEntryPage authGroup="users" />} />
-          <Route path="/labours/auth" element={<AuthEntryPage authGroup="labours" />} />
-          <Route path="/terms-conditions" element={<AppTermsConditionsPage />} />
-          <Route path="/privacy-policy" element={<AppPrivacyPolicyPage />} />
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              {bootRoutes}
+              <Route path="/auth" element={<Navigate to="/users/auth" replace />} />
+              <Route path="/users/auth" element={<AuthEntryPage authGroup="users" />} />
+              <Route path="/labours/auth" element={<AuthEntryPage authGroup="labours" />} />
+              <Route path="/terms-conditions" element={<AppTermsConditionsPage />} />
+              <Route path="/privacy-policy" element={<AppPrivacyPolicyPage />} />
 
-          {/* User App (Customer / Guest / Contractor) */}
-          <Route
-            path="/user"
-            element={
-              <ProtectedRoute roles={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR, USER_ROLES.LABOUR]} allowGuest>
-                <ErrorBoundary>
-                  <AppShell />
-                </ErrorBoundary>
-              </ProtectedRoute>
-            }
-          >
-            {appShellChildRoutes}
-          </Route>
+              {/* User App (Customer / Guest / Contractor) */}
+              <Route
+                path="/user"
+                element={
+                  <ProtectedRoute roles={[USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR, USER_ROLES.LABOUR]} allowGuest>
+                    <ErrorBoundary>
+                      <AppShell />
+                    </ErrorBoundary>
+                  </ProtectedRoute>
+                }
+              >
+                {appShellChildRoutes}
+              </Route>
 
-          {/* Service Provider App (Labour) */}
-          <Route
-            path="/serviceprovider"
-            element={
-              <ProtectedRoute roles={[USER_ROLES.LABOUR]}>
-                <ErrorBoundary>
-                  <AppShell />
-                </ErrorBoundary>
-              </ProtectedRoute>
-            }
-          >
-            {appShellChildRoutes}
-          </Route>
-          <Route
-            path="/serviceprovider/work-categories"
-            element={
-              <ProtectedRoute roles={[USER_ROLES.LABOUR]}>
-                <ErrorBoundary>
-                  <LabourCategoriesPage />
-                </ErrorBoundary>
-              </ProtectedRoute>
-            }
-          />
+              {/* Service Provider App (Labour) */}
+              <Route
+                path="/serviceprovider"
+                element={
+                  <ProtectedRoute roles={[USER_ROLES.LABOUR]}>
+                    <ErrorBoundary>
+                      <AppShell />
+                    </ErrorBoundary>
+                  </ProtectedRoute>
+                }
+              >
+                {appShellChildRoutes}
+              </Route>
+              <Route
+                path="/serviceprovider/work-categories"
+                element={
+                  <ProtectedRoute roles={[USER_ROLES.LABOUR]}>
+                    <ErrorBoundary>
+                      <LabourCategoriesPage />
+                    </ErrorBoundary>
+                  </ProtectedRoute>
+                }
+              />
 
-          {/* Legacy /app Redirects */}
-          <Route path="/app/*" element={<AppLegacyRedirect />} />
-          <Route path="/app" element={<AppLegacyRedirect />} />
+              {/* Legacy /app Redirects */}
+              <Route path="/app/*" element={<AppLegacyRedirect />} />
+              <Route path="/app" element={<AppLegacyRedirect />} />
 
-          <Route
-            path="/admin/login"
-            element={
-              <ErrorBoundary>
-                <AdminLoginPage />
-              </ErrorBoundary>
-            }
-          />
+              <Route
+                path="/admin/login"
+                element={
+                  <ErrorBoundary>
+                    <AdminLoginPage />
+                  </ErrorBoundary>
+                }
+              />
 
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute roles={[USER_ROLES.ADMIN]}>
-                <ErrorBoundary>
-                  <AdminLayout />
-                </ErrorBoundary>
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<AdminDashboardPage />} />
-            <Route path="inventory" element={<AdminInventoryHubPage />} />
-            <Route path="inventory/products" element={<AdminInventoryHubPage />} />
-            <Route path="inventory/service-materials" element={<AdminInventoryHubPage />} />
-            <Route path="inventory/material-requests" element={<AdminInventoryHubPage />} />
-            <Route path="inventory/stock" element={<AdminInventoryHubPage />} />
-            <Route path="inventory/vendor-inventory" element={<AdminInventoryHubPage />} />
-            <Route path="inventory/transactions" element={<AdminInventoryHubPage />} />
-            <Route path="inventory/low-stock" element={<AdminInventoryHubPage />} />
-            <Route path="categories" element={<AdminCategoriesPage />} />
-            <Route path="sub-categories" element={<AdminSubCategoriesPage />} />
-            <Route path="services" element={<AdminServicesPage />} />
-            <Route path="sub-services" element={<AdminSubServicesPage />} />
-            <Route path="packages" element={<AdminPackagesPage />} />
-            <Route path="users" element={<AdminUsersPage />} />
-            <Route path="identity-verifications" element={<AdminIdentityVerificationsPage />} />
-            <Route path="labour" element={<AdminLabourPage />} />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute roles={[USER_ROLES.ADMIN]}>
+                    <ErrorBoundary>
+                      <AdminLayout />
+                    </ErrorBoundary>
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<AdminDashboardPage />} />
+                <Route path="inventory" element={<AdminInventoryHubPage />} />
+                <Route path="inventory/products" element={<AdminInventoryHubPage />} />
+                <Route path="inventory/service-materials" element={<AdminInventoryHubPage />} />
+                <Route path="inventory/material-requests" element={<AdminInventoryHubPage />} />
+                <Route path="inventory/stock" element={<AdminInventoryHubPage />} />
+                <Route path="inventory/vendor-inventory" element={<AdminInventoryHubPage />} />
+                <Route path="inventory/transactions" element={<AdminInventoryHubPage />} />
+                <Route path="inventory/low-stock" element={<AdminInventoryHubPage />} />
+                <Route path="categories" element={<AdminCategoriesPage />} />
+                <Route path="sub-categories" element={<AdminSubCategoriesPage />} />
+                <Route path="services" element={<AdminServicesPage />} />
+                <Route path="sub-services" element={<AdminSubServicesPage />} />
+                <Route path="packages" element={<AdminPackagesPage />} />
+                <Route path="users" element={<AdminUsersPage />} />
+                <Route path="identity-verifications" element={<AdminIdentityVerificationsPage />} />
+                <Route path="labour" element={<AdminLabourPage />} />
 
-            <Route path="bookings" element={<AdminBookingsPage />} />
-            <Route path="booking-reminders" element={<AdminBookingRemindersPage />} />
+                <Route path="bookings" element={<AdminBookingsPage />} />
+                <Route path="booking-reminders" element={<AdminBookingRemindersPage />} />
 
 
-            <Route path="billing" element={<AdminBillingPage />} />
-            <Route path="wallet-management" element={<AdminWalletManagementPage />} />
-            <Route path="wallet-management/:tab" element={<AdminWalletManagementPage />} />
-            <Route path="qr-payments" element={<AdminQRPaymentsPage />} />
-            <Route path="rewards" element={<AdminRewardsHubPage />} />
-            <Route path="rewards/:tab" element={<AdminRewardsHubPage />} />
-            <Route path="wallet-rewards" element={<AdminWalletRewardsPage />} />
-            <Route path="banners" element={<AdminBannersPage />} />
-            <Route path="complaints" element={<AdminComplaintsPage />} />
-            <Route path="profile" element={<AdminProfilePage />} />
-            <Route path="reports" element={<AdminReportsPage />} />
-            <Route path="settings" element={<AdminSettingsPage />} />
-            <Route path="zones" element={<AdminZonesPage />} />
-            <Route path="zone-management" element={<AdminZoneManagementPage />} />
-            <Route path="platform-fee" element={<AdminPlatformFeePage />} />
-            <Route path="commission-fee" element={<AdminCommissionFeePage />} />
-            <Route path="wallet-eligibility" element={<AdminWalletEligibilityPage />} />
-            <Route path="labour-wallet" element={<AdminLabourWalletPage />} />
-            <Route path="cash-management" element={<Navigate to="/admin/labour-wallet" replace />} />
-            <Route path="reviews" element={<AdminReviewsRatingsPage />} />
-            <Route path="labour-subscriptions" element={<AdminLabourSubscriptionsPage />} />
-            <Route path="free-trials" element={<Navigate to="/admin/vendor-trials" replace />} />
-            <Route path="vendor-trials" element={<AdminVendorTrialsPage />} />
-            <Route path="vendor-trials/pending-confirmations" element={<AdminPendingConfirmationsPage />} />
-            <Route path="vendor-trials/settings" element={<AdminTrialSettingsPage />} />
-            <Route path="vendor-trials/:vendorId" element={<AdminVendorTrialDetailPage />} />
-            <Route path="privacy-policy" element={<AdminPrivacyPolicyPage />} />
-            <Route path="terms-conditions" element={<AdminTermsConditionsPage />} />
-            <Route path="faqs" element={<AdminFAQsPage />} />
-            <Route path="cancellation-policy" element={<AdminCancellationPolicyPage />} />
-            <Route path="refund-policy" element={<AdminRefundPolicyPage />} />
-            <Route path="simulated-opportunities" element={<AdminSimulatedOpportunitiesPage />} />
-            <Route path="penalty-management" element={<AdminPenaltyManagementPage />} />
-            <Route path="penalty-management/:tab" element={<AdminPenaltyManagementPage />} />
-            <Route path="booking-cancellation" element={<AdminBookingCancellationPage />} />
-            <Route path="booking-cancellation/:tab" element={<AdminBookingCancellationPage />} />
-          </Route>
+                <Route path="billing" element={<AdminBillingPage />} />
+                <Route path="wallet-management" element={<AdminWalletManagementPage />} />
+                <Route path="wallet-management/:tab" element={<AdminWalletManagementPage />} />
+                <Route path="qr-payments" element={<AdminQRPaymentsPage />} />
+                <Route path="rewards" element={<AdminRewardsHubPage />} />
+                <Route path="rewards/:tab" element={<AdminRewardsHubPage />} />
+                <Route path="wallet-rewards" element={<AdminWalletRewardsPage />} />
+                <Route path="banners" element={<AdminBannersPage />} />
+                <Route path="complaints" element={<AdminComplaintsPage />} />
+                <Route path="profile" element={<AdminProfilePage />} />
+                <Route path="reports" element={<AdminReportsPage />} />
+                <Route path="settings" element={<AdminSettingsPage />} />
+                <Route path="zones" element={<AdminZonesPage />} />
+                <Route path="zone-management" element={<AdminZoneManagementPage />} />
+                <Route path="platform-fee" element={<AdminPlatformFeePage />} />
+                <Route path="commission-fee" element={<AdminCommissionFeePage />} />
+                <Route path="wallet-eligibility" element={<AdminWalletEligibilityPage />} />
+                <Route path="labour-wallet" element={<AdminLabourWalletPage />} />
+                <Route path="cash-management" element={<Navigate to="/admin/labour-wallet" replace />} />
+                <Route path="reviews" element={<AdminReviewsRatingsPage />} />
+                <Route path="labour-subscriptions" element={<AdminLabourSubscriptionsPage />} />
+                <Route path="free-trials" element={<Navigate to="/admin/vendor-trials" replace />} />
+                <Route path="vendor-trials" element={<AdminVendorTrialsPage />} />
+                <Route path="vendor-trials/pending-confirmations" element={<AdminPendingConfirmationsPage />} />
+                <Route path="vendor-trials/settings" element={<AdminTrialSettingsPage />} />
+                <Route path="vendor-trials/:vendorId" element={<AdminVendorTrialDetailPage />} />
+                <Route path="privacy-policy" element={<AdminPrivacyPolicyPage />} />
+                <Route path="terms-conditions" element={<AdminTermsConditionsPage />} />
+                <Route path="faqs" element={<AdminFAQsPage />} />
+                <Route path="cancellation-policy" element={<AdminCancellationPolicyPage />} />
+                <Route path="refund-policy" element={<AdminRefundPolicyPage />} />
+                <Route path="simulated-opportunities" element={<AdminSimulatedOpportunitiesPage />} />
+                <Route path="penalty-management" element={<AdminPenaltyManagementPage />} />
+                <Route path="penalty-management/:tab" element={<AdminPenaltyManagementPage />} />
+                <Route path="booking-cancellation" element={<AdminBookingCancellationPage />} />
+                <Route path="booking-cancellation/:tab" element={<AdminBookingCancellationPage />} />
+              </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-        <ErrorBoundary>
-          <BroadcastPopup />
-        </ErrorBoundary>
-        <ErrorBoundary>
-          <SimulatedOpportunityPopup />
-        </ErrorBoundary>
-        <ErrorBoundary>
-          <BookingConfirmedToast />
-        </ErrorBoundary>
-        <ErrorBoundary>
-          <WelcomeBonusPopup />
-        </ErrorBoundary>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+            <ErrorBoundary>
+              <BroadcastPopup />
+            </ErrorBoundary>
+            <ErrorBoundary>
+              <SimulatedOpportunityPopup />
+            </ErrorBoundary>
+            <ErrorBoundary>
+              <BookingConfirmedToast />
+            </ErrorBoundary>
+            <ErrorBoundary>
+              <WelcomeBonusPopup />
+            </ErrorBoundary>
           </BookingCartProvider>
         </AuthProvider>
       </BrandingProvider>

@@ -227,11 +227,31 @@ export function AdminLayout() {
         )
       }
 
+      const onProviderApprovalAlert = (data) => {
+        handleNewAlert(
+          data,
+          `📝 Partner Approval Request: ${data?.partnerName || 'New Partner'}`,
+          `${data?.partnerName || 'A service provider'} (${data?.phone || ''}) submitted KYC documents for approval.`,
+          data?.link || '/admin/identity-verifications'
+        )
+      }
+
+      const onWelcomeKitAlert = (data) => {
+        handleNewAlert(
+          data,
+          `📦 Welcome Kit Payment: ${data?.partnerName || 'Service Partner'}`,
+          `${data?.partnerName || 'A service provider'} submitted payment receipt of ₹${data?.amount || 999} for Welcome Kit.`,
+          data?.link || '/admin/labour'
+        )
+      }
+
       socket.on('NEW_BOOKING_ALERT', onBookingAlert)
       socket.on('BOOKING_ACCEPTED_ADMIN', onAcceptedAlert)
       socket.on('BOOKING_STATUS_UPDATE_ADMIN', onStatusAlert)
       socket.on('WALLET_RECHARGE_REQUEST_SUBMITTED', onRechargeAlert)
       socket.on('PROVIDER_PAYMENT_SUBMITTED', onProviderPaymentAlert)
+      socket.on('PROVIDER_APPROVAL_REQUEST', onProviderApprovalAlert)
+      socket.on('WELCOME_KIT_PAYMENT_SUBMITTED', onWelcomeKitAlert)
 
       return () => {
         socket.off('NEW_BOOKING_ALERT', onBookingAlert)
@@ -239,6 +259,8 @@ export function AdminLayout() {
         socket.off('BOOKING_STATUS_UPDATE_ADMIN', onStatusAlert)
         socket.off('WALLET_RECHARGE_REQUEST_SUBMITTED', onRechargeAlert)
         socket.off('PROVIDER_PAYMENT_SUBMITTED', onProviderPaymentAlert)
+        socket.off('PROVIDER_APPROVAL_REQUEST', onProviderApprovalAlert)
+        socket.off('WELCOME_KIT_PAYMENT_SUBMITTED', onWelcomeKitAlert)
       }
     }
   }, [socket])
