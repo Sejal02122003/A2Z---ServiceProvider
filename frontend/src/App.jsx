@@ -8,6 +8,8 @@ import { AdminLayout } from './layouts/AdminLayout.jsx'
 import { LandingPage } from './pages/LandingPage'
 import { AuthEntryPage } from './pages/auth/AuthEntryPage.jsx'
 import { LabourCategoriesPage } from './pages/app/LabourCategoriesPage.jsx'
+import { AppTermsConditionsPage } from './pages/app/AppTermsConditionsPage.jsx'
+import { AppPrivacyPolicyPage } from './pages/app/AppPrivacyPolicyPage.jsx'
 import { appShellChildRoutes } from './routes/appRoutes.jsx'
 import { bootRoutes } from './routes/bootRoutes.jsx'
 import { AdminCategoriesPage } from './pages/admin/AdminCategoriesPage.jsx'
@@ -132,6 +134,8 @@ function App() {
           <Route path="/auth" element={<Navigate to="/users/auth" replace />} />
           <Route path="/users/auth" element={<AuthEntryPage authGroup="users" />} />
           <Route path="/labours/auth" element={<AuthEntryPage authGroup="labours" />} />
+          <Route path="/terms-conditions" element={<AppTermsConditionsPage />} />
+          <Route path="/privacy-policy" element={<AppPrivacyPolicyPage />} />
 
           {/* User App (Customer / Guest / Contractor) */}
           <Route

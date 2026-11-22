@@ -13,13 +13,16 @@ export const getPolicy = asyncHandler(async (req, res) => {
     })
   }
 
-  let policy = await Policy.findOne({ type, role })
+  const normalizedType = String(type).toLowerCase()
+  const normalizedRole = String(role).toLowerCase()
+
+  let policy = await Policy.findOne({ type: normalizedType, role: normalizedRole })
 
   if (!policy) {
     // Return empty policy if not found
     policy = {
-      type,
-      role,
+      type: normalizedType,
+      role: normalizedRole,
       content: ''
     }
   }
@@ -41,8 +44,11 @@ export const updatePolicy = asyncHandler(async (req, res) => {
     })
   }
 
+  const normalizedType = String(type).toLowerCase()
+  const normalizedRole = String(role).toLowerCase()
+
   const policy = await Policy.findOneAndUpdate(
-    { type, role },
+    { type: normalizedType, role: normalizedRole },
     { content },
     {
       new: true,

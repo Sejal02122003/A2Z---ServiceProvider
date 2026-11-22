@@ -13,11 +13,11 @@ export function AppTermsConditionsPage() {
 
   useEffect(() => {
     let mounted = true
-    if (!user?.role) return
+    const effectiveRole = String(user?.role || 'customer').toLowerCase()
 
     setIsLoading(true)
     // Fetch the terms and conditions for the current user's role
-    apiRequest(`/policies/terms/${user.role}`)
+    apiRequest(`/policies/terms/${effectiveRole}`)
       .then((res) => {
         if (mounted) setContent(res.data?.content || 'No terms and conditions available.')
       })

@@ -13,6 +13,9 @@ import {
   User,
   Eye,
   EyeOff,
+  X,
+  Check,
+  FileText,
 } from 'lucide-react'
 import { MobileShell } from '../../layouts/MobileShell.jsx'
 import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
@@ -23,7 +26,7 @@ import { getRoleHomePath } from '../../lib/roleHomePath.js'
 import { requestLoginOtp, requestRegisterOtp, verifyLogin, verifyRegister } from '../../api/authApi.js'
 import { useAuth } from '../../hooks/useAuth.js'
 import { useBranding } from '../../context/BrandingContext.jsx'
-import { ApiError } from '../../api/http.js'
+import { ApiError, apiRequest } from '../../api/http.js'
 
 const ROLE_OPTIONS = [
   {
@@ -137,6 +140,56 @@ export function AuthEntryPage({ authGroup = 'users' }) {
   const [busy, setBusy] = useState(false)
   const [banner, setBanner] = useState(null)
   const [termsAccepted, setTermsAccepted] = useState(false)
+  const [policyModal, setPolicyModal] = useState({
+    open: false,
+    type: 'terms',
+    title: '',
+    content: '',
+    loading: false,
+    error: '',
+  })
+
+  async function openPolicyModal(type) {
+    const isTerms = type === 'terms'
+    const title = isTerms ? 'Terms of Service' : 'Privacy Policy'
+    const effectiveRole = authGroup === 'labours' ? USER_ROLES.LABOUR : role
+    const normalizedRole = String(effectiveRole || 'customer').toLowerCase()
+
+    setPolicyModal({
+      open: true,
+      type,
+      title,
+      content: '',
+      loading: true,
+      error: '',
+    })
+
+    try {
+      const res = await apiRequest(`/policies/${type}/${normalizedRole}`)
+      const text = res.data?.content || ''
+      setPolicyModal((prev) => ({
+        ...prev,
+        loading: false,
+        content: text || `No ${title.toLowerCase()} currently published.`,
+      }))
+    } catch {
+      setPolicyModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: `Unable to load ${title.toLowerCase()}. Please try again.`,
+      }))
+    }
+  }
+
+  function closePolicyModal() {
+    setPolicyModal((prev) => ({ ...prev, open: false }))
+  }
+
+  function handleAcceptPolicyAndClose() {
+    setTermsAccepted(true)
+    if (banner?.variant === 'error') setBanner(null)
+    closePolicyModal()
+  }
 
   const p = isValidIndianMobile(phone) ? phone : null
   const code = otpCells.join('')
@@ -664,20 +717,44 @@ export function AuthEntryPage({ authGroup = 'users' }) {
 
                       {mode === 'login' ? null : (
                         <div className="mt-4 mb-2 flex items-center px-1">
-                          <label className="flex items-start gap-2.5 text-[13px] font-medium text-slate-500 cursor-pointer">
+                          <div className="flex items-start gap-2.5 text-[13px] font-medium text-slate-500">
                             <input
+                              id="terms-checkbox"
                               type="checkbox"
-                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-brand focus:ring-brand accent-brand"
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-brand focus:ring-brand accent-brand cursor-pointer"
                               checked={termsAccepted}
                               onChange={(e) => {
                                 setTermsAccepted(e.target.checked)
                                 if (e.target.checked && banner?.variant === 'error') setBanner(null)
                               }}
                             />
-                            <span>
-                              I agree to the <a href="#" onClick={(e) => e.preventDefault()} className="font-bold text-brand hover:underline">Terms of Service</a> and <a href="#" onClick={(e) => e.preventDefault()} className="font-bold text-brand hover:underline">Privacy Policy</a>
-                            </span>
-                          </label>
+                            <label htmlFor="terms-checkbox" className="cursor-pointer select-none">
+                              I agree to the{' '}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  void openPolicyModal('terms')
+                                }}
+                                className="font-bold text-brand hover:underline cursor-pointer inline focus:outline-none"
+                              >
+                                Terms of Service
+                              </button>{' '}
+                              and{' '}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  void openPolicyModal('privacy')
+                                }}
+                                className="font-bold text-brand hover:underline cursor-pointer inline focus:outline-none"
+                              >
+                                Privacy Policy
+                              </button>
+                            </label>
+                          </div>
                         </div>
                       )}
 
@@ -842,6 +919,106 @@ export function AuthEntryPage({ authGroup = 'users' }) {
 
               </div>
             </div>
-          </div>
-          )
+
+          {/* Policy Modal for Terms of Service & Privacy Policy */}
+          <AnimatePresence>
+            {policyModal.open && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                {/* Backdrop */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={closePolicyModal}
+                  className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs"
+                />
+
+                {/* Modal Card */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                  transition={{ duration: 0.2 }}
+                  className="relative w-full max-w-lg max-h-[85vh] flex flex-col rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden z-10"
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/80">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand/10 text-brand">
+                        <FileText className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900">{policyModal.title}</h3>
+                        <p className="text-xs text-slate-500 capitalize">
+                          {authGroup === 'labours' ? 'Service Provider' : (role === USER_ROLES.CONTRACTOR ? 'Contractor' : 'Customer')} Agreement
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closePolicyModal}
+                      className="rounded-full p-2 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition cursor-pointer"
+                      aria-label="Close"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  {/* Scrollable Content */}
+                  <div className="flex-1 overflow-y-auto px-6 py-5 overscroll-contain touch-pan-y" style={{ WebkitOverflowScrolling: 'touch' }}>
+                    {policyModal.loading ? (
+                      <div className="flex h-48 flex-col items-center justify-center gap-3">
+                        <div className="h-8 w-8 animate-spin rounded-full border-3 border-brand border-r-transparent" />
+                        <p className="text-xs font-medium text-slate-500">Loading {policyModal.title}…</p>
+                      </div>
+                    ) : policyModal.error ? (
+                      <div className="rounded-2xl bg-rose-50 p-4 text-center">
+                        <p className="text-sm font-semibold text-rose-600">{policyModal.error}</p>
+                        <button
+                          type="button"
+                          onClick={() => void openPolicyModal(policyModal.type)}
+                          className="mt-3 text-xs font-bold text-brand hover:underline cursor-pointer"
+                        >
+                          Try Again
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {policyModal.content.split('\n').map((para, idx) => {
+                          const trimmed = para.trim()
+                          if (!trimmed) return null
+                          return (
+                            <p key={idx} className="text-[13px] leading-relaxed text-slate-600 whitespace-pre-wrap">
+                              {trimmed}
+                            </p>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="border-t border-slate-100 bg-slate-50/60 px-6 py-3.5 flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={closePolicyModal}
+                      className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAcceptPolicyAndClose}
+                      className="rounded-full bg-brand px-5 py-2 text-xs font-bold text-white shadow-md shadow-brand/20 hover:bg-brand/90 transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      I Agree & Accept
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+        </div>
+      )
 }

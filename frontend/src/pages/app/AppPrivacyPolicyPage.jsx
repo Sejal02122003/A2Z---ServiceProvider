@@ -13,11 +13,11 @@ export function AppPrivacyPolicyPage() {
 
   useEffect(() => {
     let mounted = true
-    if (!user?.role) return
+    const effectiveRole = String(user?.role || 'customer').toLowerCase()
 
     setIsLoading(true)
     // Fetch the privacy policy for the current user's role
-    apiRequest(`/policies/privacy/${user.role}`)
+    apiRequest(`/policies/privacy/${effectiveRole}`)
       .then((res) => {
         if (mounted) setContent(res.data?.content || 'No privacy policy available.')
       })
