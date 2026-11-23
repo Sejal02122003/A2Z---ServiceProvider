@@ -1068,6 +1068,14 @@ export function AdminQRPaymentsPage() {
                     {selectedPayment.utr || 'N/A'}
                   </span>
                 </div>
+                {selectedPayment.notes && (
+                  <div className="pt-2 border-t border-slate-100">
+                    <span className="text-slate-500 font-bold block mb-1 text-[11px]">Provider Note / Remark:</span>
+                    <p className="bg-amber-50 border border-amber-200 text-amber-950 p-2 rounded-lg font-semibold text-xs leading-relaxed">
+                      &quot;{selectedPayment.notes}&quot;
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Receipt Preview Thumbnail */}

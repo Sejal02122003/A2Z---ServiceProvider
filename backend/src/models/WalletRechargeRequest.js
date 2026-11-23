@@ -72,6 +72,16 @@ const walletRechargeRequestSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    notes: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    userRemarks: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     reviewedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

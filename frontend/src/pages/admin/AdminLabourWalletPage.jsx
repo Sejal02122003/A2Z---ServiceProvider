@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   Image as ImageIcon,
+  MessageSquare,
 } from 'lucide-react'
 import { adminBookingsApi } from '../../api/adminBookingsApi.js'
 import { adminWalletsApi } from '../../api/adminWalletsApi.js'
@@ -863,6 +864,17 @@ export function AdminLabourWalletPage() {
                             {req.utrNumber || 'N/A'}
                           </span>
                           <p className="text-[10px] text-slate-400 mt-0.5">{req.paymentMode || 'UPI_QR'}</p>
+                          {(req.notes || req.userRemarks || req.metadata?.notes) && (
+                            <div
+                              className="mt-1 flex items-start gap-1 text-[11px] text-amber-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md max-w-xs truncate shadow-2xs font-sans font-normal"
+                              title={req.notes || req.userRemarks || req.metadata?.notes}
+                            >
+                              <MessageSquare className="h-3 w-3 text-amber-600 shrink-0 mt-0.5" />
+                              <span className="truncate italic">
+                                &quot;{req.notes || req.userRemarks || req.metadata?.notes}&quot;
+                              </span>
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           {req.paymentScreenshot && req.paymentScreenshot !== 'https://res.cloudinary.com/dummy/receipt.png' ? (
@@ -1580,6 +1592,19 @@ export function AdminLabourWalletPage() {
                   </p>
                 </div>
               </div>
+
+              {/* Service Provider Note / Remark */}
+              {(reviewingRecharge.notes || reviewingRecharge.userRemarks || reviewingRecharge.metadata?.notes) && (
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs">
+                  <span className="text-amber-900 font-extrabold uppercase text-[10px] flex items-center gap-1.5 mb-1">
+                    <MessageSquare className="h-3.5 w-3.5 text-amber-600" />
+                    Service Provider Note / Remark:
+                  </span>
+                  <p className="font-semibold text-slate-800 text-xs bg-white/90 p-2.5 rounded-xl border border-amber-100 leading-relaxed shadow-2xs">
+                    &quot;{reviewingRecharge.notes || reviewingRecharge.userRemarks || reviewingRecharge.metadata?.notes}&quot;
+                  </p>
+                </div>
+              )}
 
               {reviewingRecharge.paymentScreenshot && reviewingRecharge.paymentScreenshot !== 'https://res.cloudinary.com/dummy/receipt.png' && (
                 <div>

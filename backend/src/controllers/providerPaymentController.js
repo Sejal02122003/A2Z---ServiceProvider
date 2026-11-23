@@ -286,16 +286,23 @@ export const submitPayment = asyncHandler(async (req, res) => {
             paymentScreenshot: receiptUrl || 'https://res.cloudinary.com/dummy/receipt.png',
             paymentScreenshotPublicId: receiptStorageIdentifier || '',
             status: RECHARGE_STATUS.PENDING,
+            notes: notes || payment.notes || '',
+            userRemarks: notes || payment.notes || '',
             metadata: {
               providerPaymentId: payment._id,
               purpose: payment.purpose,
-              notes: notes || '',
+              notes: notes || payment.notes || '',
             },
           })
         } else {
           rechargeRequest.status = RECHARGE_STATUS.PENDING
           rechargeRequest.amount = payment.amount
           rechargeRequest.utrNumber = cleanUtr
+          rechargeRequest.notes = notes || payment.notes || rechargeRequest.notes || ''
+          rechargeRequest.userRemarks = notes || payment.notes || rechargeRequest.userRemarks || ''
+          if (!rechargeRequest.metadata) rechargeRequest.metadata = {}
+          rechargeRequest.metadata.notes = notes || payment.notes || rechargeRequest.metadata.notes || ''
+          rechargeRequest.markModified('metadata')
           if (receiptUrl) rechargeRequest.paymentScreenshot = receiptUrl
           if (receiptStorageIdentifier) rechargeRequest.paymentScreenshotPublicId = receiptStorageIdentifier
           await rechargeRequest.save()

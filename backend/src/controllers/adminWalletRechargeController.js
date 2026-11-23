@@ -133,9 +133,25 @@ export const getRechargeRequests = asyncHandler(async (req, res) => {
     if (item._id === RECHARGE_STATUS.REJECTED) stats.rejected = item.count
   }
 
+  const formattedRequests = requests.map((r) => {
+    const userNote =
+      r.notes ||
+      r.userRemarks ||
+      r.metadata?.notes ||
+      r.metadata?.note ||
+      r.metadata?.userRemarks ||
+      r.metadata?.remark ||
+      ''
+    return {
+      ...r,
+      notes: userNote,
+      userRemarks: userNote,
+    }
+  })
+
   return sendSuccess(res, {
     data: {
-      requests,
+      requests: formattedRequests,
       stats,
       pagination: {
         total,
@@ -176,10 +192,21 @@ export const getRechargeRequestById = asyncHandler(async (req, res) => {
     }
   }
 
+  const userNote =
+    request.notes ||
+    request.userRemarks ||
+    request.metadata?.notes ||
+    request.metadata?.note ||
+    request.metadata?.userRemarks ||
+    request.metadata?.remark ||
+    ''
+
   return sendSuccess(res, {
     data: {
       request: {
         ...request,
+        notes: userNote,
+        userRemarks: userNote,
         currentWalletBalance,
       },
     },

@@ -96,6 +96,8 @@ export async function createRechargeRequest({
   const isWorker = user.role === 'labour' || user.role === 'contractor'
   const accountType = isWorker ? ACCOUNT_TYPES.WORKER : ACCOUNT_TYPES.USER
 
+  const noteText = metadata?.notes || metadata?.note || metadata?.userRemarks || ''
+
   const rechargeRequest = await WalletRechargeRequest.create({
     userId,
     accountType,
@@ -106,6 +108,8 @@ export async function createRechargeRequest({
     paymentScreenshot,
     paymentScreenshotPublicId,
     status: RECHARGE_STATUS.PENDING,
+    notes: noteText,
+    userRemarks: noteText,
     metadata,
   })
 
