@@ -300,10 +300,12 @@ export function AdminWalletManagementPage() {
     }
 
     socket.on('WALLET_RECHARGE_REQUEST_SUBMITTED', handleRechargeSubmitted)
+    socket.on('PROVIDER_PAYMENT_SUBMITTED', handleRechargeSubmitted)
     socket.on('WALLET_RECHARGE_UPDATED', handleRechargeUpdated)
 
     return () => {
       socket.off('WALLET_RECHARGE_REQUEST_SUBMITTED', handleRechargeSubmitted)
+      socket.off('PROVIDER_PAYMENT_SUBMITTED', handleRechargeSubmitted)
       socket.off('WALLET_RECHARGE_UPDATED', handleRechargeUpdated)
     }
   }, [socket, activeTab, loadStats, loadRequests, loadTransactions])

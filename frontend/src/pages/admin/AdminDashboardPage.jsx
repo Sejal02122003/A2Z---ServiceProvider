@@ -170,6 +170,13 @@ export function AdminDashboardPage() {
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
               <Link
+                to="/admin/wallet-management/workers"
+                className="inline-flex items-center gap-2 text-sm font-bold text-brand hover:underline"
+              >
+                View worker recharge requests
+                <ArrowUpRight className="h-4 w-4" />
+              </Link>
+              <Link
                 to="/admin/labour-wallet"
                 className="inline-flex items-center gap-2 text-sm font-bold text-brand hover:underline"
               >

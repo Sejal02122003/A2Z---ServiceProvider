@@ -26,7 +26,7 @@ import { appSpring } from '../components/app/appMotion.js'
 import { GlassPanel } from '../components/ui/GlassPanel.jsx'
 import { adminInitials, formatLastLoginDisplay, formatLastLoginRelative } from '../lib/formatAdminLastLogin.js'
 import { registerFCMToken, showDesktopNotification } from '../services/pushNotificationService.js'
-import { playBookingAlertSound, stopBookingAlertSound, isBookingAlertPlaying } from '../utils/bookingSound.js'
+import { playBookingAlertSound, stopBookingAlertSound, isBookingAlertPlaying, subscribeAutoplayBlocked, getAutoplayBlockedStatus } from '../utils/bookingSound.js'
 import { notificationApi } from '../api/notificationApi.js'
 
 const STORAGE_KEY = 'lc-admin-sidebar-collapsed'
@@ -53,10 +53,17 @@ export function AdminLayout() {
   const [notifications, setNotifications] = useState([])
   const [enablingPush, setEnablingPush] = useState(false)
   const [isAudioAlerting, setIsAudioAlerting] = useState(false)
+  const [livePopupAlert, setLivePopupAlert] = useState(null)
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false)
 
   const profileRef = useRef(null)
   const notifRef = useRef(null)
   const soundTimeoutRef = useRef(null)
+
+  useEffect(() => {
+    setAutoplayBlocked(getAutoplayBlockedStatus())
+    return subscribeAutoplayBlocked((blocked) => setAutoplayBlocked(blocked))
+  }, [])
 
   const silenceAudioAlert = useCallback(() => {
     stopBookingAlertSound()
@@ -136,7 +143,7 @@ export function AdminLayout() {
   useEffect(() => {
     const handleNewAlert = (data, defaultTitle, defaultBody, customLink) => {
       console.log('[Admin FLOW] Live alert received in Admin Panel:', data)
-      playBookingAlertSound(data?.bookingId)
+      playBookingAlertSound(data?.bookingId || data?.requestId || data?.paymentId || 'admin_alert')
       setIsAudioAlerting(true)
 
       // Auto-silence admin chime after 10 seconds so it never loops indefinitely
@@ -149,6 +156,17 @@ export function AdminLayout() {
       const title = data?.title || defaultTitle || '🚨 Admin Notification'
       const body = data?.body || defaultBody || 'New activity received.'
       const link = data?.link || customLink || '/admin/bookings'
+
+      setLivePopupAlert({
+        id: `popup_${Date.now()}`,
+        title,
+        body,
+        link,
+        amount: data?.amount,
+        userName: data?.userName,
+        accountType: data?.accountType,
+        utrNumber: data?.utrNumber || data?.utr,
+      })
 
       if ('Notification' in window && Notification.permission === 'granted') {
         showDesktopNotification({
@@ -467,6 +485,27 @@ export function AdminLayout() {
       <aside className={`${sidebarClassName} hide-on-print`}>{sidebarInner}</aside>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {autoplayBlocked && (
+          <div
+            onClick={() => {
+              playBookingAlertSound('user_unblock')
+              stopBookingAlertSound()
+              setAutoplayBlocked(false)
+            }}
+            className="hide-on-print cursor-pointer bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black px-4 py-2.5 text-xs flex items-center justify-between shadow-md transition hover:brightness-105"
+          >
+            <div className="flex items-center gap-2">
+              <Volume2 className="h-4 w-4 animate-bounce text-slate-950" />
+              <span>
+                <strong>Sound alerts are muted by browser policy:</strong> Click anywhere on this banner to enable real-time audio chimes for new recharges and bookings!
+              </span>
+            </div>
+            <span className="rounded-lg bg-slate-950 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm shrink-0 ml-2">
+              Click to Enable Sound
+            </span>
+          </div>
+        )}
+
         {permission !== 'granted' && permission !== 'unsupported' && (
           <div className="hide-on-print flex items-center justify-between gap-3 border-b border-brand/20 bg-linear-to-r from-brand/15 via-brand/10 to-transparent px-4 py-2 text-xs font-medium text-slate-800">
             <div className="flex items-center gap-2">
@@ -744,6 +783,78 @@ export function AdminLayout() {
           </motion.div>
         </main>
       </div>
+
+      {/* Real-time Floating Alert Toast */}
+      <AnimatePresence>
+        {livePopupAlert && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-20 right-4 sm:right-6 z-[9999] max-w-sm sm:max-w-md w-full bg-white rounded-3xl shadow-2xl border-2 border-emerald-500 overflow-hidden"
+          >
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-700 px-4 py-3 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-xl bg-white/20 animate-pulse">
+                  <Wallet className="h-4 w-4" />
+                </div>
+                <span className="font-black text-xs uppercase tracking-wider">New Real-time Alert</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  silenceAudioAlert()
+                  setLivePopupAlert(null)
+                }}
+                className="p-1 rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              <div>
+                <h4 className="font-extrabold text-slate-900 text-sm">{livePopupAlert.title}</h4>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">{livePopupAlert.body}</p>
+              </div>
+
+              {livePopupAlert.amount && (
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                  <span className="text-slate-500 font-medium">Recharge Amount:</span>
+                  <span className="font-black text-slate-900 text-sm font-mono">
+                    ₹{Number(livePopupAlert.amount).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    silenceAudioAlert()
+                    setLivePopupAlert(null)
+                  }}
+                  className="flex-1 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold transition"
+                >
+                  Dismiss
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    silenceAudioAlert()
+                    const target = livePopupAlert.link || '/admin/wallet-management/workers'
+                    setLivePopupAlert(null)
+                    navigate(target)
+                  }}
+                  className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-md transition active:scale-95 text-center"
+                >
+                  Review & Approve
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

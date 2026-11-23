@@ -36,6 +36,7 @@ export function ProviderQRPaymentModal({
   allowCustomAmount = true,
   metadata = {},
   onPaymentSubmitted,
+  onSuccess,
   existingPayment = null, // if resubmitting a rejected payment
 }) {
   const socket = useSocket()
@@ -252,6 +253,9 @@ export function ProviderQRPaymentModal({
 
       if (onPaymentSubmitted) {
         onPaymentSubmitted(savedPayment)
+      }
+      if (onSuccess) {
+        onSuccess(savedPayment)
       }
     } catch (err) {
       setSubmitError(err.message || 'Payment submission failed. Please try again.')

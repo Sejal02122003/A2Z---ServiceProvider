@@ -53,6 +53,8 @@ self.addEventListener('push', (event) => {
     rawType === 'NEW_BROADCAST_JOB' ||
     rawType === 'BOOKING_REBROADCASTING' ||
     rawType === 'NEW_BOOKING_ADMIN' ||
+    rawType === 'WALLET_RECHARGE_REQUEST' ||
+    rawType === 'PROVIDER_PAYMENT_SUBMITTED' ||
     dataObj.isBookingAlert === 'true' ||
     dataObj.isBookingAlert === true;
 

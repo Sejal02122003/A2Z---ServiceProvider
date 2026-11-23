@@ -91,11 +91,13 @@ function App() {
         rawType === 'BOOKING_RECEIVED' ||
         rawType === 'NEW_BROADCAST_JOB' ||
         rawType === 'BOOKING_REBROADCASTING' ||
-      rawType === 'NEW_BOOKING_ADMIN' ||
+        rawType === 'NEW_BOOKING_ADMIN' ||
         rawType === 'PROVIDER_APPROVAL_REQUEST' ||
-        rawType === 'WELCOME_KIT_PAYMENT_SUBMITTED';
+        rawType === 'WELCOME_KIT_PAYMENT_SUBMITTED' ||
+        rawType === 'WALLET_RECHARGE_REQUEST' ||
+        rawType === 'PROVIDER_PAYMENT_SUBMITTED';
       if (isBookingOffer) {
-        playBookingAlertSound(payload?.data?.bookingId || payload?.data?.partnerId);
+        playBookingAlertSound(payload?.data?.bookingId || payload?.data?.partnerId || payload?.data?.requestId || payload?.data?.paymentId || 'admin_alert');
       }
     });
 

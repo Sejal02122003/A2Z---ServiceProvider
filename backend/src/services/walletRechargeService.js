@@ -157,12 +157,13 @@ export async function createRechargeRequest({
         title: notifTitle,
         body: notifBody,
         link: notifLink,
+        isBookingOffer: true,
         data: {
           type: 'WALLET_RECHARGE_REQUEST',
           requestId: String(rechargeRequest._id),
           amount: String(numAmount),
           utr: cleanUtr,
-          isBookingAlert: true,
+          isBookingAlert: 'true',
           link: notifLink,
         },
       }).catch((pushErr) => console.warn('[FCM Admin Push Warning]:', pushErr?.message))

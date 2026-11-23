@@ -371,13 +371,14 @@ export const submitPayment = asyncHandler(async (req, res) => {
           title: notifTitle,
           body: notifBody,
           link: notifLink,
+          isBookingOffer: true,
           data: {
             type: 'WALLET_RECHARGE_REQUEST',
             requestId: String(rechargeRequest?._id || payment._id),
             paymentId: String(payment._id),
             amount: String(payment.amount),
             utr: cleanUtr,
-            isBookingAlert: true,
+            isBookingAlert: 'true',
             link: notifLink,
           },
         }).catch((pushErr) => console.warn('[FCM Admin Push Warning]:', pushErr?.message))

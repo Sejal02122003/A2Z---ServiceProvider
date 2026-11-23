@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import {
   Wallet,
   Clock,
@@ -24,10 +24,17 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
+  Check,
+  ShieldCheck,
+  AlertTriangle,
+  Image as ImageIcon,
 } from 'lucide-react'
 import { adminBookingsApi } from '../../api/adminBookingsApi.js'
 import { adminWalletsApi } from '../../api/adminWalletsApi.js'
 import { adminSettingsApi } from '../../api/adminSettingsApi.js'
+import { adminWalletApprovalApi } from '../../api/adminWalletApprovalApi.js'
+import { useSocket } from '../../context/SocketContext.jsx'
 import { stopBookingAlertSound } from '../../utils/bookingSound.js'
 import { walletsApi } from '../../api/walletsApi.js'
 
@@ -83,6 +90,109 @@ export function AdminLabourWalletPage() {
   const [adjustReason, setAdjustReason] = useState('')
   const [adjusting, setAdjusting] = useState(false)
   const [adjustError, setAdjustError] = useState('')
+
+  // Recharge Requests State
+  const [rechargeRequests, setRechargeRequests] = useState([])
+  const [rechargeLoading, setRechargeLoading] = useState(false)
+  const [rechargeStatusFilter, setRechargeStatusFilter] = useState('ALL') // 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'
+  const [rechargeSearch, setRechargeSearch] = useState('')
+  const [rechargePage, setRechargePage] = useState(1)
+  const [rechargeTotalPages, setRechargeTotalPages] = useState(1)
+  const [previewReceiptUrl, setPreviewReceiptUrl] = useState(null)
+  const [reviewingRecharge, setReviewingRecharge] = useState(null)
+  const [reviewAction, setReviewAction] = useState('approve') // 'approve' | 'reject'
+  const [rechargeRemarks, setRechargeRemarks] = useState('')
+  const [rechargeSubmitting, setRechargeSubmitting] = useState(false)
+  const [rechargeFeedback, setRechargeFeedback] = useState(null)
+
+  const socket = useSocket()
+
+  // Fetch Recharge Requests
+  const fetchRechargeRequests = useCallback(async () => {
+    try {
+      setRechargeLoading(true)
+      const res = await adminWalletApprovalApi.getRechargeRequests({
+        accountType: 'WORKER',
+        status: rechargeStatusFilter !== 'ALL' ? rechargeStatusFilter : undefined,
+        search: rechargeSearch || undefined,
+        page: rechargePage,
+        limit: 15,
+      })
+      if (res?.data) {
+        setRechargeRequests(res.data.requests || [])
+        setRechargeTotalPages(res.data.pagination?.totalPages || 1)
+      }
+    } catch (err) {
+      console.warn('[AdminLabourWalletPage] Failed to fetch recharge requests:', err)
+    } finally {
+      setRechargeLoading(false)
+    }
+  }, [rechargeStatusFilter, rechargeSearch, rechargePage])
+
+  const pendingRechargesCount = useMemo(() => {
+    return rechargeRequests.filter((r) => r.status === 'PENDING').length
+  }, [rechargeRequests])
+
+  useEffect(() => {
+    fetchRechargeRequests()
+  }, [fetchRechargeRequests])
+
+  // Real-time Socket.IO listener for live recharge submissions
+  useEffect(() => {
+    if (!socket) return
+    const handleLiveRecharge = () => {
+      fetchRechargeRequests()
+      fetchOverviewData()
+    }
+    socket.on('WALLET_RECHARGE_REQUEST_SUBMITTED', handleLiveRecharge)
+    socket.on('PROVIDER_PAYMENT_SUBMITTED', handleLiveRecharge)
+    socket.on('WALLET_RECHARGE_UPDATED', handleLiveRecharge)
+    return () => {
+      socket.off('WALLET_RECHARGE_REQUEST_SUBMITTED', handleLiveRecharge)
+      socket.off('PROVIDER_PAYMENT_SUBMITTED', handleLiveRecharge)
+      socket.off('WALLET_RECHARGE_UPDATED', handleLiveRecharge)
+    }
+  }, [socket, fetchRechargeRequests])
+
+  const handleApproveRecharge = async (reqItem) => {
+    try {
+      setRechargeSubmitting(true)
+      await adminWalletApprovalApi.approveRechargeRequest(reqItem._id, {
+        adminRemarks: rechargeRemarks || 'Approved via Service Provider Wallet',
+      })
+      setReviewingRecharge(null)
+      setRechargeRemarks('')
+      setRechargeFeedback({ type: 'success', message: `₹${reqItem.amount} credited to ${reqItem.userId?.fullName || 'Worker'}'s wallet successfully!` })
+      fetchRechargeRequests()
+      fetchOverviewData()
+    } catch (err) {
+      setRechargeFeedback({ type: 'error', message: err.message || 'Failed to approve recharge' })
+    } finally {
+      setRechargeSubmitting(false)
+    }
+  }
+
+  const handleRejectRecharge = async (reqItem) => {
+    if (!rechargeRemarks.trim()) {
+      alert('Please enter a rejection reason.')
+      return
+    }
+    try {
+      setRechargeSubmitting(true)
+      await adminWalletApprovalApi.rejectRechargeRequest(reqItem._id, {
+        rejectionReason: rechargeRemarks.trim(),
+      })
+      setReviewingRecharge(null)
+      setRechargeRemarks('')
+      setRechargeFeedback({ type: 'success', message: 'Recharge request rejected.' })
+      fetchRechargeRequests()
+      fetchOverviewData()
+    } catch (err) {
+      setRechargeFeedback({ type: 'error', message: err.message || 'Failed to reject recharge' })
+    } finally {
+      setRechargeSubmitting(false)
+    }
+  }
 
   // Initial Data Fetch
   const fetchOverviewData = async () => {
@@ -398,6 +508,23 @@ export function AdminLabourWalletPage() {
         </button>
 
         <button
+          onClick={() => setActiveTab('recharges')}
+          className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition whitespace-nowrap ${
+            activeTab === 'recharges'
+              ? 'border-emerald-600 text-emerald-600'
+              : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'
+          }`}
+        >
+          <Wallet className="h-4 w-4" />
+          Recharge Approval Requests
+          {pendingRechargesCount > 0 && (
+            <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-black text-white animate-pulse">
+              {pendingRechargesCount} New
+            </span>
+          )}
+        </button>
+
+        <button
           onClick={() => setActiveTab('ledger')}
           className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition whitespace-nowrap ${
             activeTab === 'ledger'
@@ -437,6 +564,38 @@ export function AdminLabourWalletPage() {
       {/* TAB 1: OVERVIEW & PAYOUTS */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
+          {/* Service Provider Recharge Requests Quick Action Banner */}
+          <div className="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-teal-50 to-white p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-md">
+                  <Wallet className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">
+                    Service Provider Recharge Requests
+                  </h3>
+                  <p className="text-xs text-slate-600">
+                    {pendingRechargesCount > 0 ? (
+                      <span className="font-bold text-emerald-800">
+                        ⚡ {pendingRechargesCount} recharge approval request{pendingRechargesCount > 1 ? 's' : ''} waiting for verification!
+                      </span>
+                    ) : (
+                      'All worker recharge requests are verified and up to date.'
+                    )}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('recharges')}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-md transition active:scale-95 cursor-pointer"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                View & Approve Recharges ({pendingRechargesCount})
+              </button>
+            </div>
+          </div>
           {/* Pending Requests Section */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="border-b border-slate-100 bg-slate-50/50 px-6 py-4 flex items-center gap-2">
@@ -581,6 +740,243 @@ export function AdminLabourWalletPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: RECHARGE APPROVAL REQUESTS */}
+      {activeTab === 'recharges' && (
+        <div className="space-y-6">
+          {rechargeFeedback && (
+            <div
+              className={`rounded-2xl p-4 text-xs font-bold border flex items-center justify-between ${
+                rechargeFeedback.type === 'success'
+                  ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                  : 'bg-rose-50 text-rose-900 border-rose-200'
+              }`}
+            >
+              <span>{rechargeFeedback.message}</span>
+              <button
+                type="button"
+                onClick={() => setRechargeFeedback(null)}
+                className="text-slate-400 hover:text-slate-600 font-bold ml-2"
+              >
+                &times;
+              </button>
+            </div>
+          )}
+
+          {/* Controls: Filters & Search */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 overflow-x-auto">
+              {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => {
+                    setRechargeStatusFilter(st)
+                    setRechargePage(1)
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                    rechargeStatusFilter === st
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {st === 'ALL' ? 'All Requests' : st}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="relative min-w-[200px] flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search name, phone, UTR..."
+                  value={rechargeSearch}
+                  onChange={(e) => {
+                    setRechargeSearch(e.target.value)
+                    setRechargePage(1)
+                  }}
+                  className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-500"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={fetchRechargeRequests}
+                className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 transition"
+                title="Refresh"
+              >
+                <RefreshCw className={`h-4 w-4 ${rechargeLoading ? 'animate-spin text-emerald-600' : ''}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="border-b border-slate-100 bg-slate-50/50 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-emerald-600" />
+                <h3 className="font-extrabold text-slate-900">Service Provider Wallet Recharge Requests</h3>
+              </div>
+              <span className="text-xs text-slate-500 font-medium">
+                {rechargeRequests.length} record{rechargeRequests.length !== 1 ? 's' : ''} found
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/70 text-slate-500 font-bold uppercase tracking-wider">
+                    <th className="px-6 py-3">Service Provider</th>
+                    <th className="px-6 py-3">Amount</th>
+                    <th className="px-6 py-3">UTR / Payment Ref</th>
+                    <th className="px-6 py-3">Receipt Screenshot</th>
+                    <th className="px-6 py-3">Submitted At</th>
+                    <th className="px-6 py-3">Status</th>
+                    <th className="px-6 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {rechargeLoading ? (
+                    <tr>
+                      <td colSpan="7" className="px-6 py-12 text-center text-slate-500">
+                        <RefreshCw className="h-6 w-6 animate-spin mx-auto text-emerald-600 mb-2" />
+                        Loading recharge requests...
+                      </td>
+                    </tr>
+                  ) : rechargeRequests.length > 0 ? (
+                    rechargeRequests.map((req) => (
+                      <tr key={req._id} className="hover:bg-slate-50/80 transition">
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-slate-900">{req.userId?.fullName || 'Service Provider'}</p>
+                          <p className="text-[11px] text-slate-500">{req.userId?.phone || 'No phone'}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-base font-black text-slate-950 font-mono">
+                            ₹{Number(req.amount || 0).toLocaleString('en-IN')}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-mono font-bold text-[11px]">
+                            {req.utrNumber || 'N/A'}
+                          </span>
+                          <p className="text-[10px] text-slate-400 mt-0.5">{req.paymentMode || 'UPI_QR'}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          {req.paymentScreenshot && req.paymentScreenshot !== 'https://res.cloudinary.com/dummy/receipt.png' ? (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewReceiptUrl(req.paymentScreenshot)}
+                              className="group flex items-center gap-1.5 text-xs text-emerald-700 hover:text-emerald-900 font-bold"
+                            >
+                              <div className="h-8 w-8 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shrink-0">
+                                <img
+                                  src={req.paymentScreenshot}
+                                  alt="Receipt proof"
+                                  className="h-full w-full object-cover group-hover:scale-110 transition"
+                                />
+                              </div>
+                              <span className="underline">View</span>
+                            </button>
+                          ) : (
+                            <span className="text-slate-400 italic text-[11px]">No image proof</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-slate-600 text-[11px]">
+                          <p>{new Date(req.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                          <p className="text-slate-400">{new Date(req.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          {req.status === 'PENDING' && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                              <Clock className="h-3 w-3" /> Pending Review
+                            </span>
+                          )}
+                          {req.status === 'APPROVED' && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                              <CheckCircle2 className="h-3 w-3" /> Approved
+                            </span>
+                          )}
+                          {req.status === 'REJECTED' && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800">
+                              <XCircle className="h-3 w-3" /> Rejected
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {req.status === 'PENDING' ? (
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setReviewingRecharge(req)
+                                  setReviewAction('approve')
+                                  setRechargeRemarks('Payment verified & credited')
+                                }}
+                                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-sm transition active:scale-95"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setReviewingRecharge(req)
+                                  setReviewAction('reject')
+                                  setRechargeRemarks('')
+                                }}
+                                className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs transition active:scale-95"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-slate-400">
+                              {req.reviewedBy ? `By ${req.reviewedBy.fullName || 'Admin'}` : 'Processed'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="7" className="px-6 py-12 text-center text-slate-500">
+                        <Wallet className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                        <p className="font-bold text-sm text-slate-700">No recharge requests found</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          When service providers submit wallet top-up requests via UPI QR, they will appear here.
+                        </p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {rechargeTotalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3 bg-slate-50">
+                <button
+                  type="button"
+                  disabled={rechargePage <= 1}
+                  onClick={() => setRechargePage((p) => Math.max(1, p - 1))}
+                  className="px-3 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-white disabled:opacity-40 transition"
+                >
+                  Previous
+                </button>
+                <span className="text-xs text-slate-500 font-medium">
+                  Page {rechargePage} of {rechargeTotalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={rechargePage >= rechargeTotalPages}
+                  onClick={() => setRechargePage((p) => Math.min(rechargeTotalPages, p + 1))}
+                  className="px-3 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-white disabled:opacity-40 transition"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1142,6 +1538,134 @@ export function AdminLabourWalletPage() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recharge Review & Approval Modal */}
+      {reviewingRecharge && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-200">
+            <div className={`p-5 text-white ${reviewAction === 'approve' ? 'bg-gradient-to-r from-emerald-600 to-teal-700' : 'bg-gradient-to-r from-rose-600 to-rose-700'} flex items-center justify-between`}>
+              <div>
+                <h3 className="font-extrabold text-base">
+                  {reviewAction === 'approve' ? 'Approve & Credit Wallet' : 'Reject Recharge Request'}
+                </h3>
+                <p className="text-xs text-white/80">
+                  Worker: {reviewingRecharge.userId?.fullName || 'Service Provider'} ({reviewingRecharge.userId?.phone || ''})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReviewingRecharge(null)}
+                className="p-1 rounded-lg text-white/80 hover:text-white hover:bg-white/10"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100 text-xs">
+                <div>
+                  <span className="text-slate-400">Amount:</span>
+                  <p className="text-lg font-black text-slate-900 font-mono">
+                    ₹{Number(reviewingRecharge.amount || 0).toLocaleString('en-IN')}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-400">UTR Number:</span>
+                  <p className="font-mono font-bold text-slate-800 break-all">
+                    {reviewingRecharge.utrNumber || 'N/A'}
+                  </p>
+                </div>
+              </div>
+
+              {reviewingRecharge.paymentScreenshot && reviewingRecharge.paymentScreenshot !== 'https://res.cloudinary.com/dummy/receipt.png' && (
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1.5">Payment Screenshot Proof:</label>
+                  <div
+                    onClick={() => setPreviewReceiptUrl(reviewingRecharge.paymentScreenshot)}
+                    className="cursor-pointer group relative rounded-2xl overflow-hidden border border-slate-200 max-h-48 bg-slate-100 flex items-center justify-center"
+                  >
+                    <img
+                      src={reviewingRecharge.paymentScreenshot}
+                      alt="Receipt"
+                      className="w-full h-full object-contain group-hover:scale-105 transition max-h-48"
+                    />
+                    <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white font-bold text-xs gap-1.5">
+                      <Eye className="h-4 w-4" /> Tap to view full image
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  {reviewAction === 'approve' ? 'Admin Remarks (Optional):' : 'Rejection Reason (Required):'}
+                </label>
+                <textarea
+                  rows="2"
+                  value={rechargeRemarks}
+                  onChange={(e) => setRechargeRemarks(e.target.value)}
+                  placeholder={reviewAction === 'approve' ? 'e.g. Verified via Bank / UPI Statement' : 'e.g. Invalid UTR / Payment not received'}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setReviewingRecharge(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                {reviewAction === 'approve' ? (
+                  <button
+                    type="button"
+                    disabled={rechargeSubmitting}
+                    onClick={() => handleApproveRecharge(reviewingRecharge)}
+                    className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-md transition disabled:opacity-50"
+                  >
+                    {rechargeSubmitting ? 'Crediting...' : `Confirm & Credit ₹${reviewingRecharge.amount}`}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={rechargeSubmitting || !rechargeRemarks.trim()}
+                    onClick={() => handleRejectRecharge(reviewingRecharge)}
+                    className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-md transition disabled:opacity-50"
+                  >
+                    {rechargeSubmitting ? 'Rejecting...' : 'Confirm Reject'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full-Screen Receipt Preview Modal */}
+      {previewReceiptUrl && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative max-w-2xl max-h-[90vh] bg-white rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+            <div className="p-3 bg-slate-900 text-white flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-300">Payment Screenshot Receipt</span>
+              <button
+                type="button"
+                onClick={() => setPreviewReceiptUrl(null)}
+                className="p-1 text-slate-400 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-2 overflow-auto flex-1 flex items-center justify-center bg-slate-950">
+              <img
+                src={previewReceiptUrl}
+                alt="Receipt"
+                className="max-h-[80vh] max-w-full object-contain rounded-xl"
+              />
             </div>
           </div>
         </div>

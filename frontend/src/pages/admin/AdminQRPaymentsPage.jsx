@@ -32,6 +32,7 @@ import {
 import { adminQrPaymentsApi } from '../../api/adminQrPaymentsApi.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { useAuth } from '../../hooks/useAuth.js'
+import { useSocket } from '../../context/SocketContext.jsx'
 import { stopBookingAlertSound } from '../../utils/bookingSound.js'
 
 function formatInr(val) {
@@ -191,6 +192,20 @@ export function AdminQRPaymentsPage() {
       setPaymentsLoading(false)
     }
   }, [statusFilter, purposeFilter, searchQuery, startDate, endDate, page])
+
+  const socket = useSocket()
+  useEffect(() => {
+    if (!socket) return
+    const handlePaymentAlert = () => {
+      loadPayments()
+    }
+    socket.on('PROVIDER_PAYMENT_SUBMITTED', handlePaymentAlert)
+    socket.on('WALLET_RECHARGE_REQUEST_SUBMITTED', handlePaymentAlert)
+    return () => {
+      socket.off('PROVIDER_PAYMENT_SUBMITTED', handlePaymentAlert)
+      socket.off('WALLET_RECHARGE_REQUEST_SUBMITTED', handlePaymentAlert)
+    }
+  }, [socket, loadPayments])
 
   useEffect(() => {
     if (activeTab === 'verifications') {
