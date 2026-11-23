@@ -431,9 +431,15 @@ export const getMyPayments = asyncHandler(async (req, res) => {
     ProviderPayment.countDocuments(query),
   ])
 
+  const normalizedPayments = payments.map((p) => ({
+    ...p,
+    adminRemarks: p.adminRemarks || p.paymentVerificationDetails?.notes || '',
+    notes: p.notes || p.userRemarks || '',
+  }))
+
   return sendSuccess(res, {
     data: {
-      payments,
+      payments: normalizedPayments,
       pagination: {
         total,
         page: pageNum,
@@ -598,7 +604,9 @@ export const reviewPayment = asyncHandler(async (req, res) => {
     verifiedAmount,
     bankReference,
     notes,
+    adminRemarks: bodyAdminRemarks,
   } = req.body
+  const adminRemarks = bodyAdminRemarks || notes || ''
   const adminId = req.user._id
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -656,10 +664,11 @@ export const reviewPayment = asyncHandler(async (req, res) => {
           reviewedBy: adminId,
           reviewedAt: new Date(),
           rejectionReason: '',
+          adminRemarks: adminRemarks || '',
           paymentVerificationDetails: {
             verifiedAmount: finalAmount,
             bankReference: bankReference ? String(bankReference).trim() : '',
-            notes: notes ? String(notes).trim() : '',
+            notes: adminRemarks ? String(adminRemarks).trim() : '',
             verifiedAt: new Date(),
           },
         },
@@ -818,13 +827,16 @@ export const reviewPayment = asyncHandler(async (req, res) => {
     }
 
     // Create In-App Notification
+    const remarkText = adminRemarks || updatedPayment.adminRemarks || updatedPayment.paymentVerificationDetails?.notes || ''
     try {
       await InAppNotification.create({
         userId: updatedPayment.providerId,
         title: 'UPI Payment Verified & Approved',
-        body: `Your payment of ₹${finalAmount} (${updatedPayment.purpose}) has been verified and processed successfully.`,
+        body: remarkText
+          ? `Your payment of ₹${finalAmount} (${updatedPayment.purpose}) has been verified and processed. Remark: ${remarkText}`
+          : `Your payment of ₹${finalAmount} (${updatedPayment.purpose}) has been verified and processed successfully.`,
         type: NOTIFICATION_TYPES.WALLET_CREDIT || 'WALLET_CREDIT',
-        metadata: { paymentId: updatedPayment._id, amount: finalAmount, purpose: updatedPayment.purpose },
+        metadata: { paymentId: updatedPayment._id, amount: finalAmount, purpose: updatedPayment.purpose, adminRemarks: remarkText },
       })
     } catch (notifErr) {
       console.warn('[Notification Warning]:', notifErr?.message)
@@ -837,6 +849,7 @@ export const reviewPayment = asyncHandler(async (req, res) => {
         status: PAYMENT_STATUS.APPROVED,
         amount: finalAmount,
         purpose: updatedPayment.purpose,
+        adminRemarks: remarkText,
         message: 'Your payment has been verified and approved!',
       })
     } catch (socketErr) {
@@ -847,7 +860,9 @@ export const reviewPayment = asyncHandler(async (req, res) => {
     try {
       sendNotificationToUser(updatedPayment.providerId, {
         title: 'Payment Approved! 💰',
-        body: `Your UPI payment of ₹${finalAmount} has been verified and processed.`,
+        body: remarkText
+          ? `Your UPI payment of ₹${finalAmount} has been verified. Remark: ${remarkText}`
+          : `Your UPI payment of ₹${finalAmount} has been verified and processed.`,
         link: '/serviceprovider/wallet',
         data: {
           type: 'PAYMENT_APPROVED',

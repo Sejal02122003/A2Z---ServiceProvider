@@ -310,13 +310,14 @@ export async function approveRechargeRequest({ requestId, adminUserId, adminRema
       balanceBefore,
       balanceAfter,
       idempotencyKey,
-      description: `Wallet recharge of ₹${creditAmount.toLocaleString('en-IN')} approved by Admin (UTR: ${updatedRequest.utrNumber})`,
+      description: `Wallet recharge of ₹${creditAmount.toLocaleString('en-IN')} approved by Admin (UTR: ${updatedRequest.utrNumber})${adminRemarks ? ` - Remark: ${adminRemarks}` : ''}`,
       status: 'COMPLETED',
       metadata: {
         requestId: requestId.toString(),
         utrNumber: updatedRequest.utrNumber,
         paymentMode: updatedRequest.paymentMode,
         approvedBy: adminUserId.toString(),
+        adminRemarks: adminRemarks || '',
       },
     }
 
@@ -346,13 +347,16 @@ export async function approveRechargeRequest({ requestId, adminUserId, adminRema
     sendSafeNotification({
       userId: targetUserId,
       title: 'Wallet Recharge Approved',
-      body: `Your wallet has been successfully credited with ₹${creditAmount.toLocaleString('en-IN')}.`,
+      body: adminRemarks
+        ? `Your wallet has been successfully credited with ₹${creditAmount.toLocaleString('en-IN')}. Remark: ${adminRemarks}`
+        : `Your wallet has been successfully credited with ₹${creditAmount.toLocaleString('en-IN')}.`,
       data: {
         requestId: requestId.toString(),
         amount: String(creditAmount),
         balanceAfter: String(balanceAfter),
         status: RECHARGE_STATUS.APPROVED,
         utr: updatedRequest.utrNumber,
+        adminRemarks: adminRemarks || '',
       },
       type: 'WALLET_CREDIT',
     })
@@ -366,6 +370,7 @@ export async function approveRechargeRequest({ requestId, adminUserId, adminRema
           status: RECHARGE_STATUS.APPROVED,
           amount: creditAmount,
           userId: targetUserId,
+          adminRemarks: adminRemarks || '',
         })
       }
     } catch (sockErr) {
@@ -384,6 +389,10 @@ export async function approveRechargeRequest({ requestId, adminUserId, adminRema
               reviewedBy: adminUserId,
               reviewedAt: new Date(),
               adminRemarks: adminRemarks || 'Approved via Wallet Recharge Requests',
+              paymentVerificationDetails: {
+                notes: adminRemarks || 'Approved via Wallet Recharge Requests',
+                verifiedAt: new Date(),
+              },
               financialActionExecuted: true,
               financialActionDetails: updatedRequest.financialActionDetails,
             },
