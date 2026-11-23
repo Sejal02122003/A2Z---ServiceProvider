@@ -14,7 +14,16 @@ export function ServiceProviderIdCardModal({
   const partnerName = user?.fullName || 'Service Provider'
 
   const handlePrint = () => {
-    window.print()
+    document.body.classList.add('print-id-card-mode')
+    const cleanup = () => {
+      document.body.classList.remove('print-id-card-mode')
+      window.removeEventListener('afterprint', cleanup)
+    }
+    window.addEventListener('afterprint', cleanup)
+    setTimeout(() => {
+      window.print()
+      setTimeout(cleanup, 2000)
+    }, 60)
   }
 
   return (
