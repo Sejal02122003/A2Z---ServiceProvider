@@ -297,7 +297,8 @@ export function playBookingAlertSound(bookingOrEventId = null) {
  * Stop looping the booking alert sound immediately when dismissed, accepted, or rejected.
  * Completely shuts down Web Audio, HTML5 Audio, Chime intervals, Vibrations, and SW notifications.
  */
-export function stopBookingAlertSound() {
+export function stopBookingAlertSound(notifySw = true) {
+  const wasPlaying = isPlaying || Boolean(activeBufferSource || chimeInterval || audioElement)
   isPlaying = false
   currentPlayingId = null
 
@@ -351,7 +352,8 @@ export function stopBookingAlertSound() {
   safeVibrate(0)
 
   // 6. Notify Service Worker to stop alert sound and dismiss notification across all clients
-  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
+  // Only notify SW if notifySw is true AND the sound was actually active to prevent ping-pong loops
+  if (notifySw && wasPlaying && typeof navigator !== 'undefined' && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
     try {
       navigator.serviceWorker.controller.postMessage({
         type: 'STOP_BOOKING_ALERT_SOUND',

@@ -165,10 +165,11 @@ self.addEventListener('message', (event) => {
       }).catch(() => {});
     }
 
-    // 2. Broadcast stop command to all client tabs
+    // 2. Broadcast stop command to other client tabs (exclude the sender to prevent infinite loops)
     if (self.clients) {
       self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
         windowClients.forEach((client) => {
+          if (event.source && client.id === event.source.id) return;
           client.postMessage({ type: 'STOP_BOOKING_ALERT_SOUND' });
         });
       }).catch(() => {});
