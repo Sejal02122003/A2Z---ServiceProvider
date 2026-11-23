@@ -13,7 +13,7 @@ try {
   // Ignore if custom DNS servers cannot be set
 }
 
-export async function connectDb(maxRetries = 5, retryDelayMs = 3000) {
+export async function connectDb(maxRetries = 10, retryDelayMs = 3000) {
   const uri = process.env.MONGODB_URI
   if (!uri) {
     throw new Error('MONGODB_URI is not set')
@@ -22,8 +22,8 @@ export async function connectDb(maxRetries = 5, retryDelayMs = 3000) {
   mongoose.set('strictQuery', true)
 
   const options = {
-    serverSelectionTimeoutMS: 5000,  // 5 seconds to select a replica set server (fail fast instead of 15s freeze)
-    connectTimeoutMS: 15000,         // 15 seconds initial connection timeout
+    serverSelectionTimeoutMS: 30000, // 30 seconds to allow DNS recovery on transient drops
+    connectTimeoutMS: 30000,         // 30 seconds initial connection timeout
     socketTimeoutMS: 45000,          // 45 seconds socket inactivity timeout
     maxIdleTimeMS: 60000,            // Close idle sockets after 60s
     maxPoolSize: 25,

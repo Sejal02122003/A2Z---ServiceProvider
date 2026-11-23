@@ -41,6 +41,26 @@ async function main() {
   })
 }
 
+// Graceful handling of transient network/DNS drops to prevent nodemon from crashing
+process.on('unhandledRejection', (reason) => {
+  const msg = reason?.message || String(reason || '')
+  if (reason?.name === 'MongoNetworkError' || msg.includes('ENOTFOUND') || msg.includes('topology was destroyed')) {
+    console.warn('[MongoDB Network Warning] Transient DNS or connection interruption:', msg)
+    return
+  }
+  console.error('[UNHANDLED REJECTION]:', reason)
+})
+
+process.on('uncaughtException', (err) => {
+  const msg = err?.message || String(err || '')
+  if (err?.name === 'MongoNetworkError' || err?.code === 'ENOTFOUND' || msg.includes('ENOTFOUND')) {
+    console.warn('[MongoDB Network Warning] Transient DNS or connection interruption:', msg)
+    return
+  }
+  console.error('[UNCAUGHT EXCEPTION]:', err)
+  process.exit(1)
+})
+
 main().catch((e) => {
   console.error(e)
   process.exit(1)
