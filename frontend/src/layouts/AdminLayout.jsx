@@ -210,11 +210,12 @@ export function AdminLayout() {
       }
 
       const onRechargeAlert = (data) => {
+        const targetLink = data?.accountType === 'WORKER' ? '/admin/wallet-management/workers' : '/admin/wallet-management/users'
         handleNewAlert(
           data,
           `💰 Wallet Recharge Request: ₹${data?.amount || 0}`,
           `${data?.userName || 'User'} (${data?.accountType || 'USER'}) submitted a recharge of ₹${data?.amount || 0}`,
-          '/admin/wallet-recharge-requests'
+          targetLink
         )
       }
 
@@ -223,7 +224,7 @@ export function AdminLayout() {
           data,
           `💳 Worker Payment Proof: ₹${data?.amount || 0}`,
           `${data?.userName || 'Worker'} submitted a payment proof of ₹${data?.amount || 0}`,
-          '/admin/qr-payments'
+          data?.purpose === 'WALLET_TOPUP' ? '/admin/wallet-management/workers' : '/admin/qr-payments'
         )
       }
 

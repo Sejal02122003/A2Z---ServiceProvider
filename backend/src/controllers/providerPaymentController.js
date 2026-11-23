@@ -265,13 +265,69 @@ export const submitPayment = asyncHandler(async (req, res) => {
 
     await payment.save()
 
-    // Real-time notification to admins
+    // 1. Sync with WalletRechargeRequest if this is a WALLET_TOPUP so it appears in Worker Recharge Requests
+    let rechargeRequest = null
+    const { User } = await import('../models/User.js')
+    const providerUser = await User.findById(providerId).select('fullName phone').lean()
+    const providerName = providerUser?.fullName || providerUser?.phone || 'Service Provider'
+
+    if (payment.purpose === PAYMENT_PURPOSE.WALLET_TOPUP) {
+      try {
+        const { WalletRechargeRequest, ACCOUNT_TYPES, RECHARGE_STATUS } = await import('../models/WalletRechargeRequest.js')
+        rechargeRequest = await WalletRechargeRequest.findOne({ 'metadata.providerPaymentId': payment._id })
+        if (!rechargeRequest) {
+          rechargeRequest = await WalletRechargeRequest.create({
+            userId: providerId,
+            accountType: ACCOUNT_TYPES.WORKER,
+            amount: payment.amount,
+            currency: 'INR',
+            paymentMode: 'UPI_QR',
+            utrNumber: cleanUtr,
+            paymentScreenshot: receiptUrl || 'https://res.cloudinary.com/dummy/receipt.png',
+            paymentScreenshotPublicId: receiptStorageIdentifier || '',
+            status: RECHARGE_STATUS.PENDING,
+            metadata: {
+              providerPaymentId: payment._id,
+              purpose: payment.purpose,
+              notes: notes || '',
+            },
+          })
+        } else {
+          rechargeRequest.status = RECHARGE_STATUS.PENDING
+          rechargeRequest.amount = payment.amount
+          rechargeRequest.utrNumber = cleanUtr
+          if (receiptUrl) rechargeRequest.paymentScreenshot = receiptUrl
+          if (receiptStorageIdentifier) rechargeRequest.paymentScreenshotPublicId = receiptStorageIdentifier
+          await rechargeRequest.save()
+        }
+      } catch (wrErr) {
+        console.warn('[Sync WalletRechargeRequest Warning]:', wrErr?.message)
+      }
+    }
+
+    // 2. Real-time notification to admins
     try {
       const io = getIo()
       if (io) {
+        if (payment.purpose === PAYMENT_PURPOSE.WALLET_TOPUP) {
+          io.emit('WALLET_RECHARGE_REQUEST_SUBMITTED', {
+            requestId: rechargeRequest ? rechargeRequest._id : payment._id,
+            paymentId: payment._id,
+            userId: providerId,
+            userName: providerName,
+            accountType: 'WORKER',
+            amount: payment.amount,
+            utrNumber: cleanUtr,
+            status: 'PENDING',
+            createdAt: payment.createdAt,
+          })
+        }
+
         io.emit('PROVIDER_PAYMENT_SUBMITTED', {
           paymentId: payment._id,
+          requestId: rechargeRequest ? rechargeRequest._id : payment._id,
           providerId: payment.providerId,
+          userName: providerName,
           amount: payment.amount,
           purpose: payment.purpose,
           utr: payment.utr,
@@ -281,6 +337,53 @@ export const submitPayment = asyncHandler(async (req, res) => {
       }
     } catch (socketErr) {
       console.warn('[Socket Warning] Could not emit PROVIDER_PAYMENT_SUBMITTED:', socketErr?.message)
+    }
+
+    // 3. Create In-App Notification and FCM Push Notification for all Admins
+    try {
+      const admins = await User.find({ role: 'admin' }).select('_id').lean()
+      const notifTitle = `💰 Worker Wallet Recharge Request: ₹${payment.amount}`
+      const notifBody = `${providerName} (Service Provider) submitted a wallet recharge request of ₹${payment.amount} (UTR: ${cleanUtr}). Tap to review & approve.`
+      const notifLink = '/admin/wallet-management/workers'
+
+      for (const admin of admins) {
+        const inApp = await InAppNotification.create({
+          userId: admin._id,
+          title: notifTitle,
+          body: notifBody,
+          type: 'WALLET_RECHARGE_REQUEST',
+          deliveryStatus: 'SENT',
+          metadata: {
+            requestId: rechargeRequest?._id || payment._id,
+            paymentId: payment._id,
+            providerId,
+            amount: payment.amount,
+            utr: cleanUtr,
+            link: notifLink,
+          },
+        })
+        const io = getIo()
+        if (io) {
+          io.to(`user_${admin._id}`).emit('NEW_IN_APP_NOTIFICATION', inApp)
+        }
+
+        sendNotificationToUser(admin._id, {
+          title: notifTitle,
+          body: notifBody,
+          link: notifLink,
+          data: {
+            type: 'WALLET_RECHARGE_REQUEST',
+            requestId: String(rechargeRequest?._id || payment._id),
+            paymentId: String(payment._id),
+            amount: String(payment.amount),
+            utr: cleanUtr,
+            isBookingAlert: true,
+            link: notifLink,
+          },
+        }).catch((pushErr) => console.warn('[FCM Admin Push Warning]:', pushErr?.message))
+      }
+    } catch (notifErr) {
+      console.warn('[Admin Notification Warning]:', notifErr?.message)
     }
 
     return sendSuccess(res, {
@@ -594,6 +697,25 @@ export const reviewPayment = asyncHandler(async (req, res) => {
           executedAt: new Date(),
         }
         await updatedPayment.save()
+
+        // Also mark linked WalletRechargeRequest as APPROVED
+        try {
+          const { WalletRechargeRequest, RECHARGE_STATUS } = await import('../models/WalletRechargeRequest.js')
+          await WalletRechargeRequest.findOneAndUpdate(
+            { 'metadata.providerPaymentId': updatedPayment._id, status: RECHARGE_STATUS.PENDING },
+            {
+              $set: {
+                status: RECHARGE_STATUS.APPROVED,
+                reviewedBy: adminId,
+                reviewedAt: new Date(),
+                adminRemarks: adminRemarks || 'Approved via QR Payments',
+                financialActionDetails: updatedPayment.financialActionDetails,
+              },
+            }
+          )
+        } catch (linkErr) {
+          console.warn('[Sync WalletRechargeRequest Approve Warning]:', linkErr?.message)
+        }
       } else if (updatedPayment.purpose === PAYMENT_PURPOSE.WALLET_CLEARANCE) {
         const wallet = await getOrCreateLabourWallet(updatedPayment.providerId)
         const balanceBefore = Number(wallet.adminBalance || 0)
@@ -769,6 +891,25 @@ export const reviewPayment = asyncHandler(async (req, res) => {
       message: 'Payment status could not be updated to rejected.',
       statusCode: HTTP_STATUS.CONFLICT,
     })
+  }
+
+  // Also mark linked WalletRechargeRequest as REJECTED
+  try {
+    const { WalletRechargeRequest, RECHARGE_STATUS } = await import('../models/WalletRechargeRequest.js')
+    await WalletRechargeRequest.findOneAndUpdate(
+      { 'metadata.providerPaymentId': updatedPayment._id, status: RECHARGE_STATUS.PENDING },
+      {
+        $set: {
+          status: RECHARGE_STATUS.REJECTED,
+          rejectionReason: String(rejectionReason).trim(),
+          reviewedBy: adminId,
+          reviewedAt: new Date(),
+          adminRemarks: adminRemarks || String(rejectionReason).trim(),
+        },
+      }
+    )
+  } catch (linkErr) {
+    console.warn('[Sync WalletRechargeRequest Reject Warning]:', linkErr?.message)
   }
 
   // In-App Notification

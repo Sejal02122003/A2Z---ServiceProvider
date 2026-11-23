@@ -109,7 +109,7 @@ export async function createRechargeRequest({
     metadata,
   })
 
-  // Notify admins via Socket.IO
+  // Notify admins via Socket.IO, In-App Notifications and Push
   try {
     const io = getIo()
     if (io) {
@@ -123,6 +123,49 @@ export async function createRechargeRequest({
         status: RECHARGE_STATUS.PENDING,
         createdAt: rechargeRequest.createdAt,
       })
+    }
+
+    const { User } = await import('../models/User.js')
+    const { InAppNotification } = await import('../models/InAppNotification.js')
+    const { sendNotificationToUser } = await import('../utils/pushNotificationHelper.js')
+    const admins = await User.find({ role: 'admin' }).select('_id').lean()
+    const senderName = user.fullName || user.phone || (accountType === 'WORKER' ? 'Service Provider' : 'User')
+    const notifTitle = `💰 ${accountType === 'WORKER' ? 'Worker' : 'User'} Wallet Recharge: ₹${numAmount}`
+    const notifBody = `${senderName} submitted a wallet recharge request of ₹${numAmount.toLocaleString('en-IN')} (UTR: ${cleanUtr}). Tap to review & approve.`
+    const notifLink = accountType === 'WORKER' ? '/admin/wallet-management/workers' : '/admin/wallet-management/users'
+
+    for (const admin of admins) {
+      const inApp = await InAppNotification.create({
+        userId: admin._id,
+        title: notifTitle,
+        body: notifBody,
+        type: 'WALLET_RECHARGE_REQUEST',
+        deliveryStatus: 'SENT',
+        metadata: {
+          requestId: rechargeRequest._id,
+          userId: user._id,
+          amount: numAmount,
+          utr: cleanUtr,
+          link: notifLink,
+        },
+      })
+      if (io) {
+        io.to(`user_${admin._id}`).emit('NEW_IN_APP_NOTIFICATION', inApp)
+      }
+
+      sendNotificationToUser(admin._id, {
+        title: notifTitle,
+        body: notifBody,
+        link: notifLink,
+        data: {
+          type: 'WALLET_RECHARGE_REQUEST',
+          requestId: String(rechargeRequest._id),
+          amount: String(numAmount),
+          utr: cleanUtr,
+          isBookingAlert: true,
+          link: notifLink,
+        },
+      }).catch((pushErr) => console.warn('[FCM Admin Push Warning]:', pushErr?.message))
     }
   } catch (sockErr) {
     // safe fallback
@@ -324,6 +367,28 @@ export async function approveRechargeRequest({ requestId, adminUserId, adminRema
       // safe fallback
     }
 
+    // Also mark linked ProviderPayment as approved if initiated via QR modal
+    if (updatedRequest.metadata?.providerPaymentId) {
+      try {
+        const { ProviderPayment, PAYMENT_STATUS } = await import('../models/ProviderPayment.js')
+        await ProviderPayment.findByIdAndUpdate(
+          updatedRequest.metadata.providerPaymentId,
+          {
+            $set: {
+              status: PAYMENT_STATUS.APPROVED,
+              reviewedBy: adminUserId,
+              reviewedAt: new Date(),
+              adminRemarks: adminRemarks || 'Approved via Wallet Recharge Requests',
+              financialActionExecuted: true,
+              financialActionDetails: updatedRequest.financialActionDetails,
+            },
+          }
+        )
+      } catch (syncErr) {
+        console.warn('[Sync ProviderPayment Approve Warning]:', syncErr?.message)
+      }
+    }
+
     return {
       request: updatedRequest,
       wallet,
@@ -438,6 +503,27 @@ export async function rejectRechargeRequest({ requestId, adminUserId, rejectionR
     }
   } catch (sockErr) {
     // safe fallback
+  }
+
+  // Also mark linked ProviderPayment as rejected if initiated via QR modal
+  if (updatedRequest.metadata?.providerPaymentId) {
+    try {
+      const { ProviderPayment, PAYMENT_STATUS } = await import('../models/ProviderPayment.js')
+      await ProviderPayment.findByIdAndUpdate(
+        updatedRequest.metadata.providerPaymentId,
+        {
+          $set: {
+            status: PAYMENT_STATUS.REJECTED,
+            rejectionReason: cleanReason,
+            reviewedBy: adminUserId,
+            reviewedAt: new Date(),
+            adminRemarks: adminRemarks || cleanReason,
+          },
+        }
+      )
+    } catch (syncErr) {
+      console.warn('[Sync ProviderPayment Reject Warning]:', syncErr?.message)
+    }
   }
 
   return updatedRequest
