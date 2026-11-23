@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { AlertCircle, AlertTriangle, Check, CheckCircle2, Clock, IndianRupee, Layers, Loader2, MapPin, Package, ShieldCheck, Sparkles, Wallet, X, Zap } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Check, CheckCircle2, Clock, IndianRupee, Layers, Loader2, MapPin, Package, ShieldCheck, Sparkles, Volume2, Wallet, X, Zap } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { broadcastsApi } from '../../api/broadcastsApi.js'
 import { walletEligibilityApi } from '../../api/walletEligibilityApi.js'
 import { ApiError } from '../../api/http.js'
 import { useSocket } from '../../context/SocketContext.jsx'
 import { USER_ROLES } from '../../constants/userRoles.js'
-import { playBookingAlertSound, stopBookingAlertSound, stopAlertSound } from '../../utils/bookingSound.js'
+import { playBookingAlertSound, stopBookingAlertSound, stopAlertSound, unlockAudioContext, subscribeAutoplayBlocked, getAutoplayBlockedStatus } from '../../utils/bookingSound.js'
 
 function formatScheduleDate(dateValue) {
   if (!dateValue) return ''
@@ -56,10 +56,16 @@ export function BroadcastPopup() {
   const [selectedServiceId, setSelectedServiceId] = useState(null)
   const [eligibilityData, setEligibilityData] = useState(null)
   const [checkingEligibility, setCheckingEligibility] = useState(false)
+  const [autoplayBlocked, setAutoplayBlocked] = useState(() => getAutoplayBlockedStatus())
+
+  useEffect(() => {
+    return subscribeAutoplayBlocked(setAutoplayBlocked)
+  }, [])
 
   // Synchronize audio playback with incoming booking offer
   useEffect(() => {
     if (incoming) {
+      unlockAudioContext()
       playBookingAlertSound(incoming.bookingId)
     } else {
       stopBookingAlertSound()
@@ -385,6 +391,18 @@ export function BroadcastPopup() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={reduce ? undefined : { opacity: 0, y: 40, scale: 0.9 }}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            onClick={() => {
+              if (autoplayBlocked) {
+                unlockAudioContext()
+                playBookingAlertSound(incoming?.bookingId)
+              }
+            }}
+            onTouchStart={() => {
+              if (autoplayBlocked) {
+                unlockAudioContext()
+                playBookingAlertSound(incoming?.bookingId)
+              }
+            }}
             className="fixed inset-x-4 bottom-6 z-[9999] mx-auto max-w-md rounded-3xl bg-white shadow-2xl overflow-hidden"
           >
             {/* Timer Bar */}
@@ -396,6 +414,26 @@ export function BroadcastPopup() {
                 className="absolute inset-y-0 left-0 bg-gradient-to-r from-brand to-blue-400"
               />
             </div>
+
+            {/* Autoplay Unblock Callout Banner */}
+            {autoplayBlocked && (
+              <div
+                onClick={(e) => {
+                  e.stopPropagation()
+                  unlockAudioContext()
+                  playBookingAlertSound(incoming?.bookingId)
+                }}
+                className="bg-gradient-to-r from-rose-600 via-amber-600 to-rose-600 text-white px-4 py-2.5 text-xs font-black uppercase tracking-wider flex items-center justify-between gap-2 shadow-inner cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Volume2 className="h-4 w-4 animate-bounce text-yellow-300" />
+                  <span>Tap to turn on ringtone sound</span>
+                </div>
+                <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-extrabold uppercase text-white">
+                  PLAY SOUND
+                </span>
+              </div>
+            )}
 
             <div className="p-5 max-h-[82vh] overflow-y-auto">
               {/* Header */}

@@ -11,6 +11,27 @@ let activeBufferSource = null
 let activeGainNode = null
 let chimeInterval = null
 let keepAliveSource = null
+let isAutoplayBlocked = false
+const autoplayBlockedListeners = new Set()
+
+function notifyAutoplayBlockedChange(blocked) {
+  isAutoplayBlocked = blocked
+  autoplayBlockedListeners.forEach((fn) => {
+    try { fn(blocked) } catch {}
+  })
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('a2z-autoplay-blocked-change', { detail: { blocked } }))
+  }
+}
+
+export function subscribeAutoplayBlocked(fn) {
+  autoplayBlockedListeners.add(fn)
+  return () => autoplayBlockedListeners.delete(fn)
+}
+
+export function getAutoplayBlockedStatus() {
+  return isAutoplayBlocked
+}
 
 /**
  * Safely call navigator.vibrate respecting Chrome user activation policy.
@@ -95,6 +116,15 @@ export function unlockAudioContext() {
     if (audioContext) {
       ensureAudioContextKeepAlive(audioContext)
       loadAndDecodeAlertBuffer(audioContext).catch(() => {})
+
+      // Play a short silent buffer to satisfy browser user-gesture unlock requirement
+      try {
+        const silentBuf = audioContext.createBuffer(1, 1, 22050)
+        const silentSource = audioContext.createBufferSource()
+        silentSource.buffer = silentBuf
+        silentSource.connect(audioContext.destination)
+        silentSource.start(0)
+      } catch {}
     }
 
     if (!audioElement) {
@@ -103,32 +133,58 @@ export function unlockAudioContext() {
       audioElement.volume = 1.0
     }
 
+    // Prime the audio element with a brief gesture-initiated play/pause
+    if (audioElement && !isPlaying) {
+      const primePromise = audioElement.play()
+      if (primePromise !== undefined) {
+        primePromise
+          .then(() => {
+            if (!isPlaying && audioElement) {
+              audioElement.pause()
+              audioElement.currentTime = 0
+            }
+          })
+          .catch(() => {})
+      }
+    }
+
     isUnlocked = true
+    notifyAutoplayBlockedChange(false)
+
+    // If an alert was requested while locked, kick it off immediately now that we are unlocked
+    if (isPlaying) {
+      executeAudioPlayback()
+    }
   } catch (err) {
     console.warn('[BookingSound] Unlock attempt warning:', err)
   }
 }
 
-// Auto-register one-time unlock listeners on user interaction
+// Auto-register unlock listeners on any user interaction anywhere on the page
 if (typeof window !== 'undefined') {
-  const handleFirstInteraction = () => {
+  const handleUserInteraction = () => {
     unlockAudioContext()
+    if (isPlaying) {
+      executeAudioPlayback()
+    }
   }
-  window.addEventListener('click', handleFirstInteraction, { capture: true, passive: true })
-  window.addEventListener('touchstart', handleFirstInteraction, { capture: true, passive: true })
-  window.addEventListener('pointerdown', handleFirstInteraction, { capture: true, passive: true })
-  window.addEventListener('keydown', handleFirstInteraction, { capture: true, passive: true })
+  window.addEventListener('click', handleUserInteraction, { capture: true, passive: true })
+  window.addEventListener('touchstart', handleUserInteraction, { capture: true, passive: true })
+  window.addEventListener('pointerdown', handleUserInteraction, { capture: true, passive: true })
+  window.addEventListener('keydown', handleUserInteraction, { capture: true, passive: true })
 
   // Re-sync playback if user switches back to tab while booking offer is active
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && isPlaying) {
-        playBookingAlertSound()
+        unlockAudioContext()
+        executeAudioPlayback()
       }
     })
     window.addEventListener('focus', () => {
       if (isPlaying) {
-        playBookingAlertSound()
+        unlockAudioContext()
+        executeAudioPlayback()
       }
     })
   }
@@ -185,31 +241,23 @@ let currentPlayingId = null
 let lastPlayTimestamp = 0
 
 /**
- * Start looping the booking alert sound (in-app and background).
- * Safe against duplicate rapid calls from simultaneous socket/push/SW events.
+ * Internal execution of actual audio pipelines (WebAudio buffer, HTML5 audio, chime, vibration).
  */
-export function playBookingAlertSound(bookingOrEventId = null) {
-  const nowMs = Date.now()
-  if (isPlaying && bookingOrEventId && currentPlayingId === bookingOrEventId) {
-    // Already playing for this specific booking event - resume context if needed and keep running
-    if (audioContext && audioContext.state === 'suspended') {
-      audioContext.resume().catch(() => {})
-    }
-    return
-  }
+function executeAudioPlayback() {
+  if (!isPlaying) return
 
-  if (isPlaying && (nowMs - lastPlayTimestamp < 1500)) {
-    // Suppress rapid re-triggering within 1.5s to avoid audio glitching/doubling
-    return
+  const AudioCtxClass = typeof window !== 'undefined' ? (window.AudioContext || window.webkitAudioContext) : null
+  if (AudioCtxClass && (!audioContext || audioContext.state === 'closed')) {
+    audioContext = new AudioCtxClass()
   }
-
-  isPlaying = true
-  currentPlayingId = bookingOrEventId || currentPlayingId
-  lastPlayTimestamp = nowMs
 
   // 1. Resume AudioContext if suspended
   if (audioContext && audioContext.state === 'suspended') {
-    audioContext.resume().catch(() => {})
+    audioContext.resume().then(() => {
+      notifyAutoplayBlockedChange(false)
+    }).catch(() => {
+      notifyAutoplayBlockedChange(true)
+    })
   }
 
   // 2. Play Web Audio BufferSource (if decoded)
@@ -235,6 +283,7 @@ export function playBookingAlertSound(bookingOrEventId = null) {
 
         activeBufferSource = source
         activeGainNode = gainNode
+        notifyAutoplayBlockedChange(false)
       } else {
         // If buffer not decoded yet, load it now and play
         loadAndDecodeAlertBuffer(audioContext).then((buf) => {
@@ -249,6 +298,7 @@ export function playBookingAlertSound(bookingOrEventId = null) {
             source.start(0)
             activeBufferSource = source
             activeGainNode = gain
+            notifyAutoplayBlockedChange(false)
           }
         }).catch(() => {})
       }
@@ -268,12 +318,20 @@ export function playBookingAlertSound(bookingOrEventId = null) {
     audioElement.currentTime = 0
     activePlayPromise = audioElement.play()
     if (activePlayPromise !== undefined) {
-      activePlayPromise.catch((err) => {
-        // Expected when paused or stopped quickly
-      })
+      activePlayPromise
+        .then(() => {
+          notifyAutoplayBlockedChange(false)
+        })
+        .catch((err) => {
+          if (err?.name === 'NotAllowedError') {
+            console.warn('[BookingSound] Autoplay blocked by browser policy. Awaiting user tap to unblock.')
+            notifyAutoplayBlockedChange(true)
+          }
+        })
     }
   } catch (err) {
     console.warn('[BookingSound] HTML5 Audio error:', err)
+    notifyAutoplayBlockedChange(true)
   }
 
   // 4. Play synthesizer chime immediately and on loop as acoustic reinforcement
@@ -291,6 +349,32 @@ export function playBookingAlertSound(bookingOrEventId = null) {
 
   // 5. Trigger vibration if device supports it (phones / Android) safely
   safeVibrate([500, 200, 500, 200, 500, 200, 800])
+}
+
+/**
+ * Start looping the booking alert sound (in-app and background).
+ * Safe against duplicate rapid calls from simultaneous socket/push/SW events.
+ */
+export function playBookingAlertSound(bookingOrEventId = null) {
+  const nowMs = Date.now()
+  if (isPlaying && bookingOrEventId && currentPlayingId === bookingOrEventId) {
+    // Already playing for this specific booking event - resume context if needed and keep running
+    if (audioContext && audioContext.state === 'suspended') {
+      audioContext.resume().then(() => notifyAutoplayBlockedChange(false)).catch(() => notifyAutoplayBlockedChange(true))
+    }
+    return
+  }
+
+  if (isPlaying && (nowMs - lastPlayTimestamp < 1500)) {
+    // Suppress rapid re-triggering within 1.5s to avoid audio glitching/doubling
+    return
+  }
+
+  isPlaying = true
+  currentPlayingId = bookingOrEventId || currentPlayingId
+  lastPlayTimestamp = nowMs
+
+  executeAudioPlayback()
 }
 
 /**

@@ -157,7 +157,7 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
       channelId: channelId,
       defaultVibrateTimings: true,
       sound: isBookingOffer ? 'alert' : 'default',
-      defaultSound: true,
+      defaultSound: !isBookingOffer,
     };
 
     // Shared Web Push configuration.
