@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { MobileShell } from '../../layouts/MobileShell.jsx'
 import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
+import { AppRouteLoader } from '../../components/app/AppRouteLoader.jsx'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { LabourCategorySetup } from '../../components/auth/LabourCategorySetup.jsx'
 import { ROLE_LABELS, USER_ROLES } from '../../constants/userRoles.js'
@@ -86,7 +87,7 @@ const inputClass =
 export function AuthEntryPage({ authGroup = 'users' }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { applySession, isAuthenticated, user, loading } = useAuth()
+  const { applySession, isAuthenticated, user, loading, token, realUser } = useAuth()
   const { logoUrl } = useBranding()
   const reduce = useReducedMotion()
   const otpInputRefs = useRef([])
@@ -551,6 +552,16 @@ export function AuthEntryPage({ authGroup = 'users' }) {
     } finally {
       setBusy(false)
     }
+  }
+
+  const isResolvingAuth = loading || (token && !realUser)
+  const isAlreadyLoggedInForThisPortal =
+    authGroup === 'labours'
+      ? (user?.role === USER_ROLES.LABOUR && (token || isAuthenticated))
+      : Boolean(realUser && token)
+
+  if (isResolvingAuth || isAlreadyLoggedInForThisPortal) {
+    return <AppRouteLoader />
   }
 
   if (step === 'work-setup') {
