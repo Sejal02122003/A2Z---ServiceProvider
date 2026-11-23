@@ -6,7 +6,8 @@ const TAB_META = {
 
 export function LabourJobsTabBar({ tab, onChange, counts }) {
   return (
-    <div className="rounded-2xl border border-slate-200/90 bg-white/95 p-1.5 shadow-sm ring-1 ring-slate-100/90">
+    <div className="sticky top-0 z-30 pt-1 pb-1.5 bg-slate-50/95 backdrop-blur-md">
+      <div className="rounded-2xl border border-slate-200/90 bg-white/95 p-1.5 shadow-sm ring-1 ring-slate-100/90">
       <div className="grid grid-cols-3 gap-1" role="tablist" aria-label="Job lists">
         {Object.entries(TAB_META).map(([id, meta]) => {
           const active = tab === id
@@ -44,5 +45,6 @@ export function LabourJobsTabBar({ tab, onChange, counts }) {
         })}
       </div>
     </div>
+  </div>
   )
 }

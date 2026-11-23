@@ -9,6 +9,7 @@ import { walletsApi } from '../../api/walletsApi.js'
 import { paymentsApi } from '../../api/paymentsApi.js'
 import { useSelector } from 'react-redux'
 import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
+import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { formatInrFromPaise } from '../../lib/labourEarningsFlow.js'
 
@@ -317,6 +318,8 @@ export function AppEarningsPage() {
 
   return (
     <div className="space-y-6 pb-8">
+      <AppStackScreenHeader title="Earnings & Withdraw" backTo="/serviceprovider" />
+
       <section className="relative -mx-4 px-4 pb-1">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -331,20 +334,13 @@ export function AppEarningsPage() {
           <div className="pointer-events-none absolute inset-0 bg-linear-to-br from-slate-950/85 via-slate-900/80 to-brand/20" aria-hidden />
 
           <div className="relative p-5 sm:p-6">
-            <div className="flex items-start gap-3">
-              <Link
-                to="/serviceprovider"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/10 backdrop-blur-sm transition hover:bg-white/20"
-                aria-label="Back to home"
-              >
-                <ArrowLeft className="h-5 w-5" aria-hidden />
-              </Link>
+            <div className="flex items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600/20 ring-1 ring-blue-400/30">
                 <Wallet className="h-5 w-5 text-blue-200" aria-hidden />
               </span>
               <div className="min-w-0 flex-1 pt-0.5">
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/55">Account</p>
-                <h1 className="text-xl font-extrabold tracking-tight">Earnings & Withdraw</h1>
+                <h2 className="text-xl font-extrabold tracking-tight">Financial Overview</h2>
               </div>
             </div>
 

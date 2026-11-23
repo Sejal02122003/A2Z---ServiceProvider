@@ -21,6 +21,7 @@ import { useAuth } from '../../hooks/useAuth.js'
 import { setUser } from '../../store/slices/authSlice.js'
 import { assetUrlFromUpload, uploadMedia } from '../../api/uploadApi.js'
 import { UPLOAD_FOLDERS } from '../../constants/uploadFolders.js'
+import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx'
 import {
   getKycUiState,
   hasKycDetailsOnFile,
@@ -205,6 +206,8 @@ export function AppKycPage() {
 
   return (
     <div className="space-y-4 pb-8">
+      <AppStackScreenHeader title="Video KYC Verification" backTo={isContractor ? "/user" : "/serviceprovider"} />
+
       <AnimatePresence>
         {banner ? (
           <motion.p

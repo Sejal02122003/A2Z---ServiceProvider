@@ -398,7 +398,7 @@ export function LabourCategorySetup({ variant = 'app', onComplete }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col pb-28">
-      <header className="mb-4">
+      <header className="sticky top-0 z-30 pt-1 pb-2 bg-slate-50/95 backdrop-blur-md mb-4">
         <div className="flex items-center gap-2">
           {step === 'roles' ? (
             <button

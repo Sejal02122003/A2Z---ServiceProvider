@@ -154,7 +154,7 @@ messaging.onBackgroundMessage((payload) => {
 // Listen for messages from client tabs (e.g. stop audio request)
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'STOP_BOOKING_ALERT_SOUND') {
-    // 1. Close all active booking alert notifications
+    // 1. Close all active booking alert notifications on the service worker side
     if (self.registration && self.registration.getNotifications) {
       self.registration.getNotifications().then((notifications) => {
         notifications.forEach((n) => {
@@ -164,16 +164,9 @@ self.addEventListener('message', (event) => {
         });
       }).catch(() => {});
     }
-
-    // 2. Broadcast stop command to other client tabs (exclude the sender to prevent infinite loops)
-    if (self.clients) {
-      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-        windowClients.forEach((client) => {
-          if (event.source && client.id === event.source.id) return;
-          client.postMessage({ type: 'STOP_BOOKING_ALERT_SOUND' });
-        });
-      }).catch(() => {});
-    }
+    // Note: Do NOT broadcast STOP_BOOKING_ALERT_SOUND back to client windows here.
+    // Client windows already know when the booking sound has stopped in-app.
+    // Rebroadcasting here causes infinite message ping-pong loops between tabs and SW.
   }
 });
 

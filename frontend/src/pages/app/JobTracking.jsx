@@ -128,6 +128,7 @@ export function JobTracking() {
           ...prev,
           status: 'ACCEPTED',
           laborId: partnerObj,
+          serviceName: data.serviceName || prev.serviceName,
           startOtp: data.startOtp || prev.startOtp,
           completionOtp: data.completionOtp || prev.completionOtp,
           assignments: (prev.assignments && prev.assignments.length > 0)
@@ -334,14 +335,27 @@ export function JobTracking() {
     booking.multiServiceBooking?.isMultiService && booking.multiServiceBooking.items?.length > 0
       ? booking.multiServiceBooking.items.map((it) => (it.subServiceName ? `${it.serviceName} (${it.subServiceName})` : it.serviceName)).join(', ')
       : booking.packageBooking?.isPackage
-      ? booking.packageBooking.packageName
+      ? (booking.packageBooking.packageName || booking.packageBooking.name)
       : booking.contractorInfo?.services?.length > 0
       ? booking.contractorInfo.services.map((s) => s.serviceId?.name || s.name || 'Service').join(', ')
       : (booking.subServiceName
           ? (booking.serviceId?.name && booking.serviceId.name !== booking.subServiceName
               ? `${booking.serviceId.name} (${booking.subServiceName})`
               : booking.subServiceName)
-          : (booking.serviceId?.name || booking.assignments?.[0]?.serviceName || booking.subcategoryId?.name || ''))
+          : (booking.serviceName ||
+             (typeof booking.serviceId === 'object' && booking.serviceId?.name) ||
+             (booking.assignments && booking.assignments[0]?.serviceName) ||
+             (typeof booking.subcategoryId === 'object' && booking.subcategoryId?.name) ||
+             booking.categoryName ||
+             ''))
+
+  const finalServiceName =
+    serviceTitle ||
+    booking.serviceName ||
+    (typeof booking.serviceId === 'object' && booking.serviceId?.name) ||
+    (booking.assignments && booking.assignments[0]?.serviceName) ||
+    (typeof booking.subcategoryId === 'object' && booking.subcategoryId?.name) ||
+    'Service'
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 font-sans pb-24">
@@ -410,12 +424,10 @@ export function JobTracking() {
       <GlassPanel className="p-4">
         <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Booking Details</p>
         <div className="space-y-2 text-sm text-slate-700">
-          {serviceTitle ? (
-            <div className="flex justify-between items-start gap-3">
-              <span className="font-semibold text-slate-500 shrink-0">Service</span>
-              <span className="font-bold text-slate-900 text-right">{serviceTitle}</span>
-            </div>
-          ) : null}
+          <div className="flex justify-between items-start gap-3">
+            <span className="font-semibold text-slate-500 shrink-0">Service</span>
+            <span className="font-bold text-slate-900 text-right">{finalServiceName}</span>
+          </div>
           <div className="flex justify-between">
             <span className="font-semibold text-slate-500">Date</span>
             <span className="font-medium text-slate-900">{booking.type === 'SCHEDULED' ? new Date(booking.scheduledAt).toLocaleDateString() : 'ASAP'}</span>

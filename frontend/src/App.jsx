@@ -99,15 +99,20 @@ function App() {
       }
     });
 
+    let lastSwStopHandled = 0;
     const handleSwMessage = (event) => {
       if (event.data?.type === 'PLAY_BOOKING_ALERT_SOUND') {
         console.log('[PUSH] PLAY_BOOKING_ALERT_SOUND message received from Service Worker', event.data);
         playBookingAlertSound(event.data?.bookingId);
         window.dispatchEvent(new CustomEvent('a2z-push-notification', { detail: { data: event.data } }));
       } else if (event.data?.type === 'STOP_BOOKING_ALERT_SOUND') {
-        console.log('[PUSH] STOP_BOOKING_ALERT_SOUND message received from Service Worker');
-        // Pass false so this tab does not re-broadcast the stop command back to the Service Worker
-        stopBookingAlertSound(false);
+        const now = Date.now();
+        if (now - lastSwStopHandled > 500) {
+          lastSwStopHandled = now;
+          console.log('[PUSH] STOP_BOOKING_ALERT_SOUND message received from Service Worker');
+          // Pass false so this tab does not re-broadcast the stop command back to the Service Worker
+          stopBookingAlertSound(false);
+        }
       }
     };
 

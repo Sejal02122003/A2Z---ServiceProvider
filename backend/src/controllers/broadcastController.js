@@ -325,6 +325,24 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     const bookingHours = booking.duration || booking.hours || 1
     assignedLabourShare = booking.laborShare || 0
     assignedPricePerHour = booking.basePrice ? Math.round(booking.basePrice / bookingHours) : 0
+
+    // Fetch and resolve service name for single service or package booking
+    if (booking.serviceId) {
+      const svcDoc = await LabourService.findById(booking.serviceId).select('name').lean()
+      assignedServiceName = svcDoc?.name || booking.serviceName || ''
+    } else if (booking.subcategoryId) {
+      const { LabourSubcategory } = await import('../models/LabourSubcategory.js')
+      const subDoc = await LabourSubcategory.findById(booking.subcategoryId).select('name').lean()
+      assignedServiceName = subDoc?.name || booking.serviceName || ''
+    } else if (booking.packageBooking?.packageName) {
+      assignedServiceName = booking.packageBooking.packageName
+    } else {
+      assignedServiceName = booking.serviceName || 'Service'
+    }
+
+    if (booking.subServiceName && assignedServiceName && !assignedServiceName.includes(booking.subServiceName)) {
+      assignedServiceName = `${assignedServiceName} (${booking.subServiceName})`
+    }
   }
 
   // Determine total expected assignments to decide if fully ACCEPTED

@@ -26,6 +26,7 @@ import { AppBadge } from '../../../components/app-ui/data-display/AppBadge.jsx'
 import { AppEmptyState } from '../../../components/app/AppEmptyState.jsx'
 import { GlassPanel } from '../../../components/ui/GlassPanel.jsx'
 import { AppPillTabs } from '../../../components/app-ui/navigation/AppPillTabs.jsx'
+import { AppStackScreenHeader } from '../../../components/app/AppStackScreenHeader.jsx'
 import {
   buildLabourNotifications,
   dismissNotification,
@@ -200,37 +201,30 @@ export function LabourNotificationsPage() {
 
   return (
     <div className="-mx-4 min-h-[70vh] pb-6">
-      <section className="relative overflow-hidden rounded-b-[2rem] bg-linear-to-br from-slate-900 via-slate-800 to-slate-950 px-4 pb-6 pt-[max(0.5rem,env(safe-area-inset-top))] text-white">
+      <div className="px-4">
+        <AppStackScreenHeader title="Notifications" backTo="/serviceprovider" />
+      </div>
+
+      <section className="relative overflow-hidden rounded-2xl bg-linear-to-br from-slate-900 via-slate-800 to-slate-950 px-4 py-4 text-white mx-4 mt-2 shadow-lg">
         <motion.div
           className="pointer-events-none absolute -right-8 top-0 h-40 w-40 rounded-full bg-brand/30 blur-3xl"
           animate={reduce ? undefined : { opacity: [0.3, 0.55, 0.3] }}
           transition={{ duration: 4, repeat: Infinity }}
           aria-hidden
         />
-        <div className="relative flex items-start gap-3">
-          <button
-            type="button"
-            onClick={() => navigate('/serviceprovider')}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/10 backdrop-blur-sm transition hover:bg-white/20"
-            aria-label="Back to home"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div className="min-w-0 flex-1 pt-1">
-            <div className="flex items-center gap-2">
-              <BellRing className="h-5 w-5 text-brand-bright" aria-hidden />
-              <h1 className="text-xl font-extrabold tracking-tight">Notifications</h1>
-            </div>
-            <p className="mt-1 text-sm text-white/75">Job requests, KYC & pay alerts</p>
+        <div className="relative flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <BellRing className="h-5 w-5 text-brand-bright" aria-hidden />
+            <p className="text-sm font-bold text-white/90">Job requests, KYC & pay alerts</p>
           </div>
           {feed.unreadCount > 0 ? (
-            <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-amber-400 px-2 text-xs font-black text-amber-950">
+            <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-amber-400 px-2 text-xs font-black text-amber-950">
               {feed.unreadCount > 99 ? '99+' : feed.unreadCount}
             </span>
           ) : null}
         </div>
 
-        <div className="relative mt-4 grid grid-cols-3 gap-2">
+        <div className="relative mt-3 grid grid-cols-3 gap-2">
           {[
             { label: 'Unread', value: String(feed.unreadCount) },
             { label: 'Job requests', value: String(feed.jobCount) },

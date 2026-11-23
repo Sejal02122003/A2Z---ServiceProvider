@@ -563,6 +563,7 @@ export const createBooking = asyncHandler(async (req, res) => {
 
   let bookingSubcategoryId = null
   let bookingServiceId = null
+  let bookingServiceName = null
   let subTotal = 0
   let maxHourDiscount = 0
   let packageBookingData = null
@@ -693,6 +694,7 @@ export const createBooking = asyncHandler(async (req, res) => {
 
     bookingServiceId = processedItems[0].serviceId
     bookingSubcategoryId = processedItems[0].subcategoryId
+    bookingServiceName = processedItems.map(it => (it.subServiceName ? `${it.serviceName} (${it.subServiceName})` : it.serviceName)).join(', ')
     subTotal = computedSubTotal
     totalQuantity = processedItems.reduce((acc, it) => acc + it.quantity, 0)
     bookingHours = Math.max(0.5, parseFloat((computedTotalDurationMins / 60).toFixed(1)))
@@ -747,6 +749,7 @@ export const createBooking = asyncHandler(async (req, res) => {
     if (!bookingSubcategoryId) {
       bookingSubcategoryId = pkg.subcategoryId
     }
+    bookingServiceName = pkg.name
 
     subTotal = Number(pkg.price) || 0
     maxHourDiscount = 0
@@ -801,6 +804,9 @@ export const createBooking = asyncHandler(async (req, res) => {
     }
     bookingSubcategoryId = service.subcategoryId
     bookingServiceId = service._id
+    bookingServiceName = req.body.subServiceName
+      ? (service.name !== req.body.subServiceName ? `${service.name} (${req.body.subServiceName})` : req.body.subServiceName)
+      : service.name
 
     const resolveHourlyRate = async (sId, ssId = req.body.subServiceId) => {
       let hrRate = 0
@@ -947,6 +953,7 @@ export const createBooking = asyncHandler(async (req, res) => {
       userId: req.user._id,
       subcategoryId: bookingSubcategoryId,
       serviceId: bookingServiceId,
+      serviceName: bookingServiceName || undefined,
       subServiceId: req.body.subServiceId || undefined,
       subServiceName: req.body.subServiceName || undefined,
       type,

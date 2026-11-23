@@ -27,6 +27,10 @@ const bookingSchema = new mongoose.Schema(
         return !this.packageBooking?.isPackage && !this.multiServiceBooking?.isMultiService
       },
     },
+    serviceName: {
+      type: String,
+      trim: true,
+    },
     subServiceId: {
       type: mongoose.Schema.Types.ObjectId,
     },
