@@ -24,6 +24,7 @@ import {
   QrCode,
   Upload,
   ShieldCheck,
+  MessageSquare,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth.js'
@@ -131,6 +132,8 @@ export function LaborWallet() {
       const providerPayments = (qrRes.data?.payments || []).map((p) => ({
         ...p,
         itemType: 'provider_payment',
+        adminRemarks: p.adminRemarks || p.paymentVerificationDetails?.notes || '',
+        notes: p.notes || p.userRemarks || '',
       }))
 
       const unifiedRecharges = (rechargeRes.data?.requests || []).map((r) => ({
@@ -142,6 +145,9 @@ export function LaborWallet() {
         receiptUrl: r.paymentScreenshot,
         createdAt: r.createdAt,
         rejectionReason: r.rejectionReason,
+        adminRemarks: r.adminRemarks || '',
+        notes: r.notes || r.userRemarks || '',
+        financialActionDetails: r.financialActionDetails,
         itemType: 'recharge_request',
       }))
 
@@ -739,6 +745,15 @@ export function LaborWallet() {
                           </p>
                         )}
 
+                        {/* Admin Remark if present */}
+                        {tx.metadata?.adminRemarks && (
+                          <div className="mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-[10px] text-emerald-900 font-medium">
+                            <MessageSquare className="h-3 w-3 text-emerald-600 shrink-0" />
+                            <span className="font-bold text-emerald-800">Admin Remark:</span>
+                            <span>{tx.metadata.adminRemarks}</span>
+                          </div>
+                        )}
+
                         {/* Commission Snapshot or Charges Breakdown Pill */}
                         <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
                           {tx.commissionPercentageSnapshot != null && (
@@ -874,6 +889,14 @@ export function LaborWallet() {
                             </p>
                           )}
 
+                          {/* Provider's own note / remarks */}
+                          {(p.notes || p.userRemarks) && (
+                            <p className="text-[11px] text-slate-500 mt-1 flex items-start gap-1">
+                              <span className="font-semibold text-slate-600 shrink-0">Your Note:</span>
+                              <span className="text-slate-700 italic">"{p.notes || p.userRemarks}"</span>
+                            </p>
+                          )}
+
                           <p className="text-[10px] text-slate-400 mt-1">
                             Submitted: {formatDate(p.createdAt)}
                           </p>
@@ -886,6 +909,9 @@ export function LaborWallet() {
                                 Rejection Reason:
                               </p>
                               <p className="text-[11px] text-rose-800">{p.rejectionReason || 'Details could not be verified'}</p>
+                              {p.adminRemarks && p.adminRemarks !== p.rejectionReason && (
+                                <p className="text-[10px] text-rose-700">Admin Remark: {p.adminRemarks}</p>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => {
@@ -902,11 +928,28 @@ export function LaborWallet() {
                             </div>
                           )}
 
-                          {isApproved && p.financialActionDetails?.balanceAfter !== undefined && (
-                            <p className="text-[11px] font-bold text-emerald-700 mt-1 flex items-center gap-1">
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              Wallet updated: {formatInr(p.financialActionDetails.balanceAfter)}
-                            </p>
+                          {/* Approved / Recharged successfully notice with Admin Remark */}
+                          {isApproved && (
+                            <div className="mt-2.5 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs space-y-1.5">
+                              <p className="font-bold flex items-center gap-1.5 text-emerald-800">
+                                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                                Recharge Approved & Credited
+                              </p>
+                              {(p.adminRemarks || p.paymentVerificationDetails?.notes) && (
+                                <div className="p-2 rounded-lg bg-white/90 border border-emerald-200 text-[11px] text-emerald-900 flex items-start gap-1.5">
+                                  <MessageSquare className="h-3.5 w-3.5 text-emerald-700 mt-0.5 shrink-0" />
+                                  <div>
+                                    <span className="font-bold text-emerald-850">Admin Remark: </span>
+                                    <span className="font-medium text-slate-800">{p.adminRemarks || p.paymentVerificationDetails?.notes}</span>
+                                  </div>
+                                </div>
+                              )}
+                              {p.financialActionDetails?.balanceAfter !== undefined && (
+                                <p className="text-[10px] font-semibold text-emerald-700 pl-5">
+                                  Updated Wallet Balance: {formatInr(p.financialActionDetails.balanceAfter)}
+                                </p>
+                              )}
+                            </div>
                           )}
                         </div>
 

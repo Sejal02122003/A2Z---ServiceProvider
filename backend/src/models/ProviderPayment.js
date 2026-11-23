@@ -126,6 +126,11 @@ const providerPaymentSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    adminRemarks: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     paymentVerificationDetails: {
       verifiedAmount: Number,
       bankReference: String,

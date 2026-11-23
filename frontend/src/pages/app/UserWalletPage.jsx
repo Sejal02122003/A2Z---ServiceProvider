@@ -20,6 +20,7 @@ import {
   AlertCircle,
   ZoomIn,
   X,
+  MessageSquare,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { walletsApi } from '../../api/walletsApi';
@@ -514,6 +515,14 @@ export default function UserWalletPage() {
                         )}
                       </div>
 
+                      {/* User's own submitted note if present */}
+                      {(r.notes || r.userRemarks) && (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 flex items-start gap-1">
+                          <span className="font-semibold text-slate-600 dark:text-slate-300 shrink-0">Your Note:</span>
+                          <span className="text-slate-700 dark:text-slate-300 italic">"{r.notes || r.userRemarks}"</span>
+                        </p>
+                      )}
+
                       {/* Display admin rejection reason if request was rejected */}
                       {isRejected && (
                         <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-xs text-rose-900 dark:text-rose-200 space-y-1">
@@ -522,14 +531,31 @@ export default function UserWalletPage() {
                             Rejection Reason:
                           </p>
                           <p className="pl-5 font-medium">{r.rejectionReason || 'Receipt could not be verified'}</p>
+                          {r.adminRemarks && r.adminRemarks !== r.rejectionReason && (
+                            <p className="pl-5 text-[11px] text-rose-700 dark:text-rose-300">Admin Remark: {r.adminRemarks}</p>
+                          )}
                         </div>
                       )}
 
-                      {/* Display approval credit confirmation */}
+                      {/* Display approval credit confirmation with admin remarks */}
                       {isApproved && (
-                        <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40 text-xs text-emerald-800 dark:text-emerald-300 font-medium flex items-center gap-2">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span>Amount credited to your wallet balance.</span>
+                        <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40 text-xs text-emerald-800 dark:text-emerald-300 font-medium space-y-1.5">
+                          <div className="flex items-center gap-1.5 font-bold text-emerald-800 dark:text-emerald-300">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span>Recharge Approved & Credited</span>
+                          </div>
+                          {r.adminRemarks && (
+                            <div className="p-2 rounded-lg bg-white/90 dark:bg-slate-800/90 border border-emerald-200 dark:border-emerald-900/50 text-[11px] flex items-start gap-1.5">
+                              <MessageSquare className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                              <div>
+                                <span className="font-bold text-emerald-800 dark:text-emerald-300">Admin Remark: </span>
+                                <span className="text-slate-800 dark:text-slate-200">{r.adminRemarks}</span>
+                              </div>
+                            </div>
+                          )}
+                          <p className="text-[10px] text-emerald-600 dark:text-emerald-400 pl-5">
+                            Amount credited to your wallet balance.
+                          </p>
                         </div>
                       )}
                     </div>
