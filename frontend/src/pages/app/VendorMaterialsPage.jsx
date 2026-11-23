@@ -21,6 +21,7 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
+import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx'
 import {
   fetchVendorMaterialRequests,
   fetchVendorMaterialRequestById,
@@ -92,7 +93,9 @@ export function VendorMaterialsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5 px-3 py-4 sm:px-6 animate-in fade-in duration-300">
+    <div className="mx-auto max-w-4xl space-y-5 px-3 pb-8 pt-1 sm:px-6 animate-in fade-in duration-300">
+      <AppStackScreenHeader title="Materials & Inventory" backTo="/serviceprovider" />
+
       {/* Toast Notification */}
       <AnimatePresence>
         {toastMsg && (

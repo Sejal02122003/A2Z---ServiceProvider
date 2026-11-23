@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth.js'
 import { KYC_STATUS } from '../../constants/userRoles.js'
 import { AppEmptyState } from '../../components/app/AppEmptyState.jsx'
 import { AppButton } from '../../components/app-ui/buttons/AppButton.jsx'
+import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx'
 import { LabourAssignmentDetailModal } from '../../components/labour/LabourAssignmentDetailModal.jsx'
 import { LabourJobActiveCard } from '../../components/labour/jobs/LabourJobActiveCard.jsx'
 import { LabourJobHistoryCard } from '../../components/labour/jobs/LabourJobHistoryCard.jsx'
@@ -205,6 +206,8 @@ export function AppJobsPage() {
 
   return (
     <div className="space-y-4 pb-6">
+      <AppStackScreenHeader title="Jobs & Sites" backTo="/serviceprovider" />
+
       <AnimatePresence>
         {toast ? (
           <motion.p

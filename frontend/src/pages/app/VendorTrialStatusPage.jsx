@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { vendorTrialApi } from '../../api/vendorTrialApi.js'
 import { VendorJoiningConfirmedModal } from '../../components/labour/VendorJoiningConfirmedModal.jsx'
+import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx'
 import {
   Award,
   Star,
@@ -147,7 +148,9 @@ export function VendorTrialStatusPage() {
   const progressPct = totalRequired > 0 ? Math.min(100, Math.round((completed / totalRequired) * 100)) : 0
 
   return (
-    <div className="mx-auto max-w-lg space-y-5 px-4 pb-20 pt-4">
+    <div className="mx-auto max-w-lg space-y-5 px-4 pb-20 pt-1">
+      <AppStackScreenHeader title="Trial Services & Status" backTo="/serviceprovider" />
+
       {/* Toast Notification */}
       {toast.message && (
         <motion.div

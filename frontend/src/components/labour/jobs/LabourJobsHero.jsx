@@ -27,13 +27,6 @@ export function LabourJobsHero({ offersCount, activeCount, kycOk }) {
 
         <div className="relative p-4 sm:p-5">
           <div className="flex items-start gap-3">
-            <Link
-              to="/serviceprovider"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20"
-              aria-label="Back to home"
-            >
-              <ArrowLeft className="h-5 w-5" aria-hidden />
-            </Link>
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/12 ring-1 ring-white/25 backdrop-blur-sm">
               <HardHat className="h-6 w-6" aria-hidden />
             </span>

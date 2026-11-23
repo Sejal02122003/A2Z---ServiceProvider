@@ -508,8 +508,77 @@ export function LabourHomeScreen({ user }) {
       {/* Notification & Sound Alert Status Banner */}
       <ProviderNotificationBanner user={user} />
 
-      {/* 1. Header */}
-      <section className="relative px-4 pb-2 pt-2">
+      {/* 1. Fixed / Sticky Top Header Navigation */}
+      <div className="sticky top-0 z-40 -mx-4 px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-1 bg-slate-50/95 backdrop-blur-md">
+        <div className="rounded-2xl border border-white/20 bg-linear-to-br from-slate-900 via-slate-800 to-slate-950 px-3.5 py-2.5 shadow-md text-white">
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={openDrawer}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20"
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Link
+                to="/serviceprovider/wallet"
+                className="relative flex h-10 items-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/20 px-3 text-white backdrop-blur-sm transition hover:bg-emerald-500/30 active:scale-95"
+                aria-label="Open Wallet"
+              >
+                <Wallet className="h-4 w-4 text-emerald-300" />
+                <span className="text-xs font-black tracking-tight text-white">Wallet</span>
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => navigate('/serviceprovider/notifications')}
+                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20"
+                aria-label={
+                  notifications.unreadCount > 0
+                    ? `Notifications, ${notifications.unreadCount} unread`
+                    : 'Notifications'
+                }
+              >
+                <Bell className="h-5 w-5" />
+                {notifications.unreadCount > 0 ? (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white shadow-md ring-2 ring-slate-900/80">
+                    {notifications.unreadCount > 9 ? '9+' : notifications.unreadCount}
+                  </span>
+                ) : null}
+              </button>
+
+              <Link
+                to="/serviceprovider/profile"
+                className="relative shrink-0 rounded-xl p-0.5 ring-2 ring-white/40 transition hover:ring-white/70"
+                aria-label="Open profile"
+              >
+                {profileImageUrl ? (
+                  <img
+                    src={profileImageUrl}
+                    alt=""
+                    className="h-9 w-9 rounded-[0.55rem] object-cover sm:h-10 sm:w-10 sm:rounded-xl"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="flex h-9 w-9 items-center justify-center rounded-[0.55rem] bg-white/15 text-xs font-black sm:h-10 sm:w-10 sm:rounded-xl sm:text-sm">
+                    {initials}
+                  </span>
+                )}
+                {kycOk ? (
+                  <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-brand text-white ring-2 ring-slate-900">
+                    <Check className="h-2 w-2" strokeWidth={3} aria-hidden />
+                  </span>
+                ) : null}
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Provider Profile Overview Card */}
+      <section className="relative px-4 pb-2 pt-1">
         <motion.div
           initial={reduce ? false : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -529,71 +598,7 @@ export function LabourHomeScreen({ user }) {
           />
 
           <motion.div className="relative p-4 sm:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={openDrawer}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20"
-                aria-label="Open menu"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-
-              <div className="flex items-center gap-2 sm:gap-3">
-                <Link
-                  to="/serviceprovider/wallet"
-                  className="relative flex h-11 items-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/20 px-3 text-white backdrop-blur-sm transition hover:bg-emerald-500/30 active:scale-95"
-                  aria-label="Open Wallet"
-                >
-                  <Wallet className="h-4 w-4 text-emerald-300" />
-                  <span className="text-xs font-black tracking-tight text-white">Wallet</span>
-                </Link>
-
-                <button
-                  type="button"
-                  onClick={() => navigate('/serviceprovider/notifications')}
-                  className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20"
-                  aria-label={
-                    notifications.unreadCount > 0
-                      ? `Notifications, ${notifications.unreadCount} unread`
-                      : 'Notifications'
-                  }
-                >
-                  <Bell className="h-5 w-5" />
-                  {notifications.unreadCount > 0 ? (
-                    <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white shadow-md ring-2 ring-slate-900/80">
-                      {notifications.unreadCount > 9 ? '9+' : notifications.unreadCount}
-                    </span>
-                  ) : null}
-                </button>
-
-                <Link
-                  to="/serviceprovider/profile"
-                  className="relative shrink-0 rounded-xl p-0.5 ring-2 ring-white/40 transition hover:ring-white/70"
-                  aria-label="Open profile"
-                >
-                  {profileImageUrl ? (
-                    <img
-                      src={profileImageUrl}
-                      alt=""
-                      className="h-10 w-10 rounded-[0.6rem] object-cover sm:h-11 sm:w-11 sm:rounded-xl"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <span className="flex h-10 w-10 items-center justify-center rounded-[0.6rem] bg-white/15 text-sm font-black sm:h-11 sm:w-11 sm:rounded-xl sm:text-base">
-                      {initials}
-                    </span>
-                  )}
-                  {kycOk ? (
-                    <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-brand text-white ring-2 ring-slate-900">
-                      <Check className="h-2.5 w-2.5" strokeWidth={3} aria-hidden />
-                    </span>
-                  ) : null}
-                </Link>
-              </div>
-            </div>
-
-            <div className="mt-4 flex items-stretch gap-2.5 sm:gap-3">
+            <div className="flex items-stretch gap-2.5 sm:gap-3">
 
               <div className="flex min-w-0 flex-1 flex-col justify-center">
                 <p className="text-[11px] font-semibold text-white/75">

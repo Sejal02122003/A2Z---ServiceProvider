@@ -47,7 +47,7 @@ export function PartnerOnboardingPage() {
   return (
     <div className="min-h-screen w-full bg-slate-50 text-slate-900 pb-24 overflow-y-visible">
       {/* Top Navigation Bar */}
-      <div className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-md">
+      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-slate-200/80 bg-white/95 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 backdrop-blur-md">
         <button
           type="button"
           onClick={() => setShowExitModal(true)}

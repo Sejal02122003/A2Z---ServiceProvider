@@ -72,22 +72,7 @@ export function MyBookings() {
 
   return (
     <div className="space-y-4 pb-8">
-      <div className="sticky top-0 z-30 pt-1 pb-1.5 bg-slate-50/95 backdrop-blur-md">
-        <div className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <div className="flex items-center gap-3.5">
-            <button 
-              onClick={() => navigate(user?.role === USER_ROLES.LABOUR ? '/serviceprovider' : '/user')}
-              className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[14px] border border-slate-200 text-slate-700 shadow-sm transition-colors hover:bg-slate-50 cursor-pointer"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-            <div className="flex flex-col justify-center">
-              <h1 className="text-[20px] font-bold tracking-tight text-slate-900 leading-none mb-1.5">My bookings</h1>
-              <p className="text-[13px] font-medium text-slate-500 leading-none">Hire service providers for your home or small site</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <AppStackScreenHeader title="My Bookings" backTo={isLabour ? '/serviceprovider' : '/user'} />
 
       {/* Tab Bar */}
       <GlassPanel className="p-1.5">

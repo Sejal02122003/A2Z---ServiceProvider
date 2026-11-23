@@ -20,6 +20,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { rewardApi } from '../../api/rewardApi';
+import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx';
 
 export default function VendorRewardsPage() {
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'history' | 'tiers'
@@ -79,7 +80,9 @@ export default function VendorRewardsPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-5xl mx-auto px-4 pb-12 pt-1 space-y-6">
+      <AppStackScreenHeader title="Rewards & Incentives" backTo="/serviceprovider" />
+
       {/* Top Header Card */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-gray-900 via-indigo-950 to-purple-950 text-white p-6 md:p-8 shadow-2xl border border-indigo-800/40">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />

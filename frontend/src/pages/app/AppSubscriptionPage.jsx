@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom'
 import { userSubscriptionApi } from '../../api/userSubscriptionApi'
 import { useSelector } from 'react-redux'
 import { getRoleHomePath } from '../../lib/roleHomePath'
+import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx'
 
 function Toast({ message, variant = 'success' }) {
   if (!message) return null
@@ -242,6 +243,8 @@ export function AppSubscriptionPage() {
       </AnimatePresence>
 
       <div className="mx-auto max-w-lg space-y-4 px-4">
+        <AppStackScreenHeader title="Subscriptions" backTo="/serviceprovider" />
+
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
