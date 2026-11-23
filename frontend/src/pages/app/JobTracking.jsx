@@ -330,6 +330,19 @@ export function JobTracking() {
   const displayStartOtp = booking.assignments?.length > 0 ? booking.assignments[0].startOtp : booking.startOtp
   const displayCompletionOtp = booking.assignments?.length > 0 ? booking.assignments[0].completionOtp : booking.completionOtp
 
+  const serviceTitle =
+    booking.multiServiceBooking?.isMultiService && booking.multiServiceBooking.items?.length > 0
+      ? booking.multiServiceBooking.items.map((it) => (it.subServiceName ? `${it.serviceName} (${it.subServiceName})` : it.serviceName)).join(', ')
+      : booking.packageBooking?.isPackage
+      ? booking.packageBooking.packageName
+      : booking.contractorInfo?.services?.length > 0
+      ? booking.contractorInfo.services.map((s) => s.serviceId?.name || s.name || 'Service').join(', ')
+      : (booking.subServiceName
+          ? (booking.serviceId?.name && booking.serviceId.name !== booking.subServiceName
+              ? `${booking.serviceId.name} (${booking.subServiceName})`
+              : booking.subServiceName)
+          : (booking.serviceId?.name || booking.assignments?.[0]?.serviceName || booking.subcategoryId?.name || ''))
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 font-sans pb-24">
       <AppStackScreenHeader title="Job Tracking" backTo="/user" />
@@ -397,6 +410,12 @@ export function JobTracking() {
       <GlassPanel className="p-4">
         <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Booking Details</p>
         <div className="space-y-2 text-sm text-slate-700">
+          {serviceTitle ? (
+            <div className="flex justify-between items-start gap-3">
+              <span className="font-semibold text-slate-500 shrink-0">Service</span>
+              <span className="font-bold text-slate-900 text-right">{serviceTitle}</span>
+            </div>
+          ) : null}
           <div className="flex justify-between">
             <span className="font-semibold text-slate-500">Date</span>
             <span className="font-medium text-slate-900">{booking.type === 'SCHEDULED' ? new Date(booking.scheduledAt).toLocaleDateString() : 'ASAP'}</span>
