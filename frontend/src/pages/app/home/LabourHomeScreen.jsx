@@ -85,6 +85,7 @@ import {
 import { getLabourBookingShare } from '../../../lib/bookingLabourShare.js'
 import { walletEligibilityApi } from '../../../api/walletEligibilityApi.js'
 import { ProviderNotificationBanner } from '../../../components/app/ProviderNotificationBanner.jsx'
+import { ProviderQRPaymentModal } from '../../../components/app/ProviderQRPaymentModal.jsx'
 
 function getTimeGreeting() {
   const h = new Date().getHours()
@@ -185,6 +186,9 @@ export function LabourHomeScreen({ user }) {
 
   const [walletEligibility, setWalletEligibility] = useState(null)
   const [loadingEligibility, setLoadingEligibility] = useState(false)
+  const [lowWalletModalData, setLowWalletModalData] = useState(null)
+  const [qrModalOpen, setQrModalOpen] = useState(false)
+  const [qrRechargeAmount, setQrRechargeAmount] = useState(300)
 
   const loadEligibility = useCallback(() => {
     if (!user || user.id === 'guest' || user._id === 'guest') return
@@ -441,6 +445,24 @@ export function LabourHomeScreen({ user }) {
       navigate('/serviceprovider/kyc')
       return
     }
+
+    // Check if wallet balance is insufficient before attempting acceptance
+    if (walletEligibility && walletEligibility.eligible === false) {
+      const shortage = Math.max(
+        0,
+        (walletEligibility.minimumWalletBalance || 300) - (walletEligibility.availableBalance || 0)
+      )
+      setLowWalletModalData({
+        isOpen: true,
+        shortageAmount: shortage || 300,
+        availableBalance: walletEligibility.availableBalance || 0,
+        walletBalance: walletEligibility.walletBalance || 0,
+        requiredBalance: walletEligibility.minimumWalletBalance || 300,
+        bookingId: offerId,
+      })
+      return
+    }
+
     try {
       await broadcastsApi.acceptBroadcast(offerId)
       removeOfferLocal(offerId)
@@ -448,6 +470,21 @@ export function LabourHomeScreen({ user }) {
       showToast('Job accepted — see Active in My Jobs.')
       navigate(`/serviceprovider/active-job/${offerId}`)
     } catch (err) {
+      if (err?.code === 'LOW_WALLET_BALANCE' || err?.message?.toLowerCase().includes('wallet balance')) {
+        const shortage = err?.data?.shortageAmount || Math.max(
+          0,
+          (walletEligibility?.minimumWalletBalance || 300) - (walletEligibility?.availableBalance || 0)
+        )
+        setLowWalletModalData({
+          isOpen: true,
+          shortageAmount: shortage || 300,
+          availableBalance: err?.data?.availableBalance ?? walletEligibility?.availableBalance ?? 0,
+          walletBalance: err?.data?.walletBalance ?? walletEligibility?.walletBalance ?? 0,
+          requiredBalance: err?.data?.requiredBalance ?? walletEligibility?.minimumWalletBalance ?? 300,
+          bookingId: offerId,
+        })
+        return
+      }
       removeOfferLocal(offerId)
       showToast(err.message || 'Failed to accept job. It might have expired.')
     }
@@ -1601,6 +1638,96 @@ export function LabourHomeScreen({ user }) {
         isOpen={showIdCardModal}
         onClose={() => setShowIdCardModal(false)}
         user={user}
+      />
+
+      {/* "Need to Recharge First" Modal */}
+      <AnimatePresence>
+        {lowWalletModalData?.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-md overflow-hidden rounded-3xl border border-amber-200 bg-white p-6 shadow-2xl"
+            >
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 shadow-inner">
+                <Wallet className="h-7 w-7 text-amber-600" />
+              </div>
+
+              <div className="mt-4 text-center">
+                <span className="inline-block rounded-full bg-amber-100 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-amber-800">
+                  Action Required
+                </span>
+                <h3 className="mt-2 text-xl font-black tracking-tight text-slate-900">
+                  Need to Recharge First
+                </h3>
+                <p className="mt-2 text-xs text-slate-600 leading-relaxed">
+                  Your wallet balance is insufficient to accept this job. Please recharge your wallet with at least{' '}
+                  <strong className="text-amber-950 font-black">₹{lowWalletModalData.shortageAmount}</strong> to accept new job requests.
+                </p>
+              </div>
+
+              {/* Balance Breakdown Grid */}
+              <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-xs">
+                <div>
+                  <span className="text-slate-400">Current Balance:</span>
+                  <p className="font-mono font-bold text-slate-800">
+                    ₹{Number(lowWalletModalData.walletBalance || 0).toLocaleString('en-IN')}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-400">Minimum Required:</span>
+                  <p className="font-mono font-bold text-slate-800">
+                    ₹{Number(lowWalletModalData.requiredBalance || 300).toLocaleString('en-IN')}
+                  </p>
+                </div>
+                <div className="col-span-2 pt-2 border-t border-slate-200 flex items-center justify-between">
+                  <span className="font-bold text-amber-900">Shortage to Recharge:</span>
+                  <span className="font-black text-amber-950 text-base font-mono">
+                    ₹{Number(lowWalletModalData.shortageAmount || 300).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="mt-5 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const shortage = lowWalletModalData.shortageAmount
+                    setLowWalletModalData(null)
+                    setQrRechargeAmount(Math.max(300, shortage || 300))
+                    setQrModalOpen(true)
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 py-3 text-sm font-black text-slate-950 shadow-md shadow-amber-500/25 transition hover:bg-amber-400 active:scale-98 cursor-pointer"
+                >
+                  <Wallet className="h-4 w-4" />
+                  Recharge Wallet Now (₹{lowWalletModalData.shortageAmount})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setLowWalletModalData(null)}
+                  className="flex w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-100 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-200 transition active:scale-98 cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <ProviderQRPaymentModal
+        isOpen={qrModalOpen}
+        onClose={() => setQrModalOpen(false)}
+        onSuccess={() => {
+          loadEligibility()
+          loadBookings()
+          showToast('Recharge submitted! Awaiting administrator verification.')
+        }}
+        purpose="WALLET_TOPUP"
+        defaultAmount={qrRechargeAmount}
       />
     </motion.div>
   )

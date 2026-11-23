@@ -37,7 +37,7 @@ export const checkBookingEligibility = asyncHandler(async (req, res) => {
 
   if (!result.eligible) {
     return sendError(res, {
-      message: `Insufficient wallet balance to accept this booking. Please recharge your wallet with at least ₹${result.shortageAmount} to become eligible.`,
+      message: `Need to recharge first! Please recharge your wallet with at least ₹${result.shortageAmount} to accept this booking.`,
       statusCode: HTTP_STATUS.BAD_REQUEST,
       code: 'LOW_WALLET_BALANCE',
       data: result,

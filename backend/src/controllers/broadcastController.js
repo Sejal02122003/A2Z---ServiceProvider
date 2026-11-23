@@ -149,7 +149,7 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
   const reserveResult = await reserveBookingCommission({ providerId: labour._id, booking })
   if (!reserveResult.reserved) {
     return sendError(res, {
-      message: reserveResult.message || 'Insufficient wallet balance to accept this booking.',
+      message: reserveResult.message || 'Need to recharge first! Insufficient wallet balance to accept this booking.',
       statusCode: HTTP_STATUS.BAD_REQUEST,
       code: reserveResult.code || 'LOW_WALLET_BALANCE',
       data: reserveResult.data,

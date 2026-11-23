@@ -278,7 +278,7 @@ export function BroadcastPopup() {
 
     // If wallet balance is insufficient, prevent acceptance
     if (eligibilityData && eligibilityData.eligible === false) {
-      setError(`Insufficient wallet balance. Recharge with at least ₹${eligibilityData.shortageAmount || 50} to accept this booking.`)
+      setError(`Need to recharge first! Please recharge your wallet with at least ₹${eligibilityData.shortageAmount || 50} to accept this booking.`)
       return
     }
 
@@ -817,10 +817,10 @@ export function BroadcastPopup() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <p className="text-xs font-black uppercase tracking-wider text-amber-950">
-                          LOW WALLET BALANCE
+                          NEED TO RECHARGE FIRST
                         </p>
                         <span className="rounded-full bg-amber-200/90 px-2 py-0.5 text-[9px] font-black text-amber-900">
-                          Ineligible
+                          Recharge Required
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-amber-900 leading-snug">
