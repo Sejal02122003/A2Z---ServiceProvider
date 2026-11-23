@@ -248,17 +248,11 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
 
     // 2. Dispatch to Mobile Tokens (Android Native / APK)
     if (mobileTokens.length > 0) {
-
       const mobileMessage = {
-        notification: {
-          title: finalTitle,
-          body: finalBody,
-        },
         data: baseDataPayload,
         android: {
           priority: 'high',
           ttl: 86400 * 1000, // 24 hours TTL so sleeping/locked phones receive it without timeout drop
-          notification: androidNotificationConfig,
         },
         // Phones running the web app in Chrome / PWA register Firebase JS SDK (web push) tokens.
         // Those tokens ignore `android` and need `webpush` with high urgency to arrive while the app is closed.
@@ -266,8 +260,23 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
         tokens: mobileTokens,
       };
 
-      if (payload.icon) {
-        mobileMessage.notification.imageUrl = payload.icon;
+      if (isBookingOffer) {
+        // CRITICAL FOR INCOMING BOOKING ALERTS IN KILL STATE:
+        // In Android, if an FCM message contains a top-level `notification` payload, Google Play Services
+        // handles the notification directly and DOES NOT invoke the Flutter background message handler
+        // (firebaseMessagingBackgroundHandler) when the app is in the KILLED state!
+        // To wake up the app's background isolate from killed state and trigger showOrderNotification()
+        // with the continuous siren ringtone (FLAG_INSISTENT alarm via flutter_local_notifications),
+        // the FCM message MUST be a high-priority DATA-ONLY payload (no top-level notification).
+      } else {
+        mobileMessage.notification = {
+          title: finalTitle,
+          body: finalBody,
+        };
+        mobileMessage.android.notification = androidNotificationConfig;
+        if (payload.icon) {
+          mobileMessage.notification.imageUrl = payload.icon;
+        }
       }
 
       try {
