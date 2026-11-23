@@ -58,9 +58,9 @@ export function AdminLoginPage() {
       >
         {/* Logo & Header */}
         <div className="mb-8 text-center">
-          <Link to="/" className="inline-flex items-center gap-3">
+          <div className="inline-flex items-center gap-3 select-none">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#015F6C] p-2 shadow-lg shadow-[#015F6C]/30 ring-1 ring-white/20">
-              <img src="/logo.png" alt="A2Z" className="h-full w-full object-contain filter brightness-0 invert" />
+              <img src="/logo.png" alt="A2Z" className="h-full w-full object-contain filter brightness-0 invert pointer-events-none" />
             </div>
             <div className="text-left">
               <span className="block text-xl font-black tracking-tight text-white">A2Z</span>
@@ -68,7 +68,7 @@ export function AdminLoginPage() {
                 Super Control Panel
               </span>
             </div>
-          </Link>
+          </div>
           <h1 className="mt-6 text-2xl font-extrabold tracking-tight text-white md:text-3xl">
             Admin Sign In
           </h1>
