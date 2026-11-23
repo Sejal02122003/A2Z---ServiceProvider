@@ -59,8 +59,12 @@ export function AdminLoginPage() {
         {/* Logo & Header */}
         <div className="mb-8 text-center">
           <div className="inline-flex items-center gap-3 select-none">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#015F6C] p-2 shadow-lg shadow-[#015F6C]/30 ring-1 ring-white/20">
-              <img src="/logo.png" alt="A2Z" className="h-full w-full object-contain filter brightness-0 invert pointer-events-none" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/95 p-1.5 shadow-lg shadow-black/20 ring-1 ring-white/30 overflow-hidden">
+              <img
+                src="/logo.png"
+                alt="A2Z"
+                className="h-full w-full object-contain pointer-events-none"
+              />
             </div>
             <div className="text-left">
               <span className="block text-xl font-black tracking-tight text-white">A2Z</span>
