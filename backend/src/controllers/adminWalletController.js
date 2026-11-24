@@ -260,6 +260,20 @@ function resolveDisplayBalance(wallet, role) {
 }
 
 /**
+ * Funds the owner can actually use right now = total balance minus amounts held against
+ * accepted bookings (`reservedBalance`). Same rule the booking-acceptance reservation uses
+ * (selfBalance - reservedBalance). Customers have no holds, so available == total.
+ */
+function resolveAvailableBalance(wallet, role) {
+  const total = resolveDisplayBalance(wallet, role)
+  if (!wallet) return { total: 0, reserved: 0, available: 0 }
+  const isProvider = role === 'labour' || role === 'contractor'
+  const reserved = isProvider ? Math.max(0, Number(wallet.reservedBalance || 0)) : 0
+  const round = (n) => Math.round(n * 100) / 100
+  return { total: round(total), reserved: round(reserved), available: round(Math.max(0, total - reserved)) }
+}
+
+/**
  * GET /api/admin/wallets/users
  * Returns list of users with wallet balances and bonus status
  */
@@ -334,6 +348,7 @@ export const getAdminUserWallets = asyncHandler(async (req, res) => {
     const w = walletMap.get(String(u._id))
     const s = userStats[String(u._id)] || { credits: 0, debits: 0 }
     const currentBalance = resolveDisplayBalance(w, u.role)
+    const { reserved, available } = resolveAvailableBalance(w, u.role)
     return {
       _id: u._id,
       fullName: u.fullName || '—',
@@ -342,6 +357,8 @@ export const getAdminUserWallets = asyncHandler(async (req, res) => {
       role: u.role,
       welcomeBonusCredited: Boolean(u.welcomeBonusCredited || w?.welcomeBonusCredited),
       balance: currentBalance,
+      reservedBalance: reserved,
+      availableBalance: available,
       totalCredits: s.credits,
       totalDebits: s.debits,
       createdAt: u.createdAt,
@@ -374,6 +391,7 @@ export const getAdminUserWalletDetails = asyncHandler(async (req, res) => {
 
   const wallet = await Wallet.findOne({ userId }).lean()
   const currentBalance = resolveDisplayBalance(wallet, user.role)
+  const { reserved: reservedBalance, available: availableBalance } = resolveAvailableBalance(wallet, user.role)
 
   const transactions = await WalletTransaction.find({
     $or: [{ userId }, { walletId: wallet?._id }],
@@ -394,6 +412,8 @@ export const getAdminUserWalletDetails = asyncHandler(async (req, res) => {
       },
       wallet: {
         balance: currentBalance,
+        reservedBalance,
+        availableBalance,
         welcomeBonusCredited: Boolean(wallet?.welcomeBonusCredited),
       },
       transactions,

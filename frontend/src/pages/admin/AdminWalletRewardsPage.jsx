@@ -162,13 +162,19 @@ export default function AdminWalletRewardsPage() {
     fetchUsers(1, searchTerm, roleFilter);
   };
 
+  // Available = total minus funds held against accepted bookings (server computes it; fall back to total)
+  const availableOf = (u) => {
+    const v = u?.availableBalance ?? u?.balance;
+    return Number(v) || 0;
+  };
+
   // Filtered users by balance filter
   const filteredUsers = useMemo(() => {
     if (balanceFilter === 'HAS_BALANCE') {
-      return users.filter((u) => Number(u.balance) > 0);
+      return users.filter((u) => availableOf(u) > 0);
     }
     if (balanceFilter === 'ZERO_BALANCE') {
-      return users.filter((u) => !u.balance || Number(u.balance) <= 0);
+      return users.filter((u) => availableOf(u) <= 0);
     }
     return users;
   }, [users, balanceFilter]);
@@ -310,13 +316,15 @@ export default function AdminWalletRewardsPage() {
   const handleExportCSV = () => {
     if (filteredUsers.length === 0) return;
 
-    const headers = ['User ID', 'Customer Name', 'Phone', 'Role', 'Wallet Balance', 'Welcome Credit', 'Lifetime Credits', 'Lifetime Debits', 'Registered Date'];
+    const headers = ['User ID', 'Customer Name', 'Phone', 'Role', 'Total Balance', 'Held Balance', 'Available Balance', 'Welcome Credit', 'Lifetime Credits', 'Lifetime Debits', 'Registered Date'];
     const rows = filteredUsers.map((u) => [
       u.userId || u._id,
       u.userName || u.fullName || 'N/A',
       u.userPhone || u.phone || 'N/A',
       u.role || 'customer',
       u.balance || 0,
+      u.reservedBalance || 0,
+      availableOf(u),
       u.welcomeBonusCredited ? 'Credited' : 'Pending',
       u.totalCredits || 0,
       u.totalDebits || 0,
@@ -529,7 +537,12 @@ export default function AdminWalletRewardsPage() {
                           )}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <p className="font-bold text-slate-900">₹{(Number(item.balance) || 0).toLocaleString('en-IN')}</p>
+                          <p className="font-bold text-slate-900">₹{availableOf(item).toLocaleString('en-IN')}</p>
+                          {Number(item.reservedBalance) > 0 && (
+                            <p className="mt-0.5 text-[10px] font-medium leading-tight text-slate-400">
+                              Total ₹{(Number(item.balance) || 0).toLocaleString('en-IN')} · Held ₹{Number(item.reservedBalance).toLocaleString('en-IN')}
+                            </p>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <p className="font-bold text-blue-600">+ ₹{(Number(item.totalCredits) || 0).toLocaleString('en-IN')}</p>
@@ -775,10 +788,15 @@ export default function AdminWalletRewardsPage() {
               {/* Financial Summary Box */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 text-center">
-                  <span className="text-[10px] font-bold text-blue-800/70 uppercase tracking-wider block">Balance</span>
+                  <span className="text-[10px] font-bold text-blue-800/70 uppercase tracking-wider block">Available Balance</span>
                   <span className="text-xl font-black text-blue-700 mt-1 block">
-                    ₹{(userWalletData?.wallet?.balance ?? selectedUser.balance ?? 0).toLocaleString('en-IN')}
+                    ₹{(Number(userWalletData?.wallet?.availableBalance ?? selectedUser.availableBalance ?? userWalletData?.wallet?.balance ?? selectedUser.balance ?? 0)).toLocaleString('en-IN')}
                   </span>
+                  {Number(userWalletData?.wallet?.reservedBalance ?? selectedUser.reservedBalance ?? 0) > 0 && (
+                    <span className="mt-0.5 block text-[10px] font-medium text-blue-800/60">
+                      Total ₹{Number(userWalletData?.wallet?.balance ?? selectedUser.balance ?? 0).toLocaleString('en-IN')} · Held ₹{Number(userWalletData?.wallet?.reservedBalance ?? selectedUser.reservedBalance ?? 0).toLocaleString('en-IN')}
+                    </span>
+                  )}
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-xs">
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total Credited</span>
