@@ -378,21 +378,36 @@ export async function initiateCancellationPenaltyPayment({ bookingId, customerId
     throw new Error('Booking not found')
   }
 
-  if (String(booking.userId) !== String(customerId)) {
-    throw new Error('Unauthorized to pay penalty for this booking')
+  if (customerId && String(booking.userId?._id || booking.userId) !== String(customerId)) {
+    const { User } = await import('../models/User.js')
+    const userDoc = await User.findById(customerId).select('role')
+    if (userDoc?.role !== 'admin') {
+      throw new Error('Unauthorized to pay penalty for this booking')
+    }
   }
 
   let penaltyQuery = {
     bookingId: booking._id,
-    paymentStatus: { $in: [PENALTY_PAYMENT_STATUS.PENDING, PENALTY_PAYMENT_STATUS.FAILED] },
+    paymentStatus: { $in: [PENALTY_PAYMENT_STATUS.PENDING, PENALTY_PAYMENT_STATUS.FAILED, PENALTY_PAYMENT_STATUS.PROCESSING] },
   }
   if (penaltyId) {
     penaltyQuery = { ...penaltyQuery, penaltyId }
   }
 
-  const penalty = await BookingCancellationPenalty.findOne(penaltyQuery).sort({ createdAt: -1 })
+  let penalty = await BookingCancellationPenalty.findOne(penaltyQuery).sort({ createdAt: -1 })
   if (!penalty) {
-    throw new Error('No pending cancellation penalty found for this booking')
+    const settings = await getCancellationSettings()
+    const penaltyCalc = calculatePenaltyAmount({ booking, settings })
+    if (!penaltyCalc.penaltyApplicable || penaltyCalc.calculatedPenaltyAmount <= 0) {
+      throw new Error('No cancellation penalty applies to this booking')
+    }
+    const prepared = await prepareCancellationPenaltyRecord({
+      booking,
+      customerId,
+      settings,
+      reason: 'Customer initiated penalty payment',
+    })
+    penalty = prepared.penalty
   }
 
   if (penalty.calculatedPenaltyAmount <= 0) {

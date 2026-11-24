@@ -1450,6 +1450,7 @@ export async function processCustomerCancellation({
   reason,
   reasonNote = '',
   overrideTime = null,
+  forceCancel = false,
 }) {
   if (!bookingId) {
     throw new Error('Booking ID is required')
@@ -1508,13 +1509,13 @@ export async function processCustomerCancellation({
     throw new Error(eligibility.reason || 'Booking is not eligible for cancellation')
   }
 
-  // 2b. If Penalty applies: DO NOT CANCEL THE BOOKING!
-  // Calculate penalty, add separate line item to booking bill, and return penalty requirement
+  // 2b. If Penalty applies: Prepare penalty record
+  let penaltyRes = null
   if (eligibility.penaltyApplicable) {
-    const booking = await Booking.findById(bookingId)
+    const bookingDoc = await Booking.findById(bookingId)
     const settings = await getBookingCancellationSettings()
-    const penaltyRes = await prepareCancellationPenaltyRecord({
-      booking,
+    penaltyRes = await prepareCancellationPenaltyRecord({
+      booking: bookingDoc,
       customerId,
       settings,
       reason: finalReasonText,
@@ -1522,28 +1523,51 @@ export async function processCustomerCancellation({
       overrideTime,
     })
 
-    return {
-      success: true,
-      penaltyRequired: true,
-      status: 'PENALTY_PENDING',
-      message:
-        'Your cancellation request requires a penalty payment according to the applicable cancellation policy. After successful payment, your cancellation policy will restart, and you will receive another cancellation opportunity.',
-      penalty: penaltyRes.penalty,
-      billingSummary: penaltyRes.billingSummary,
-      cycle: penaltyRes.cycle,
-      attemptId: penaltyRes.attemptId,
-      booking,
+    if (!forceCancel) {
+      return {
+        success: true,
+        penaltyRequired: true,
+        status: 'PENALTY_PENDING',
+        message:
+          'Your cancellation request requires a penalty payment according to the applicable cancellation policy. After successful payment, your cancellation policy will restart, and you will receive another cancellation opportunity.',
+        penalty: penaltyRes.penalty,
+        billingSummary: penaltyRes.billingSummary,
+        cycle: penaltyRes.cycle,
+        attemptId: penaltyRes.attemptId,
+        booking: bookingDoc,
+      }
     }
   }
 
   const now = overrideTime ? new Date(overrideTime) : new Date()
 
   // 3. Atomic conditional update to prevent race conditions
-  const allowedStatuses = ['CREATED', 'BROADCASTING', 'ACCEPTED', 'ASSIGNED']
+  const allowedStatuses = [
+    'CREATED',
+    'BROADCASTING',
+    'ACCEPTED',
+    'ASSIGNED',
+    'PARTIALLY_ACCEPTED',
+    'PENDING',
+    'FAILED',
+  ]
+
+  // Validate ownership before update
+  const currentBooking = await Booking.findById(bookingId)
+  if (!currentBooking) {
+    throw new Error('Booking not found')
+  }
+  const isOwner = String(currentBooking.userId?._id || currentBooking.userId) === String(customerId)
+  if (!isOwner) {
+    const userDoc = await User.findById(customerId).select('role')
+    if (userDoc?.role !== 'admin') {
+      throw new Error('You are not authorized to cancel this booking')
+    }
+  }
+
   const booking = await Booking.findOneAndUpdate(
     {
       _id: bookingId,
-      userId: customerId,
       status: { $in: allowedStatuses },
     },
     {
@@ -1559,30 +1583,24 @@ export async function processCustomerCancellation({
 
   if (!booking) {
     // Check if it was already cancelled (idempotent duplicate request handling)
-    const currentBooking = await Booking.findById(bookingId)
-    if (!currentBooking) {
-      throw new Error('Booking not found')
-    }
-    if (String(currentBooking.userId) !== String(customerId)) {
-      throw new Error('You are not authorized to cancel this booking')
-    }
-    if (currentBooking.status === 'CANCELLED') {
+    const checkBooking = await Booking.findById(bookingId)
+    if (checkBooking && checkBooking.status === 'CANCELLED') {
       const existingRecord = await BookingCancellationRecord.findOne({
-        bookingId: currentBooking._id,
-        dedupeKey: `customer_cancellation_${currentBooking._id}`,
+        bookingId: checkBooking._id,
+        dedupeKey: `customer_cancellation_${checkBooking._id}`,
       })
       return {
         success: true,
         status: 'CANCELLED',
         alreadyCancelled: true,
         message: 'Booking has already been cancelled',
-        booking: currentBooking,
+        booking: checkBooking,
         record: existingRecord,
       }
     }
 
     throw new Error(
-      `Cannot cancel booking because its status was concurrently updated to ${currentBooking.status}`
+      `Cannot cancel booking because its status was concurrently updated to ${checkBooking ? checkBooking.status : 'UNKNOWN'}`
     )
   }
 

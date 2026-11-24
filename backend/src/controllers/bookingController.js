@@ -2175,7 +2175,7 @@ export const getCustomerCancellationEligibilityController = asyncHandler(async (
 
 export const cancelCustomerBooking = asyncHandler(async (req, res) => {
   const { id } = req.params
-  const { reason, reasonNote } = req.body
+  const { reason, reasonNote, forceCancel } = req.body
 
   if (!reason || !String(reason).trim()) {
     return sendError(res, {
@@ -2189,6 +2189,7 @@ export const cancelCustomerBooking = asyncHandler(async (req, res) => {
     customerId: req.user._id,
     reason: String(reason).trim(),
     reasonNote: reasonNote ? String(reasonNote).trim() : '',
+    forceCancel: Boolean(forceCancel),
   })
 
   return sendSuccess(res, {

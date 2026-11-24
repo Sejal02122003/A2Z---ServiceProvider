@@ -70,6 +70,7 @@ router.post(
   [
     body('reason').trim().notEmpty().withMessage('Cancellation reason is required'),
     body('reasonNote').optional().trim(),
+    body('forceCancel').optional(),
   ],
   validateRequest,
   booking.cancelCustomerBooking
