@@ -18,6 +18,7 @@ import { useSelector } from 'react-redux'
 import { simulatedOpportunitiesApi } from '../../api/simulatedOpportunitiesApi.js'
 import { ApiError } from '../../api/http.js'
 import { useSocket } from '../../context/SocketContext.jsx'
+import { useLockBodyScroll } from '../../hooks/useLockBodyScroll.js'
 import { USER_ROLES } from '../../constants/userRoles.js'
 import { playBookingAlertSound, stopBookingAlertSound } from '../../utils/bookingSound.js'
 
@@ -39,6 +40,9 @@ export function SimulatedOpportunityPopup() {
   const [responding, setResponding] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [resultState, setResultState] = useState(null) // 'WON' | 'TAKEN' | 'EXPIRED' | 'CANCELLED'
+
+  // Page behind the popup must not scroll
+  useLockBodyScroll(Boolean(incoming))
 
   const isVendor =
     user?.role === USER_ROLES.LABOUR ||
@@ -309,7 +313,7 @@ export function SimulatedOpportunityPopup() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[320] bg-slate-950/70 backdrop-blur-xs"
+            className="fixed inset-0 z-[320] bg-slate-950/70 backdrop-blur-xs touch-none"
           />
 
           {/* Alert Card Modal */}
@@ -332,7 +336,7 @@ export function SimulatedOpportunityPopup() {
               </div>
             )}
 
-            <div className="p-5 max-h-[85vh] overflow-y-auto">
+            <div className="p-5 max-h-[85vh] overflow-y-auto overscroll-contain">
               {/* Header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">

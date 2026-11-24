@@ -7,6 +7,7 @@ import { broadcastsApi } from '../../api/broadcastsApi.js'
 import { walletEligibilityApi } from '../../api/walletEligibilityApi.js'
 import { ApiError } from '../../api/http.js'
 import { useSocket } from '../../context/SocketContext.jsx'
+import { useLockBodyScroll } from '../../hooks/useLockBodyScroll.js'
 import { USER_ROLES } from '../../constants/userRoles.js'
 import { playBookingAlertSound, stopBookingAlertSound, stopAlertSound, unlockAudioContext, subscribeAutoplayBlocked, getAutoplayBlockedStatus } from '../../utils/bookingSound.js'
 
@@ -57,6 +58,9 @@ export function BroadcastPopup() {
   const [eligibilityData, setEligibilityData] = useState(null)
   const [checkingEligibility, setCheckingEligibility] = useState(false)
   const [autoplayBlocked, setAutoplayBlocked] = useState(() => getAutoplayBlockedStatus())
+
+  // Page behind the new-request popup must not scroll
+  useLockBodyScroll(Boolean(incoming))
 
   useEffect(() => {
     return subscribeAutoplayBlocked(setAutoplayBlocked)
@@ -403,7 +407,7 @@ export function BroadcastPopup() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm touch-none"
           />
 
           {/* Popup */}
@@ -456,7 +460,7 @@ export function BroadcastPopup() {
               </div>
             )}
 
-            <div className="p-5 max-h-[82vh] overflow-y-auto">
+            <div className="p-5 max-h-[82vh] overflow-y-auto overscroll-contain">
               {/* Header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
