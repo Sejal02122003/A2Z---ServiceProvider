@@ -553,41 +553,41 @@ export function LabourHomeScreen({ user }) {
       <ProviderNotificationBanner user={user} />
 
       {/* 1. Fixed / Sticky Top Header Navigation */}
-      <div className="sticky top-0 z-40 -mx-4 px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-1 bg-slate-50/95 backdrop-blur-md">
-        <div className="rounded-2xl border border-white/20 bg-linear-to-br from-slate-900 via-slate-800 to-slate-950 px-3.5 py-2.5 shadow-md text-white">
+      <div className="pointer-events-none sticky top-0 z-40 -mx-4 bg-transparent px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-1 [&>*]:pointer-events-auto">
+        <div className="rounded-2xl border border-white/10 bg-slate-900 px-2.5 py-2 text-white shadow-[0_8px_24px_-12px_rgba(15,23,42,0.6)]">
           <div className="flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={openDrawer}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.07] text-white/90 transition hover:bg-white/15 active:scale-95"
               aria-label="Open menu"
             >
               <Menu className="h-5 w-5" />
             </button>
 
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2">
               <Link
                 to="/serviceprovider/wallet"
-                className="relative flex h-10 items-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/20 px-3 text-white backdrop-blur-sm transition hover:bg-emerald-500/30 active:scale-95"
+                className="flex h-10 items-center gap-1.5 rounded-xl bg-emerald-500/15 px-3.5 text-emerald-100 ring-1 ring-inset ring-emerald-400/25 transition hover:bg-emerald-500/25 active:scale-95"
                 aria-label="Open Wallet"
               >
                 <Wallet className="h-4 w-4 text-emerald-300" />
-                <span className="text-xs font-black tracking-tight text-white">Wallet</span>
+                <span className="text-[13px] font-bold leading-none tracking-tight text-white">Wallet</span>
               </Link>
 
               <button
                 type="button"
                 onClick={() => navigate('/serviceprovider/notifications')}
-                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20"
+                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.07] text-white/90 transition hover:bg-white/15 active:scale-95"
                 aria-label={
                   notifications.unreadCount > 0
                     ? `Notifications, ${notifications.unreadCount} unread`
                     : 'Notifications'
                 }
               >
-                <Bell className="h-5 w-5" />
+                <Bell className="h-[18px] w-[18px]" />
                 {notifications.unreadCount > 0 ? (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white shadow-md ring-2 ring-slate-900/80">
+                  <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-slate-900">
                     {notifications.unreadCount > 9 ? '9+' : notifications.unreadCount}
                   </span>
                 ) : null}
@@ -595,24 +595,24 @@ export function LabourHomeScreen({ user }) {
 
               <Link
                 to="/serviceprovider/profile"
-                className="relative shrink-0 rounded-xl p-0.5 ring-2 ring-white/40 transition hover:ring-white/70"
+                className="relative h-10 w-10 shrink-0 rounded-xl transition active:scale-95"
                 aria-label="Open profile"
               >
                 {profileImageUrl ? (
                   <img
                     src={profileImageUrl}
                     alt=""
-                    className="h-9 w-9 rounded-[0.55rem] object-cover sm:h-10 sm:w-10 sm:rounded-xl"
+                    className="h-10 w-10 rounded-xl object-cover ring-1 ring-white/25"
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <span className="flex h-9 w-9 items-center justify-center rounded-[0.55rem] bg-white/15 text-xs font-black sm:h-10 sm:w-10 sm:rounded-xl sm:text-sm">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-600 to-slate-700 text-[13px] font-bold text-white ring-1 ring-white/25">
                     {initials}
                   </span>
                 )}
                 {kycOk ? (
-                  <span className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-brand text-white ring-2 ring-slate-900">
-                    <Check className="h-2 w-2" strokeWidth={3} aria-hidden />
+                  <span className="absolute -bottom-1 -right-1 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-emerald-500 text-white ring-2 ring-slate-900">
+                    <Check className="h-2.5 w-2.5" strokeWidth={3.5} aria-hidden />
                   </span>
                 ) : null}
               </Link>
