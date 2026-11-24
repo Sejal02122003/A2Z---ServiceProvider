@@ -34,6 +34,8 @@ export function AppEarningsPage() {
   const [maxWithdrawable, setMaxWithdrawable] = useState(0)
   const [withdrawals, setWithdrawals] = useState([])
   const [adminDues, setAdminDues] = useState(0)
+  // Charges (commission + platform fee + GST) of completed cash bookings not yet settled with admin
+  const [pendingCashDues, setPendingCashDues] = useState(0)
   const [loading, setLoading] = useState(true)
 
   // Form State
@@ -53,10 +55,25 @@ export function AppEarningsPage() {
   const fetchEarnings = async () => {
     setLoading(true)
     try {
+      // Fetch wallet first so admin dues still show even if the earnings maths below fails
+      const walletRes = await walletsApi.getMyWallet().catch(() => null)
+      setAdminDues(Number(walletRes?.data?.wallet?.adminBalance || 0))
+
       // Fetch bookings for earnings display
       const bookingsRes = await bookingsApi.getMyBookings().catch(() => null)
-      
+
       const allBookings = bookingsRes?.data?.bookings || bookingsRes?.bookings || bookingsRes || []
+
+      // Admin dues on completed cash bookings that are not settled yet (same figure the admin sees as UNPAID)
+      let unsettledCash = 0
+      allBookings.forEach((b) => {
+        if (b.paymentMethod !== 'CASH' || b.status !== 'COMPLETED' || b.adminSettlementStatus === 'SETTLED') return
+        const mainLabId = typeof b.laborId === 'object' ? b.laborId?._id : b.laborId
+        if (String(mainLabId) !== String(user?._id)) return
+        unsettledCash += Number(b.platformFee || 0) + Number(b.commissionAmount || 0) + Number(b.taxes || 0)
+      })
+      setPendingCashDues(Math.round(unsettledCash * 100) / 100)
+
       let onlineSum = 0
       let cashSum = 0
       allBookings.forEach(b => {
@@ -150,10 +167,6 @@ export function AppEarningsPage() {
       
       // Prevent overdrawing if there are pending requests
       setMaxWithdrawable(Math.max(0, calculatedDue - pending))
-      // Fetch wallet for admin dues
-      const walletRes = await walletsApi.getMyWallet().catch(() => null)
-      setAdminDues(walletRes?.data?.wallet?.adminBalance || 0)
-
     } catch (err) {
       console.error('Failed to load wallet data:', err)
     } finally {
@@ -430,17 +443,19 @@ export function AppEarningsPage() {
               </div>
             </div>
               
-              {(adminDues > 0 || !loading) && (
+              {(adminDues > 0 || pendingCashDues > 0 || !loading) && (
                 <div className="flex items-center justify-between gap-3 rounded-xl bg-linear-to-br from-rose-500/10 to-rose-900/20 p-3 border border-rose-500/20 shadow-inner mt-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-[11px] font-extrabold uppercase tracking-widest text-rose-300 truncate">
                       Admin Dues (Cash)
                     </p>
-                    <p className="mt-1 text-[10px] font-medium text-rose-300/60 truncate">
-                      Remaining amount to be paid
+                    <p className="mt-1 text-[10px] font-medium text-rose-300/60">
+                      {pendingCashDues > 0
+                        ? `₹${adminDues.toLocaleString('en-IN')} outstanding + ₹${pendingCashDues.toLocaleString('en-IN')} on unsettled cash bookings`
+                        : 'Remaining amount to be paid'}
                     </p>
                     <p className="mt-1 font-mono text-xl font-black tracking-tight text-rose-400 drop-shadow-sm">
-                      ₹{adminDues.toLocaleString('en-IN')}
+                      ₹{(adminDues + pendingCashDues).toLocaleString('en-IN')}
                     </p>
                   </div>
                   {adminDues > 0 && (
@@ -449,7 +464,7 @@ export function AppEarningsPage() {
                       disabled={loading}
                       className="shrink-0 rounded-xl bg-linear-to-b from-rose-500 to-rose-600 px-5 py-2.5 text-sm font-extrabold text-white shadow-lg shadow-rose-500/20 ring-1 ring-white/10 transition-all hover:scale-105 hover:shadow-rose-500/40 active:scale-95 disabled:pointer-events-none disabled:opacity-50"
                     >
-                      Pay Admin
+                      Pay ₹{adminDues.toLocaleString('en-IN')}
                     </button>
                   )}
                 </div>
