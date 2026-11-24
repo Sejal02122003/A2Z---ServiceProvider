@@ -43,6 +43,9 @@ const ROLE_OPTIONS = [
   },
 ]
 
+// Seconds the user must wait before they can request another OTP
+const OTP_RESEND_SECONDS = 30
+
 function isValidIndianMobile(digits) {
   return digits.length === 10 && /^[6-9]\d{9}$/.test(digits)
 }
@@ -142,6 +145,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
   const [otpHint, setOtpHint] = useState(null)
   const [busy, setBusy] = useState(false)
   const [banner, setBanner] = useState(null)
+  const [resendIn, setResendIn] = useState(0)
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [showExitModal, setShowExitModal] = useState(false)
 
@@ -263,6 +267,13 @@ export function AuthEntryPage({ authGroup = 'users' }) {
     })
   }, [step])
 
+  // Resend OTP countdown (ticks once a second while the OTP screen is open)
+  useEffect(() => {
+    if (step !== 'otp' || resendIn <= 0) return undefined
+    const t = setTimeout(() => setResendIn((s) => Math.max(0, s - 1)), 1000)
+    return () => clearTimeout(t)
+  }, [step, resendIn])
+
   function setPhoneDigits(value) {
     const digits = String(value).replace(/\D/g, '').slice(0, 10)
     setPhone(digits)
@@ -310,6 +321,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
     setOtpHint(null)
     setBanner(null)
     setOtpCells(Array(6).fill(''))
+    setResendIn(0)
   }
 
   function switchMode(next) {
@@ -368,6 +380,7 @@ export function AuthEntryPage({ authGroup = 'users' }) {
       setOtpHint(codeToHint)
       setOtpCells(Array(6).fill(''))
       setStep('otp')
+      setResendIn(OTP_RESEND_SECONDS)
       setBanner({
         variant: 'success',
         message: 'OTP has been dispatched to your mobile number.',
@@ -975,6 +988,30 @@ export function AuthEntryPage({ authGroup = 'users' }) {
                   {busy ? 'Verifying…' : mode === 'login' ? 'Verify & login' : 'Verify & continue'}
                   <User className="h-4 w-4" aria-hidden />
                 </AppPrimaryButton>
+                {authGroup === 'users' && (
+                  <div className="mt-3 text-center text-[13px] font-semibold text-slate-500" aria-live="polite">
+                    {resendIn > 0 ? (
+                      <span>
+                        Resend OTP in{' '}
+                        <span className="font-bold tabular-nums text-slate-800">
+                          {Math.floor(resendIn / 60)}:{String(resendIn % 60).padStart(2, '0')}
+                        </span>
+                      </span>
+                    ) : (
+                      <span>
+                        Didn&apos;t get the code?{' '}
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void handleSendOtp()}
+                          className="font-bold text-brand underline underline-offset-2 hover:opacity-80 disabled:opacity-50"
+                        >
+                          {busy ? 'Sending…' : 'Resend OTP'}
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                )}
                 <button
                   type="button"
                   className="w-full py-3 text-[13px] font-bold text-slate-500 hover:text-slate-800 transition mt-2"
