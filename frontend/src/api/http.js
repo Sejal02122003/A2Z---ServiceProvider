@@ -5,12 +5,13 @@ import { store } from '../store/index.js'
 const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5005/api/v1'
 
 export class ApiError extends Error {
-  constructor(message, { status, code, errors } = {}) {
+  constructor(message, { status, code, errors, data } = {}) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
     this.errors = errors
+    this.data = data
   }
 }
 
@@ -76,6 +77,7 @@ export async function apiRequest(path, { method = 'GET', body, headers = {}, ski
         status: e.response?.status,
         code: json.code,
         errors: json.errors,
+        data: json.data,
       })
     }
     throw e

@@ -273,12 +273,32 @@ export function BroadcastPopup() {
   const requiresSelection = incoming?.requiresServiceSelection && services.length > 1
   const selectedService = services.find(s => (s.itemId || s.serviceId) === selectedServiceId)
 
+  // Insufficient wallet balance: close the offer and send the provider to the recharge page
+  const redirectToRecharge = useCallback(() => {
+    stopBookingAlertSound()
+    if (activeNotificationRef.current) {
+      try { activeNotificationRef.current.close() } catch {}
+      activeNotificationRef.current = null
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+    if (incoming?.bookingId) {
+      dismissedBookingsRef.current.add(incoming.bookingId)
+    }
+    setResponding(false)
+    setError('')
+    setIncoming(null)
+    navigate('/serviceprovider/wallet')
+  }, [incoming, navigate])
+
   const handleAccept = useCallback(async () => {
     if (!incoming) return
 
-    // If wallet balance is insufficient, prevent acceptance
+    // If wallet balance is insufficient, send the provider straight to recharge
     if (eligibilityData && eligibilityData.eligible === false) {
-      setError(`Need to recharge first! Please recharge your wallet with at least ₹${eligibilityData.shortageAmount || 50} to accept this booking.`)
+      redirectToRecharge()
       return
     }
 
@@ -316,13 +336,14 @@ export function BroadcastPopup() {
       navigate(`/serviceprovider/active-job/${currentBookingId}`)
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : 'Failed to accept'
+      if (err?.code === 'LOW_WALLET_BALANCE' || err?.data?.eligible === false || msg.toLowerCase().includes('wallet balance')) {
+        // Wallet is empty / below the required balance: redirect to the recharge page
+        redirectToRecharge()
+        return
+      }
       setError(msg)
       setResponding(false)
-      if (err?.code === 'LOW_WALLET_BALANCE' || err?.data?.eligible === false || msg.toLowerCase().includes('wallet balance')) {
-        if (err?.data) {
-          setEligibilityData(err.data)
-        }
-      } else if (
+      if (
         msg.includes('already accepted by you') ||
         msg.includes('Current status is EN_ROUTE') ||
         msg.includes('Current status is STARTED')
@@ -342,7 +363,7 @@ export function BroadcastPopup() {
         }, 2500)
       }
     }
-  }, [incoming, navigate, selectedServiceId, services, eligibilityData])
+  }, [incoming, navigate, selectedServiceId, services, eligibilityData, redirectToRecharge])
 
   const handleReject = useCallback(async () => {
     if (!incoming) return
@@ -942,20 +963,20 @@ export function BroadcastPopup() {
                 </button>
                 <button
                   type="button"
-                  disabled={responding || eligibilityData?.eligible === false || (requiresSelection && !selectedServiceId)}
+                  disabled={responding || (eligibilityData?.eligible !== false && requiresSelection && !selectedServiceId)}
                   onClick={handleAccept}
-                  className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-extrabold text-white transition active:scale-[0.97] ${
+                  className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-extrabold transition active:scale-[0.97] ${
                     eligibilityData?.eligible === false
-                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
-                      : 'bg-brand shadow-lg shadow-brand/25 hover:bg-brand/90 disabled:opacity-50'
+                      ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25 hover:bg-amber-400'
+                      : 'bg-brand text-white shadow-lg shadow-brand/25 hover:bg-brand/90 disabled:opacity-50'
                   }`}
                 >
                   {responding ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : eligibilityData?.eligible === false ? (
                     <>
-                      <AlertTriangle className="h-4 w-4 text-amber-700" />
-                      Low Balance (Short ₹{eligibilityData.shortageAmount})
+                      <Wallet className="h-4 w-4" aria-hidden />
+                      Recharge to Accept (₹{eligibilityData.shortageAmount})
                     </>
                   ) : (
                     <>
