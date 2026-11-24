@@ -593,6 +593,7 @@ export async function processVendorCancellation({
       const balanceAfter = balanceBefore - penaltyToApply
 
       wallet.selfBalance = balanceAfter
+      wallet.balance = balanceAfter // keep the mirror field in step with selfBalance
       await wallet.save()
 
       const tx = await WalletTransaction.create({

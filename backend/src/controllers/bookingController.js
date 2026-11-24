@@ -1565,11 +1565,14 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
 
         // Add laborShare to labor's self wallet
         wallet.selfBalance += booking.laborShare
+        wallet.balance = wallet.selfBalance // keep the mirror field in step with selfBalance
         await wallet.save()
 
         import('../models/WalletTransaction.js').then(({ WalletTransaction }) => {
           WalletTransaction.create({
             walletId: wallet._id,
+            userId: booking.laborId,
+            status: 'COMPLETED',
             amount: booking.laborShare,
             type: 'CREDIT',
             targetWallet: 'SELF',

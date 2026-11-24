@@ -188,11 +188,14 @@ export const processWithdrawalRequest = asyncHandler(async (req, res) => {
     if (status === 'REJECTED') {
       // Refund the held amount back to the labour's wallet
       wallet.selfBalance += request.amount
+      wallet.balance = wallet.selfBalance // keep the mirror field in step with selfBalance
       await wallet.save({ session })
     } else if (status === 'APPROVED') {
       // Amount is already deducted, just create the transaction log
       await WalletTransaction.create([{
         walletId: wallet._id,
+        userId: request.labourId,
+        status: 'COMPLETED',
         amount: request.amount,
         type: 'DEBIT',
         targetWallet: 'BANK',
@@ -241,6 +244,22 @@ export const updateAdminWalletSettings = asyncHandler(async (req, res) => {
 })
 
 /**
+ * Balance shown to admin for a wallet.
+ * - Service providers / contractors: `selfBalance` is the source of truth (it is what the provider app,
+ *   booking eligibility and every payout/penalty/recharge path maintain). `balance` is only a mirror
+ *   and several paths do not update it, so taking max(balance, selfBalance) showed stale, too-high amounts.
+ * - Customers: unchanged (their wallet is tracked in `balance`; `selfBalance` defaults to 0).
+ */
+function resolveDisplayBalance(wallet, role) {
+  if (!wallet) return 0
+  if (role === 'labour' || role === 'contractor') {
+    const self = wallet.selfBalance
+    return Number(self !== undefined && self !== null ? self : (wallet.balance || 0))
+  }
+  return Math.max(Number(wallet.balance || 0), Number(wallet.selfBalance || 0))
+}
+
+/**
  * GET /api/admin/wallets/users
  * Returns list of users with wallet balances and bonus status
  */
@@ -283,12 +302,20 @@ export const getAdminUserWallets = asyncHandler(async (req, res) => {
   const wallets = await Wallet.find({ userId: { $in: userIds } }).lean()
   const walletMap = new Map(wallets.map((w) => [String(w.userId), w]))
 
-  // Aggregate total credits & debits for these users
+  // Aggregate total credits & debits per WALLET. Some ledger rows (provider payouts, withdrawals)
+  // are saved without userId / status, so matching on those silently dropped real money.
+  const walletIdToUserId = new Map(wallets.map((w) => [String(w._id), String(w.userId)]))
   const txAgg = await WalletTransaction.aggregate([
-    { $match: { userId: { $in: userIds }, status: 'COMPLETED' } },
+    {
+      $match: {
+        walletId: { $in: wallets.map((w) => w._id) },
+        type: { $in: ['CREDIT', 'DEBIT'] },
+        status: { $in: ['COMPLETED', 'PARTIAL', null] }, // null also matches rows with no status
+      },
+    },
     {
       $group: {
-        _id: { userId: '$userId', type: '$type' },
+        _id: { walletId: '$walletId', type: '$type' },
         total: { $sum: '$amount' },
       },
     },
@@ -296,7 +323,8 @@ export const getAdminUserWallets = asyncHandler(async (req, res) => {
 
   const userStats = {}
   txAgg.forEach((stat) => {
-    const uid = String(stat._id.userId)
+    const uid = walletIdToUserId.get(String(stat._id.walletId))
+    if (!uid) return
     if (!userStats[uid]) userStats[uid] = { credits: 0, debits: 0 }
     if (stat._id.type === 'CREDIT') userStats[uid].credits += stat.total
     if (stat._id.type === 'DEBIT') userStats[uid].debits += stat.total
@@ -305,7 +333,7 @@ export const getAdminUserWallets = asyncHandler(async (req, res) => {
   const results = users.map((u) => {
     const w = walletMap.get(String(u._id))
     const s = userStats[String(u._id)] || { credits: 0, debits: 0 }
-    const currentBalance = w ? Math.max(Number(w.balance || 0), Number(w.selfBalance || 0)) : 0
+    const currentBalance = resolveDisplayBalance(w, u.role)
     return {
       _id: u._id,
       fullName: u.fullName || '—',
@@ -345,7 +373,7 @@ export const getAdminUserWalletDetails = asyncHandler(async (req, res) => {
   }
 
   const wallet = await Wallet.findOne({ userId }).lean()
-  const currentBalance = wallet ? Math.max(Number(wallet.balance || 0), Number(wallet.selfBalance || 0)) : 0
+  const currentBalance = resolveDisplayBalance(wallet, user.role)
 
   const transactions = await WalletTransaction.find({
     $or: [{ userId }, { walletId: wallet?._id }],
