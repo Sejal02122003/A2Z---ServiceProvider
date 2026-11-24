@@ -41,8 +41,42 @@ export function resolveProviderZoneId(user, zones) {
  * cannot be determined are kept so they are not silently cut off.
  */
 export function providerMatchesBookingZone(user, bookingZoneId, zones) {
-  if (!bookingZoneId) return true
+  return explainProviderZoneMatch(user, bookingZoneId, zones).matches
+}
+
+/**
+ * Same decision as providerMatchesBookingZone, but returns the reason too (for logging).
+ * Zones are city based, so two zone records in the SAME city (e.g. "Indore Zone" and
+ * "regal square", both city=Indore) count as the same dispatch area. Without this, a provider
+ * whose trial slot / address resolves to a sibling zone in the booking's city was silently skipped.
+ */
+export function explainProviderZoneMatch(user, bookingZoneId, zones) {
+  if (!bookingZoneId) return { matches: true, reason: 'booking has no zone' }
+
   const providerZoneId = resolveProviderZoneId(user, zones)
-  if (!providerZoneId) return true
-  return providerZoneId === String(bookingZoneId)
+  if (!providerZoneId) return { matches: true, reason: 'provider zone unknown (kept)' }
+
+  if (providerZoneId === String(bookingZoneId)) {
+    return { matches: true, reason: 'same zone', providerZoneId }
+  }
+
+  const list = Array.isArray(zones) ? zones : []
+  const providerZone = list.find((z) => String(z._id) === providerZoneId)
+  const bookingZone = list.find((z) => String(z._id) === String(bookingZoneId))
+  const providerCity = norm(providerZone?.city)
+  const bookingCity = norm(bookingZone?.city)
+
+  if (providerCity && bookingCity && providerCity === bookingCity) {
+    return {
+      matches: true,
+      reason: `different zone records but same city "${bookingZone.city}" (${providerZone.name} ~ ${bookingZone.name})`,
+      providerZoneId,
+    }
+  }
+
+  return {
+    matches: false,
+    reason: `provider zone "${providerZone?.name || providerZoneId}" (${providerZone?.city || '?'}) != booking zone "${bookingZone?.name || bookingZoneId}" (${bookingZone?.city || '?'})`,
+    providerZoneId,
+  }
 }

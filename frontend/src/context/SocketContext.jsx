@@ -18,7 +18,9 @@ export function SocketProvider({ children }) {
   const [socket, setSocket] = useState(null)
 
   useEffect(() => {
+    console.log('[Socket][SP] Provider effect → hasToken =', Boolean(token), '| tokenPreview =', token ? token.slice(0, 12) + '…' : null, '| localStorage token present =', Boolean(typeof localStorage !== 'undefined' && localStorage.getItem('lc_access_token')))
     if (!token) {
+      console.warn('[Socket][SP] NO TOKEN in redux auth state → socket NOT created. Provider will never get live bookings until logged in.')
       if (currentSocket) {
         currentSocket.disconnect()
         currentSocket = null
@@ -45,12 +47,31 @@ export function SocketProvider({ children }) {
       reconnectionDelay: 2000,
     })
 
+    console.log('[Socket][SP] Creating socket →', SOCKET_URL)
+
     newSocket.on('connect', () => {
-      console.log('[Socket] Connected:', newSocket.id)
+      console.log('[Socket][SP] Connected:', newSocket.id, '| transport:', newSocket.io?.engine?.transport?.name, '| url:', SOCKET_URL)
+    })
+
+    newSocket.on('disconnect', (reason) => {
+      console.warn('[Socket][SP] Disconnected. reason =', reason)
+    })
+
+    newSocket.io.on('reconnect_attempt', (n) => {
+      console.log('[Socket][SP] Reconnect attempt #', n)
+    })
+
+    newSocket.io.on('reconnect_failed', () => {
+      console.error('[Socket][SP] Reconnect FAILED - giving up')
+    })
+
+    // Log EVERY event received so we can see if BOOKING_RECEIVED ever arrives
+    newSocket.onAny((eventName, ...args) => {
+      console.log(`[Socket][SP] ◀ EVENT "${eventName}"`, args[0])
     })
 
     newSocket.on('connect_error', (err) => {
-      console.warn('[Socket] Connection error:', err.message)
+      console.warn('[Socket][SP] Connection error:', err.message)
       if (err.message && err.message.toLowerCase().includes('authentication error')) {
         newSocket.disconnect()
       }

@@ -11,7 +11,7 @@ import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
 import { USER_ROLES } from '../constants/roles.js'
 import { getBookingLabourShareRate } from '../utils/labourShare.js'
 import { Zone } from '../models/Zone.js'
-import { providerMatchesBookingZone } from '../utils/zoneMatch.js'
+import { explainProviderZoneMatch } from '../utils/zoneMatch.js'
 
 export const BROADCAST_TIMEOUT_MS = 90000 // 1.5 minutes (90 seconds) flash broadcast timeout
 
@@ -212,9 +212,11 @@ export async function startBroadcastCycle(bookingId) {
     if (booking.zoneId && potentialLaborersRaw.length > 0) {
       const activeZones = await Zone.find({ isActive: true }).lean()
       const before = potentialLaborersRaw.length
-      potentialLaborersRaw = potentialLaborersRaw.filter((p) =>
-        providerMatchesBookingZone(p, booking.zoneId, activeZones)
-      )
+      potentialLaborersRaw = potentialLaborersRaw.filter((p) => {
+        const { matches, reason } = explainProviderZoneMatch(p, booking.zoneId, activeZones)
+        console.log(`[BROADCAST] Zone check ${p.fullName || p.phone} (${p._id}): ${matches ? 'INCLUDED' : 'EXCLUDED'} - ${reason}`)
+        return matches
+      })
       console.log(`[BROADCAST] Zone filter (${booking.zoneName || booking.zoneId}): ${before} -> ${potentialLaborersRaw.length} providers`)
     }
   } else {

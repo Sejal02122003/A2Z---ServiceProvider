@@ -20,6 +20,7 @@ export function useLabourSocket() {
 
     // Flash Broadcast Received
     const onBookingReceived = (data) => {
+      console.log('[useLabourSocket] BOOKING_RECEIVED', data)
       setLiveOffers((prev) => {
         if (prev.find((o) => o.bookingId === data.bookingId)) return prev
         return [...prev, { ...data, receivedAt: Date.now() }]

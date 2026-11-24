@@ -47,7 +47,7 @@ export const initSocket = (httpServer) => {
   })
 
   io.on('connection', (socket) => {
-    console.log(`Socket connected: ${socket.id} (User: ${socket.user._id})`)
+    console.log(`Socket connected: ${socket.id} (User: ${socket.user._id}, role=${socket.user.role}, name=${socket.user.fullName || socket.user.phone})`)
     
     // Join a room specific to this user ID so we can emit directly to them
     socket.join(socket.user._id.toString())
@@ -97,6 +97,9 @@ export const emitToUser = (userId, eventName, payload) => {
     const room = io.sockets.adapter.rooms.get(strId)
     const activeSockets = room ? room.size : 0
     console.log(`[SOCKET] emitToUser event="${eventName}" to user=${strId} (active sockets in room: ${activeSockets})`)
+    if (activeSockets === 0) {
+      console.warn(`[SOCKET] ⚠ event="${eventName}" NOT DELIVERED live: user ${strId} has NO connected socket (app closed / socket not connected / wrong user id)`)
+    }
     io.to(strId).emit(eventName, payload)
   }
 }

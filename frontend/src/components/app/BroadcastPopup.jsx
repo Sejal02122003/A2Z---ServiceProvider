@@ -91,8 +91,23 @@ export function BroadcastPopup() {
   const roleLower = String(user?.role || '').toLowerCase()
   const isLabour = roleLower === 'labour' || roleLower === 'contractor' || roleLower === 'serviceprovider' || roleLower === 'provider'
 
+  useEffect(() => {
+    console.log('[BroadcastPopup] State check →', {
+      userId: user?._id || user?.id,
+      role: user?.role,
+      isLabour,
+      socketExists: Boolean(socket),
+      socketConnected: socket?.connected,
+      socketId: socket?.id,
+    })
+  }, [user, isLabour, socket])
+
   const handleBroadcast = useCallback((data) => {
-    if (!data || !data.bookingId) return
+    console.log('[BroadcastPopup] handleBroadcast called with:', data)
+    if (!data || !data.bookingId) {
+      console.warn('[BroadcastPopup] Ignored broadcast: missing data/bookingId', data)
+      return
+    }
     if (dismissedBookingsRef.current.has(data.bookingId)) {
       console.log('[BroadcastPopup] Ignoring already dismissed booking:', data.bookingId)
       return
@@ -138,12 +153,17 @@ export function BroadcastPopup() {
   // Listen for real-time WebSocket broadcast events
   useEffect(() => {
     if (!isLabour) {
+      console.warn('[BroadcastPopup] NOT listening: user role is not labour/contractor/serviceprovider/provider. role =', user?.role)
       stopBookingAlertSound()
       setIncoming(null)
       return
     }
-    if (!socket) return
+    if (!socket) {
+      console.warn('[BroadcastPopup] NOT listening: socket is null (no token or not created yet)')
+      return
+    }
 
+    console.log('[BroadcastPopup] Registered BOOKING_RECEIVED listener. socket connected =', socket.connected, 'id =', socket.id)
     socket.on('BOOKING_RECEIVED', handleBroadcast)
     const handleExpired = (data) => {
       setIncoming((prev) => {
@@ -173,11 +193,12 @@ export function BroadcastPopup() {
       try {
         const res = await broadcastsApi.getActiveBroadcast()
         const b = res?.data?.broadcast
+        console.log('[BroadcastPopup] Poll /active broadcast →', b ? { bookingId: b.bookingId, serviceName: b.serviceName } : 'none', '| dismissed?', b ? dismissedBookingsRef.current.has(b.bookingId) : false)
         if (!cancelled && b && !incoming && !dismissedBookingsRef.current.has(b.bookingId)) {
           handleBroadcast(b)
         }
-      } catch {
-        // ignore background poll errors
+      } catch (err) {
+        console.warn('[BroadcastPopup] Poll /active broadcast FAILED:', err?.status || '', err?.message || err)
       }
     }
 
