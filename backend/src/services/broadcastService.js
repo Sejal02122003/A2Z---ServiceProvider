@@ -193,6 +193,52 @@ export async function startBroadcastCycle(bookingId) {
   console.log(`[BROADCAST] Excluded user IDs: ${JSON.stringify(excludedUserIds)}`)
   console.log(`[BROADCAST] Match criteria: ${JSON.stringify(matchOr)}`)
 
+  // ---- Dispatch audit: record, for EVERY skill-matching provider, whether they got the offer and why not ----
+  const dispatchAudit = new Map()
+  const auditSet = (id, outcome, reason, extra = {}) => {
+    const key = String(id?._id || id)
+    dispatchAudit.set(key, { ...(dispatchAudit.get(key) || {}), outcome, reason, ...extra })
+  }
+  const persistAudit = async () => {
+    try {
+      const candidates = [...dispatchAudit.entries()].map(([userId, v]) =>
+        v.outcome === 'PENDING'
+          ? { userId, ...v, outcome: 'EXCLUDED', reason: 'Dropped by an earlier filter (see server log)' }
+          : { userId, ...v }
+      )
+      await Booking.updateOne(
+        { _id: booking._id },
+        { $set: { dispatchAudit: { at: new Date(), radiusKm, zone: booking.zoneName || null, candidates } } }
+      )
+    } catch (err) {
+      console.warn('[BROADCAST] Could not persist dispatch audit:', err.message)
+    }
+  }
+  if (matchOr.length > 0) {
+    try {
+      const pool = await User.find({
+        role: { $in: [USER_ROLES.LABOUR, 'labour', USER_ROLES.CONTRACTOR, 'contractor'] },
+        $or: matchOr,
+      }).select('fullName phone isActive vendorStatus labourProfile.availabilityStatus').lean()
+      const busySet = new Set(busyLabourIds)
+      const rejectedSet = new Set(rejectedLaborIds)
+      pool.forEach((p) => {
+        const id = String(p._id)
+        const meta = { name: p.fullName || '', phone: p.phone || '' }
+        let reason = null
+        if (rejectedSet.has(id)) reason = 'Already declined this booking'
+        else if (busySet.has(id)) reason = 'Busy: on an active job (en route / started in the last 4 hours)'
+        else if (excludedUserIds.includes(id)) reason = 'Excluded (customer account)'
+        else if (p.isActive === false) reason = 'Account is inactive'
+        else if (['BLOCKED', 'REJECTED'].includes(p.vendorStatus)) reason = `Account status is ${p.vendorStatus}`
+        else if (p.labourProfile?.availabilityStatus === 'offline') reason = 'Marked offline (availability switched off)'
+        auditSet(id, reason ? 'EXCLUDED' : 'PENDING', reason || 'Evaluating', meta)
+      })
+    } catch (err) {
+      console.warn('[BROADCAST] Dispatch audit pool query failed:', err.message)
+    }
+  }
+
   // Base query for active, non-blocked service providers
   const baseQuery = {
     _id: { $nin: excludedUserIds },
@@ -215,6 +261,7 @@ export async function startBroadcastCycle(bookingId) {
       potentialLaborersRaw = potentialLaborersRaw.filter((p) => {
         const { matches, reason } = explainProviderZoneMatch(p, booking.zoneId, activeZones)
         console.log(`[BROADCAST] Zone check ${p.fullName || p.phone} (${p._id}): ${matches ? 'INCLUDED' : 'EXCLUDED'} - ${reason}`)
+        if (!matches) auditSet(p._id, 'EXCLUDED', `Zone mismatch: ${reason}`)
         return matches
       })
       console.log(`[BROADCAST] Zone filter (${booking.zoneName || booking.zoneId}): ${before} -> ${potentialLaborersRaw.length} providers`)
@@ -270,6 +317,7 @@ export async function startBroadcastCycle(bookingId) {
     // 1. If worker's global status is explicitly offline, exclude them immediately
     if (labor.labourProfile?.availabilityStatus === 'offline') {
       console.log(`[BROADCAST] Excluding provider ${labor.fullName || labor.phone} - availabilityStatus is 'offline'`)
+      auditSet(labor._id, 'EXCLUDED', 'Marked offline (availability switched off)')
       return false
     }
 
@@ -280,6 +328,7 @@ export async function startBroadcastCycle(bookingId) {
         // 2. If the toggle for this day is turned off in Time Management, they are OFFLINE
         if (dayEntry.isAvailable === false) {
           console.log(`[BROADCAST] Excluding provider ${labor.fullName || labor.phone} - offline on ${targetDayName} (Time Management toggle is OFF)`)
+          auditSet(labor._id, 'EXCLUDED', `Working hours: ${targetDayName} is switched OFF in Time Management`)
           return false
         }
 
@@ -290,6 +339,7 @@ export async function startBroadcastCycle(bookingId) {
           // 3. For instant booking, if current IST time is outside working hours, they are OFFLINE
           if (currentIstTimeStr < sTime || currentIstTimeStr > eTime) {
             console.log(`[BROADCAST] Excluding provider ${labor.fullName || labor.phone} - outside working hours ${sTime}-${eTime} on ${targetDayName} (current IST: ${currentIstTimeStr})`)
+            auditSet(labor._id, 'EXCLUDED', `Working hours: ${targetDayName} hours are ${sTime}-${eTime}, booking arrived at ${currentIstTimeStr} IST`)
             return false
           }
         } else {
@@ -301,10 +351,12 @@ export async function startBroadcastCycle(bookingId) {
 
           if (targetStartTimeStr && (targetStartTimeStr < sTime || targetStartTimeStr > effectiveEndTime)) {
             console.log(`[BROADCAST] Excluding provider ${labor.fullName || labor.phone} - target start time ${targetStartTimeStr} outside working hours ${sTime}-${effectiveEndTime}`)
+            auditSet(labor._id, 'EXCLUDED', `Working hours: ${targetDayName} hours are ${sTime}-${effectiveEndTime}, job starts ${targetStartTimeStr}`)
             return false
           }
           if (targetEndTimeStr && targetEndTimeStr > effectiveEndTime) {
             console.log(`[BROADCAST] Excluding provider ${labor.fullName || labor.phone} - target end time ${targetEndTimeStr} outside ${effectiveEndTime}`)
+            auditSet(labor._id, 'EXCLUDED', `Working hours: job ends ${targetEndTimeStr}, after ${targetDayName} closing time ${effectiveEndTime}`)
             return false
           }
         }
@@ -320,6 +372,7 @@ export async function startBroadcastCycle(bookingId) {
 
   if (eligibleToConsider.length === 0) {
     console.warn(`[BROADCAST] Booking ${booking._id}: No online/available service providers found for ${targetDayName} at current time. Providers are offline or outside schedule.`)
+    await persistAudit()
     await markBookingFailed(booking, `No available service providers online right now`)
     return
   }
@@ -401,6 +454,7 @@ export async function startBroadcastCycle(bookingId) {
   let eligibleLaborers = subEligible.filter(labor => {
     const distData = finalDistances.find(d => d.id === String(labor._id))
     const inRadius = distData && distData.distanceKm <= radiusKm
+    if (!inRadius) auditSet(labor._id, 'EXCLUDED', `Too far: ${distData ? distData.distanceKm.toFixed(1) : '?'} km from the booking (max radius ${radiusKm} km)`, { distanceKm: distData ? Number(distData.distanceKm.toFixed(1)) : undefined })
     if (distData) {
       console.log(`[BROADCAST] Worker ${labor.fullName || labor.phone} (${labor._id}): distance=${distData.distanceKm.toFixed(1)}km, maxRadius=${radiusKm}km => inRadius=${inRadius}`)
     }
@@ -417,6 +471,7 @@ export async function startBroadcastCycle(bookingId) {
 
   if (eligibleLaborers.length === 0) {
     console.warn(`[BROADCAST] Booking ${booking._id} FAILED: No laborers available in system`)
+    await persistAudit()
     await markBookingFailed(booking, 'No laborers available in system')
     return
   }
@@ -587,6 +642,7 @@ export async function startBroadcastCycle(bookingId) {
 
           if (matchingMulti.length === 0) {
             console.log(`[BROADCAST] Skipping labour ${labor.fullName || labor.phone} - does not offer any pending multi-service items`)
+            auditSet(labor._id, 'EXCLUDED', 'Does not offer any of the requested services')
             return
           }
 
@@ -699,6 +755,7 @@ export async function startBroadcastCycle(bookingId) {
 
           if (matchingOpenServices.length === 0) {
             console.log(`[BROADCAST] Skipping labour ${labor.fullName || labor.phone} - does not offer any open contractor services`)
+            auditSet(labor._id, 'EXCLUDED', 'Does not offer any open contractor service')
             return
           }
 
@@ -803,6 +860,7 @@ export async function startBroadcastCycle(bookingId) {
 
           if (!offersService) {
             console.log(`[BROADCAST] Skipping labour ${labor.fullName || labor.phone} (${labor._id}) - does not offer service "${singleServiceName}" (${booking.serviceId})`)
+            auditSet(labor._id, 'EXCLUDED', `Does not offer the service "${singleServiceName}"`)
             return
           }
 
@@ -924,6 +982,8 @@ export async function startBroadcastCycle(bookingId) {
           }).catch(err => console.error(err))
         }
 
+        auditSet(labor._id, 'SENT', 'Offer sent', { distanceKm: labor.approximateDistance })
+
         const sub = activeSubsMap[labor._id]
         if (sub) {
           sub.bookingsReceived += 1
@@ -936,6 +996,8 @@ export async function startBroadcastCycle(bookingId) {
           }).exec()
         )
       })
+
+      persistAudit()
 
       Promise.all(laborUpdates).catch(err => console.error('Failed to update lifetime received', err))
     })

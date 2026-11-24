@@ -236,6 +236,8 @@ const bookingSchema = new mongoose.Schema(
     // Providers this booking was actually dispatched to in the latest broadcast cycle.
     // The "active broadcast" poll only shows the offer to these providers.
     broadcastedTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    // Why each skill-matching provider did / did not receive this booking (written by the dispatcher)
+    dispatchAudit: { type: mongoose.Schema.Types.Mixed },
     rejectedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     
     // Support for Bulk Bookings (Contractor)

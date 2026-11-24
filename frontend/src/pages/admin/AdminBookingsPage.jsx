@@ -527,6 +527,37 @@ function BookingDetailsModal({ booking, onClose }) {
         </div>
         
         <div className="mt-4 space-y-4">
+          {Array.isArray(booking.dispatchAudit?.candidates) && booking.dispatchAudit.candidates.length > 0 && (
+            <div className="rounded-lg border border-slate-200 bg-white text-sm">
+              <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-700">Dispatch report</p>
+                <p className="text-[11px] text-slate-400">
+                  {booking.dispatchAudit.candidates.filter((c) => c.outcome === 'SENT').length} sent ·{' '}
+                  {booking.dispatchAudit.candidates.filter((c) => c.outcome !== 'SENT').length} not sent
+                  {booking.dispatchAudit.zone ? ` · ${booking.dispatchAudit.zone}` : ''}
+                  {booking.dispatchAudit.radiusKm ? ` · ${booking.dispatchAudit.radiusKm} km radius` : ''}
+                </p>
+              </div>
+              <ul className="max-h-56 divide-y divide-slate-100 overflow-y-auto">
+                {[...booking.dispatchAudit.candidates]
+                  .sort((a, b) => (a.outcome === 'SENT' ? -1 : 1) - (b.outcome === 'SENT' ? -1 : 1))
+                  .map((c) => (
+                    <li key={c.userId} className="flex items-start justify-between gap-3 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-bold text-slate-900">{c.name || 'Service provider'}</p>
+                        <p className="text-[11px] text-slate-400">{c.phone}</p>
+                      </div>
+                      <div className="max-w-[60%] text-right">
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${c.outcome === 'SENT' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>
+                          {c.outcome === 'SENT' ? 'Offer sent' : 'Not sent'}
+                        </span>
+                        {c.outcome !== 'SENT' && <p className="mt-0.5 text-[11px] leading-snug text-slate-500">{c.reason}</p>}
+                      </div>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
             <p className="text-slate-500 text-xs">Booking ID</p>
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
