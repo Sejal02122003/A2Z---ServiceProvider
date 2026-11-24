@@ -718,6 +718,13 @@ export async function processVendorCancellation({
       .catch((err) => console.error(err))
   }
 
+  // Close any material request that has not been issued yet
+  import('./materialRequirementService.js')
+    .then(({ cancelPendingMaterialRequestsForBooking }) =>
+      cancelPendingMaterialRequestsForBooking(booking._id, 'Booking cancelled by service provider')
+    )
+    .catch((err) => console.warn('[Material Request Release Warning]', err?.message))
+
   // Release commission reservation hold
   import('./walletEligibilityService.js')
     .then(({ releaseBookingCommissionReservation }) => {
@@ -1703,6 +1710,13 @@ export async function processCustomerCancellation({
       })
       .catch((err) => console.error(err))
   }
+
+  // Close any material request that has not been issued yet
+  import('./materialRequirementService.js')
+    .then(({ cancelPendingMaterialRequestsForBooking }) =>
+      cancelPendingMaterialRequestsForBooking(booking._id, 'Booking cancelled by customer')
+    )
+    .catch((err) => console.warn('[Material Request Release Warning]', err?.message))
 
   // B. Release commission reservation hold
   import('./walletEligibilityService.js')

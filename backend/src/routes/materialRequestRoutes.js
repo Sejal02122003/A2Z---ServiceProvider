@@ -14,6 +14,11 @@ router.get(
   materialRequestController.getVendorMaterialRequests
 )
 router.get(
+  '/vendor/booking/:bookingId/materials',
+  restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR, USER_ROLES.ADMIN),
+  materialRequestController.getBookingMaterialOptions
+)
+router.get(
   '/vendor/:id',
   restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR, USER_ROLES.ADMIN),
   materialRequestController.getVendorMaterialRequestById

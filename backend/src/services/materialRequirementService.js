@@ -89,6 +89,18 @@ export async function generateMaterialRequirementForBooking(bookingId, vendorId 
 }
 
 /**
+ * When a booking is cancelled, close material requests that have not been issued yet.
+ * Requests already issued / in use stay open so the provider can still return the materials.
+ */
+export async function cancelPendingMaterialRequestsForBooking(bookingId, reason = 'Booking cancelled') {
+  const res = await MaterialRequest.updateMany(
+    { bookingId, status: { $in: ['REQUESTED', 'APPROVED', 'WAITING_FOR_STOCK', 'READY_FOR_ISSUE'] } },
+    { $set: { status: 'CANCELLED', adminRemarks: reason } }
+  )
+  return res.modifiedCount || 0
+}
+
+/**
  * Re-evaluate pending material requests when new stock is added for a product
  */
 export async function recheckStockForPendingRequests(productId) {

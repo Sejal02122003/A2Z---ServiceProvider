@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Package,
@@ -31,6 +32,7 @@ import {
   requestAdditionalMaterial,
   recordMaterialUsage,
   fetchProducts,
+  fetchBookingMaterialOptions,
 } from '../../api/inventoryApi.js'
 
 export function VendorMaterialsPage() {
@@ -42,7 +44,9 @@ export function VendorMaterialsPage() {
   // Modals
   const [usageModalReq, setUsageModalReq] = useState(null)
   const [additionalModalReq, setAdditionalModalReq] = useState(null)
-  const [newRequestOpen, setNewRequestOpen] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const presetBookingId = searchParams.get('newRequest') || ''
+  const [newRequestOpen, setNewRequestOpen] = useState(Boolean(presetBookingId))
   const [availableProducts, setAvailableProducts] = useState([])
 
   const showToast = (msg) => {
@@ -235,9 +239,14 @@ export function VendorMaterialsPage() {
       {newRequestOpen && (
         <NewMaterialRequestModal
           products={availableProducts}
-          onClose={() => setNewRequestOpen(false)}
+          initialBookingId={presetBookingId}
+          onClose={() => {
+            setNewRequestOpen(false)
+            if (presetBookingId) setSearchParams({}, { replace: true })
+          }}
           onSuccess={() => {
             setNewRequestOpen(false)
+            if (presetBookingId) setSearchParams({}, { replace: true })
             loadRequests()
             showToast('Material request submitted to admin for approval')
           }}
@@ -801,32 +810,50 @@ function RequestAdditionalMaterialModal({ request, products, onClose, onSuccess 
   )
 }
 
-function NewMaterialRequestModal({ products, onClose, onSuccess }) {
+function NewMaterialRequestModal({ products, initialBookingId = '', onClose, onSuccess }) {
   const { user } = useAuth()
   const [bookings, setBookings] = useState([])
   const [loadingBookings, setLoadingBookings] = useState(true)
   const [bookingId, setBookingId] = useState('')
-  const [lines, setLines] = useState([{ productId: '', quantityRequested: 1 }])
+  const [quantity, setQuantity] = useState(1)
   const [remarks, setRemarks] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
+  // Materials required for the services this provider accepted on the selected booking
+  const [services, setServices] = useState([])
+  const [loadingMaterials, setLoadingMaterials] = useState(false)
+  // Only used when the admin has not set any materials for the service
+  const [manualLines, setManualLines] = useState([{ productId: '' }])
+
   useEffect(() => {
     let cancelled = false
-    bookingsApi
-      .getMyBookings()
-      .then((res) => {
+    const myId = String(user?._id || user?.id || '')
+    const idOf = (v) => String(v?._id || v || '')
+    const isMine = (b) =>
+      idOf(b.laborId) === myId ||
+      idOf(b.acceptedLabourId) === myId ||
+      (b.assignments || []).some((a) => idOf(a.labourId) === myId) ||
+      (b.multiServiceBooking?.items || []).some((it) => idOf(it.assignedLabourId) === myId)
+    const OPEN = ['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED', 'PARTIALLY_ACCEPTED']
+
+    Promise.all([
+      bookingsApi.getMyBookings().catch(() => null),
+      // When opened from a job, load that job directly so it is always selectable
+      initialBookingId ? bookingsApi.getBookingStatus(initialBookingId).catch(() => null) : Promise.resolve(null),
+    ])
+      .then(([listRes, oneRes]) => {
         if (cancelled) return
-        const all = res?.data?.bookings || res?.bookings || []
-        const myId = String(user?._id || user?.id || '')
-        // Jobs I'm assigned to as the provider and that are still open
-        const mine = all.filter(
-          (b) =>
-            ['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED', 'PARTIALLY_ACCEPTED'].includes(b.status) &&
-            String(b.userId?._id || b.userId) !== myId,
-        )
+        const all = listRes?.data?.bookings || listRes?.bookings || []
+        const mine = all.filter((b) => OPEN.includes(b.status) && isMine(b))
+        const loadedJob = oneRes?.data?.booking
+        if (loadedJob && OPEN.includes(loadedJob.status) && !mine.some((b) => String(b._id) === String(loadedJob._id))) {
+          mine.unshift(loadedJob)
+        }
         setBookings(mine)
-        if (mine[0]) setBookingId(mine[0]._id)
+        const preset = initialBookingId && mine.find((b) => String(b._id) === String(initialBookingId))
+        if (preset) setBookingId(preset._id)
+        else if (mine[0]) setBookingId(mine[0]._id)
       })
       .catch(() => {})
       .finally(() => {
@@ -835,28 +862,84 @@ function NewMaterialRequestModal({ products, onClose, onSuccess }) {
     return () => {
       cancelled = true
     }
-  }, [user])
+  }, [user, initialBookingId])
 
-  const bookingLabel = (b) => {
-    const name =
+  useEffect(() => {
+    if (!bookingId) {
+      setServices([])
+      return undefined
+    }
+    let cancelled = false
+    setLoadingMaterials(true)
+    fetchBookingMaterialOptions(bookingId)
+      .then((data) => {
+        if (!cancelled) setServices(data?.services || [])
+      })
+      .catch(() => {
+        if (!cancelled) setServices([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingMaterials(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [bookingId])
+
+  const jobInfo = (b) => ({
+    code: String(b._id).slice(-6).toUpperCase(),
+    name:
       b.serviceId?.name ||
       b.serviceName ||
       b.multiServiceBooking?.items?.[0]?.serviceName ||
       b.packageBooking?.packageName ||
-      'Service job'
-    const when = b.scheduledAt ? new Date(b.scheduledAt).toLocaleDateString() : b.type === 'INSTANT' ? 'Instant' : ''
-    return `#${String(b._id).slice(-6).toUpperCase()} • ${name}${when ? ` • ${when}` : ''}`
-  }
+      'Service job',
+    when: b.type === 'INSTANT' ? 'Instant booking' : b.scheduledAt ? 'Scheduled ' + new Date(b.scheduledAt).toLocaleString() : 'Scheduled booking',
+    where: b.address?.locationText || '',
+  })
 
-  const updateLine = (idx, patch) => setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)))
+  // One row per distinct product across the provider's services (quantities add up)
+  const requiredMaterials = useMemo(() => {
+    const byProduct = new Map()
+    services.forEach((svc) => {
+      svc.materials.forEach((m) => {
+        const key = String(m._id)
+        const prev = byProduct.get(key)
+        if (prev) {
+          prev.perUnitQty += Number(m.requiredQty) || 1
+          if (!prev.serviceNames.includes(svc.serviceName)) prev.serviceNames.push(svc.serviceName)
+        } else {
+          byProduct.set(key, { ...m, perUnitQty: Number(m.requiredQty) || 1, serviceNames: [svc.serviceName] })
+        }
+      })
+    })
+    return [...byProduct.values()]
+  }, [services])
+
+  const hasRequired = requiredMaterials.length > 0
+  const qty = Math.max(1, Number(quantity) || 0)
+
+  // Catalogue for the manual fallback (distinct materials only)
+  const uniqueProducts = useMemo(() => {
+    const seen = new Set()
+    return (products || []).filter((p) => {
+      const key = [p.name, p.unit, p.currentStock].join('|').toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }, [products])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const items = lines
-      .filter((l) => l.productId && Number(l.quantityRequested) > 0)
-      .map((l) => ({ productId: l.productId, quantityRequested: Number(l.quantityRequested) }))
     if (!bookingId) return setError('Select the job this material is for')
-    if (items.length === 0) return setError('Add at least one material with a quantity')
+    if (!(Number(quantity) > 0)) return setError('Enter a quantity of 1 or more')
+
+    const items = hasRequired
+      ? requiredMaterials.map((m) => ({ productId: m._id, quantityRequested: m.perUnitQty * qty }))
+      : manualLines.filter((l) => l.productId).map((l) => ({ productId: l.productId, quantityRequested: qty }))
+    if (items.length === 0) return setError('Select at least one material')
+
     setError('')
     setBusy(true)
     try {
@@ -869,10 +952,12 @@ function NewMaterialRequestModal({ products, onClose, onSuccess }) {
     }
   }
 
+  const multi = services.length > 1
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-3 backdrop-blur-xs sm:p-4">
+      <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 pb-3 pt-5">
           <div>
             <h3 className="text-base font-bold text-slate-900">New Material Request</h3>
             <p className="text-xs text-slate-500">Requires Admin Approval</p>
@@ -882,14 +967,14 @@ function NewMaterialRequestModal({ products, onClose, onSuccess }) {
           </button>
         </div>
 
-        {error && (
-          <div className="mt-3 flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 py-4">
+          {error && (
+            <div className="flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
           <div>
             <label className="block text-xs font-bold text-slate-700">For which job? *</label>
             {loadingBookings ? (
@@ -899,63 +984,132 @@ function NewMaterialRequestModal({ products, onClose, onSuccess }) {
                 You have no active job to request materials for. Accept a job first.
               </p>
             ) : (
-              <select
-                value={bookingId}
-                onChange={(e) => setBookingId(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:bg-white"
-              >
-                {bookings.map((b) => (
-                  <option key={b._id} value={b._id}>
-                    {bookingLabel(b)}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1 space-y-2">
+                {bookings.map((b) => {
+                  const active = String(b._id) === String(bookingId)
+                  const info = jobInfo(b)
+                  return (
+                    <button
+                      key={b._id}
+                      type="button"
+                      onClick={() => setBookingId(b._id)}
+                      className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition ${
+                        active ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-200' : 'border-slate-200 bg-slate-50 hover:bg-white'
+                      }`}
+                    >
+                      <span
+                        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                          active ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white'
+                        }`}
+                      >
+                        {active && <Check className="h-3 w-3" />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="truncate text-xs font-bold text-slate-900">{info.name}</span>
+                          <span className="shrink-0 rounded-md bg-white px-1.5 py-0.5 font-mono text-[10px] font-bold text-indigo-600 ring-1 ring-slate-200">
+                            #{info.code}
+                          </span>
+                        </span>
+                        <span className="mt-0.5 block text-[11px] text-slate-500">
+                          {info.when}
+                          {info.where ? ` • ${info.where}` : ''}
+                        </span>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
             )}
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-700">Materials *</label>
-            {lines.map((line, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                <select
-                  value={line.productId}
-                  onChange={(e) => updateLine(idx, { productId: e.target.value })}
-                  className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:bg-white"
-                >
-                  <option value="">Select material</option>
-                  {products.map((p) => (
-                    <option key={p._id} value={p._id}>
-                      {p.name} — Available: {p.currentStock} {p.unit}
-                    </option>
+          {bookingId && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700">Quantity *</label>
+              <input
+                type="number"
+                min="1"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-900 focus:bg-white"
+              />
+            </div>
+          )}
+
+          {bookingId && (
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-slate-700">Required materials</label>
+              {loadingMaterials ? (
+                <p className="text-[11px] text-slate-500">Loading required materials...</p>
+              ) : hasRequired ? (
+                <div className="space-y-3">
+                  {services
+                    .filter((svc) => svc.materials.length > 0)
+                    .map((svc) => (
+                      <div key={svc.serviceId} className="space-y-1.5">
+                        {multi && <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{svc.serviceName}</p>}
+                        {svc.materials.map((m) => {
+                          const tone = stockTone(Number(m.currentStock) || 0)
+                          const perUnit = Number(m.requiredQty) || 1
+                          return (
+                            <div
+                              key={`${svc.serviceId}-${m._id}`}
+                              className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate text-xs font-bold text-slate-900">{m.name}</span>
+                                <span className="block text-[10px] text-slate-500">
+                                  Needed: {perUnit * qty} {m.unit}
+                                </span>
+                              </span>
+                              <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${tone.cls}`}>
+                                {tone.label}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] font-semibold text-amber-800">
+                    The admin has not set materials for {multi ? 'these services' : 'this service'} yet. Choose what you need from the list.
+                  </p>
+                  {manualLines.map((line, idx) => (
+                    <div key={idx} className="flex items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        <ProductPicker
+                          products={uniqueProducts}
+                          value={line.productId}
+                          onChange={(id) =>
+                            setManualLines((prev) => prev.map((l, i) => (i === idx ? { ...l, productId: id } : l)))
+                          }
+                        />
+                      </div>
+                      {manualLines.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setManualLines((prev) => prev.filter((_, i) => i !== idx))}
+                          className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50"
+                          aria-label="Remove material"
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   ))}
-                </select>
-                <input
-                  type="number"
-                  min="1"
-                  value={line.quantityRequested}
-                  onChange={(e) => updateLine(idx, { quantityRequested: e.target.value })}
-                  className="w-16 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-900 focus:bg-white"
-                />
-                {lines.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => setLines((prev) => prev.filter((_, i) => i !== idx))}
-                    className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50"
-                    aria-label="Remove material"
+                    onClick={() => setManualLines((prev) => [...prev, { productId: '' }])}
+                    className="text-xs font-bold text-blue-600 hover:underline"
                   >
-                    <XCircle className="h-4 w-4" />
+                    + Add another material
                   </button>
-                )}
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => setLines((prev) => [...prev, { productId: '', quantityRequested: 1 }])}
-              className="text-xs font-bold text-blue-600 hover:underline"
-            >
-              + Add another material
-            </button>
-          </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-bold text-slate-700">Remarks</label>
@@ -967,8 +1121,9 @@ function NewMaterialRequestModal({ products, onClose, onSuccess }) {
               className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 focus:bg-white"
             />
           </div>
+        </div>
 
-          <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 bg-white px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <button
               type="button"
               onClick={onClose}
@@ -978,7 +1133,7 @@ function NewMaterialRequestModal({ products, onClose, onSuccess }) {
             </button>
             <button
               type="submit"
-              disabled={busy || bookings.length === 0}
+              disabled={busy || bookings.length === 0 || loadingMaterials}
               className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-700 disabled:opacity-50"
             >
               {busy ? 'Submitting...' : 'Submit Request to Admin'}
@@ -986,6 +1141,111 @@ function NewMaterialRequestModal({ products, onClose, onSuccess }) {
           </div>
         </form>
       </div>
+    </div>
+  )
+}
+
+function stockTone(stock) {
+  if (stock <= 0) return { label: 'Out of stock', cls: 'bg-rose-50 text-rose-700 border-rose-200' }
+  if (stock <= 5) return { label: 'Low stock', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
+  return { label: 'In stock', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+}
+
+function ProductPicker({ products, value, onChange, jobMaterialIds = new Set(), categoryMaterialIds = new Set(), categoryLabel = '' }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const selected = products.find((p) => p._id === value)
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const list = q
+      ? products.filter((p) => `${p.name} ${p.sku || ''}`.toLowerCase().includes(q))
+      : products
+    // This job's materials first, then available items, out-of-stock last
+    const rank = (p) =>
+      jobMaterialIds.has(String(p._id)) ? 0 : categoryMaterialIds.has(String(p._id)) ? 1 : p.currentStock > 0 ? 2 : 3
+    return [...list].sort((a, b) => rank(a) - rank(b))
+  }, [products, query, jobMaterialIds, categoryMaterialIds])
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-2 p-2.5 text-left"
+      >
+        {selected ? (
+          <span className="min-w-0">
+            <span className="block truncate text-xs font-bold text-slate-900">{selected.name}</span>
+            <span className="block text-[10px] text-slate-500">
+              Available: {selected.currentStock} {selected.unit}
+            </span>
+          </span>
+        ) : (
+          <span className="text-xs font-semibold text-slate-500">Select material</span>
+        )}
+        <ChevronRight className={`h-4 w-4 shrink-0 text-slate-400 transition ${open ? 'rotate-90' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="border-t border-slate-200 bg-white p-2">
+          <input
+            type="text"
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search material or SKU"
+            className="mb-2 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-900 outline-none focus:border-blue-400 focus:bg-white"
+          />
+          <ul className="max-h-52 space-y-1 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <li className="px-2 py-3 text-center text-xs text-slate-500">No materials found</li>
+            ) : (
+              filtered.map((p) => {
+                const tone = stockTone(Number(p.currentStock) || 0)
+                const active = p._id === value
+                return (
+                  <li key={p._id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onChange(p._id)
+                        setOpen(false)
+                        setQuery('')
+                      }}
+                      className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left transition ${
+                        active ? 'bg-blue-50 ring-1 ring-blue-200' : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-bold text-slate-900">{p.name}</span>
+                        <span className="block text-[10px] text-slate-500">
+                          {p.sku ? `${p.sku} • ` : ''}
+                          {p.currentStock} {p.unit} available
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 flex-col items-end gap-1">
+                        {jobMaterialIds.has(String(p._id)) ? (
+                          <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                            For this job
+                          </span>
+                        ) : categoryMaterialIds.has(String(p._id)) ? (
+                          <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
+                            {categoryLabel || 'Category'}
+                          </span>
+                        ) : null}
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${tone.cls}`}>
+                          {tone.label}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                )
+              })
+            )}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

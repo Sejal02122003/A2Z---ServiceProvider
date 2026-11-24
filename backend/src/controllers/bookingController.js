@@ -1258,13 +1258,15 @@ export const getMyBookings = asyncHandler(async (req, res) => {
   const { role, _id } = req.user
 
   let query = {}
-  if (role === 'customer' || role === 'contractor') {
+  if (role === 'customer') {
     query = { userId: _id }
   } else if (role === 'labour' || role === 'contractor') {
     query = {
       $or: [
         { userId: _id },
         { laborId: _id, status: { $in: ['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED', 'COMPLETED', 'CANCELLED'] } },
+        { acceptedLabourId: _id },
+        { 'assignments.labourId': _id },
         { acceptedLabourIds: _id },
         { 'multiServiceBooking.items.assignedLabourId': _id }
       ]

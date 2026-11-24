@@ -222,6 +222,11 @@ export async function fetchVendorMaterialRequestById(id) {
   return res.data
 }
 
+export async function fetchBookingMaterialOptions(bookingId) {
+  const res = await apiRequest(`/material-requests/vendor/booking/${bookingId}/materials`)
+  return res.data
+}
+
 export async function createVendorMaterialRequest(payload) {
   const res = await apiRequest('/material-requests/vendor', {
     method: 'POST',

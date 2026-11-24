@@ -10,6 +10,9 @@ import {
   createInventoryLog,
 } from '../services/materialRequirementService.js'
 import { emitToUser } from '../socket.js'
+import { LabourService } from '../models/LabourService.js'
+import { LabourSubcategory } from '../models/LabourSubcategory.js'
+import { LabourCategory } from '../models/LabourCategory.js'
 
 // ==========================================
 // VENDOR CONTROLLERS
@@ -111,6 +114,66 @@ export const getVendorMaterialRequestById = asyncHandler(async (req, res) => {
   }
 
   return sendSuccess(res, { data: { request } })
+})
+
+/**
+ * Materials required for the service(s) this provider accepted on a booking, grouped per service.
+ * Multi-service bookings: only the services assigned to this provider are returned.
+ */
+export const getBookingMaterialOptions = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params
+  const vendorId = String(req.user._id)
+  const isAdmin = req.user.role === 'admin'
+  const idOf = (v) => String(v?._id || v || '')
+
+  const booking = await Booking.findById(bookingId).lean()
+  if (!booking) {
+    return sendError(res, { message: 'Booking not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+
+  const myMultiItems = (booking.multiServiceBooking?.items || []).filter(
+    (it) => idOf(it.assignedLabourId) === vendorId && it.status !== 'CANCELLED'
+  )
+  const myAssignments = (booking.assignments || []).filter((a) => idOf(a.labourId) === vendorId)
+  const isAssigned =
+    idOf(booking.laborId) === vendorId ||
+    idOf(booking.acceptedLabourId) === vendorId ||
+    myAssignments.length > 0 ||
+    myMultiItems.length > 0
+  if (!isAssigned && !isAdmin) {
+    return sendError(res, { message: 'You are not assigned to this booking', statusCode: HTTP_STATUS.FORBIDDEN })
+  }
+
+  // Services this provider is responsible for
+  let serviceIds = []
+  if (booking.multiServiceBooking?.isMultiService && (booking.multiServiceBooking.items || []).length > 0) {
+    serviceIds = (myMultiItems.length ? myMultiItems : isAdmin ? booking.multiServiceBooking.items : []).map((it) => idOf(it.serviceId))
+  } else if (myAssignments.some((a) => a.serviceId)) {
+    serviceIds = myAssignments.map((a) => idOf(a.serviceId))
+  } else {
+    serviceIds = [
+      idOf(booking.serviceId),
+      ...(booking.packageBooking?.inclusions || []).map((inc) => idOf(inc.serviceId)),
+      ...(booking.contractorInfo?.services || []).map((sv) => idOf(sv.serviceId)),
+    ]
+  }
+  serviceIds = serviceIds.filter((v, i, arr) => v && arr.indexOf(v) === i)
+
+  const [svcDocs, mappings] = await Promise.all([
+    serviceIds.length ? LabourService.find({ _id: { $in: serviceIds } }).select('name').lean() : [],
+    serviceIds.length ? ServiceProduct.find({ serviceId: { $in: serviceIds }, isActive: true }).populate('productId').lean() : [],
+  ])
+  const nameById = new Map(svcDocs.map((sv) => [String(sv._id), sv.name]))
+
+  const services = serviceIds.map((sid) => ({
+    serviceId: sid,
+    serviceName: nameById.get(sid) || 'Service',
+    materials: mappings
+      .filter((m) => String(m.serviceId) === sid && m.productId && m.productId.isActive !== false)
+      .map((m) => ({ ...m.productId, requiredQty: m.quantityRequired || 1 })),
+  }))
+
+  return sendSuccess(res, { data: { services } })
 })
 
 export const createVendorMaterialRequest = asyncHandler(async (req, res) => {
@@ -732,11 +795,14 @@ export const issueMaterials = asyncHandler(async (req, res) => {
     }
   }
 
-  // Determine overall status
-  const totalItems = materialRequest.items.length
-  if (totalPendingCount === 0 && totalIssuedCount > 0) {
+  // Determine overall status from ALL items on the request (not just the ones in this call)
+  const anyIssued = materialRequest.items.some((i) => (i.quantityIssued || 0) > 0)
+  const anyStillPending = materialRequest.items.some(
+    (i) => (i.quantityIssued || 0) < (i.quantityRequired || 0)
+  )
+  if (anyIssued && !anyStillPending) {
     materialRequest.status = 'ISSUED'
-  } else if (totalIssuedCount > 0 || materialRequest.items.some((i) => (i.quantityIssued || 0) > 0)) {
+  } else if (anyIssued) {
     materialRequest.status = 'PARTIALLY_ISSUED'
   } else {
     materialRequest.status = 'WAITING_FOR_STOCK'

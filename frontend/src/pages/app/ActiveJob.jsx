@@ -19,7 +19,6 @@ import {
   User,
   Package,
   Boxes,
-  Lock,
   Send,
   Sparkles,
   Info,
@@ -617,7 +616,6 @@ export function ActiveJob() {
 
   const hasRequiredMaterials = materialItems.length > 0
   const materialStatus = materialRequest?.status || (hasRequiredMaterials ? 'UNREQUESTED' : 'NONE')
-  const isMaterialApproved = !hasRequiredMaterials || ['APPROVED', 'ISSUED', 'READY_FOR_ISSUE'].includes(materialStatus)
   const isMaterialRejected = materialStatus === 'REJECTED'
   const isMaterialWaiting = ['REQUESTED', 'PENDING_APPROVAL', 'WAITING_FOR_STOCK', 'UNREQUESTED'].includes(materialStatus)
 
@@ -1149,8 +1147,20 @@ export function ActiveJob() {
                 </div>
               </div>
             ) : (
-              <div className="rounded-xl bg-slate-50 p-3 text-center text-xs text-slate-500">
-                No physical inventory products required for this booking. You can start directly.
+              <div className="space-y-2">
+                <div className="rounded-xl bg-slate-50 p-3 text-center text-xs text-slate-500">
+                  No physical inventory products are mapped to this service. You can start directly, or request materials if you need any for this job.
+                </div>
+                {['ACCEPTED', 'EN_ROUTE', 'STARTED'].includes(status) && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/serviceprovider/materials?newRequest=${bookingId}`)}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-sky-200 bg-sky-50 py-2.5 px-4 text-xs font-extrabold text-sky-800 hover:bg-sky-100 active:scale-95 transition"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    Request Materials for this Job
+                  </button>
+                )}
               </div>
             )}
 
@@ -1161,10 +1171,10 @@ export function ActiveJob() {
                   <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-800 space-y-1">
                     <div className="flex items-center gap-1.5 font-bold">
                       <ShieldAlert className="h-4 w-4 text-rose-600" />
-                      <span>Admin Status: Materials Out of Stock</span>
+                      <span>Admin Status: Materials Not Available</span>
                     </div>
                     <p className="text-[11px] text-rose-700">
-                      Admin verified inventory and confirmed required materials are unavailable. Please cancel this booking below.
+                      Admin could not supply the requested materials. You can still start the job without them, or cancel the booking below if you cannot proceed.
                     </p>
                     {materialRequest?.adminRemarks && (
                       <p className="text-[11px] font-semibold text-rose-900 bg-white/70 p-1.5 rounded-lg border border-rose-200">
@@ -1176,10 +1186,10 @@ export function ActiveJob() {
                   <div className="rounded-xl bg-sky-50 border border-sky-200 p-3 text-xs text-sky-900 space-y-2">
                     <div className="flex items-center gap-1.5 font-bold">
                       <Info className="h-4 w-4 text-sky-700" />
-                      <span>Action Required: Request Materials from Admin</span>
+                      <span>Optional: Request Materials from Admin</span>
                     </div>
                     <p className="text-[11px] text-sky-700">
-                      Send a stock verification request to Admin. Once Admin approves that products are in stock, you can start your journey.
+                      Need materials for this job? Send a stock request to Admin. This is optional — you can start your journey without it.
                     </p>
                     <button
                       type="button"
@@ -1201,10 +1211,10 @@ export function ActiveJob() {
                   <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900 space-y-1.5">
                     <div className="flex items-center gap-1.5 font-bold">
                       <Clock className="h-4 w-4 text-amber-600 animate-pulse" />
-                      <span>Waiting for Admin Stock Approval</span>
+                      <span>Material Request Pending with Admin</span>
                     </div>
                     <p className="text-[11px] text-amber-800">
-                      Your material request is being reviewed by the Admin. You will receive an instant notification here once confirmed.
+                      Your material request is being reviewed by the Admin. You will be notified here once it is confirmed. You do not have to wait — you can start your journey now.
                     </p>
                     {materialRequest?.adminRemarks && (
                       <p className="text-[11px] font-semibold text-amber-950 bg-white/70 p-1.5 rounded-lg border border-amber-200">
@@ -1219,7 +1229,7 @@ export function ActiveJob() {
                       <span>Materials Approved & Confirmed in Stock</span>
                     </div>
                     <p className="text-[11px] text-emerald-700">
-                      Admin has verified warehouse inventory. All materials are ready. You are clear to start your journey!
+                      Admin has verified warehouse inventory. All materials are ready. You can start your journey.
                     </p>
                   </div>
                 )}
@@ -1408,31 +1418,6 @@ export function ActiveJob() {
                 </GlassPanel>
               ) : status === 'ACCEPTED' ? (
                 <>
-                  {isMaterialRejected ? (
-                    <button
-                      type="button"
-                      disabled={updating}
-                      onClick={() => handleCancel(true)}
-                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 px-6 py-4 text-base font-extrabold text-white shadow-lg shadow-rose-600/25 transition hover:bg-rose-700 active:scale-[0.98] disabled:opacity-50"
-                    >
-                      <AlertTriangle className="h-5 w-5" />
-                      Cancel Booking (Materials Out of Stock)
-                    </button>
-                  ) : !isMaterialApproved ? (
-                    <div className="space-y-1.5">
-                      <button
-                        type="button"
-                        disabled
-                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-200 px-6 py-4 text-base font-extrabold text-slate-400 cursor-not-allowed border border-slate-300 shadow-none"
-                      >
-                        <Lock className="h-5 w-5 text-slate-400" />
-                        Start Journey (Locked)
-                      </button>
-                      <p className="text-center text-[11px] font-semibold text-amber-700">
-                        🔒 Locked: Waiting for Admin to confirm & approve materials in stock
-                      </p>
-                    </div>
-                  ) : (
                     <button
                       type="button"
                       disabled={updating}
@@ -1448,18 +1433,15 @@ export function ActiveJob() {
                         </>
                       )}
                     </button>
-                  )}
 
-                  {!isMaterialRejected && (
-                    <button
-                      type="button"
-                      disabled={updating}
-                      onClick={() => handleCancel(false)}
-                      className="w-full rounded-2xl border-2 border-slate-200 bg-white px-6 py-3 text-sm font-extrabold text-slate-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 active:scale-[0.98] disabled:opacity-50"
-                    >
-                      Cancel Booking
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    disabled={updating}
+                    onClick={() => handleCancel(false)}
+                    className="w-full rounded-2xl border-2 border-slate-200 bg-white px-6 py-3 text-sm font-extrabold text-slate-600 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 active:scale-[0.98] disabled:opacity-50"
+                  >
+                    Cancel Booking
+                  </button>
                 </>
               ) : (
                 <button
