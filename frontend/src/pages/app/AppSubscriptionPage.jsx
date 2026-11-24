@@ -60,7 +60,9 @@ export function AppSubscriptionPage() {
     freeTrialDays: 3,
   })
   const [loading, setLoading] = useState(true)
-  const [processing, setProcessing] = useState(false)
+  // Which plan is being processed ('daily' for the daily pass, or a plan _id). null = none.
+  const [processingKey, setProcessingKey] = useState(null)
+  const processing = processingKey !== null
   const [showBuyAnotherPlan, setShowBuyAnotherPlan] = useState(false)
   const [currentHour, setCurrentHour] = useState(getCurrentISTHour())
   const [toast, setToast] = useState({ message: '', variant: 'success' })
@@ -133,8 +135,9 @@ export function AppSubscriptionPage() {
     })
 
   const handleSubscribe = async (planId = null) => {
+    if (processingKey !== null) return
     try {
-      setProcessing(true)
+      setProcessingKey(planId || 'daily')
 
       const sdkLoaded = await loadRazorpay()
       if (!sdkLoaded) {
@@ -193,7 +196,7 @@ export function AppSubscriptionPage() {
     } catch (err) {
       showToast(err?.response?.data?.message || err?.message || 'Could not start payment', 'error')
     } finally {
-      setProcessing(false)
+      setProcessingKey(null)
     }
   }
 
@@ -507,7 +510,7 @@ export function AppSubscriptionPage() {
                     disabled={processing || !isWithinWindow}
                     className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand to-blue-800 py-4 text-base font-bold text-white shadow-lg shadow-brand/30 transition hover:from-brand/90 disabled:opacity-60"
                   >
-                    {processing ? (
+                    {processingKey === 'daily' ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
                     ) : (
                       <>
@@ -605,7 +608,7 @@ export function AppSubscriptionPage() {
                     disabled={processing}
                     className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand py-3.5 text-sm font-bold text-white shadow-lg shadow-brand/20 transition hover:bg-brand/90 disabled:opacity-60"
                   >
-                    {processing ? <Loader2 className="h-5 w-5 animate-spin" /> : `Select ${plan.name}`}
+                    {processingKey === plan._id ? <Loader2 className="h-5 w-5 animate-spin" /> : `Select ${plan.name}`}
                   </button>
                 </div>
               </motion.div>
