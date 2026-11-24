@@ -1,31 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   Wallet,
   ShieldCheck,
   AlertTriangle,
   CheckCircle2,
-  Percent,
-  IndianRupee,
-  Lock,
   RefreshCw,
-  Search,
-  Filter,
   Save,
-  Clock,
   History,
-  Users,
-  Sliders,
   HelpCircle,
-  ChevronLeft,
-  ChevronRight,
-  TrendingUp,
-  FileText,
 } from 'lucide-react'
 import { walletEligibilityApi } from '../../api/walletEligibilityApi.js'
 import { ApiError } from '../../api/http.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
-import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
 
 function formatInr(amount) {
   return `₹${Number(amount || 0).toLocaleString('en-IN')}`
@@ -45,8 +32,6 @@ function formatDate(dateStr) {
 }
 
 export function AdminWalletEligibilityPage() {
-  const reduce = useReducedMotion()
-  const [activeTab, setActiveTab] = useState('settings') // 'settings' | 'providers' | 'transactions'
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState({ message: '', variant: 'success' })
@@ -71,23 +56,6 @@ export function AdminWalletEligibilityPage() {
   // Simulation preview state
   const [simBookingAmount, setSimBookingAmount] = useState('1000')
 
-  // Providers Report State
-  const [providers, setProviders] = useState([])
-  const [providersLoading, setProvidersLoading] = useState(false)
-  const [providerSearch, setProviderSearch] = useState('')
-  const [providerFilter, setProviderFilter] = useState('all') // all, eligible, low_balance, pending_reservations
-  const [providerPage, setProviderPage] = useState(1)
-  const [providerTotalPages, setProviderTotalPages] = useState(1)
-  const [providerTotalCount, setProviderTotalCount] = useState(0)
-
-  // Transactions State
-  const [transactions, setTransactions] = useState([])
-  const [txLoading, setTxLoading] = useState(false)
-  const [txSearch, setTxSearch] = useState('')
-  const [txContext, setTxContext] = useState('ALL')
-  const [txPage, setTxPage] = useState(1)
-  const [txTotalPages, setTxTotalPages] = useState(1)
-
   const showToast = useCallback((message, variant = 'success') => {
     setToast({ message, variant })
     setTimeout(() => setToast({ message: '', variant: 'success' }), 4000)
@@ -109,45 +77,6 @@ export function AdminWalletEligibilityPage() {
     }
   }, [showToast])
 
-  // Load Providers Report
-  const loadProviders = useCallback(async () => {
-    setProvidersLoading(true)
-    try {
-      const res = await walletEligibilityApi.getProvidersReport({
-        search: providerSearch,
-        filter: providerFilter,
-        page: providerPage,
-        limit: 15,
-      })
-      setProviders(res?.data?.providers || [])
-      setProviderTotalPages(res?.data?.pagination?.pages || 1)
-      setProviderTotalCount(res?.data?.pagination?.total || 0)
-    } catch (err) {
-      console.error('Failed to load provider eligibility report:', err)
-    } finally {
-      setProvidersLoading(false)
-    }
-  }, [providerSearch, providerFilter, providerPage])
-
-  // Load Transactions
-  const loadTransactions = useCallback(async () => {
-    setTxLoading(true)
-    try {
-      const res = await walletEligibilityApi.getEligibilityTransactions({
-        search: txSearch,
-        context: txContext,
-        page: txPage,
-        limit: 15,
-      })
-      setTransactions(res?.data?.transactions || [])
-      setTxTotalPages(res?.data?.pagination?.pages || 1)
-    } catch (err) {
-      console.error('Failed to load eligibility transactions:', err)
-    } finally {
-      setTxLoading(false)
-    }
-  }, [txSearch, txContext, txPage])
-
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -156,14 +85,6 @@ export function AdminWalletEligibilityPage() {
     })
     return () => { cancelled = true }
   }, [loadSettings])
-
-  useEffect(() => {
-    if (activeTab === 'providers') {
-      loadProviders()
-    } else if (activeTab === 'transactions') {
-      loadTransactions()
-    }
-  }, [activeTab, loadProviders, loadTransactions])
 
   // Save Settings Handler
   const handleSaveSettings = async (e) => {
@@ -192,7 +113,6 @@ export function AdminWalletEligibilityPage() {
       const s = res?.data?.settings || {}
       setSettings(s)
       showToast('Wallet eligibility configuration saved successfully!')
-      if (activeTab === 'providers') loadProviders()
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : 'Failed to save settings'
       showToast(msg, 'error')
@@ -259,8 +179,6 @@ export function AdminWalletEligibilityPage() {
               type="button"
               onClick={() => {
                 loadSettings()
-                if (activeTab === 'providers') loadProviders()
-                if (activeTab === 'transactions') loadTransactions()
               }}
               className="flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-white/20 active:scale-95"
             >
@@ -316,55 +234,8 @@ export function AdminWalletEligibilityPage() {
         </div>
       </GlassPanel>
 
-      {/* Tabs */}
-      <div className="flex border-b border-slate-200">
-        <button
-          type="button"
-          onClick={() => setActiveTab('settings')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-extrabold transition ${
-            activeTab === 'settings'
-              ? 'border-brand text-brand'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Sliders className="h-4 w-4" />
-          Wallet Eligibility Settings
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('providers')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-extrabold transition ${
-            activeTab === 'providers'
-              ? 'border-brand text-brand'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Users className="h-4 w-4" />
-          Provider Eligibility Report
-          {providerTotalCount > 0 ? (
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-              {providerTotalCount}
-            </span>
-          ) : null}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('transactions')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-extrabold transition ${
-            activeTab === 'transactions'
-              ? 'border-brand text-brand'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <History className="h-4 w-4" />
-          Reservation & Settlement Ledger
-        </button>
-      </div>
-
-      {/* TAB 1: SETTINGS */}
-      {activeTab === 'settings' && (
+      {/* SETTINGS */}
+      {(
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Main Configuration Card */}
           <div className="space-y-6 lg:col-span-2">
@@ -633,320 +504,6 @@ export function AdminWalletEligibilityPage() {
             </GlassPanel>
           </div>
         </div>
-      )}
-
-      {/* TAB 2: PROVIDERS REPORT */}
-      {activeTab === 'providers' && (
-        <GlassPanel className="p-6 space-y-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-base font-black text-slate-900">Service Provider Eligibility Audit Table</h2>
-              <p className="text-xs text-slate-500">
-                Authoritative overview of provider wallets, reserved funds, available balances, and current booking acceptance eligibility.
-              </p>
-            </div>
-
-            {/* Filter pills */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              {[
-                { key: 'all', label: 'All Providers' },
-                { key: 'eligible', label: 'Eligible (Pass)' },
-                { key: 'low_balance', label: 'Low Balance (Blocked)' },
-                { key: 'pending_reservations', label: 'With Active Holds' },
-              ].map((f) => (
-                <button
-                  key={f.key}
-                  type="button"
-                  onClick={() => {
-                    setProviderFilter(f.key)
-                    setProviderPage(1)
-                  }}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-extrabold transition ${
-                    providerFilter === f.key
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="pointer-events-none absolute inset-y-0 left-0 ml-3.5 h-4 w-4 text-slate-400 self-center" />
-            <input
-              type="text"
-              value={providerSearch}
-              onChange={(e) => {
-                setProviderSearch(e.target.value)
-                setProviderPage(1)
-              }}
-              placeholder="Search provider by name, phone or email..."
-              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-xs font-medium text-slate-900 shadow-xs outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
-            />
-          </div>
-
-          {/* Providers Table */}
-          <div className="overflow-x-auto rounded-2xl border border-slate-100">
-            <table className="w-full border-collapse text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/80 font-bold uppercase tracking-wider text-slate-500">
-                  <th className="py-3 px-4">Provider</th>
-                  <th className="py-3 px-3">Wallet Balance</th>
-                  <th className="py-3 px-3">Reserved Holds</th>
-                  <th className="py-3 px-3">Available Balance</th>
-                  <th className="py-3 px-3">Min Required</th>
-                  <th className="py-3 px-3">Eligibility Status</th>
-                  <th className="py-3 px-3">Active Holds</th>
-                  <th className="py-3 px-3">Last Recharge</th>
-                  <th className="py-3 px-4">Total Commission</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {providersLoading ? (
-                  <tr>
-                    <td colSpan={9} className="py-12 text-center text-slate-400">
-                      <RefreshCw className="mx-auto h-6 w-6 animate-spin text-brand" />
-                      <p className="mt-2 text-xs">Loading provider records...</p>
-                    </td>
-                  </tr>
-                ) : providers.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="py-12 text-center text-slate-400">
-                      No service providers found matching current filters.
-                    </td>
-                  </tr>
-                ) : (
-                  providers.map((p) => {
-                    const isEligible = p.eligibilityStatus === 'ELIGIBLE'
-                    return (
-                      <tr key={p.providerId} className="hover:bg-slate-50/60 transition">
-                        <td className="py-3.5 px-4">
-                          <p className="font-extrabold text-slate-900">{p.providerName}</p>
-                          <p className="text-[11px] text-slate-400">{p.phone}</p>
-                        </td>
-                        <td className="py-3.5 px-3 font-mono font-bold text-slate-900">
-                          {formatInr(p.walletBalance)}
-                        </td>
-                        <td className="py-3.5 px-3 font-mono text-amber-600 font-bold">
-                          {p.reservedAmount > 0 ? formatInr(p.reservedAmount) : '₹0'}
-                        </td>
-                        <td className="py-3.5 px-3 font-mono font-black text-emerald-700">
-                          {formatInr(p.availableBalance)}
-                        </td>
-                        <td className="py-3.5 px-3 font-mono text-slate-500">
-                          {formatInr(p.minimumRequiredBalance)}
-                        </td>
-                        <td className="py-3.5 px-3">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide ${
-                              isEligible
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-amber-100 text-amber-800'
-                            }`}
-                          >
-                            {isEligible ? (
-                              <CheckCircle2 className="h-3 w-3" />
-                            ) : (
-                              <AlertTriangle className="h-3 w-3" />
-                            )}
-                            {isEligible ? 'Eligible' : 'Low Balance'}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-3 font-mono">
-                          {p.pendingReservationsCount > 0 ? (
-                            <span className="rounded-md bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-800">
-                              {p.pendingReservationsCount} pending
-                            </span>
-                          ) : (
-                            <span className="text-slate-400">0</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-3">
-                          {p.lastRechargeAmount ? (
-                            <div>
-                              <p className="font-mono font-bold text-slate-800">{formatInr(p.lastRechargeAmount)}</p>
-                              <p className="text-[10px] text-slate-400">{formatDate(p.lastRechargeDate)}</p>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400">—</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                          {formatInr(p.totalCommissionCollected)}
-                        </td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {providerTotalPages > 1 ? (
-            <div className="flex items-center justify-between border-t border-slate-100 pt-4 text-xs text-slate-500">
-              <p>
-                Page {providerPage} of {providerTotalPages} ({providerTotalCount} total providers)
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={providerPage <= 1}
-                  onClick={() => setProviderPage((p) => p - 1)}
-                  className="rounded-lg border border-slate-200 p-1.5 hover:bg-slate-100 disabled:opacity-40"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  disabled={providerPage >= providerTotalPages}
-                  onClick={() => setProviderPage((p) => p + 1)}
-                  className="rounded-lg border border-slate-200 p-1.5 hover:bg-slate-100 disabled:opacity-40"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          ) : null}
-        </GlassPanel>
-      )}
-
-      {/* TAB 3: RESERVATION & SETTLEMENT LEDGER */}
-      {activeTab === 'transactions' && (
-        <GlassPanel className="p-6 space-y-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-base font-black text-slate-900">Reservation & Settlement Ledger Audit</h2>
-              <p className="text-xs text-slate-500">
-                Immutable audit trail of booking commission reservations, completed settlements, cancellations releases, and recharges.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <select
-                value={txContext}
-                onChange={(e) => {
-                  setTxContext(e.target.value)
-                  setTxPage(1)
-                }}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
-              >
-                <option value="ALL">All Contexts</option>
-                <option value="BOOKING_COMMISSION_RESERVE">Hold Reservations</option>
-                <option value="BOOKING_COMMISSION_SETTLEMENT">Settled Commissions</option>
-                <option value="BOOKING_COMMISSION_RELEASE">Released Reservations</option>
-                <option value="WALLET_RECHARGE">Recharges</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Transactions Table */}
-          <div className="overflow-x-auto rounded-2xl border border-slate-100">
-            <table className="w-full border-collapse text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/80 font-bold uppercase tracking-wider text-slate-500">
-                  <th className="py-3 px-4">Tx ID & Date</th>
-                  <th className="py-3 px-3">Provider</th>
-                  <th className="py-3 px-3">Context</th>
-                  <th className="py-3 px-3">Amount</th>
-                  <th className="py-3 px-3">Snapshots</th>
-                  <th className="py-3 px-3">Balance Change</th>
-                  <th className="py-3 px-4">Description</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {txLoading ? (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400">
-                      <RefreshCw className="mx-auto h-6 w-6 animate-spin text-brand" />
-                      <p className="mt-2 text-xs">Loading ledger entries...</p>
-                    </td>
-                  </tr>
-                ) : transactions.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400">
-                      No financial ledger transactions found.
-                    </td>
-                  </tr>
-                ) : (
-                  transactions.map((t) => {
-                    const isHold = t.context === 'BOOKING_COMMISSION_RESERVE'
-                    const isSettle = t.context === 'BOOKING_COMMISSION_SETTLEMENT'
-                    const isRelease = t.context === 'BOOKING_COMMISSION_RELEASE'
-                    const isRecharge = t.context === 'WALLET_RECHARGE'
-
-                    let badgeColor = 'bg-slate-100 text-slate-800'
-                    if (isHold) badgeColor = 'bg-blue-100 text-blue-800'
-                    if (isSettle) badgeColor = 'bg-emerald-100 text-emerald-800'
-                    if (isRelease) badgeColor = 'bg-purple-100 text-purple-800'
-                    if (isRecharge) badgeColor = 'bg-teal-100 text-teal-800'
-
-                    return (
-                      <tr key={t._id} className="hover:bg-slate-50/60 transition">
-                        <td className="py-3.5 px-4">
-                          <p className="font-mono font-bold text-slate-900">{t.transactionId || String(t._id).slice(-8)}</p>
-                          <p className="text-[10px] text-slate-400">{formatDate(t.createdAt)}</p>
-                        </td>
-                        <td className="py-3.5 px-3">
-                          <p className="font-bold text-slate-800">{t.userId?.fullName || '—'}</p>
-                          <p className="text-[10px] text-slate-400">{t.userId?.phone}</p>
-                        </td>
-                        <td className="py-3.5 px-3">
-                          <span className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-black uppercase ${badgeColor}`}>
-                            {t.context.replace(/_/g, ' ')}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-3 font-mono font-black text-slate-900">
-                          {formatInr(t.amount)}
-                        </td>
-                        <td className="py-3.5 px-3 text-[11px] text-slate-500 font-mono">
-                          {t.commissionPercentageSnapshot ? `${t.commissionPercentageSnapshot}% comm` : '—'}
-                          {t.minimumBalanceSnapshot ? ` · ₹${t.minimumBalanceSnapshot} min` : ''}
-                        </td>
-                        <td className="py-3.5 px-3 font-mono text-[11px]">
-                          {formatInr(t.balanceBefore)} → {formatInr(t.balanceAfter)}
-                        </td>
-                        <td className="py-3.5 px-4 text-xs text-slate-600 max-w-xs truncate">
-                          {t.description || '—'}
-                        </td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {txTotalPages > 1 ? (
-            <div className="flex items-center justify-between border-t border-slate-100 pt-4 text-xs text-slate-500">
-              <p>
-                Page {txPage} of {txTotalPages}
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={txPage <= 1}
-                  onClick={() => setTxPage((p) => p - 1)}
-                  className="rounded-lg border border-slate-200 p-1.5 hover:bg-slate-100 disabled:opacity-40"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  disabled={txPage >= txTotalPages}
-                  onClick={() => setTxPage((p) => p + 1)}
-                  className="rounded-lg border border-slate-200 p-1.5 hover:bg-slate-100 disabled:opacity-40"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          ) : null}
-        </GlassPanel>
       )}
     </div>
   )
