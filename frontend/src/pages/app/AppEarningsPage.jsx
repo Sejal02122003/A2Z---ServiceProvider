@@ -635,7 +635,10 @@ export function AppEarningsPage() {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="font-bold text-slate-900 text-lg">₹{(w.amount || 0).toLocaleString('en-IN')}</p>
-                    <p className="text-xs text-slate-500 mt-1">{new Date(w.createdAt).toLocaleDateString()}</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-600">
+                      Request ID: <span className="font-mono font-bold text-slate-900">#{String(w._id).slice(-6)}</span>
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">{new Date(w.createdAt).toLocaleDateString()}</p>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                     w.status === 'APPROVED' ? 'bg-blue-100 text-blue-700' :
