@@ -177,7 +177,7 @@ export function LabourHomeScreen({ user }) {
         console.error('Failed to load bookings:', err)
       }
     })
-    
+
     withdrawalsApi.getEarningsSummary().then(res => {
       if (res.data?.earnings) {
         setEarnings(res.data.earnings)
@@ -200,7 +200,7 @@ export function LabourHomeScreen({ user }) {
           setWalletEligibility(res.data)
         }
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoadingEligibility(false))
   }, [user])
 
@@ -256,11 +256,11 @@ export function LabourHomeScreen({ user }) {
             setShowConfirmedModal(true)
           } else if (!seenOnServer && seenOnDevice) {
             // Already dismissed on this device before the server flag existed: sync it once
-            vendorTrialApi.markJoiningSeen().catch(() => {})
+            vendorTrialApi.markJoiningSeen().catch(() => { })
           }
         }
       }
-    }).catch(() => {})
+    }).catch(() => { })
     return () => { cancelled = true }
   }, [user])
 
@@ -277,17 +277,17 @@ export function LabourHomeScreen({ user }) {
   const [assignmentDetailOpen, setAssignmentDetailOpen] = useState(false)
   const { online, setOnline } = useLabourPresence()
   const [schedule, setSchedule] = useState(() => {
-    return user?.labourProfile?.schedule && user.labourProfile.schedule.length === 7 
-      ? user.labourProfile.schedule 
+    return user?.labourProfile?.schedule && user.labourProfile.schedule.length === 7
+      ? user.labourProfile.schedule
       : [
-          { day: 'Monday', startTime: '09:00', endTime: '17:00', isAvailable: true },
-          { day: 'Tuesday', startTime: '09:00', endTime: '17:00', isAvailable: true },
-          { day: 'Wednesday', startTime: '09:00', endTime: '17:00', isAvailable: true },
-          { day: 'Thursday', startTime: '09:00', endTime: '17:00', isAvailable: true },
-          { day: 'Friday', startTime: '09:00', endTime: '17:00', isAvailable: true },
-          { day: 'Saturday', startTime: '09:00', endTime: '17:00', isAvailable: true },
-          { day: 'Sunday', startTime: '09:00', endTime: '17:00', isAvailable: false },
-        ]
+        { day: 'Monday', startTime: '09:00', endTime: '17:00', isAvailable: true },
+        { day: 'Tuesday', startTime: '09:00', endTime: '17:00', isAvailable: true },
+        { day: 'Wednesday', startTime: '09:00', endTime: '17:00', isAvailable: true },
+        { day: 'Thursday', startTime: '09:00', endTime: '17:00', isAvailable: true },
+        { day: 'Friday', startTime: '09:00', endTime: '17:00', isAvailable: true },
+        { day: 'Saturday', startTime: '09:00', endTime: '17:00', isAvailable: true },
+        { day: 'Sunday', startTime: '09:00', endTime: '17:00', isAvailable: false },
+      ]
   })
 
   const isScheduleOffline = useMemo(() => {
@@ -295,14 +295,14 @@ export function LabourHomeScreen({ user }) {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
     const currentDay = days[new Date().getDay()]
     const todaySchedule = schedule.find(s => s.day === currentDay)
-    
+
     if (!todaySchedule || !todaySchedule.isAvailable) return true
-    
+
     const now = new Date()
     const hh = String(now.getHours()).padStart(2, '0')
     const mm = String(now.getMinutes()).padStart(2, '0')
     const currentIstStr = `${hh}:${mm}`
-    
+
     if (currentIstStr < todaySchedule.startTime || currentIstStr > todaySchedule.endTime) {
       return true
     }
@@ -316,20 +316,20 @@ export function LabourHomeScreen({ user }) {
     const loc = readAppUserLocation()
     if (loc?.lat && loc?.lng) {
       import('../../../api/locationApi.js').then(({ updateLabourLocation, updateLabourStatus }) => {
-        updateLabourLocation(loc.lat, loc.lng).catch(() => {})
-        updateLabourStatus(targetStatus).catch(() => {})
+        updateLabourLocation(loc.lat, loc.lng).catch(() => { })
+        updateLabourStatus(targetStatus).catch(() => { })
       })
     } else if (typeof navigator !== 'undefined' && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           import('../../../api/locationApi.js').then(({ updateLabourLocation, updateLabourStatus }) => {
-            updateLabourLocation(pos.coords.latitude, pos.coords.longitude).catch(() => {})
-            updateLabourStatus(targetStatus).catch(() => {})
+            updateLabourLocation(pos.coords.latitude, pos.coords.longitude).catch(() => { })
+            updateLabourStatus(targetStatus).catch(() => { })
           })
         },
         () => {
           import('../../../api/locationApi.js').then(({ updateLabourStatus }) => {
-            updateLabourStatus(targetStatus).catch(() => {})
+            updateLabourStatus(targetStatus).catch(() => { })
           })
         }
       )
@@ -717,22 +717,21 @@ export function LabourHomeScreen({ user }) {
                     <span className="text-xs font-black text-white">
                       {!online ? 'You are Offline' : isScheduleOffline ? 'Offline (Schedule)' : 'You are Online'}
                     </span>
-                    <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${
-                      !online 
-                        ? 'bg-slate-700/80 text-slate-300' 
-                        : isScheduleOffline 
-                        ? 'bg-amber-500/30 text-amber-200 border border-amber-400/40' 
+                    <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${!online
+                      ? 'bg-slate-700/80 text-slate-300'
+                      : isScheduleOffline
+                        ? 'bg-amber-500/30 text-amber-200 border border-amber-400/40'
                         : 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/40'
-                    }`}>
+                      }`}>
                       {!online ? 'Off Duty' : isScheduleOffline ? 'Schedule Off' : 'On Duty'}
                     </span>
                   </div>
                   <p className="text-[10px] text-white/70">
-                    {!online 
-                      ? 'Offline — will not receive broadcast bookings or sound' 
-                      : isScheduleOffline 
-                      ? 'Outside working hours in Time Management' 
-                      : 'Receiving broadcasts & alert sound (open or closed)'}
+                    {!online
+                      ? 'Offline — will not receive broadcast bookings or sound'
+                      : isScheduleOffline
+                        ? 'Outside working hours in Time Management'
+                        : 'Receiving broadcasts & alert sound (open or closed)'}
                   </p>
                 </div>
               </div>
@@ -743,13 +742,12 @@ export function LabourHomeScreen({ user }) {
                   const next = !online
                   setOnline(next)
                   import('../../../api/locationApi.js').then(({ updateLabourStatus }) => {
-                    updateLabourStatus(next ? 'available' : 'offline').catch(() => {})
+                    updateLabourStatus(next ? 'available' : 'offline').catch(() => { })
                   })
                   showToast(next ? 'Status set to ONLINE: Ready for broadcasts' : 'Status set to OFFLINE: Broadcasts paused')
                 }}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  online ? 'bg-emerald-500 ring-2 ring-emerald-400/40' : 'bg-slate-600'
-                }`}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${online ? 'bg-emerald-500 ring-2 ring-emerald-400/40' : 'bg-slate-600'
+                  }`}
                 role="switch"
                 aria-checked={online}
                 title="Toggle Online / Offline status"
@@ -757,9 +755,8 @@ export function LabourHomeScreen({ user }) {
                 <span className="sr-only">Toggle duty status</span>
                 <span
                   aria-hidden="true"
-                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    online ? 'translate-x-2.5' : '-translate-x-2.5'
-                  }`}
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${online ? 'translate-x-2.5' : '-translate-x-2.5'
+                    }`}
                 />
               </button>
             </div>
@@ -786,20 +783,17 @@ export function LabourHomeScreen({ user }) {
           <motion.div
             initial={reduce ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`overflow-hidden rounded-3xl border transition-all shadow-lg ${
-              walletEligibility.eligible
-                ? 'border-emerald-200/90 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/40 shadow-emerald-900/5'
-                : 'border-amber-300 bg-gradient-to-br from-amber-50/90 via-white to-orange-50/40 shadow-amber-900/10'
-            }`}
+            className={`overflow-hidden rounded-3xl border transition-all shadow-lg ${walletEligibility.eligible
+              ? 'border-emerald-200/90 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/40 shadow-emerald-900/5'
+              : 'border-amber-300 bg-gradient-to-br from-amber-50/90 via-white to-orange-50/40 shadow-amber-900/10'
+              }`}
           >
             {/* Header / Status Banner */}
-            <div className={`flex flex-wrap items-center justify-between gap-2.5 px-4 py-3 border-b ${
-              walletEligibility.eligible ? 'border-emerald-100 bg-emerald-50/50' : 'border-amber-200 bg-amber-100/60'
-            }`}>
+            <div className={`flex flex-wrap items-center justify-between gap-2.5 px-4 py-3 border-b ${walletEligibility.eligible ? 'border-emerald-100 bg-emerald-50/50' : 'border-amber-200 bg-amber-100/60'
+              }`}>
               <div className="flex items-center gap-2">
-                <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${
-                  walletEligibility.eligible ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'
-                }`}>
+                <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${walletEligibility.eligible ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'
+                  }`}>
                   <Wallet className="h-4 w-4" />
                 </span>
                 <div>
@@ -857,15 +851,12 @@ export function LabourHomeScreen({ user }) {
                   <p className="text-[9px] text-blue-600">Pending booking hold</p>
                 </div>
 
-                <div className={`rounded-2xl border p-2.5 shadow-xs ${
-                  walletEligibility.eligible ? 'border-emerald-200 bg-emerald-50/40' : 'border-amber-200 bg-amber-50/60'
-                }`}>
-                  <p className={`text-[10px] font-bold uppercase tracking-wider ${
-                    walletEligibility.eligible ? 'text-emerald-800' : 'text-amber-800'
-                  }`}>Available Balance</p>
-                  <p className={`mt-1 font-mono text-base font-black ${
-                    walletEligibility.eligible ? 'text-emerald-900' : 'text-amber-900'
+                <div className={`rounded-2xl border p-2.5 shadow-xs ${walletEligibility.eligible ? 'border-emerald-200 bg-emerald-50/40' : 'border-amber-200 bg-amber-50/60'
                   }`}>
+                  <p className={`text-[10px] font-bold uppercase tracking-wider ${walletEligibility.eligible ? 'text-emerald-800' : 'text-amber-800'
+                    }`}>Available Balance</p>
+                  <p className={`mt-1 font-mono text-base font-black ${walletEligibility.eligible ? 'text-emerald-900' : 'text-amber-900'
+                    }`}>
                     ₹{Number(walletEligibility.availableBalance || 0).toLocaleString('en-IN')}
                   </p>
                   <p className="text-[9px] text-slate-500">Balance - Reserved</p>
@@ -1090,23 +1081,21 @@ export function LabourHomeScreen({ user }) {
                             newSchedule[idx] = { ...newSchedule[idx], isAvailable: !newSchedule[idx].isAvailable };
                             setSchedule(newSchedule);
                           }}
-                          className={`relative ml-2 inline-flex h-6 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 order-2 sm:order-3 ${
-                            daySchedule.isAvailable ? 'bg-brand' : 'bg-slate-300'
-                          }`}
+                          className={`relative ml-2 inline-flex h-6 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 order-2 sm:order-3 ${daySchedule.isAvailable ? 'bg-brand' : 'bg-slate-300'
+                            }`}
                           role="switch"
                           aria-checked={daySchedule.isAvailable}
                         >
                           <span className="sr-only">Toggle {daySchedule.day} availability</span>
                           <span
                             aria-hidden="true"
-                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              daySchedule.isAvailable ? 'translate-x-2.5' : '-translate-x-2.5'
-                            }`}
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${daySchedule.isAvailable ? 'translate-x-2.5' : '-translate-x-2.5'
+                              }`}
                           />
                         </button>
                         <div className="w-full sm:w-auto sm:flex-1 flex items-center gap-2 order-3 sm:order-2">
-                          <input 
-                            type="time" 
+                          <input
+                            type="time"
                             value={daySchedule.startTime}
                             onChange={(e) => {
                               const newSchedule = [...schedule];
@@ -1117,8 +1106,8 @@ export function LabourHomeScreen({ user }) {
                             className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-900 bg-slate-50 focus:border-brand focus:ring-1 focus:ring-brand disabled:opacity-50"
                           />
                           <span className="text-xs text-slate-500">to</span>
-                          <input 
-                            type="time" 
+                          <input
+                            type="time"
                             value={daySchedule.endTime}
                             onChange={(e) => {
                               const newSchedule = [...schedule];
@@ -1132,8 +1121,8 @@ export function LabourHomeScreen({ user }) {
                       </div>
                     ))}
                   </div>
-            
-            
+
+
                   <AppPrimaryButton
                     type="button"
                     onClick={async () => {
@@ -1144,7 +1133,7 @@ export function LabourHomeScreen({ user }) {
                         const todayEntry = schedule.find(s => s.day === currentDay)
                         const isOff = !todayEntry || !todayEntry.isAvailable
                         import('../../../api/locationApi.js').then(({ updateLabourStatus }) => {
-                          updateLabourStatus(isOff || !online ? 'offline' : 'available').catch(() => {})
+                          updateLabourStatus(isOff || !online ? 'offline' : 'available').catch(() => { })
                         })
                         showToast(isOff ? 'Schedule saved. You are OFFLINE for today.' : 'Time schedule saved successfully')
                         setTimeManagementOpen(false)
@@ -1646,7 +1635,7 @@ export function LabourHomeScreen({ user }) {
           if (vendorId) {
             localStorage.setItem(`a2z_vendor_confirmed_seen_${vendorId}`, 'true')
           }
-          vendorTrialApi.markJoiningSeen().catch(() => {})
+          vendorTrialApi.markJoiningSeen().catch(() => { })
           setShowConfirmedModal(false)
         }}
         user={user}

@@ -179,7 +179,7 @@ export function ActiveJob() {
   const [error, setError] = useState('')
   const [updating, setUpdating] = useState(false)
   const [updateError, setUpdateError] = useState('')
-  
+
   const [otp, setOtp] = useState('')
   const [jobImage, setJobImage] = useState(null)
   const [uploadingImage, setUploadingImage] = useState(false)
@@ -346,7 +346,7 @@ export function ActiveJob() {
             redirectToHomeOnCancellation(b.cancellationReason)
           }
         })
-        .catch(() => {})
+        .catch(() => { })
     }, 5000)
     return () => clearInterval(pollId)
   }, [bookingId, redirectToHomeOnCancellation, user])
@@ -577,7 +577,7 @@ export function ActiveJob() {
   }
 
   let rawStatus = booking.status || 'ACCEPTED'
-  
+
   if (booking.assignments && booking.assignments.length > 0 && user) {
     const myAssignment = booking.assignments.find(a => {
       const aId = typeof a.labourId === 'object' ? a.labourId._id : a.labourId
@@ -607,12 +607,12 @@ export function ActiveJob() {
   const materialItems = (materialRequest?.items && materialRequest.items.length > 0)
     ? materialRequest.items
     : serviceProducts.map(sp => ({
-        productId: sp.productId,
-        quantityRequired: sp.quantityRequired || 1,
-        unit: sp.unit || sp.productId?.unit || 'Piece',
-        itemType: sp.itemType || 'CONSUMABLE',
-        itemStatus: 'PENDING_CHECK',
-      }))
+      productId: sp.productId,
+      quantityRequired: sp.quantityRequired || 1,
+      unit: sp.unit || sp.productId?.unit || 'Piece',
+      itemType: sp.itemType || 'CONSUMABLE',
+      itemStatus: 'PENDING_CHECK',
+    }))
 
   const hasRequiredMaterials = materialItems.length > 0
   const materialStatus = materialRequest?.status || (hasRequiredMaterials ? 'UNREQUESTED' : 'NONE')
@@ -1012,7 +1012,7 @@ export function ActiveJob() {
                     <div className="flex flex-col">
                       <span className="text-[10px] uppercase font-bold text-slate-400">Professional {idx + 1} {isMe && '(You)'}</span>
                       <span className={`font-bold leading-tight ${assignment ? 'text-slate-800' : 'text-slate-400'}`}>
-                        {assignment 
+                        {assignment
                           ? `${assignment.labourId?.fullName || assignment.labourId?.name || 'Assigned'}`
                           : 'Pending Acceptance'}
                       </span>
@@ -1123,9 +1123,8 @@ export function ActiveJob() {
                         className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/80 border border-slate-100 text-xs"
                       >
                         <div className="flex items-center gap-2">
-                          <div className={`h-6 w-6 rounded-lg flex items-center justify-center shrink-0 ${
-                            isItemOk ? 'bg-emerald-100 text-emerald-700' : isItemBad ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-600'
-                          }`}>
+                          <div className={`h-6 w-6 rounded-lg flex items-center justify-center shrink-0 ${isItemOk ? 'bg-emerald-100 text-emerald-700' : isItemBad ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-600'
+                            }`}>
                             {isItemOk ? <Check className="h-3.5 w-3.5" /> : isItemBad ? <X className="h-3.5 w-3.5" /> : <Package className="h-3.5 w-3.5" />}
                           </div>
                           <div>
@@ -1350,7 +1349,7 @@ export function ActiveJob() {
                             }
                           }
                           startedAt = startedAt || booking.startedAt || new Date();
-                          
+
                           const totalHours = (booking.hours || 1) + myExtraHours;
                           const durationMs = totalHours * 60 * 60 * 1000;
                           const elapsed = now - new Date(startedAt).getTime();
@@ -1418,21 +1417,21 @@ export function ActiveJob() {
                 </GlassPanel>
               ) : status === 'ACCEPTED' ? (
                 <>
-                    <button
-                      type="button"
-                      disabled={updating}
-                      onClick={() => handleStatusUpdate(config.next, false)}
-                      className={`flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-extrabold text-white shadow-lg transition hover:opacity-90 active:scale-[0.98] disabled:opacity-50 ${config.color}`}
-                    >
-                      {updating ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <>
-                          <config.icon className="h-5 w-5" />
-                          {config.label}
-                        </>
-                      )}
-                    </button>
+                  <button
+                    type="button"
+                    disabled={updating}
+                    onClick={() => handleStatusUpdate(config.next, false)}
+                    className={`flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-extrabold text-white shadow-lg transition hover:opacity-90 active:scale-[0.98] disabled:opacity-50 ${config.color}`}
+                  >
+                    {updating ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <>
+                        <config.icon className="h-5 w-5" />
+                        {config.label}
+                      </>
+                    )}
+                  </button>
 
                   <button
                     type="button"
@@ -1476,7 +1475,7 @@ export function ActiveJob() {
       {/* Payment Waiting Modal */}
       {showPaymentWaiting && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl text-center"
@@ -1589,9 +1588,9 @@ export function ActiveJob() {
                   {/* CSS Ripples */}
                   <div className="absolute inset-0 rounded-full bg-blue-400 opacity-75 animate-ping" style={{ animationDuration: '2s' }} />
                   <div className="absolute inset-0 rounded-full bg-indigo-400 opacity-50 animate-ping" style={{ animationDuration: '2s', animationDelay: '1s' }} />
-                  
+
                   {/* Center Glowing Icon */}
-                  <motion.div 
+                  <motion.div
                     animate={{ scale: [1, 1.1, 1] }}
                     transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
                     className="relative z-10 flex h-full w-full items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-xl shadow-blue-500/40"
