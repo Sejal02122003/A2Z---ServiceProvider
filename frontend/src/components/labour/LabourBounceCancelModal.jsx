@@ -131,7 +131,8 @@ export function LabourBounceCancelModal({ open, onClose, booking, onCancelled })
     }
   }
 
-  const isBlocked = eligibility?.isBlocked
+  // Blocked when policy blocks it, the start time has passed, or the server says the booking is not cancellable
+  const isBlocked = Boolean(eligibility?.isBlocked || eligibility?.isExpired || eligibility?.isEligible === false)
   const requiresApproval = eligibility?.requiresApproval
   const isLate = eligibility?.isLate
   const penaltyAmount = isExempt ? 0 : eligibility?.penaltyAmount || 0
@@ -207,9 +208,9 @@ export function LabourBounceCancelModal({ open, onClose, booking, onCancelled })
                       Late Cancellation Blocked (&lt; {cutoffHours}h Notice)
                     </p>
                     <p className="font-medium text-rose-800 leading-relaxed">
-                      Platform policy blocks partner cancellations within {cutoffHours} hours of
-                      the scheduled start time. Please contact admin support if you have an
-                      unavoidable emergency.
+                      {eligibility?.reason ||
+                        `Scheduled bookings can only be cancelled at least ${cutoffHours} hours before the scheduled start time.`}{' '}
+                      Please contact admin support if you have an unavoidable emergency.
                     </p>
                   </div>
                 </div>

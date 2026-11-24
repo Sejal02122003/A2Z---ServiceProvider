@@ -314,7 +314,10 @@ export async function getCancellationEligibility(bookingId, userId, overrideTime
   const timeRemainingMinutes = Math.floor(timeRemainingMs / (60 * 1000))
   const timeRemainingHours = Number((timeRemainingMs / (3600 * 1000)).toFixed(2))
 
-  const cutoffHours = Number(settings.cutoffHours || 2)
+  // A service provider can only cancel a scheduled booking at least 2 hours before the scheduled
+  // time (admin can raise the cutoff, but never lower it below 2 hours).
+  const MIN_PROVIDER_CANCEL_HOURS = 2
+  const cutoffHours = Math.max(MIN_PROVIDER_CANCEL_HOURS, Number(settings.cutoffHours) || MIN_PROVIDER_CANCEL_HOURS)
   const cutoffMs = cutoffHours * 3600 * 1000
 
   // 1. If start time has already passed
@@ -331,8 +334,8 @@ export async function getCancellationEligibility(bookingId, userId, overrideTime
     }
   }
 
-  // 2. If policy is disabled OR cancellation is at least cutoffHours away (Standard Cancellation)
-  if (!settings.enabled || timeRemainingMs >= cutoffMs) {
+  // 2. Cancellation is at least cutoffHours away (Standard Cancellation)
+  if (timeRemainingMs >= cutoffMs) {
     return {
       isEligible: true,
       isLate: false,
@@ -364,7 +367,8 @@ export async function getCancellationEligibility(bookingId, userId, overrideTime
     calculatedPenalty = Math.round((rate / 100) * baseAmount)
   }
 
-  const lateAction = settings.lateCancellationAction || 'PENALIZE'
+  // Within the cutoff a scheduled booking can no longer be cancelled by the provider
+  const lateAction = 'BLOCK'
 
   if (lateAction === 'BLOCK') {
     return {
@@ -380,7 +384,7 @@ export async function getCancellationEligibility(bookingId, userId, overrideTime
       timeRemainingMinutes,
       timeRemainingHours,
       serviceStartDateTime,
-      reason: `Late cancellation within ${cutoffHours} hours of service is blocked by platform policy.`,
+      reason: `Scheduled bookings can only be cancelled at least ${cutoffHours} hours before the scheduled time. Only ${Math.max(0, timeRemainingMinutes)} minutes remain, so this booking can no longer be cancelled.`,
     }
   }
 
