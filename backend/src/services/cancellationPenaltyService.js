@@ -27,6 +27,22 @@ export async function getCancellationSettings() {
       configKey: 'master_cancellation_config',
     })
   }
+
+  // Ensure synchronization with SystemSetting master cancellation penalty if FIXED
+  try {
+    const { SystemSetting } = await import('../models/SystemSetting.js')
+    const sysSettings = await SystemSetting.findOne({ configKey: 'master_config' })
+    if (sysSettings && typeof sysSettings.cancellationPenalty === 'number' && !isNaN(sysSettings.cancellationPenalty)) {
+      if (settings.customerPenaltyType === 'FIXED' && settings.customerPenaltyValue !== sysSettings.cancellationPenalty) {
+        settings.customerPenaltyValue = sysSettings.cancellationPenalty
+        settings.fixedPenaltyAmount = sysSettings.cancellationPenalty
+        await settings.save()
+      }
+    }
+  } catch (err) {
+    // Graceful fallback without failing request
+  }
+
   return settings
 }
 

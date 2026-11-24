@@ -31,6 +31,22 @@ export async function getBookingCancellationSettings() {
       configKey: 'master_cancellation_config',
     })
   }
+
+  // Ensure synchronization with SystemSetting master cancellation penalty if FIXED
+  try {
+    const { SystemSetting } = await import('../models/SystemSetting.js')
+    const sysSettings = await SystemSetting.findOne({ configKey: 'master_config' })
+    if (sysSettings && typeof sysSettings.cancellationPenalty === 'number' && !isNaN(sysSettings.cancellationPenalty)) {
+      if (settings.customerPenaltyType === 'FIXED' && settings.customerPenaltyValue !== sysSettings.cancellationPenalty) {
+        settings.customerPenaltyValue = sysSettings.cancellationPenalty
+        settings.fixedPenaltyAmount = sysSettings.cancellationPenalty
+        await settings.save()
+      }
+    }
+  } catch (err) {
+    // Graceful fallback without failing request
+  }
+
   return settings
 }
 
@@ -163,6 +179,25 @@ export async function updateBookingCancellationSettings(data, adminUser) {
   }
 
   await settings.save()
+
+  // Sync to SystemSetting if customerPenaltyValue or fixedPenaltyAmount updated
+  try {
+    const { SystemSetting } = await import('../models/SystemSetting.js')
+    let sysSettings = await SystemSetting.findOne({ configKey: 'master_config' })
+    if (!sysSettings) {
+      sysSettings = new SystemSetting({ configKey: 'master_config' })
+    }
+    if (data.customerPenaltyType === 'FIXED' && data.customerPenaltyValue !== undefined) {
+      sysSettings.cancellationPenalty = Number(data.customerPenaltyValue)
+      await sysSettings.save()
+    } else if (data.fixedPenaltyAmount !== undefined) {
+      sysSettings.cancellationPenalty = Number(data.fixedPenaltyAmount)
+      await sysSettings.save()
+    }
+  } catch (err) {
+    // Graceful fallback
+  }
+
   return settings
 }
 

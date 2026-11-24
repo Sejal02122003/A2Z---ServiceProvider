@@ -1,4 +1,5 @@
 import { SystemSetting } from '../models/SystemSetting.js'
+import { BookingCancellationSetting } from '../models/BookingCancellationSetting.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { uploadBufferToCloudinary } from '../services/cloudinaryService.js'
@@ -70,9 +71,30 @@ export const updateCancellationPenalty = asyncHandler(async (req, res) => {
   let settings = await SystemSetting.findOne({ configKey: 'master_config' })
   if (!settings) settings = new SystemSetting({ configKey: 'master_config' })
   
-  if (cancellationPenalty !== undefined) settings.cancellationPenalty = Number(cancellationPenalty)
+  if (cancellationPenalty !== undefined) {
+    const penaltyNum = Math.max(0, Number(cancellationPenalty) || 0)
+    settings.cancellationPenalty = penaltyNum
+    await settings.save()
+
+    // Keep BookingCancellationSetting in sync for both customer and service provider cancellation
+    try {
+      let cancelSetting = await BookingCancellationSetting.findOne({
+        configKey: 'master_cancellation_config',
+      })
+      if (!cancelSetting) {
+        cancelSetting = new BookingCancellationSetting({
+          configKey: 'master_cancellation_config',
+        })
+      }
+      cancelSetting.fixedPenaltyAmount = penaltyNum
+      cancelSetting.customerPenaltyValue = penaltyNum
+      cancelSetting.customerPenaltyType = 'FIXED'
+      await cancelSetting.save()
+    } catch (err) {
+      console.error('Failed to sync cancellation penalty to BookingCancellationSetting:', err)
+    }
+  }
   
-  await settings.save()
   return sendSuccess(res, { message: 'Cancellation penalty updated', data: { settings } })
 })
 
