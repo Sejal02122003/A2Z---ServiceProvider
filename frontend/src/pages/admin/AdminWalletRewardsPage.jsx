@@ -887,7 +887,7 @@ export default function AdminWalletRewardsPage() {
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block mb-2">
                   Transaction History
                 </span>
-                <div className="border border-slate-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                <div className="border border-slate-200 rounded-xl overflow-auto max-h-80">
                   <table className="w-full text-left text-xs">
                     <thead className="border-b border-slate-100 bg-slate-50 text-slate-500 font-semibold sticky top-0">
                       <tr>
@@ -918,7 +918,9 @@ export default function AdminWalletRewardsPage() {
                                 {tx.context || tx.type}
                               </span>
                             </td>
-                            <td className="px-4 py-2.5 text-slate-700 truncate max-w-xs">{tx.description || tx.reason || '—'}</td>
+                            <td className="min-w-[220px] max-w-[360px] whitespace-normal break-words px-4 py-2.5 align-top leading-snug text-slate-700">
+                              {tx.description || tx.reason || '—'}
+                            </td>
                             <td className={`px-4 py-2.5 text-right font-bold ${tx.type === 'CREDIT' ? 'text-blue-600' : 'text-rose-600'}`}>
                               {tx.type === 'CREDIT' ? '+' : '-'} ₹{Number(tx.amount).toLocaleString('en-IN')}
                             </td>
