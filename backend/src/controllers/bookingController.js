@@ -1436,6 +1436,14 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
     return sendError(res, { message: `Invalid transition from ${currentStatus} to ${status}`, statusCode: HTTP_STATUS.BAD_REQUEST })
   }
 
+  // Scheduled jobs: the provider may start the journey only within 30 minutes of the scheduled time
+  if (status === 'EN_ROUTE' && booking.type === 'SCHEDULED' && booking.scheduledAt) {
+    const msToStart = new Date(booking.scheduledAt).getTime() - Date.now()
+    if (!isNaN(msToStart) && msToStart > 30 * 60 * 1000) {
+      return sendError(res, { message: 'You can start your journey only 30 minutes before the scheduled time.', statusCode: HTTP_STATUS.BAD_REQUEST })
+    }
+  }
+
   const startOtp = assignment ? assignment.startOtp : booking.startOtp;
   const completionOtp = assignment ? assignment.completionOtp : booking.completionOtp;
 

@@ -1303,7 +1303,7 @@ export function ActiveJob() {
 
                   <button
                     type="button"
-                    disabled={updating || otp.length < 4 || uploadingImage || (booking.type === 'SCHEDULED' && booking.scheduledAt && new Date(booking.scheduledAt).getTime() > now)}
+                    disabled={updating || otp.length < 4 || uploadingImage}
                     onClick={() => handleStatusUpdate(config.next, true)}
                     className={`flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-extrabold text-white shadow-lg transition hover:opacity-90 active:scale-[0.98] disabled:opacity-50 ${config.color}`}
                   >
