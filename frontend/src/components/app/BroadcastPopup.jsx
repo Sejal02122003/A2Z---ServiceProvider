@@ -74,14 +74,14 @@ export function BroadcastPopup() {
     } else {
       stopBookingAlertSound()
       if (activeNotificationRef.current) {
-        try { activeNotificationRef.current.close() } catch {}
+        try { activeNotificationRef.current.close() } catch { }
         activeNotificationRef.current = null
       }
     }
     return () => {
       stopBookingAlertSound()
       if (activeNotificationRef.current) {
-        try { activeNotificationRef.current.close() } catch {}
+        try { activeNotificationRef.current.close() } catch { }
         activeNotificationRef.current = null
       }
     }
@@ -91,23 +91,8 @@ export function BroadcastPopup() {
   const roleLower = String(user?.role || '').toLowerCase()
   const isLabour = roleLower === 'labour' || roleLower === 'contractor' || roleLower === 'serviceprovider' || roleLower === 'provider'
 
-  useEffect(() => {
-    console.log('[BroadcastPopup] State check →', {
-      userId: user?._id || user?.id,
-      role: user?.role,
-      isLabour,
-      socketExists: Boolean(socket),
-      socketConnected: socket?.connected,
-      socketId: socket?.id,
-    })
-  }, [user, isLabour, socket])
-
   const handleBroadcast = useCallback((data) => {
-    console.log('[BroadcastPopup] handleBroadcast called with:', data)
-    if (!data || !data.bookingId) {
-      console.warn('[BroadcastPopup] Ignored broadcast: missing data/bookingId', data)
-      return
-    }
+    if (!data || !data.bookingId) return
     if (dismissedBookingsRef.current.has(data.bookingId)) {
       console.log('[BroadcastPopup] Ignoring already dismissed booking:', data.bookingId)
       return
@@ -124,7 +109,7 @@ export function BroadcastPopup() {
     if (window.Notification && Notification.permission === 'granted') {
       try {
         if (activeNotificationRef.current) {
-          try { activeNotificationRef.current.close() } catch {}
+          try { activeNotificationRef.current.close() } catch { }
         }
         const title = data.type === 'SCHEDULED' ? 'Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡'
         const notif = new Notification(title, {
@@ -153,17 +138,12 @@ export function BroadcastPopup() {
   // Listen for real-time WebSocket broadcast events
   useEffect(() => {
     if (!isLabour) {
-      console.warn('[BroadcastPopup] NOT listening: user role is not labour/contractor/serviceprovider/provider. role =', user?.role)
       stopBookingAlertSound()
       setIncoming(null)
       return
     }
-    if (!socket) {
-      console.warn('[BroadcastPopup] NOT listening: socket is null (no token or not created yet)')
-      return
-    }
+    if (!socket) return
 
-    console.log('[BroadcastPopup] Registered BOOKING_RECEIVED listener. socket connected =', socket.connected, 'id =', socket.id)
     socket.on('BOOKING_RECEIVED', handleBroadcast)
     const handleExpired = (data) => {
       setIncoming((prev) => {
@@ -193,12 +173,11 @@ export function BroadcastPopup() {
       try {
         const res = await broadcastsApi.getActiveBroadcast()
         const b = res?.data?.broadcast
-        console.log('[BroadcastPopup] Poll /active broadcast →', b ? { bookingId: b.bookingId, serviceName: b.serviceName } : 'none', '| dismissed?', b ? dismissedBookingsRef.current.has(b.bookingId) : false)
         if (!cancelled && b && !incoming && !dismissedBookingsRef.current.has(b.bookingId)) {
           handleBroadcast(b)
         }
-      } catch (err) {
-        console.warn('[BroadcastPopup] Poll /active broadcast FAILED:', err?.status || '', err?.message || err)
+      } catch {
+        // ignore background poll errors
       }
     }
 
@@ -229,7 +208,7 @@ export function BroadcastPopup() {
         if (res?.data?.broadcast && !dismissedBookingsRef.current.has(res.data.broadcast.bookingId)) {
           handleBroadcast(res.data.broadcast)
         }
-      }).catch(() => {})
+      }).catch(() => { })
       const cleanUrl = window.location.pathname
       window.history.replaceState({}, '', cleanUrl)
     }
@@ -248,7 +227,7 @@ export function BroadcastPopup() {
           }
           stopBookingAlertSound()
           if (activeNotificationRef.current) {
-            try { activeNotificationRef.current.close() } catch {}
+            try { activeNotificationRef.current.close() } catch { }
             activeNotificationRef.current = null
           }
           if (incoming?.bookingId) {
@@ -302,7 +281,7 @@ export function BroadcastPopup() {
   const redirectToRecharge = useCallback(() => {
     stopBookingAlertSound()
     if (activeNotificationRef.current) {
-      try { activeNotificationRef.current.close() } catch {}
+      try { activeNotificationRef.current.close() } catch { }
       activeNotificationRef.current = null
     }
     if (timerRef.current) {
@@ -336,7 +315,7 @@ export function BroadcastPopup() {
     // Immediately kill sound, timer, and notifications upon user tapping Accept
     stopBookingAlertSound()
     if (activeNotificationRef.current) {
-      try { activeNotificationRef.current.close() } catch {}
+      try { activeNotificationRef.current.close() } catch { }
       activeNotificationRef.current = null
     }
     if (timerRef.current) {
@@ -396,7 +375,7 @@ export function BroadcastPopup() {
     // Immediately kill sound, timer, and notifications upon user tapping Reject
     stopBookingAlertSound()
     if (activeNotificationRef.current) {
-      try { activeNotificationRef.current.close() } catch {}
+      try { activeNotificationRef.current.close() } catch { }
       activeNotificationRef.current = null
     }
     if (timerRef.current) {
@@ -413,7 +392,7 @@ export function BroadcastPopup() {
     setResponding(false)
 
     if (bId) {
-      broadcastsApi.rejectBroadcast(bId).catch(() => {})
+      broadcastsApi.rejectBroadcast(bId).catch(() => { })
     }
   }, [incoming])
 
@@ -485,9 +464,8 @@ export function BroadcastPopup() {
               {/* Header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                    incoming.type === 'SCHEDULED' ? 'bg-amber-500/10 text-amber-600' : 'bg-brand/10 text-brand'
-                  }`}>
+                  <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${incoming.type === 'SCHEDULED' ? 'bg-amber-500/10 text-amber-600' : 'bg-brand/10 text-brand'
+                    }`}>
                     {incoming.type === 'SCHEDULED' ? <Clock className="h-5 w-5" aria-hidden /> : <Zap className="h-5 w-5" aria-hidden />}
                   </span>
                   <div>
@@ -771,11 +749,10 @@ export function BroadcastPopup() {
                           key={svcKey}
                           type="button"
                           onClick={() => setSelectedServiceId(svcKey)}
-                          className={`w-full flex items-center justify-between rounded-2xl border-2 px-4 py-3 text-left transition ${
-                            isSelected
-                              ? 'border-brand bg-brand/5 shadow-sm'
-                              : 'border-slate-200 bg-white hover:border-brand/40'
-                          }`}
+                          className={`w-full flex items-center justify-between rounded-2xl border-2 px-4 py-3 text-left transition ${isSelected
+                            ? 'border-brand bg-brand/5 shadow-sm'
+                            : 'border-slate-200 bg-white hover:border-brand/40'
+                            }`}
                         >
                           <div>
                             <p className="font-bold text-sm text-slate-900">{svc.name}</p>
@@ -797,9 +774,8 @@ export function BroadcastPopup() {
                               <p className="text-[10px] text-slate-400">You earn</p>
                               <p className="font-extrabold text-blue-700 text-base">₹{formatFixedAmount(svc.estimatedEarnings)}</p>
                             </div>
-                            <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition ${
-                              isSelected ? 'border-brand bg-brand' : 'border-slate-300'
-                            }`}>
+                            <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition ${isSelected ? 'border-brand bg-brand' : 'border-slate-300'
+                              }`}>
                               {isSelected && <Check className="h-3 w-3 text-white" />}
                             </div>
                           </div>
@@ -947,19 +923,19 @@ export function BroadcastPopup() {
                     error.toLowerCase().includes('started') ||
                     error.toLowerCase().includes('already accepted by you') ||
                     (error.toLowerCase().includes('already') && !error.toLowerCase().includes('another'))) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (timerRef.current) clearInterval(timerRef.current)
-                        const bId = incoming?.bookingId
-                        setIncoming(null)
-                        if (bId) navigate(`/serviceprovider/active-job/${bId}`)
-                      }}
-                      className="mt-1 block text-xs font-extrabold text-brand underline"
-                    >
-                      Go to Active Job Screen &rarr;
-                    </button>
-                  )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (timerRef.current) clearInterval(timerRef.current)
+                          const bId = incoming?.bookingId
+                          setIncoming(null)
+                          if (bId) navigate(`/serviceprovider/active-job/${bId}`)
+                        }}
+                        className="mt-1 block text-xs font-extrabold text-brand underline"
+                      >
+                        Go to Active Job Screen &rarr;
+                      </button>
+                    )}
                   {(error.toLowerCase().includes('wallet') || error.toLowerCase().includes('recharge') || error.toLowerCase().includes('balance')) && (
                     <button
                       type="button"
@@ -1014,11 +990,10 @@ export function BroadcastPopup() {
                   type="button"
                   disabled={responding || (eligibilityData?.eligible !== false && requiresSelection && !selectedServiceId)}
                   onClick={handleAccept}
-                  className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-extrabold transition active:scale-[0.97] ${
-                    eligibilityData?.eligible === false
-                      ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25 hover:bg-amber-400'
-                      : 'bg-brand text-white shadow-lg shadow-brand/25 hover:bg-brand/90 disabled:opacity-50'
-                  }`}
+                  className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-extrabold transition active:scale-[0.97] ${eligibilityData?.eligible === false
+                    ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25 hover:bg-amber-400'
+                    : 'bg-brand text-white shadow-lg shadow-brand/25 hover:bg-brand/90 disabled:opacity-50'
+                    }`}
                 >
                   {responding ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -1033,8 +1008,8 @@ export function BroadcastPopup() {
                       {requiresSelection && !selectedServiceId
                         ? 'Pick Service'
                         : incoming.isMultiServiceBooking && services.length > 1 && !selectedServiceId
-                        ? `Accept All (${services.length} Services)`
-                        : 'Accept'}
+                          ? `Accept All (${services.length} Services)`
+                          : 'Accept'}
                     </>
                   )}
                 </button>
