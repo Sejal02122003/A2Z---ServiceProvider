@@ -1275,15 +1275,18 @@ export async function getCustomerCancellationEligibility(bookingId, customerId, 
 
   // 1. Ownership validation
   if (customerId && String(booking.userId?._id || booking.userId) !== String(customerId)) {
-    return {
-      isEligible: false,
-      code: 'UNAUTHORIZED',
-      reason: 'You are not authorized to cancel this booking',
+    const userDoc = await User.findById(customerId).select('role')
+    if (userDoc?.role !== 'admin') {
+      return {
+        isEligible: false,
+        code: 'UNAUTHORIZED',
+        reason: 'You are not authorized to cancel this booking',
+      }
     }
   }
 
   // 2. Lifecycle status check
-  const nonCancellableStatuses = ['EN_ROUTE', 'STARTED', 'COMPLETED', 'CANCELLED', 'REFUNDED', 'FAILED']
+  const nonCancellableStatuses = ['EN_ROUTE', 'STARTED', 'COMPLETED', 'CANCELLED', 'REFUNDED']
   if (nonCancellableStatuses.includes(booking.status)) {
     let reasonText = `Booking is already ${booking.status.toLowerCase()}.`
     let code = 'STATUS_INELIGIBLE'

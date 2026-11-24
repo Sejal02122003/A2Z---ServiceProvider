@@ -50,6 +50,16 @@ export async function getCancellationSettings() {
  * 2. Calculate cancellation penalty dynamically based on admin configuration
  */
 export function calculatePenaltyAmount({ booking, settings, itemId = null, overrideTime = null }) {
+  if (booking.status === 'FAILED') {
+    return {
+      penaltyApplicable: false,
+      reason: 'Booking is marked as failed. No cancellation penalty applies.',
+      calculatedPenaltyAmount: 0,
+      penaltyCalculationType: settings.customerPenaltyType || 'PERCENTAGE',
+      configuredPenaltyValue: settings.customerPenaltyValue || 0,
+    }
+  }
+
   if (!settings.customerPenaltyEnabled) {
     return {
       penaltyApplicable: false,

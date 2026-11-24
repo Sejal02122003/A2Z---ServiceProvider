@@ -60,13 +60,13 @@ router.post(
 
 router.get(
   '/:id/cancel-eligibility',
-  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR, USER_ROLES.ADMIN),
   booking.getCustomerCancellationEligibilityController
 )
 
 router.post(
   '/:id/cancel',
-  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR, USER_ROLES.ADMIN),
   [
     body('reason').trim().notEmpty().withMessage('Cancellation reason is required'),
     body('reasonNote').optional().trim(),
@@ -77,7 +77,7 @@ router.post(
 
 router.post(
   '/:id/reschedule',
-  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR, USER_ROLES.ADMIN),
   [
     body('scheduledAt').notEmpty().withMessage('scheduledAt date is required'),
     body('timeSlot').optional().trim(),
@@ -90,7 +90,7 @@ router.post(
 
 router.post(
   '/:id/items/:itemId/cancel',
-  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR, USER_ROLES.ADMIN),
   [
     body('reason').trim().notEmpty().withMessage('Cancellation reason is required'),
     body('reasonNote').optional().trim(),

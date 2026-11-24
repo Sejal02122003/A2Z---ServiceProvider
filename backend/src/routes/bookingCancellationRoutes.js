@@ -43,12 +43,12 @@ router.post(
 // -------------------------------------------------------------
 router.get(
   '/customer/policy-status',
-  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR, USER_ROLES.ADMIN),
   getCustomerPolicyStatusController
 )
 router.get(
   '/customer/bookings/:bookingId/eligibility',
-  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR, USER_ROLES.ADMIN),
   async (req, res, next) => {
     const { getCustomerCancellationEligibilityController } = await import('../controllers/bookingController.js')
     req.params.id = req.params.bookingId
@@ -57,7 +57,7 @@ router.get(
 )
 router.post(
   '/customer/bookings/:bookingId/cancel',
-  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR, USER_ROLES.ADMIN),
   async (req, res, next) => {
     const { cancelCustomerBooking } = await import('../controllers/bookingController.js')
     req.params.id = req.params.bookingId
@@ -66,7 +66,7 @@ router.post(
 )
 router.post(
   '/customer/bookings/:bookingId/penalty/init',
-  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR, USER_ROLES.ADMIN),
   async (req, res, next) => {
     const { initCustomerPenaltyPaymentController } = await import('../controllers/bookingCancellationController.js')
     return initCustomerPenaltyPaymentController(req, res, next)
@@ -74,7 +74,7 @@ router.post(
 )
 router.post(
   '/customer/bookings/:bookingId/penalty/verify',
-  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR, USER_ROLES.ADMIN),
   async (req, res, next) => {
     const { verifyCustomerPenaltyPaymentController } = await import('../controllers/bookingCancellationController.js')
     return verifyCustomerPenaltyPaymentController(req, res, next)
@@ -82,7 +82,7 @@ router.post(
 )
 router.get(
   '/customer/bookings/:bookingId/penalty-status',
-  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.CONTRACTOR),
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR, USER_ROLES.ADMIN),
   async (req, res, next) => {
     const { getCustomerPenaltyStatusController } = await import('../controllers/bookingCancellationController.js')
     return getCustomerPenaltyStatusController(req, res, next)
