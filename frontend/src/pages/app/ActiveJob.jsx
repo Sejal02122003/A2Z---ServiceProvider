@@ -13,6 +13,7 @@ import {
   X,
   Clock,
   Camera,
+  FileText,
   Upload,
   Wallet,
   User,
@@ -698,6 +699,27 @@ export function ActiveJob() {
         </GlassPanel>
       )}
 
+      {/* Service Location */}
+      {booking.address?.locationText && (
+        <GlassPanel className="p-4">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Service Location</p>
+          <div className="mt-2 flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2 text-sm text-slate-800 font-semibold leading-snug min-w-0 flex-1">
+              <MapPin className="h-4 w-4 text-brand shrink-0 mt-0.5" />
+              <span className="break-words">{booking.address.locationText}</span>
+            </div>
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(booking.address.locationText)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 rounded-lg bg-brand/10 px-3 py-1.5 text-xs font-bold text-brand hover:bg-brand/20 transition flex items-center gap-1"
+            >
+              <Navigation className="h-3.5 w-3.5" /> Directions
+            </a>
+          </div>
+        </GlassPanel>
+      )}
+
       {/* Booking Details */}
       <GlassPanel className="p-4 text-sm">
         {booking && (() => {
@@ -947,6 +969,19 @@ export function ActiveJob() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+        {(booking.notes || booking.userInstructions) && (
+          <div className="my-2 rounded-2xl border-2 border-amber-200/90 bg-amber-50/80 p-3.5 space-y-1">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-amber-700 shrink-0" />
+              <span className="text-xs font-black uppercase tracking-wider text-amber-900">
+                Customer Instructions
+              </span>
+            </div>
+            <p className="text-xs font-semibold text-amber-950 leading-relaxed whitespace-pre-line break-words pl-6">
+              {booking.notes || booking.userInstructions}
+            </p>
           </div>
         )}
         {booking.paymentMethod && (

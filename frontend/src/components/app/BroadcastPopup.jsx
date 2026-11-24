@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { AlertCircle, AlertTriangle, Check, CheckCircle2, Clock, IndianRupee, Layers, Loader2, MapPin, Package, ShieldCheck, Sparkles, Volume2, Wallet, X, Zap } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Check, CheckCircle2, Clock, FileText, IndianRupee, Layers, Loader2, MapPin, Package, ShieldCheck, Sparkles, Volume2, Wallet, X, Zap } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { broadcastsApi } from '../../api/broadcastsApi.js'
 import { walletEligibilityApi } from '../../api/walletEligibilityApi.js'
@@ -831,6 +831,30 @@ export function BroadcastPopup() {
                   </div>
                 )}
               </div>
+
+              {/* Customer / User Instructions */}
+              {(incoming.notes || incoming.userInstructions) && (
+                <div className="mt-3 rounded-2xl border-2 border-amber-300 bg-amber-50/90 p-3.5 shadow-2xs">
+                  <div className="flex items-start gap-2.5">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white shadow-2xs">
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-amber-900">
+                          Customer Instructions
+                        </p>
+                        <span className="rounded-full bg-amber-200/90 px-2 py-0.5 text-[9px] font-extrabold text-amber-900">
+                          Special Note
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs font-semibold text-amber-950 leading-relaxed whitespace-pre-line break-words">
+                        {incoming.notes || incoming.userInstructions}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Dynamic Wallet Balance & Booking Acceptance Eligibility Warning (Section 10) */}
               {eligibilityData && eligibilityData.eligible === false && (

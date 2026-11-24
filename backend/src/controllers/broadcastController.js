@@ -881,6 +881,8 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       estimatedEarnings: totalEarnings,
       bookingAmount: Number(booking.totalAmount || booking.basePrice || 0),
       totalAmount: Number(booking.totalAmount || booking.basePrice || 0),
+      notes: booking.notes || '',
+      userInstructions: booking.notes || '',
       timeoutMs: remainingMs,
     }
   } else if (booking.contractorInfo?.services?.length > 0) {
@@ -929,6 +931,8 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       estimatedEarnings: bestEarning,
       bookingAmount: Number(booking.totalAmount || booking.basePrice || 0),
       totalAmount: Number(booking.totalAmount || booking.basePrice || 0),
+      notes: booking.notes || '',
+      userInstructions: booking.notes || '',
       timeoutMs: remainingMs,
     }
   } else {
@@ -1015,6 +1019,8 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       estimatedEarnings: singleShare,
       bookingAmount: Number(booking.totalAmount || booking.basePrice || 0),
       totalAmount: Number(booking.totalAmount || booking.basePrice || 0),
+      notes: booking.notes || '',
+      userInstructions: booking.notes || '',
       timeoutMs: remainingMs,
     }
   }

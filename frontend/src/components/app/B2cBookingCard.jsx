@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
-import { Calendar, CreditCard, MapPin, User, Loader2, Plus, Minus, Clock, CheckCircle, Star } from 'lucide-react'
+import { Calendar, CreditCard, MapPin, User, Loader2, Plus, Minus, Clock, CheckCircle, Star, FileText } from 'lucide-react'
 import { GlassPanel } from '../ui/GlassPanel.jsx'
 import { bookingsApi } from '../../api/bookingsApi.js'
 import { getLabourBookingShare } from '../../lib/bookingLabourShare.js'
@@ -234,6 +234,20 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
                 <MapPin className="h-4 w-4 text-brand" />
               </div>
               <span className="line-clamp-2 leading-snug mt-1 font-medium text-slate-600">{booking.address.locationText}</span>
+            </div>
+          )}
+
+          {(booking.notes || booking.userInstructions) && (
+            <div className="flex items-start gap-3 text-sm text-slate-700 mt-0.5">
+              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-amber-50 text-amber-700 border border-amber-200/80 shrink-0 mt-0.5">
+                <FileText className="h-4 w-4 text-amber-600" />
+              </div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider">User Instructions</span>
+                <span className="font-medium text-xs leading-relaxed text-slate-800 whitespace-pre-line break-words">
+                  {booking.notes || booking.userInstructions}
+                </span>
+              </div>
             </div>
           )}
 

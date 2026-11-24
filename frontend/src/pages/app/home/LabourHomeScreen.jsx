@@ -15,6 +15,7 @@ import {
   Clock,
   Crown,
   Droplets,
+  FileText,
   Flame,
   GraduationCap,
   HardHat,
@@ -1400,6 +1401,18 @@ export function LabourHomeScreen({ user }) {
                             <span className="truncate">{offer.customerLocation || offer.address?.locationText || 'Service location'}</span>
                           </p>
                         </div>
+
+                        {/* Customer Instructions */}
+                        {(offer.notes || offer.userInstructions) && (
+                          <div className="mt-2 rounded-xl bg-amber-100/80 p-2.5 text-xs text-amber-900 border border-amber-200/80">
+                            <p className="font-extrabold text-[10px] uppercase tracking-wider text-amber-800 flex items-center gap-1">
+                              <FileText className="h-3.5 w-3.5 text-amber-700" /> Customer Instructions
+                            </p>
+                            <p className="mt-0.5 font-semibold text-amber-950 whitespace-pre-line break-words">
+                              {offer.notes || offer.userInstructions}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="relative mt-3 flex gap-2">

@@ -594,6 +594,12 @@ function BookingDetailsModal({ booking, onClose }) {
             <p className="font-semibold">{booking.userId?.fullName}</p>
             <p className="text-slate-600">{booking.userId?.phone}</p>
             <p className="text-slate-600 mt-1 text-xs">{booking.address?.locationText}</p>
+            {booking.notes && (
+              <div className="mt-2 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-900 border border-amber-200">
+                <span className="font-bold text-[10px] uppercase text-amber-800 block">User Instructions:</span>
+                <span className="font-medium whitespace-pre-line">{booking.notes}</span>
+              </div>
+            )}
           </div>
 
           {booking.assignments && booking.assignments.length > 0 ? (

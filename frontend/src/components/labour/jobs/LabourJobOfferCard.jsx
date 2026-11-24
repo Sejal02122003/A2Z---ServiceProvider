@@ -85,6 +85,17 @@ export function LabourJobOfferCard({
           </a>
         </div>
 
+        {(offer.notes || offer.userInstructions || offer.rawNotes) && (
+          <div className="mt-2.5 rounded-xl bg-amber-50/80 p-2.5 text-xs text-amber-950 border border-amber-200/70">
+            <p className="font-extrabold text-[10px] uppercase tracking-wider text-amber-800 flex items-center gap-1">
+              <FileText className="h-3 w-3 text-amber-600" /> Customer Instructions:
+            </p>
+            <p className="mt-0.5 font-medium line-clamp-2 text-amber-950">
+              {offer.notes || offer.userInstructions || offer.rawNotes}
+            </p>
+          </div>
+        )}
+
         <button
           type="button"
           onClick={() => onOpenDetail(offer)}

@@ -604,6 +604,8 @@ export async function startBroadcastCycle(bookingId) {
               estimatedEarnings: totalEarnings,
               bookingAmount: Number(booking.totalAmount || booking.basePrice || 0),
               totalAmount: Number(booking.totalAmount || booking.basePrice || 0),
+              notes: booking.notes || '',
+              userInstructions: booking.notes || '',
               timeoutMs: BROADCAST_TIMEOUT_MS
             })
           })
@@ -617,6 +619,8 @@ export async function startBroadcastCycle(bookingId) {
               bookingId: String(booking._id),
               serviceProviderId: String(labor._id),
               providerId: String(labor._id),
+              notes: booking.notes || '',
+              userInstructions: booking.notes || '',
               eventId: `evt_${booking._id}_${labor._id}_${Date.now()}`,
               notificationId: `notif_${booking._id}_${labor._id}_${Date.now()}`,
               createdAt: String(booking.createdAt || Date.now()),
@@ -705,6 +709,8 @@ export async function startBroadcastCycle(bookingId) {
               estimatedEarnings: bestEarning,
               bookingAmount: Number(booking.totalAmount || booking.basePrice || 0),
               totalAmount: Number(booking.totalAmount || booking.basePrice || 0),
+              notes: booking.notes || '',
+              userInstructions: booking.notes || '',
               timeoutMs: BROADCAST_TIMEOUT_MS
             })
           })
@@ -718,6 +724,8 @@ export async function startBroadcastCycle(bookingId) {
               bookingId: String(booking._id),
               serviceProviderId: String(labor._id),
               providerId: String(labor._id),
+              notes: booking.notes || '',
+              userInstructions: booking.notes || '',
               eventId: `evt_${booking._id}_${labor._id}_${Date.now()}`,
               notificationId: `notif_${booking._id}_${labor._id}_${Date.now()}`,
               createdAt: String(booking.createdAt || Date.now()),
@@ -827,6 +835,8 @@ export async function startBroadcastCycle(bookingId) {
               estimatedEarnings: singleShare,
               bookingAmount: Number(booking.totalAmount || booking.basePrice || 0),
               totalAmount: Number(booking.totalAmount || booking.basePrice || 0),
+              notes: booking.notes || '',
+              userInstructions: booking.notes || '',
               timeoutMs: BROADCAST_TIMEOUT_MS
             })
           })
@@ -843,6 +853,8 @@ export async function startBroadcastCycle(bookingId) {
             data: {
               type: 'NEW_BOOKING',
               bookingId: String(booking._id),
+              notes: booking.notes || '',
+              userInstructions: booking.notes || '',
               serviceProviderId: String(labor._id),
               providerId: String(labor._id),
               eventId: `evt_${booking._id}_${labor._id}_${Date.now()}`,

@@ -524,6 +524,7 @@ export const createBooking = asyncHandler(async (req, res) => {
     imageNames = [],
     contractorInfo
   } = req.body
+  const bookingNotes = (notes || req.body.instructions || req.body.userInstructions || req.body.instruction || '').toString().trim() || undefined
   const hours = parseFloat(rawHours) || 1 // supports 0.5 = 30 min
 
   const isMultiService = (Array.isArray(req.body.items) && req.body.items.length > 0)
@@ -964,7 +965,7 @@ export const createBooking = asyncHandler(async (req, res) => {
       timeSlot: type === 'SCHEDULED' ? timeSlot : (type === 'INSTANT' ? timeSlot : undefined),
       endTime: type === 'SCHEDULED' ? endTime : undefined,
       images: Array.isArray(imageNames) ? imageNames : [],
-      notes,
+      notes: bookingNotes,
       hours: bookingHours,
       quantity: totalQuantity,
       totalDurationMins: computedTotalDurationMins,

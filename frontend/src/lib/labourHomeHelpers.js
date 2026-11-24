@@ -67,7 +67,7 @@ export function enrichJobForHome(job) {
     supervisorPhone: job.supervisorPhone,
     daysLabel: job.headcount,
     facilities: job.facilities || DEFAULT_FACILITIES,
-    notes: job.notes,
+    notes: job.notes || job.userInstructions || job.userInstruction || job.instructions || '',
     urgency: job.urgency,
     mapQuery: encodeURIComponent(job.site || 'construction site'),
     contractorName: job.contractorName,
@@ -77,7 +77,7 @@ export function enrichJobForHome(job) {
     projectEndDate: endIso,
     reportingTime: job.reportingTime,
     endTime: job.endTime,
-    gateInstruction: job.gateInstruction,
+    gateInstruction: job.gateInstruction || job.notes || job.userInstructions || '',
     acceptedAt: job.acceptedAt,
   }
 }

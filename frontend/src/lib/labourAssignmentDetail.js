@@ -90,8 +90,8 @@ export function buildAssignmentDetailSnapshot(entries, job, rawJob = null) {
     progressPct: Math.min(100, Math.round((workedDays / durationDays) * 100)),
     timeline,
     isMultiDay: durationDays > 1,
-    rawNotes: job.notes,
-    gateInstruction: job.gateInstruction,
+    rawNotes: job.notes || job.userInstructions || job.userInstruction || job.instructions || '',
+    gateInstruction: job.gateInstruction || job.notes || job.userInstructions || '',
     acceptedAt: rawJob?.acceptedAt,
   }
 }
