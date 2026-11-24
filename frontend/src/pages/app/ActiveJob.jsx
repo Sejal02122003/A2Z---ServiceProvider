@@ -1302,13 +1302,23 @@ export function ActiveJob() {
                     <p className="text-sm font-bold text-slate-800 mb-2">2. Ask customer for Start OTP</p>
                     <input
                       type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      autoComplete="one-time-code"
                       placeholder="Enter 4-digit OTP"
                       value={otp}
-                      onChange={(e) => setOtp(e.target.value)}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
                       className="w-full rounded-xl border border-slate-200 p-3 text-lg font-bold tracking-widest text-center outline-hidden focus:border-brand focus:ring-1 focus:ring-brand"
                       maxLength={4}
                     />
                   </div>
+
+                  {updateError && (
+                    <p className="flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
+                      <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+                      {updateError}
+                    </p>
+                  )}
 
                   <button
                     type="button"
@@ -1316,7 +1326,7 @@ export function ActiveJob() {
                     onClick={() => handleStatusUpdate(config.next, true)}
                     className={`flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-extrabold text-white shadow-lg transition hover:opacity-90 active:scale-[0.98] disabled:opacity-50 ${config.color}`}
                   >
-                    {updating ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Start Job'}
+                    {updating ? <Loader2 className="h-5 w-5 animate-spin" /> : uploadingImage ? 'Uploading photo…' : 'Start Job'}
                   </button>
 
                   <button

@@ -437,10 +437,13 @@ export function LabourAssignmentDetailModal({ open, onClose, job, rawJob, assign
                       <div>
                         <p className="text-sm font-bold text-slate-800 mb-2">2. Ask customer for Start OTP</p>
                         <input 
-                          type="text" 
-                          placeholder="Enter Start OTP" 
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          autoComplete="one-time-code"
+                          placeholder="Enter Start OTP"
                           value={otp}
-                          onChange={(e) => setOtp(e.target.value)}
+                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
                           className="w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold tracking-widest outline-hidden focus:border-brand focus:ring-1 focus:ring-brand"
                           maxLength={4}
                         />
