@@ -6,6 +6,7 @@ import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
 import { PipelineTimeline } from '../../components/shared/PipelineTimeline.jsx'
 import { calculateCompletedBookingBill } from '../../lib/completedBillingHelper.js'
+import { getBookingLabourRate } from '../../lib/bookingLabourShare.js'
 import {
   useGetAdminRequestsQuery,
   useLazyGetAdminRequestByIdQuery,
@@ -606,7 +607,7 @@ function BookingDetailsModal({ booking, onClose }) {
                       const matchedSvc = booking.contractorInfo.services.find(s => String(s.serviceId?._id || s.serviceId) === aServiceId);
                       if (matchedSvc && matchedSvc.price) {
                         const hours = booking.duration || booking.hours || 1;
-                        share = Math.round(matchedSvc.price * hours * 0.90);
+                        share = Math.round(matchedSvc.price * hours * getBookingLabourRate(booking));
                       } else {
                         share = Math.round((booking.laborShare || 0) / (booking.assignments.length || 1));
                       }
@@ -830,13 +831,13 @@ function BookingDetailsModal({ booking, onClose }) {
             <div className="flex justify-between text-xs text-slate-600 py-1 mt-2">
               <span>Commission (Admin):</span>
               <span className="font-semibold text-brand">
-                ₹{Math.round(completedBill.isContractorBooking ? (completedBill.completedBasePrice * 0.10) : (booking.commissionAmount || 0)).toLocaleString('en-IN')}
+                ₹{Math.round(completedBill.isContractorBooking ? (completedBill.completedBasePrice * (1 - getBookingLabourRate(booking))) : (booking.commissionAmount || 0)).toLocaleString('en-IN')}
               </span>
             </div>
             <div className="flex justify-between text-xs text-slate-600 py-1">
               <span>Service Provider Share:</span>
               <span className="font-semibold text-green-600">
-                ₹{Math.round(completedBill.isContractorBooking ? (completedBill.completedBasePrice * 0.90) : (booking.laborShare || 0)).toLocaleString('en-IN')}
+                ₹{Math.round(completedBill.isContractorBooking ? (completedBill.completedBasePrice * getBookingLabourRate(booking)) : (booking.laborShare || 0)).toLocaleString('en-IN')}
               </span>
             </div>
           </div>

@@ -7,6 +7,7 @@ import { UserSubscription } from '../models/UserSubscription.js'
 import { Review } from '../models/Review.js'
 import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
 import { USER_ROLES } from '../constants/roles.js'
+import { getBookingLabourShareRate } from '../utils/labourShare.js'
 
 export const BROADCAST_TIMEOUT_MS = 90000 // 1.5 minutes (90 seconds) flash broadcast timeout
 
@@ -556,7 +557,7 @@ export async function startBroadcastCycle(bookingId) {
             pricePerHour: it.unitPrice || 0,
             unitPrice: it.unitPrice || 0,
             itemTotal: it.itemTotal || 0,
-            estimatedEarnings: Math.round(it.itemTotal * 0.90),
+            estimatedEarnings: Math.round((it.itemTotal || 0) * getBookingLabourShareRate(booking)),
             openSlots: 1
           })
 
@@ -666,7 +667,7 @@ export async function startBroadcastCycle(bookingId) {
             })
             .map(s => {
               const sId = String(s.serviceId)
-              const labourShare = Math.round((s.price || 0) * bookingHours * 0.90)
+              const labourShare = Math.round((s.price || 0) * bookingHours * getBookingLabourShareRate(booking))
               return {
                 serviceId: sId,
                 name: serviceNameMap[sId] || 'Service',

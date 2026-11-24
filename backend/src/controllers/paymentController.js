@@ -5,6 +5,7 @@ import { WalletTransaction } from '../models/WalletTransaction.js'
 import { createOrder, verifyPaymentSignature } from '../services/paymentService.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
+import { getBookingLabourShareRate } from '../utils/labourShare.js'
 
 export const initPayment = asyncHandler(async (req, res) => {
   const { amount, purpose, bookingId } = req.body
@@ -94,7 +95,7 @@ export const verifyPayment = asyncHandler(async (req, res) => {
                  const s = booking.contractorInfo.services.find(svc => String(svc.serviceId?._id || svc.serviceId) === String(a.serviceId?._id || a.serviceId))
                  if (s && s.price) {
                    const hrs = (booking.duration || booking.hours || 1) + (a.extraHours || 0)
-                   workerShare = (s.price * hrs) * 0.9
+                   workerShare = (s.price * hrs) * getBookingLabourShareRate(booking)
                  }
                }
                if (workerShare > 0) {

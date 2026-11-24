@@ -42,6 +42,7 @@ import {
   fetchServiceProductMappings,
 } from '../../api/inventoryApi.js'
 import { LabourBounceCancelModal } from '../../components/labour/LabourBounceCancelModal.jsx'
+import { getLabourBookingShare, getBookingLabourRate } from '../../lib/bookingLabourShare.js'
 
 function formatDateTime(val) {
   if (!val) return '—'
@@ -700,59 +701,8 @@ export function ActiveJob() {
       {/* Booking Details */}
       <GlassPanel className="p-4 text-sm">
         {booking && (() => {
-          let share = booking.laborShare || booking.basePrice || 0;
-          if (booking.multiServiceBooking?.isMultiService) {
-            const myMultiItems = (booking.multiServiceBooking.items || []).filter(it => {
-              const lId = typeof it.assignedLabourId === 'object' ? it.assignedLabourId?._id : it.assignedLabourId
-              return String(lId) === String(user?._id)
-            })
-            if (myMultiItems.length > 0) {
-              share = myMultiItems.reduce((acc, it) => acc + Math.round((it.itemTotal || 0) * 0.90), 0)
-            }
-          } else if (booking.assignments && booking.assignments.length > 0) {
-            if (booking.contractorInfo?.services?.length > 0) {
-              let subTotal = 0;
-              booking.contractorInfo.services.forEach(s => {
-                subTotal += (s.price || 0) * (booking.hours || 1) * (s.quantity || 1);
-              });
-              const ratio = subTotal > 0 ? (booking.laborShare || 0) / subTotal : 0;
-              
-              let availableServices = [];
-              booking.contractorInfo.services.forEach(s => {
-                const sShare = (s.price || 0) * (booking.hours || 1) * ratio;
-                for (let i = 0; i < (s.quantity || 1); i++) {
-                  availableServices.push({ serviceId: String(s.serviceId?._id || s.serviceId), share: sShare, assigned: false });
-                }
-              });
-              
-              booking.assignments.forEach(a => {
-                const labour = a.labourId;
-                if (!labour) return;
-                const labServiceIds = [
-                  ...(labour.serviceIds || []),
-                  ...(labour.labourProfile?.serviceIds || [])
-                ].map(id => String(id));
-                let matchedService = availableServices.find(as => !as.assigned && labServiceIds.includes(as.serviceId));
-                if (!matchedService) matchedService = availableServices.find(as => !as.assigned);
-                if (matchedService) {
-                  matchedService.assigned = true;
-                  matchedService.labourIdStr = String(labour._id || labour);
-                }
-              });
-              
-              const myService = availableServices.find(as => as.labourIdStr === String(user?._id));
-              if (myService) {
-                share = myService.share;
-              } else {
-                share = booking.laborShare / booking.assignments.length;
-              }
-            } else {
-              const mainLabId = typeof booking.laborId === 'object' ? booking.laborId?._id : booking.laborId;
-              if (String(mainLabId) !== String(user?._id) && !booking.acceptedLabourIds?.includes(user?._id)) {
-                share = 0;
-              }
-            }
-          }
+          // Same single rule as the Jobs list, Home and Admin screens
+          const share = getLabourBookingShare(booking, user?._id);
 
           let resolvedStartedAt = booking.startedAt;
           if (booking.assignments && booking.assignments.length > 0 && user) {
@@ -899,7 +849,7 @@ export function ActiveJob() {
                     </span>
                     <span>•</span>
                     <span className="font-bold text-emerald-700">
-                      Earnings: ₹{Math.round((myItem.itemTotal || 0) * 0.90)}
+                      Earnings: ₹{Math.round((myItem.itemTotal || 0) * getBookingLabourRate(booking))}
                     </span>
                   </div>
                 </div>

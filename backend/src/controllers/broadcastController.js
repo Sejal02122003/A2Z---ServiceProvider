@@ -4,6 +4,7 @@ import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { KYC_STATUS } from '../constants/roles.js'
 import { BROADCAST_TIMEOUT_MS } from '../services/broadcastService.js'
 import { getLabourStats } from '../services/labourStatsService.js'
+import { getBookingLabourShareRate } from '../utils/labourShare.js'
 
 function formatDurationHuman(mins) {
   const m = Math.max(1, Math.round(Number(mins) || 45))
@@ -222,7 +223,7 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     assignedServiceName = chosenMultiItems.length === 1
       ? (chosenMultiItem.subServiceName ? `${chosenMultiItem.serviceName} (${chosenMultiItem.subServiceName})` : chosenMultiItem.serviceName)
       : `Multi-Service (${chosenMultiItems.length} services)`
-    assignedLabourShare = chosenMultiItems.reduce((acc, it) => acc + Math.round((it.itemTotal || 0) * 0.90), 0)
+    assignedLabourShare = chosenMultiItems.reduce((acc, it) => acc + Math.round((it.itemTotal || 0) * getBookingLabourShareRate(booking)), 0)
   } else if (isContractorBooking) {
     const currentAssignments = booking.assignments || []
     const { LabourService } = await import('../models/LabourService.js')
@@ -282,9 +283,9 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     const svcDoc = await LabourService.findById(assignedServiceId).lean()
     assignedServiceName = svcDoc?.name || ''
 
-    // Labour share = price × hours × 90% (platform takes 10%)
+    // Labour share = price × hours × (1 − booking's commission rate)
     const bookingHours = booking.duration || booking.hours || 1
-    assignedLabourShare = Math.round(assignedPricePerHour * bookingHours * 0.90)
+    assignedLabourShare = Math.round(assignedPricePerHour * bookingHours * getBookingLabourShareRate(booking))
   } else {
     // Simple single-service or package booking: Strictly verify labourer offers this service
     const fullLabour = await (await import('../models/User.js')).User.findById(labour._id).lean()
@@ -363,7 +364,7 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
         serviceId: itm.serviceId,
         serviceName: itm.subServiceName ? `${itm.serviceName} (${itm.subServiceName})` : itm.serviceName,
         pricePerHour: itm.unitPrice || 0,
-        labourShare: Math.round((itm.itemTotal || 0) * 0.90),
+        labourShare: Math.round((itm.itemTotal || 0) * getBookingLabourShareRate(booking)),
         status: 'ACCEPTED',
         startOtp: itm.startOtp || startOtp,
         completionOtp: itm.completionOtp || completionOtp,
@@ -850,7 +851,7 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       pricePerHour: it.unitPrice || 0,
       unitPrice: it.unitPrice || 0,
       itemTotal: it.itemTotal || 0,
-      estimatedEarnings: Math.round(it.itemTotal * 0.90),
+      estimatedEarnings: Math.round((it.itemTotal || 0) * getBookingLabourShareRate(booking)),
       openSlots: 1,
     }))
 
@@ -902,7 +903,7 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
         serviceId: String(s.serviceId),
         name: nameMap[String(s.serviceId)] || 'Contractor Service',
         pricePerHour: s.price || 0,
-        estimatedEarnings: Math.round((s.price || 0) * bookingHours * 0.90),
+        estimatedEarnings: Math.round((s.price || 0) * bookingHours * getBookingLabourShareRate(booking)),
         openSlots: Math.max(0, (s.quantity || 1) - currentAssignments.filter((a) => String(a.serviceId) === String(s.serviceId)).length),
       }))
 

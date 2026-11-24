@@ -1,7 +1,27 @@
+const idOf = (v) => String(typeof v === 'object' && v?._id ? v._id : (v || ''))
+
 /**
- * Calculates a single worker's individual shared earning for a booking.
- * Correctly accounts for bulk contractor bookings, multiple assignments,
- * custom service rates, and single 1-to-1 direct bookings.
+ * Fraction of a booking's base price that goes to the service provider.
+ * Derived from the booking's own snapshot (basePrice & commissionAmount), so it always agrees with
+ * booking.laborShare even if the commission % changes later. Never hard-code 0.90.
+ */
+export function getBookingLabourRate(booking) {
+  const base = Number(booking?.basePrice) || 0
+  const commission = Number(booking?.commissionAmount)
+  if (base > 0 && Number.isFinite(commission) && commission >= 0) {
+    return Math.min(1, Math.max(0, (base - commission) / base))
+  }
+  return 0.9 // legacy fallback for bookings without a commission snapshot
+}
+
+/**
+ * A single worker's earning for a booking. ONE rule used by every screen (Jobs, Home, Active Job,
+ * Admin) so the amounts always match:
+ *
+ *   1. The provider's own assignments: sum of the share stored on each assignment at acceptance.
+ *   2. Legacy bookings without a stored share: derived from the items / services they were given,
+ *      using the booking's own commission rate.
+ *   3. No assignments (direct single booking): booking.laborShare.
  *
  * @param {Object} booking - The booking object
  * @param {string|Object} userId - The current labour user's ID or user object
@@ -9,11 +29,30 @@
  */
 export function getLabourBookingShare(booking, userId) {
   if (!booking) return 0
-  const uIdStr = String(typeof userId === 'object' && userId?._id ? userId._id : (userId || ''))
+  const uIdStr = idOf(userId)
+  const assignments = Array.isArray(booking.assignments) ? booking.assignments : []
 
-  // 1. Multi-Worker / Bulk Contractor Booking
-  if (booking.assignments && booking.assignments.length > 0) {
-    // If specific service breakdowns exist under contractorInfo
+  if (assignments.length > 0) {
+    // 1. Stored share on this worker's own assignment(s)
+    const mine = assignments.filter((a) => idOf(a.labourId) === uIdStr && a.status !== 'CANCELLED')
+    if (mine.length > 0) {
+      const stored = mine.reduce((sum, a) => sum + (Number(a.labourShare) || 0), 0)
+      if (stored > 0) return Math.round(stored)
+    }
+
+    // 2a. Legacy multi-service: items assigned to this worker
+    const items = booking.multiServiceBooking?.items
+    if (booking.multiServiceBooking?.isMultiService && Array.isArray(items)) {
+      const rate = getBookingLabourRate(booking)
+      const myItems = items.filter((it) => idOf(it.assignedLabourId) === uIdStr && it.status !== 'CANCELLED')
+      if (myItems.length > 0) {
+        return Math.round(
+          myItems.reduce((sum, it) => sum + Math.round((Number(it.itemTotal) || 0) * rate), 0),
+        )
+      }
+    }
+
+    // 2b. Legacy contractor booking: share of the matched service
     if (booking.contractorInfo?.services?.length > 0) {
       let subTotal = 0
       booking.contractorInfo.services.forEach((s) => {
@@ -34,7 +73,7 @@ export function getLabourBookingShare(booking, userId) {
         }
       })
 
-      booking.assignments.forEach((a) => {
+      assignments.forEach((a) => {
         const labour = a.labourId
         if (!labour) return
         const labServiceIds = [
@@ -48,23 +87,19 @@ export function getLabourBookingShare(booking, userId) {
         if (!matchedService) matchedService = availableServices.find((as) => !as.assigned)
         if (matchedService) {
           matchedService.assigned = true
-          matchedService.labourIdStr = String(typeof labour === 'object' && labour._id ? labour._id : labour)
+          matchedService.labourIdStr = idOf(labour)
         }
       })
 
       const myService = availableServices.find((as) => as.labourIdStr === uIdStr)
-      if (myService && myService.share > 0) {
-        return Math.round(myService.share)
-      } else {
-        return Math.round((Number(booking.laborShare) || 0) / (booking.assignments.length || 1))
-      }
-    } else {
-      // Standard multi-labour split without per-service rates
-      return Math.round((Number(booking.laborShare) || 0) / (booking.assignments.length || 1))
+      if (myService && myService.share > 0) return Math.round(myService.share)
     }
+
+    // 2c. Last resort: even split of the booking share between its assignments
+    return Math.round((Number(booking.laborShare) || 0) / (assignments.length || 1))
   }
 
-  // 2. Direct Single Worker Booking
+  // 3. Direct single worker booking
   const share = Number(booking.laborShare) ||
     (Number(booking.totalAmount) - (Number(booking.commissionAmount) || 0)) ||
     Number(booking.basePrice) ||
