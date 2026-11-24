@@ -696,16 +696,20 @@ function BookingDetailsModal({ booking, onClose }) {
 
           {(!booking.assignments || booking.assignments.length === 0) && (
             <>
-              <div className="border-t border-slate-100 pt-4 grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-slate-500 text-xs">Start OTP</p>
-                  <p className="font-mono font-semibold">{booking.startOtp || 'N/A'}</p>
+              {/* Multi-service bookings use a separate OTP pair per service (shown in "Booked Service Items"),
+                  so the booking-level OTP is not shown for them. */}
+              {!booking.multiServiceBooking?.isMultiService && (
+                <div className="border-t border-slate-100 pt-4 grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-slate-500 text-xs">Start OTP</p>
+                    <p className="font-mono font-semibold">{booking.startOtp || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 text-xs">Completion OTP</p>
+                    <p className="font-mono font-semibold">{booking.completionOtp || 'N/A'}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-slate-500 text-xs">Completion OTP</p>
-                  <p className="font-mono font-semibold">{booking.completionOtp || 'N/A'}</p>
-                </div>
-              </div>
+              )}
 
               <div className="border-t border-slate-100 pt-4 grid grid-cols-2 gap-4">
                 <div>
