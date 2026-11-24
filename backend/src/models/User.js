@@ -87,6 +87,9 @@ const labourProfileSchema = new mongoose.Schema(
         { day: 'Sunday', startTime: '09:00', endTime: '17:00', isAvailable: false },
       ]
     },
+    // True once the provider has explicitly saved their own working hours (Time Management).
+    // Until then the default 09:00-17:00 schedule above is NOT enforced when broadcasting bookings.
+    scheduleCustomized: { type: Boolean, default: false },
     currentLatitude: { type: Number },
     currentLongitude: { type: Number },
     lastLocationUpdatedAt: { type: Date },

@@ -1041,11 +1041,25 @@ export const createBooking = asyncHandler(async (req, res) => {
   const customerName = req.user?.fullName || req.user?.phone || 'Customer'
   const bookingServiceTitle = booking.packageBooking?.packageName || booking.subServiceName || 'Service'
 
-  // Phase 3: Trigger the Broadcast Engine asynchronously
-  console.log(`[FLOW: 1_BROADCAST_TRIGGERED] Triggering immediate broadcast for booking ${booking._id} (type=${booking.type})`)
-  import('../services/broadcastService.js').then(({ startBroadcastCycle }) => {
-    startBroadcastCycle(booking._id).catch(err => console.error('[FLOW: BROADCAST_ERROR]', err))
-  })
+  // Phase 3: Trigger the Broadcast Engine asynchronously.
+  // SCHEDULED jobs more than 65 mins away stay in CREATED; broadcastCron.js broadcasts them once they are
+  // within 65 mins (keep this value in sync with the cron). Broadcasting them now would expire after 90s
+  // and mark the booking FAILED before the cron ever sees it.
+  const CRON_BROADCAST_LEAD_MS = 65 * 60 * 1000
+  const deferToCron =
+    isScheduled &&
+    scheduledAtDate &&
+    !isNaN(scheduledAtDate.getTime()) &&
+    scheduledAtDate.getTime() - nowMs > CRON_BROADCAST_LEAD_MS
+
+  if (deferToCron) {
+    console.log(`[FLOW: 1_BROADCAST_DEFERRED] Booking ${booking._id} is scheduled ${minutesUntilScheduled} mins ahead; broadcast deferred to cron (starts within 65 mins of the job).`)
+  } else {
+    console.log(`[FLOW: 1_BROADCAST_TRIGGERED] Triggering immediate broadcast for booking ${booking._id} (type=${booking.type})`)
+    import('../services/broadcastService.js').then(({ startBroadcastCycle }) => {
+      startBroadcastCycle(booking._id).catch(err => console.error('[FLOW: BROADCAST_ERROR]', err))
+    })
+  }
 
   // 1. Immediate Push Notification & In-App Notification to Customer
   import('../utils/pushNotificationHelper.js').then(async ({ sendNotificationToUser, sendNotificationToAdmins }) => {

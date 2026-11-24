@@ -1206,6 +1206,8 @@ export const updateLabourSchedule = asyncHandler(async (req, res) => {
 
   req.user.labourProfile = req.user.labourProfile || {}
   req.user.labourProfile.schedule = schedule
+  // Provider explicitly saved their hours -> from now on the schedule is enforced for broadcasts
+  req.user.labourProfile.scheduleCustomized = true
 
   // If today's day in IST is marked unavailable in the schedule, automatically set availabilityStatus to 'offline'
   const todayName = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', weekday: 'long' }).format(new Date())

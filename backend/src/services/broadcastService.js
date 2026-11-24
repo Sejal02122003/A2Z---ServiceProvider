@@ -23,6 +23,42 @@ function formatDurationHuman(mins) {
   return `${m} mins`
 }
 
+// The schedule every provider gets at signup (see User.js). A provider who never opened
+// Time Management still has this, so it must not be treated as real working hours.
+const DEFAULT_SCHEDULE_SIGNATURE = [
+  'Monday|09:00|17:00|true',
+  'Tuesday|09:00|17:00|true',
+  'Wednesday|09:00|17:00|true',
+  'Thursday|09:00|17:00|true',
+  'Friday|09:00|17:00|true',
+  'Saturday|09:00|17:00|true',
+  'Sunday|09:00|17:00|false',
+].join(';')
+
+function isUntouchedDefaultSchedule(schedule) {
+  if (!Array.isArray(schedule) || schedule.length !== 7) return false
+  const order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  const byDay = new Map(schedule.map((s) => [s.day, s]))
+  const signature = order
+    .map((d) => {
+      const s = byDay.get(d)
+      return s ? `${d}|${s.startTime}|${s.endTime}|${s.isAvailable !== false}` : `${d}|missing`
+    })
+    .join(';')
+  return signature === DEFAULT_SCHEDULE_SIGNATURE
+}
+
+/**
+ * Only enforce a provider's working hours when they actually set them:
+ * either they saved their schedule (scheduleCustomized) or it differs from the signup default.
+ */
+function shouldEnforceSchedule(labourProfile) {
+  const schedule = labourProfile?.schedule || []
+  if (schedule.length === 0) return false
+  if (labourProfile?.scheduleCustomized === true) return true
+  return !isUntouchedDefaultSchedule(schedule)
+}
+
 /**
  * Starts the flash broadcast for a new booking based on a radius zone.
  */
@@ -222,7 +258,7 @@ export async function startBroadcastCycle(bookingId) {
     }
 
     const schedule = labor.labourProfile?.schedule || []
-    if (schedule.length > 0) {
+    if (shouldEnforceSchedule(labor.labourProfile)) {
       const dayEntry = schedule.find(s => s.day === targetDayName)
       if (dayEntry) {
         // 2. If the toggle for this day is turned off in Time Management, they are OFFLINE
@@ -423,6 +459,8 @@ export async function startBroadcastCycle(bookingId) {
 
   // 5. Update eligible count
   booking.eligibleLabourCount = eligibleLaborers.length
+  // Remember exactly who this offer was dispatched to, so the in-app poll shows it only to them
+  booking.broadcastedTo = eligibleLaborers.map(l => l._id)
   await booking.save()
 
   // 6. Flash Broadcast via WebSockets

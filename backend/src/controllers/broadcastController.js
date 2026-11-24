@@ -771,6 +771,9 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
     status: { $in: ['BROADCASTING', 'PARTIALLY_ACCEPTED'] },
     rejectedBy: { $ne: labour._id },
     acceptedLabourIds: { $ne: labour._id },
+    // Only providers the server actually dispatched this offer to (same rules as the socket/push route:
+    // hours, offline, busy, radius). Keeps "app open" and "app closed" behaviour identical.
+    broadcastedTo: labour._id,
   }
 
   if (requestedBookingId) {
