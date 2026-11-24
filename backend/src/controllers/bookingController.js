@@ -319,8 +319,8 @@ export const calculateBill = asyncHandler(async (req, res) => {
   const isMultiService = Array.isArray(req.body.items) && req.body.items.length > 0
   const servicesToCalculate = isMultiService
     ? req.body.items
-    : (contractorServices && contractorServices.length > 0 
-      ? contractorServices 
+    : (contractorServices && contractorServices.length > 0
+      ? contractorServices
       : [{ serviceId, subServiceId, quantity, hours }])
 
   let primaryCategoryId = null
@@ -333,7 +333,7 @@ export const calculateBill = asyncHandler(async (req, res) => {
     const itemQty = Number(item.quantity) || 1
     const { hourlyRate, originalHourlyRate, discountType, discountValue, offerBadge, name, categoryId, subcategoryId, iconUrl, estimatedDurationMins: resolvedDurationMins, error } = await resolveHourlyRate(item.serviceId, item.subServiceId)
     if (error) return sendError(res, { message: error, statusCode: HTTP_STATUS.NOT_FOUND })
-    
+
     if (!primaryCategoryId && categoryId) primaryCategoryId = categoryId
 
     const itemUnitDuration = Number(item.estimatedDurationMins || resolvedDurationMins || 45)
@@ -549,8 +549,8 @@ export const createBooking = asyncHandler(async (req, res) => {
   let matchingZone = null
   if (activeZones.length > 0) {
     const normalizedLocation = locationText.toLowerCase()
-    matchingZone = activeZones.find(z => 
-      normalizedLocation.includes(z.city.toLowerCase()) || 
+    matchingZone = activeZones.find(z =>
+      normalizedLocation.includes(z.city.toLowerCase()) ||
       (z.name && normalizedLocation.includes(z.name.toLowerCase()))
     )
     if (!matchingZone && activeZones.length === 1) {
@@ -883,8 +883,8 @@ export const createBooking = asyncHandler(async (req, res) => {
   const basePrice = subTotal - maxHourDiscount
   let platformFee = 0
   if (settings?.platformFee?.isActive) {
-    platformFee = settings.platformFee.type === 'fixed' 
-      ? settings.platformFee.value 
+    platformFee = settings.platformFee.type === 'fixed'
+      ? settings.platformFee.value
       : (basePrice * settings.platformFee.value) / 100
   }
 
@@ -974,7 +974,7 @@ export const createBooking = asyncHandler(async (req, res) => {
       maxHourDiscount,
       packageBooking: packageBookingData,
       multiServiceBooking: multiServiceBookingData,
-      address: { 
+      address: {
         locationText,
         coordinates: {
           type: 'Point',
@@ -1254,18 +1254,18 @@ export const getBookingStatus = asyncHandler(async (req, res) => {
 
 export const getMyBookings = asyncHandler(async (req, res) => {
   const { role, _id } = req.user
-  
+
   let query = {}
   if (role === 'customer' || role === 'contractor') {
     query = { userId: _id }
   } else if (role === 'labour' || role === 'contractor') {
-    query = { 
+    query = {
       $or: [
         { userId: _id },
         { laborId: _id, status: { $in: ['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED', 'COMPLETED', 'CANCELLED'] } },
         { acceptedLabourIds: _id },
         { 'multiServiceBooking.items.assignedLabourId': _id }
-      ] 
+      ]
     }
   } else {
     return sendError(res, { message: 'Unauthorized role for fetching bookings', statusCode: HTTP_STATUS.FORBIDDEN })
@@ -1383,9 +1383,9 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
   const { id } = req.params
   const { status, otp, startWorkImage, endWorkImage, beforeImage, afterImage } = req.body
   const booking = await Booking.findById(id)
-  
+
   if (!booking) return sendError(res, { message: 'Booking not found', statusCode: HTTP_STATUS.NOT_FOUND })
-  
+
   const isLabourer = String(req.user._id) !== String(booking.userId);
   const labourIdStr = String(req.user._id);
 
@@ -1407,8 +1407,8 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
           cancelResult.status === 'CANCELLATION_REQUESTED'
             ? 'Cancellation requested. Sent to Admin Dashboard for approval.'
             : cancelResult.penaltyDeducted > 0
-            ? `Booking cancelled. A late penalty of ₹${cancelResult.penaltyDeducted} was deducted.`
-            : 'Booking cancelled. Booking will be re-broadcast to nearby service providers.',
+              ? `Booking cancelled. A late penalty of ₹${cancelResult.penaltyDeducted} was deducted.`
+              : 'Booking cancelled. Booking will be re-broadcast to nearby service providers.',
         data: cancelResult,
       })
     } catch (err) {
@@ -1442,7 +1442,7 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
     if (!otp) return sendError(res, { message: 'OTP is required to start the job', statusCode: HTTP_STATUS.BAD_REQUEST })
     if (otp !== startOtp) return sendError(res, { message: 'Invalid Start OTP', statusCode: HTTP_STATUS.BAD_REQUEST })
     const finalStartImg = startWorkImage || beforeImage
-    
+
     if (assignment) {
       if (finalStartImg) assignment.startWorkImage = finalStartImg;
       assignment.startedAt = new Date();
@@ -1463,7 +1463,7 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
     if (!otp) return sendError(res, { message: 'OTP is required to complete the job', statusCode: HTTP_STATUS.BAD_REQUEST })
     if (otp !== completionOtp) return sendError(res, { message: 'Invalid Completion OTP', statusCode: HTTP_STATUS.BAD_REQUEST })
     const finalEndImg = endWorkImage || afterImage
-    
+
     if (assignment) {
       if (finalEndImg) assignment.endWorkImage = finalEndImg;
       assignment.completedAt = new Date();
@@ -1480,8 +1480,8 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
 
   // Sync multiServiceBooking item status if applicable
   if (booking.multiServiceBooking?.isMultiService && Array.isArray(booking.multiServiceBooking.items)) {
-    const multiItems = booking.multiServiceBooking.items.filter(it => 
-      String(it.assignedLabourId) === labourIdStr || 
+    const multiItems = booking.multiServiceBooking.items.filter(it =>
+      String(it.assignedLabourId) === labourIdStr ||
       (assignment && String(it.serviceId) === String(assignment.serviceId))
     )
     multiItems.forEach(multiItem => {
@@ -1541,14 +1541,14 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
           console.error('[Cash Settlement Error in updateBookingStatus]:', settleErr)
         }
       }
-    } else if (booking.paymentMethod === 'ONLINE') {
+    } else if (booking.paymentMethod === 'ONLINE' || booking.paymentMethod === 'WALLET') {
       // ONLY payout if the customer has actually completed the online payment.
       // If they haven't paid yet, the paymentController will handle this payout later once they pay.
       if (booking.paymentStatus === 'PAID') {
         // Settle booking commission reservation
         import('../services/walletEligibilityService.js').then(({ settleBookingCommission }) => {
           settleBookingCommission({ bookingId: booking._id }).catch(err => console.error('[Online Settlement Error]:', err))
-        }).catch(() => {})
+        }).catch(() => { })
 
         // Add laborShare to labor's self wallet
         wallet.selfBalance += booking.laborShare
@@ -1570,7 +1570,7 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
         if (booking.platformFee > 0 || booking.commissionAmount > 0 || booking.basePrice > 0 || booking.taxes > 0) {
           let adminWallet = await AdminWallet.findOne()
           if (!adminWallet) adminWallet = new AdminWallet()
-          
+
           adminWallet.totalPlatformFeesCollected += (booking.platformFee || 0)
           adminWallet.totalCommissionsCollected += (booking.commissionAmount || 0)
           adminWallet.totalTaxesCollected += (booking.taxes || 0)
@@ -1598,7 +1598,7 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
       // Cancel any pending reminders for completed booking
       import('../services/bookingReminderService.js').then(({ cancelRemindersForBooking }) => {
         cancelRemindersForBooking(booking._id, 'Booking completed').catch(console.error)
-      }).catch(() => {})
+      }).catch(() => { })
     }
 
     // Award automatic 15% (or configured %) service completion credit to customer wallet
@@ -1628,12 +1628,12 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
 
       // Check if reason is an exempt fake/bogus customer alert
       const lowerReason = String(reason).toLowerCase()
-      const isExempt = Boolean(waivePenalty) || 
-                       lowerReason.includes('fake') || 
-                       lowerReason.includes('unreachable') || 
-                       lowerReason.includes('wrong address') ||
-                       lowerReason.includes('customer requested') ||
-                       lowerReason.includes('customer cancelled')
+      const isExempt = Boolean(waivePenalty) ||
+        lowerReason.includes('fake') ||
+        lowerReason.includes('unreachable') ||
+        lowerReason.includes('wrong address') ||
+        lowerReason.includes('customer requested') ||
+        lowerReason.includes('customer cancelled')
 
       if (!isExempt) {
         // Record Bounce Penalty through central engine (supports review vs auto-deduct, audit, precedence)
@@ -1670,7 +1670,7 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
     import('../services/walletEligibilityService.js').then(({ releaseBookingCommissionReservation }) => {
       releaseBookingCommissionReservation({ bookingId: booking._id, reason: `Booking cancelled by ${booking.cancelledBy || 'User'}` })
         .catch(err => console.error('Error releasing commission reservation on cancellation:', err))
-    }).catch(() => {})
+    }).catch(() => { })
 
     // Release held cash charges reservation for labourer if cash booking
     if (booking.paymentMethod === 'CASH') {
@@ -1680,7 +1680,7 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
         import('../services/labourWalletService.js').then(({ releaseCashBookingCharges }) => {
           releaseCashBookingCharges({ labourId: labourIdToRelease, bookingId: booking._id, amount: expectedCharges })
             .catch(err => console.error('Error releasing reservation on cancellation:', err))
-        }).catch(() => {})
+        }).catch(() => { })
       }
     }
 
@@ -1694,22 +1694,22 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
 
   // Notify customer
   import('../socket.js').then(({ emitToUser }) => {
-    emitToUser(booking.userId, 'BOOKING_STATUS_UPDATE', { 
-      bookingId: booking._id, 
-      status, 
+    emitToUser(booking.userId, 'BOOKING_STATUS_UPDATE', {
+      bookingId: booking._id,
+      status,
       cancelledBy: booking.cancelledBy,
       cancellationReason: booking.cancellationReason,
-      penaltyDeducted 
+      penaltyDeducted
     })
     if (booking.assignments && booking.assignments.length > 0) {
       booking.assignments.forEach(a => {
         const lid = typeof a.labourId === 'object' ? a.labourId._id : a.labourId;
-        if (lid) emitToUser(lid, 'BOOKING_STATUS_UPDATE', { 
-          bookingId: booking._id, 
-          status, 
+        if (lid) emitToUser(lid, 'BOOKING_STATUS_UPDATE', {
+          bookingId: booking._id,
+          status,
           cancelledBy: booking.cancelledBy,
           cancellationReason: booking.cancellationReason,
-          penaltyDeducted 
+          penaltyDeducted
         })
       });
     }
@@ -1842,27 +1842,27 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
         shortBookingId,
         status,
       })
-    }).catch(() => {})
+    }).catch(() => { })
   }).catch(err => console.error(err))
 
-  return sendSuccess(res, { 
+  return sendSuccess(res, {
     message: penaltyDeducted > 0
       ? `Booking marked as ${status}. Bounce penalty of ₹${penaltyDeducted} has been deducted.`
-      : `Booking marked as ${status}`, 
-    data: { booking, penaltyDeducted } 
+      : `Booking marked as ${status}`,
+    data: { booking, penaltyDeducted }
   })
 })
 
 export const confirmCashPayment = asyncHandler(async (req, res) => {
   const { id } = req.params
-  
+
   const booking = await Booking.findById(id)
   if (!booking) {
     return sendError(res, { message: 'Booking not found', statusCode: HTTP_STATUS.NOT_FOUND })
   }
-  
+
   const isCustomer = booking.userId && booking.userId.toString() === req.user._id.toString()
-  const isAssignedLabour = 
+  const isAssignedLabour =
     (booking.laborId && booking.laborId.toString() === req.user._id.toString()) ||
     booking.acceptedLabourIds?.some(id => String(id) === String(req.user._id)) ||
     booking.assignments?.some(a => {
@@ -1878,7 +1878,7 @@ export const confirmCashPayment = asyncHandler(async (req, res) => {
   if (!['STARTED', 'COMPLETED'].includes(booking.status)) {
     return sendError(res, { message: 'Booking must be started or completed before confirming cash payment', statusCode: HTTP_STATUS.BAD_REQUEST })
   }
-  
+
   if (booking.paymentMethod !== 'CASH') {
     return sendError(res, { message: 'Not a cash booking', statusCode: HTTP_STATUS.BAD_REQUEST })
   }
@@ -1909,13 +1909,13 @@ export const confirmCashPayment = asyncHandler(async (req, res) => {
   // Notify both
   import('../socket.js').then(({ emitToUser }) => {
     emitToUser(booking.laborId, 'BOOKING_STATUS_UPDATE', { bookingId: booking._id, status: booking.status, paymentStatus: 'PAID' })
-        emitToUser(booking.userId, 'BOOKING_STATUS_UPDATE', { bookingId: booking._id, status: booking.status, paymentStatus: 'PAID' })
-        if (booking.assignments && booking.assignments.length > 0) {
-          booking.assignments.forEach(a => {
-            const lid = typeof a.labourId === 'object' ? a.labourId._id : a.labourId;
-            if (lid) emitToUser(lid, 'BOOKING_STATUS_UPDATE', { bookingId: booking._id, status: booking.status, paymentStatus: 'PAID' })
-          });
-        }
+    emitToUser(booking.userId, 'BOOKING_STATUS_UPDATE', { bookingId: booking._id, status: booking.status, paymentStatus: 'PAID' })
+    if (booking.assignments && booking.assignments.length > 0) {
+      booking.assignments.forEach(a => {
+        const lid = typeof a.labourId === 'object' ? a.labourId._id : a.labourId;
+        if (lid) emitToUser(lid, 'BOOKING_STATUS_UPDATE', { bookingId: booking._id, status: booking.status, paymentStatus: 'PAID' })
+      });
+    }
   }).catch(err => console.error(err))
 
   return sendSuccess(res, { message: 'Cash payment confirmed', data: { booking } })
@@ -1947,19 +1947,19 @@ export const addExtraTime = asyncHandler(async (req, res) => {
     return sendError(res, { message: 'Booking is already paid', statusCode: HTTP_STATUS.BAD_REQUEST })
   }
 
-  const totalExtraAmount = (booking.assignments && booking.assignments.length > 0) 
-    ? booking.assignments.reduce((sum, a) => sum + (a.extraAmount || 0), 0) 
+  const totalExtraAmount = (booking.assignments && booking.assignments.length > 0)
+    ? booking.assignments.reduce((sum, a) => sum + (a.extraAmount || 0), 0)
     : (booking.extraAmount || 0)
-  
+
   const originalBasePrice = booking.basePrice - totalExtraAmount
-  
+
   let totalProfessionals = booking.quantity || 1
   if (booking.contractorInfo && booking.contractorInfo.services && booking.contractorInfo.services.length > 0) {
     totalProfessionals = booking.contractorInfo.services.reduce((sum, s) => sum + (s.quantity || 1), 0)
   }
-  
+
   let hourlyRate = originalBasePrice / (booking.hours * totalProfessionals)
-  
+
   // If specific assignment is provided, try to find its exact service rate
   if (assignmentId && booking.assignments && booking.contractorInfo && booking.contractorInfo.services) {
     const assignment = booking.assignments.find(a => String(a.labourId) === String(assignmentId) || String(a._id) === String(assignmentId))
@@ -1979,11 +1979,11 @@ export const addExtraTime = asyncHandler(async (req, res) => {
 
   let platformFee = booking.platformFee
   if (settings?.platformFee?.isActive) {
-    platformFee = settings.platformFee.type === 'fixed' 
-      ? settings.platformFee.value 
+    platformFee = settings.platformFee.type === 'fixed'
+      ? settings.platformFee.value
       : (newBasePrice * settings.platformFee.value) / 100
   }
-  
+
   const baseAmount = newBasePrice + platformFee
   let taxes = 0
 
@@ -2005,7 +2005,7 @@ export const addExtraTime = asyncHandler(async (req, res) => {
     taxes = (newBasePrice * gstPercentage) / 100
   }
 
-  
+
   const newTotalAmount = baseAmount + taxes
 
   let commissionAmount = booking.commissionAmount
@@ -2266,8 +2266,8 @@ export const cancelBookingItem = asyncHandler(async (req, res) => {
   if (item.assignedLabourId) {
     notifiedLabourId = item.assignedLabourId
     if (Array.isArray(booking.assignments)) {
-      const assignment = booking.assignments.find(a => 
-        String(a.labourId) === String(item.assignedLabourId) && 
+      const assignment = booking.assignments.find(a =>
+        String(a.labourId) === String(item.assignedLabourId) &&
         String(a.serviceId) === String(item.serviceId)
       )
       if (assignment) {

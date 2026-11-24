@@ -1,6 +1,8 @@
 import { User } from '../models/User.js'
 import { Booking } from '../models/Booking.js'
 import { BroadcastLog } from '../models/BroadcastLog.js'
+import { LabourService } from '../models/LabourService.js'
+import { LabourSubcategory } from '../models/LabourSubcategory.js'
 import { SystemSetting } from '../models/SystemSetting.js'
 import { getRoadDistances } from '../utils/googleMapsDistance.js'
 import { UserSubscription } from '../models/UserSubscription.js'
@@ -131,7 +133,6 @@ export async function startBroadcastCycle(bookingId) {
 
   let bookingCategoryId = null
   if (booking.subcategoryId) {
-    const { LabourSubcategory } = await import('../models/LabourSubcategory.js')
     const subcatDoc = await LabourSubcategory.findById(booking.subcategoryId).select('categoryId').lean()
     if (subcatDoc?.categoryId) {
       bookingCategoryId = String(subcatDoc.categoryId)

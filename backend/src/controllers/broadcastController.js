@@ -1,4 +1,7 @@
 import { Booking } from '../models/Booking.js'
+import { User } from '../models/User.js'
+import { LabourService } from '../models/LabourService.js'
+import { LabourSubcategory } from '../models/LabourSubcategory.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { KYC_STATUS } from '../constants/roles.js'
@@ -56,8 +59,8 @@ async function validateLabourBookingAccess(labour) {
 
   // 4. Check today's subscription
   const todayIST = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
-  const subscription = await UserSubscription.findOne({ 
-    labour: labour._id, 
+  const subscription = await UserSubscription.findOne({
+    labour: labour._id,
     status: 'active',
     date: { $lte: todayIST },
     endDate: { $gte: todayIST }
@@ -102,7 +105,7 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
 
   // Fetch booking first (can be CREATED, BROADCASTING or PARTIALLY_ACCEPTED for multi-service)
   let booking = await Booking.findOne({ _id: bookingId, status: { $in: ['CREATED', 'BROADCASTING', 'PARTIALLY_ACCEPTED'] } })
-  
+
   if (!booking) {
     const currentBooking = await Booking.findById(bookingId)
     if (!currentBooking) {
@@ -181,12 +184,12 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
       return sendError(res, { message: 'All service slots for this booking are already filled', statusCode: HTTP_STATUS.CONFLICT })
     }
 
-    const fullLabour = await (await import('../models/User.js')).User.findById(labour._id).lean()
+    const fullLabour = await User.findById(labour._id).lean()
     const labourServiceIds = (fullLabour?.labourProfile?.serviceIds || []).map(id => String(id))
     const labourSubcatIds = (fullLabour?.labourProfile?.subcategoryIds || []).map(id => String(id))
 
     // Match open items against provider skills
-    const matchingOpen = openItems.filter(it => 
+    const matchingOpen = openItems.filter(it =>
       labourServiceIds.length > 0
         ? labourServiceIds.includes(String(it.serviceId))
         : (it.subcategoryId && labourSubcatIds.includes(String(it.subcategoryId)))
@@ -226,10 +229,9 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     assignedLabourShare = chosenMultiItems.reduce((acc, it) => acc + Math.round((it.itemTotal || 0) * getBookingLabourShareRate(booking)), 0)
   } else if (isContractorBooking) {
     const currentAssignments = booking.assignments || []
-    const { LabourService } = await import('../models/LabourService.js')
 
     // Labour's registered service IDs
-    const fullLabour = await (await import('../models/User.js')).User.findById(labour._id).lean()
+    const fullLabour = await User.findById(labour._id).lean()
     const labourServiceIds = (fullLabour?.labourProfile?.serviceIds || []).map(id => String(id))
 
     // The serviceId explicitly chosen by the labour from the popup (if multi-match)
@@ -288,14 +290,13 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     assignedLabourShare = Math.round(assignedPricePerHour * bookingHours * getBookingLabourShareRate(booking))
   } else {
     // Simple single-service or package booking: Strictly verify labourer offers this service
-    const fullLabour = await (await import('../models/User.js')).User.findById(labour._id).lean()
+    const fullLabour = await User.findById(labour._id).lean()
     const labourServiceIds = (fullLabour?.labourProfile?.serviceIds || []).map(id => String(id))
     const labourSubcatIds = (fullLabour?.labourProfile?.subcategoryIds || []).map(id => String(id))
     const labourCatIds = (fullLabour?.labourProfile?.categoryIds || []).map(id => String(id))
 
     let allSubcatIds = [...labourSubcatIds]
     if (labourCatIds.length > 0) {
-      const { LabourSubcategory } = await import('../models/LabourSubcategory.js')
       const subsInCats = await LabourSubcategory.find({ categoryId: { $in: labourCatIds } }).select('_id').lean()
       subsInCats.forEach(s => allSubcatIds.push(String(s._id)))
     }
@@ -332,7 +333,6 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
       const svcDoc = await LabourService.findById(booking.serviceId).select('name').lean()
       assignedServiceName = svcDoc?.name || booking.serviceName || ''
     } else if (booking.subcategoryId) {
-      const { LabourSubcategory } = await import('../models/LabourSubcategory.js')
       const subDoc = await LabourSubcategory.findById(booking.subcategoryId).select('name').lean()
       assignedServiceName = subDoc?.name || booking.serviceName || ''
     } else if (booking.packageBooking?.packageName) {
@@ -384,9 +384,9 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
   }
 
   const remainingPendingItems = isMultiServiceBooking
-    ? booking.multiServiceBooking.items.filter(it => 
-        it.status === 'PENDING' && !chosenMultiItems.some(ci => String(ci._id) === String(it._id))
-      )
+    ? booking.multiServiceBooking.items.filter(it =>
+      it.status === 'PENDING' && !chosenMultiItems.some(ci => String(ci._id) === String(it._id))
+    )
     : []
 
   const willBeFullyAccepted = isMultiServiceBooking
@@ -456,11 +456,11 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
   if (!updatedBooking) {
     // Release commission reservation if concurrent accept race lost
     const { releaseBookingCommissionReservation } = await import('../services/walletEligibilityService.js')
-    await releaseBookingCommissionReservation({ bookingId: booking._id, reason: 'CONCURRENT_ACCEPT_RACE_LOST' }).catch(() => {})
+    await releaseBookingCommissionReservation({ bookingId: booking._id, reason: 'CONCURRENT_ACCEPT_RACE_LOST' }).catch(() => { })
 
     if (booking.paymentMethod === 'CASH') {
       const { releaseCashBookingCharges } = await import('../services/labourWalletService.js')
-      await releaseCashBookingCharges({ labourId: labour._id, bookingId: booking._id }).catch(() => {})
+      await releaseCashBookingCharges({ labourId: labour._id, bookingId: booking._id }).catch(() => { })
     }
     return sendError(res, {
       message: 'Booking was already accepted by another partner or slots are full',
@@ -475,7 +475,7 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
   if (isMultiServiceBooking && !willBeFullyAccepted) {
     import('../services/broadcastService.js').then(({ startBroadcastCycle }) => {
       startBroadcastCycle(booking._id).catch(err => console.error('[PARTIALLY_ACCEPTED_BROADCAST_ERROR]', err))
-    }).catch(() => {})
+    }).catch(() => { })
   }
 
   // Auto-generate material requirement if service has mapped products
@@ -627,7 +627,7 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
         console.log(`[FLOW: 2_PROVIDER_ACCEPT_BOOKING] Admin push sent for #${shortId}: success=${res?.success}, count=${res?.successCount}`)
       }).catch(err => console.warn('[Admin Accept Push Error]', err?.message))
     })
-    .catch(() => {})
+    .catch(() => { })
 
   import('../socket.js')
     .then(({ emitToAdmins }) => {
@@ -646,7 +646,7 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
       })
       console.log(`[FLOW: 2_PROVIDER_ACCEPT_BOOKING] Admin socket emitted for #${shortId}`)
     })
-    .catch(() => {})
+    .catch(() => { })
 
   // Schedule automated reminders for assigned vendor & customer
   import('../services/bookingReminderService.js')
@@ -688,8 +688,8 @@ export const rejectBroadcast = asyncHandler(async (req, res) => {
       if (!inTrial) {
         const todayIST = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
         await UserSubscription.findOneAndUpdate(
-          { 
-            labour: labour._id, 
+          {
+            labour: labour._id,
             status: 'active',
             date: { $lte: todayIST },
             endDate: { $gte: todayIST }
@@ -730,7 +730,6 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
   const cutoff = new Date(Date.now() - BROADCAST_TIMEOUT_MS) // 1.5 minutes timeout window
 
   // Fetch full labour details with labourProfile
-  const { User } = await import('../models/User.js')
   const fullLabour = await User.findById(labour._id).select('labourProfile').lean()
   const labourServiceIds = (fullLabour?.labourProfile?.serviceIds || []).map((id) => String(id))
   const labourSubcatIds = (fullLabour?.labourProfile?.subcategoryIds || []).map((id) => String(id))
@@ -738,7 +737,6 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
 
   let allSubcatIds = [...labourSubcatIds]
   if (labourCatIds.length > 0) {
-    const { LabourSubcategory } = await import('../models/LabourSubcategory.js')
     const subsInCats = await LabourSubcategory.find({ categoryId: { $in: labourCatIds } }).select('_id').lean()
     subsInCats.forEach((s) => allSubcatIds.push(String(s._id)))
   }
@@ -887,7 +885,6 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
     }
   } else if (booking.contractorInfo?.services?.length > 0) {
     const currentAssignments = booking.assignments || []
-    const { LabourService } = await import('../models/LabourService.js')
     const svcDocs = await LabourService.find({
       _id: { $in: booking.contractorInfo.services.map((s) => s.serviceId) },
     }).select('_id name').lean()
@@ -955,7 +952,6 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       return sendSuccess(res, { data: { broadcast: null }, statusCode: HTTP_STATUS.OK })
     }
 
-    const { LabourService } = await import('../models/LabourService.js')
     let singleServiceName = 'Requested Service'
     let singleServiceDetail = ''
     let singleCategoryName = ''
@@ -984,7 +980,6 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
         }
       }
     } else if (booking.subcategoryId) {
-      const { LabourSubcategory } = await import('../models/LabourSubcategory.js')
       const subcat = await LabourSubcategory.findById(booking.subcategoryId).select('name').lean()
       if (subcat) {
         singleServiceName = subcat.name
