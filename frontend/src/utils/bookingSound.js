@@ -14,6 +14,14 @@ let keepAliveSource = null
 let isAutoplayBlocked = false
 const autoplayBlockedListeners = new Set()
 
+/**
+ * Web-side alert sound is DISABLED everywhere.
+ * The booking alert sound is played only by the Flutter app's native notification
+ * (works in foreground, background AND killed state).
+ * Set to true to re-enable the web sound.
+ */
+const WEB_ALERT_SOUND_ENABLED = false
+
 function notifyAutoplayBlockedChange(blocked) {
   isAutoplayBlocked = blocked
   autoplayBlockedListeners.forEach((fn) => {
@@ -104,6 +112,7 @@ function ensureAudioContextKeepAlive(ctx) {
  * Required by modern browser autoplay policies so sound can play when bookings arrive (in and out of app).
  */
 export function unlockAudioContext() {
+  if (!WEB_ALERT_SOUND_ENABLED) return
   try {
     const AudioCtxClass = window.AudioContext || window.webkitAudioContext
     if (AudioCtxClass && (!audioContext || audioContext.state === 'closed')) {
@@ -356,6 +365,9 @@ function executeAudioPlayback() {
  * Safe against duplicate rapid calls from simultaneous socket/push/SW events.
  */
 export function playBookingAlertSound(bookingOrEventId = null) {
+  if (!WEB_ALERT_SOUND_ENABLED) {
+    return // web alert sound removed — Flutter native notification plays the sound
+  }
   const nowMs = Date.now()
   if (isPlaying && bookingOrEventId && currentPlayingId === bookingOrEventId) {
     // Already playing for this specific booking event - resume context if needed and keep running
