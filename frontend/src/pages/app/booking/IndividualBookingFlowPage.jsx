@@ -2033,10 +2033,9 @@ export function IndividualBookingFlowPage() {
                   {isPaying ? 'Processing...' : 'Proceed to pay'}
                 </BookingPrimaryButton>
               ) : activeBooking?.status === 'COMPLETED' ? (
-                <BookingPrimaryButton type="button" onClick={handleOpenReview}>
-                  <Star className="h-4 w-4" aria-hidden />
-                  Rate your experience
-                </BookingPrimaryButton>
+                <p className="rounded-xl bg-amber-50 px-3 py-2 text-center text-xs font-semibold text-amber-900">
+                  Please complete the cash payment to the service provider. You can rate your experience right after payment.
+                </p>
               ) : null
             ) : activeBooking?.status === 'COMPLETED' && activeBooking?.paymentStatus === 'PAID' ? (
               !reviewOpen ? (
@@ -2045,11 +2044,6 @@ export function IndividualBookingFlowPage() {
                   Rate your experience
                 </BookingPrimaryButton>
               ) : null
-            ) : activeBooking?.status === 'COMPLETED' ? (
-              <BookingPrimaryButton type="button" onClick={handleOpenReview}>
-                <Star className="h-4 w-4" aria-hidden />
-                Rate your experience
-              </BookingPrimaryButton>
             ) : null}
             {activeBooking?.status !== 'COMPLETED' && activeBooking?.status !== 'CANCELLED' && step !== 'billing' ? (
               <BookingPrimaryButton type="button" onClick={() => goStep('payment')}>

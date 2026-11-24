@@ -34,6 +34,13 @@ const BOOKING_STEPS = [
   { id: 'COMPLETED', label: 'Completed' },
 ]
 
+// A completed booking is "settled" once the customer's payment is recorded (or nothing is payable)
+function isPaymentSettled(b) {
+  if (!b) return false
+  if (String(b.paymentStatus || '').toUpperCase() === 'PAID') return true
+  return Number(b.totalAmount || 0) <= 0
+}
+
 export function JobTracking() {
   const { bookingId } = useParams()
   const navigate = useNavigate()
@@ -86,7 +93,10 @@ export function JobTracking() {
         if (b) {
           setBooking(b)
           dispatch(setActiveBooking({ bookingId: b._id, status: b.status }))
-          if (b.status === 'COMPLETED') {
+          if (b.status === 'COMPLETED' && !isPaymentSettled(b)) {
+            // Job is done but the customer has not paid yet: go to billing/payment first, rate afterwards
+            navigate(`/user/booking/flow?bookingId=${b._id}&step=billing`, { replace: true })
+          } else if (b.status === 'COMPLETED') {
             reviewsApi.getBookingReview(b._id)
               .then((revRes) => {
                 if (!cancelled && !revRes?.data?.hasReviewed) {
@@ -162,7 +172,16 @@ export function JobTracking() {
         setBooking((prev) => prev ? { ...prev, status: data.status } : prev)
         dispatch(updateBookingStatusAction(data.status))
         if (data.status === 'COMPLETED') {
-          setShowReview(true)
+          // Only ask for a rating once payment is done; otherwise send the customer to pay first
+          bookingsApi.getBookingStatus(bookingId)
+            .then((res) => {
+              const b = res.data?.booking
+              if (!b) return
+              setBooking(b)
+              if (isPaymentSettled(b)) setShowReview(true)
+              else navigate(`/user/booking/flow?bookingId=${b._id}&step=billing`, { replace: true })
+            })
+            .catch(() => {})
         }
         if (['ACCEPTED', 'ASSIGNED', 'PARTIALLY_ACCEPTED', 'EN_ROUTE', 'STARTED'].includes(data.status)) {
           bookingsApi.getBookingStatus(bookingId)
