@@ -248,8 +248,14 @@ export function LabourHomeScreen({ user }) {
         const vendorId = user?._id || user?.id || t?.vendorId
         if ((t?.status === 'CONFIRMED' || user?.vendorStatus === 'CONFIRMED') && vendorId) {
           const key = `a2z_vendor_confirmed_seen_${vendorId}`
-          if (!localStorage.getItem(key)) {
+          // "Seen" is remembered on the server (works across devices / re-login / cleared storage)
+          const seenOnServer = Boolean(res.data.vendor?.joiningModalSeenAt)
+          const seenOnDevice = Boolean(localStorage.getItem(key))
+          if (!seenOnServer && !seenOnDevice) {
             setShowConfirmedModal(true)
+          } else if (!seenOnServer && seenOnDevice) {
+            // Already dismissed on this device before the server flag existed: sync it once
+            vendorTrialApi.markJoiningSeen().catch(() => {})
           }
         }
       }
@@ -1627,6 +1633,7 @@ export function LabourHomeScreen({ user }) {
           if (vendorId) {
             localStorage.setItem(`a2z_vendor_confirmed_seen_${vendorId}`, 'true')
           }
+          vendorTrialApi.markJoiningSeen().catch(() => {})
           setShowConfirmedModal(false)
         }}
         user={user}

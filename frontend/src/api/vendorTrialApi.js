@@ -8,6 +8,9 @@ export const vendorTrialApi = {
   getMyTrialHistory() {
     return apiRequest('/vendor/trial/history')
   },
+  markJoiningSeen() {
+    return apiRequest('/vendor/trial/joining-seen', { method: 'POST' })
+  },
   requestFinalChance() {
     return apiRequest('/vendor/trial/final-chance/request', { method: 'POST' })
   },

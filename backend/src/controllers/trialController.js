@@ -350,6 +350,18 @@ export const getVendorMyTrial = asyncHandler(async (req, res) => {
 })
 
 /**
+ * POST /api/v1/vendor/trial/joining-seen
+ * Marks the one-time "Joining Confirmed / Collect Welcome Kit" popup as seen (idempotent).
+ */
+export const markJoiningModalSeen = asyncHandler(async (req, res) => {
+  await User.updateOne(
+    { _id: req.user._id, $or: [{ joiningModalSeenAt: null }, { joiningModalSeenAt: { $exists: false } }] },
+    { $set: { joiningModalSeenAt: new Date() } },
+  )
+  return sendSuccess(res, { message: 'Joining popup marked as seen', data: { seen: true } })
+})
+
+/**
  * GET /api/v1/vendor/trial/history
  */
 export const getVendorTrialHistory = asyncHandler(async (req, res) => {

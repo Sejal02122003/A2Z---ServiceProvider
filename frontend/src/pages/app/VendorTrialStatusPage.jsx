@@ -47,8 +47,12 @@ export function VendorTrialStatusPage() {
         const vendorId = v?._id || t?.vendorId
         if (t?.status === 'CONFIRMED' && vendorId) {
           const key = `a2z_vendor_confirmed_seen_${vendorId}`
-          if (!localStorage.getItem(key)) {
+          const seenOnServer = Boolean(v?.joiningModalSeenAt)
+          const seenOnDevice = Boolean(localStorage.getItem(key))
+          if (!seenOnServer && !seenOnDevice) {
             setShowConfirmedModal(true)
+          } else if (!seenOnServer && seenOnDevice) {
+            vendorTrialApi.markJoiningSeen().catch(() => {})
           }
         }
       }
@@ -502,6 +506,7 @@ export function VendorTrialStatusPage() {
           if (vendorId) {
             localStorage.setItem(`a2z_vendor_confirmed_seen_${vendorId}`, 'true')
           }
+          vendorTrialApi.markJoiningSeen().catch(() => {})
           setShowConfirmedModal(false)
         }}
         user={trialData?.vendor}

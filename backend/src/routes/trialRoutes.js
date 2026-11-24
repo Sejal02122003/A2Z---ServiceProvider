@@ -20,6 +20,7 @@ import {
   adminMigrateVendors,
   getVendorMyTrial,
   getVendorTrialHistory,
+  markJoiningModalSeen,
   vendorRequestFinalChance,
   vendorVerifyPenaltyPayment,
 } from '../controllers/trialController.js'
@@ -29,6 +30,7 @@ const router = Router()
 // ==================== VENDOR ROUTES ====================
 router.get('/vendor/trial', protect, restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR), getVendorMyTrial)
 router.get('/vendor/trial/history', protect, restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR), getVendorTrialHistory)
+router.post('/vendor/trial/joining-seen', protect, restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR), markJoiningModalSeen)
 router.post('/vendor/trial/final-chance/request', protect, restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR), vendorRequestFinalChance)
 router.post('/vendor/trial/final-chance/verify-payment', protect, restrictTo(USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR), vendorVerifyPenaltyPayment)
 

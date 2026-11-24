@@ -391,6 +391,9 @@ const userSchema = new mongoose.Schema(
       default: 'NOT_STARTED',
       index: true,
     },
+    // Set once the provider has seen the "Joining Confirmed / Collect Welcome Kit" popup,
+    // so it is never shown again on any device or after re-login.
+    joiningModalSeenAt: { type: Date, default: null },
     identityStatus: {
       type: String,
       enum: Object.values(IDENTITY_STATUS),
