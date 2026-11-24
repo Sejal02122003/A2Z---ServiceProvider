@@ -704,20 +704,40 @@ export async function adminAdjustWallet({ userId, amount, type, action, reason, 
   }
 
   let wallet = await getOrCreateUserWallet(userId)
-  const currentBalance = wallet.balance !== undefined ? wallet.balance : (wallet.selfBalance || 0)
+
+  // Service providers / contractors: `selfBalance` is the source of truth (provider app + booking
+  // eligibility read it). Customers: unchanged, tracked in `balance`.
+  const { User } = await import('../models/User.js')
+  const owner = await User.findById(userId).select('role').lean()
+  const isProvider = owner?.role === 'labour' || owner?.role === 'contractor'
+
+  const currentBalance = isProvider
+    ? Number(wallet.selfBalance !== undefined && wallet.selfBalance !== null ? wallet.selfBalance : (wallet.balance || 0))
+    : (wallet.balance !== undefined ? wallet.balance : (wallet.selfBalance || 0))
 
   if (adjustType === 'DEBIT' && currentBalance < adjustAmount) {
     throw new Error(`Insufficient wallet balance. Current balance is ₹${currentBalance}`)
   }
 
   const delta = adjustType === 'CREDIT' ? adjustAmount : -adjustAmount
-  const updatedWallet = await Wallet.findByIdAndUpdate(
-    wallet._id,
-    { $inc: { balance: delta, selfBalance: delta } },
-    { new: true }
-  )
+  const updatedWallet = isProvider
+    ? await Wallet.findByIdAndUpdate(
+        wallet._id,
+        // Atomic: both fields end up equal to (selfBalance + delta); never leaves a stale mirror
+        [{ $set: {
+          selfBalance: { $add: [{ $ifNull: ['$selfBalance', { $ifNull: ['$balance', 0] }] }, delta] },
+        } }, { $set: { balance: '$selfBalance' } }],
+        { new: true }
+      )
+    : await Wallet.findByIdAndUpdate(
+        wallet._id,
+        { $inc: { balance: delta, selfBalance: delta } },
+        { new: true }
+      )
 
-  const balanceAfter = updatedWallet.balance !== undefined ? updatedWallet.balance : (updatedWallet.selfBalance || 0)
+  const balanceAfter = isProvider
+    ? Number(updatedWallet.selfBalance || 0)
+    : (updatedWallet.balance !== undefined ? updatedWallet.balance : (updatedWallet.selfBalance || 0))
   const balanceBefore = currentBalance
 
   const tx = await WalletTransaction.create({

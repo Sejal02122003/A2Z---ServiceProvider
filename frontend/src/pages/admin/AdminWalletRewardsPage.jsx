@@ -289,9 +289,10 @@ export default function AdminWalletRewardsPage() {
 
     try {
       const res = await walletsApi.adjustAdminUserWallet(targetUserId, {
+        type: adjustAction,
         action: adjustAction,
         amount: Number(adjustAmount),
-        reason: adjustReason || 'Admin Manual Adjustment',
+        reason: adjustReason.trim() || 'Admin Manual Adjustment',
       });
 
       if (res.success) {
@@ -306,7 +307,11 @@ export default function AdminWalletRewardsPage() {
         setTimeout(() => setSuccessMsg(''), 4000);
       }
     } catch (err) {
-      alert(err.message || 'Failed to adjust user wallet');
+      // Show the specific reason (e.g. "Amount must be positive number") instead of just "Validation failed"
+      const detail = Array.isArray(err?.errors) && err.errors.length
+        ? err.errors.map((e) => e.message).filter(Boolean).join('\n')
+        : '';
+      alert(detail ? `${err.message}:\n${detail}` : (err.message || 'Failed to adjust user wallet'));
     } finally {
       setAdjustSubmitting(false);
     }

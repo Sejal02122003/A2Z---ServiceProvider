@@ -142,6 +142,12 @@ router.get('/users', adminWallet.getAdminUserWallets)
 router.get('/users/:userId', adminWallet.getAdminUserWalletDetails)
 router.post(
   '/users/:userId/adjust',
+  // Some admin screens send the direction as `action`, others as `type`. Accept both.
+  (req, _res, next) => {
+    const raw = req.body?.type ?? req.body?.action
+    if (req.body && typeof raw === 'string') req.body.type = raw.trim().toUpperCase()
+    next()
+  },
   [
     param('userId').isMongoId().withMessage('Invalid userId'),
     body('amount').isFloat({ min: 0.01 }).withMessage('Amount must be positive number'),
