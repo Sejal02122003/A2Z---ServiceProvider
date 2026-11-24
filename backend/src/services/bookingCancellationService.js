@@ -1614,7 +1614,7 @@ export async function processCustomerCancellation({
       a.status = 'CANCELLED'
       a.cancellationReason = finalReasonText
     })
-    await booking.save()
+    await booking.save({ validateModifiedOnly: true })
   }
 
   // 5. Determine refund details safely
@@ -1671,7 +1671,7 @@ export async function processCustomerCancellation({
   )
 
   booking.cancellationRecordId = record._id
-  await booking.save()
+  await booking.save({ validateModifiedOnly: true })
 
   // 7. Wallet & financial safety
   // A. Customer wallet discount refund if applied
@@ -1776,7 +1776,7 @@ export async function processCustomerCancellation({
             performedBy: 'SYSTEM_POLICY',
             timestamp: now,
           })
-          await customer.save()
+          await customer.save({ validateModifiedOnly: true })
 
           try {
             await InAppNotification.create({
@@ -1813,7 +1813,7 @@ export async function processCustomerCancellation({
             performedBy: 'SYSTEM_POLICY',
             timestamp: now,
           })
-          await customer.save()
+          await customer.save({ validateModifiedOnly: true })
           restrictionTriggered = true
           actionTaken = 'MANUAL_REVIEW'
         } else {
@@ -1832,7 +1832,7 @@ export async function processCustomerCancellation({
             performedBy: 'SYSTEM_POLICY',
             timestamp: now,
           })
-          await customer.save()
+          await customer.save({ validateModifiedOnly: true })
 
           try {
             await InAppNotification.create({
@@ -1879,7 +1879,7 @@ export async function processCustomerCancellation({
     actionTaken,
   }
   record.isCountedForPolicy = true
-  await record.save()
+  await record.save({ validateModifiedOnly: true })
 
   // 9. In-App Notification for booking cancellation confirmation
   try {

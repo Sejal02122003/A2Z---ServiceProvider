@@ -2537,6 +2537,9 @@ export function IndividualBookingFlowPage() {
                       id="scheduled-time"
                       name="timeSlot"
                       type="time"
+                      min={draft.serviceDate === todayISODate()
+                        ? `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`
+                        : undefined}
                       value={draft.timeSlot || ''}
                       onChange={(e) => syncDraft({ timeSlot: e.target.value })}
                       className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-black outline-none focus:border-brand focus:ring-1"

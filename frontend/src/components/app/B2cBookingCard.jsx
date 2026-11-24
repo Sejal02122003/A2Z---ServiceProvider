@@ -27,6 +27,8 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
   const navigate = useNavigate()
   const authUser = useSelector((state) => state.auth.user)
   const status = (booking.status || 'CREATED').toUpperCase()
+  // OTPs are only useful while the job is active; hide once finished or cancelled
+  const isOtpHidden = (st) => ['COMPLETED', 'CANCELLED', 'REJECTED'].includes(String(st || '').toUpperCase())
   const isPaid = (booking.paymentStatus || '').toUpperCase() === 'PAID'
   
   let displayStatus = status
@@ -286,7 +288,7 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
                           </span>
                         </div>
                       </div>
-                      {(!isLabour) && assignment && (assignment.startOtp || assignment.completionOtp) && (
+                      {(!isLabour) && assignment && !isOtpHidden(assignment.status) && (assignment.startOtp || assignment.completionOtp) && (
                         <div className="flex gap-2 w-full mt-2">
                           {assignment.startOtp && (
                             <div className="flex flex-col items-center px-2 py-1.5 bg-blue-50/50 border border-blue-100/50 rounded-lg flex-1">
@@ -407,7 +409,7 @@ export function B2cBookingCard({ booking, isLabour, onBookingUpdated }) {
               </div>
           ) : <div />}
           
-          {(!booking.assignments || booking.assignments.length === 0) && (booking.quantity === 1 || !booking.quantity) && (!booking.contractorInfo?.services || booking.contractorInfo.services.length === 0) && (booking.startOtp || booking.completionOtp) && !isLabour && (
+          {!isOtpHidden(status) && (!booking.assignments || booking.assignments.length === 0) && (booking.quantity === 1 || !booking.quantity) && (!booking.contractorInfo?.services || booking.contractorInfo.services.length === 0) && (booking.startOtp || booking.completionOtp) && !isLabour && (
             <div className="flex gap-2">
               {booking.startOtp && (
                 <div className="flex flex-col items-center px-3 py-1.5 bg-blue-50/50 border border-blue-100/50 rounded-lg">

@@ -114,7 +114,8 @@ export function LabourNotificationsPage() {
       body: sn.body,
       kind: 'system',
       read: sn.read,
-      category: 'updates',
+      // New booking offers sent to this provider (by location + skill) belong under Job requests
+      category: /offer|booking received|new .*job/i.test(sn.title || '') ? 'jobs' : 'updates',
       time: sn.createdAt ? new Date(sn.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
       href: sn.bookingId?._id || sn.bookingId ? `/serviceprovider/active-job/${sn.bookingId?._id || sn.bookingId}` : undefined,
       isServer: true,

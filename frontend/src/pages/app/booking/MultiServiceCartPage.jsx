@@ -29,6 +29,30 @@ import { GlassPanel } from '../../../components/ui/GlassPanel.jsx'
 import { getCategoryImageUrl } from '../../../lib/labourCategoryDisplay.js'
 import { SelectAddressSheet } from '../../../components/app/address/SelectAddressSheet.jsx'
 
+const SCHEDULE_SLOTS = [
+  { label: '08:00 AM - 11:00 AM', startHour: 8 },
+  { label: '11:00 AM - 02:00 PM', startHour: 11 },
+  { label: '02:00 PM - 05:00 PM', startHour: 14 },
+  { label: '05:00 PM - 08:00 PM', startHour: 17 },
+]
+
+function localISODate(d) {
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
+
+/** Slots whose start time is still in the future (for today); all slots for later dates; none for past dates. */
+function getAvailableSlots(dateStr) {
+  const now = new Date()
+  const today = localISODate(now)
+  if (!dateStr || dateStr < today) return []
+  if (dateStr > today) return SCHEDULE_SLOTS
+  const nowHours = now.getHours() + now.getMinutes() / 60
+  return SCHEDULE_SLOTS.filter((s) => s.startHour > nowHours)
+}
+
+
 function formatDuration(mins) {
   const m = Math.max(1, Math.round(Number(mins) || 45))
   const hrs = Math.floor(m / 60)
@@ -56,14 +80,16 @@ export function MultiServiceCartPage() {
 
   // Booking settings state
   const [bookingType, setBookingType] = useState('INSTANT')
-  const [scheduledDate, setScheduledDate] = useState(() => {
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    return tomorrow.toISOString().split('T')[0]
-  })
-  const [timeSlot, setTimeSlot] = useState('10:00 AM - 01:00 PM')
+  const [scheduledDate, setScheduledDate] = useState(() => localISODate(new Date()))
+  const [timeSlot, setTimeSlot] = useState('')
   const [notes, setNotes] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('CASH')
+
+  // Only offer slots that start in the future (past slots of today are hidden)
+  const availableSlots = useMemo(() => getAvailableSlots(scheduledDate), [scheduledDate])
+  useEffect(() => {
+    if (timeSlot && !availableSlots.some((s) => s.label === timeSlot)) setTimeSlot('')
+  }, [availableSlots, timeSlot])
   const [useWallet, setUseWallet] = useState(false)
 
   // Address state
@@ -172,6 +198,10 @@ export function MultiServiceCartPage() {
 
     if (bookingType === 'SCHEDULED' && (!scheduledDate || !timeSlot)) {
       setSubmitError('Please choose a preferred schedule date and time slot.')
+      return
+    }
+    if (bookingType === 'SCHEDULED' && !getAvailableSlots(scheduledDate).some((s) => s.label === timeSlot)) {
+      setSubmitError('The selected time slot has already passed. Please choose a future slot.')
       return
     }
 
@@ -576,7 +606,7 @@ export function MultiServiceCartPage() {
                 <label className="text-[11px] font-bold text-slate-500 uppercase">Select Date</label>
                 <input
                   type="date"
-                  min={new Date().toISOString().split('T')[0]}
+                  min={localISODate(new Date())}
                   value={scheduledDate}
                   onChange={(e) => setScheduledDate(e.target.value)}
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs font-bold text-slate-800 focus:border-brand focus:bg-white focus:outline-hidden"
@@ -585,13 +615,13 @@ export function MultiServiceCartPage() {
 
               <div>
                 <label className="text-[11px] font-bold text-slate-500 uppercase">Select Preferred Time Slot</label>
+                {availableSlots.length === 0 && (
+                  <p className="mt-1 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                    No more slots available for this date. Please pick another date.
+                  </p>
+                )}
                 <div className="grid grid-cols-2 gap-2 mt-1">
-                  {[
-                    '08:00 AM - 11:00 AM',
-                    '11:00 AM - 02:00 PM',
-                    '02:00 PM - 05:00 PM',
-                    '05:00 PM - 08:00 PM',
-                  ].map((slot) => (
+                  {availableSlots.map(({ label: slot }) => (
                     <button
                       key={slot}
                       type="button"

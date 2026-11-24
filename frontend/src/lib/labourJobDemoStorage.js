@@ -21,18 +21,8 @@ function isoDateDaysFromToday(offset) {
 export function getDefaultJobDemoState() {
   return {
     version: 1,
-    offers: [
-      {
-        id: 'demo-offer-1',
-        title: 'Masonry line — Tower B shell',
-        site: 'Cyber City Phase 2, Gurugram',
-        shiftWindow: `${shiftDateLabel(1)} · 07:00–18:00`,
-        rateLabel: '₹850 / day',
-        trade: 'Masonry',
-        sourceType: 'contractor',
-        requestRef: 'DEMO-SEED-1',
-      },
-    ],
+    // No seeded sample requests: job requests come from real bookings (location-based)
+    offers: [],
     active: [],
     history: [],
   }
@@ -46,7 +36,10 @@ function readLegacyBuckets() {
     const data = JSON.parse(raw)
     if (!data || data.version !== 1) return null
     return {
-      offers: Array.isArray(data.offers) ? data.offers : [],
+      // drop any sample offers saved by older versions
+      offers: Array.isArray(data.offers)
+        ? data.offers.filter((o) => !String(o?.id || '').startsWith('demo-') && !String(o?.requestRef || '').startsWith('DEMO-'))
+        : [],
       active: Array.isArray(data.active) ? data.active : [],
       history: Array.isArray(data.history) ? data.history : [],
     }

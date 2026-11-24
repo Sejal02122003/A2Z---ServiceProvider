@@ -8,6 +8,7 @@ import { KYC_STATUS } from '../constants/roles.js'
 import { BROADCAST_TIMEOUT_MS } from '../services/broadcastService.js'
 import { getLabourStats } from '../services/labourStatsService.js'
 import { getBookingLabourShareRate } from '../utils/labourShare.js'
+import { getProviderDistanceKm } from '../utils/providerDistance.js'
 
 function formatDurationHuman(mins) {
   const m = Math.max(1, Math.round(Number(mins) || 45))
@@ -496,7 +497,6 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
   }
 
   // Increment lifetime broadcasts accepted
-  const { User } = await import('../models/User.js')
   await User.findByIdAndUpdate(labour._id, {
     $inc: { 'labourProfile.lifetimeBroadcastsAccepted': 1 }
   })
@@ -875,7 +875,7 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       time: booking.timeSlot || 'Earliest available',
       duration: bookingHours,
       customerLocation: booking.address?.locationText || 'Service Location',
-      approximateDistance: 2.5,
+      approximateDistance: getProviderDistanceKm(fullLabour, booking),
       estimatedEarnings: totalEarnings,
       bookingAmount: Number(booking.totalAmount || booking.basePrice || 0),
       totalAmount: Number(booking.totalAmount || booking.basePrice || 0),
@@ -924,7 +924,7 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       time: booking.timeSlot || 'Earliest available',
       duration: bookingHours,
       customerLocation: booking.address?.locationText || 'Service Location',
-      approximateDistance: 2.5,
+      approximateDistance: getProviderDistanceKm(fullLabour, booking),
       estimatedEarnings: bestEarning,
       bookingAmount: Number(booking.totalAmount || booking.basePrice || 0),
       totalAmount: Number(booking.totalAmount || booking.basePrice || 0),
@@ -1010,7 +1010,7 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       time: booking.timeSlot || 'Earliest available',
       duration: bookingHours,
       customerLocation: booking.address?.locationText || 'Service Location',
-      approximateDistance: 2.5,
+      approximateDistance: getProviderDistanceKm(fullLabour, booking),
       estimatedEarnings: singleShare,
       bookingAmount: Number(booking.totalAmount || booking.basePrice || 0),
       totalAmount: Number(booking.totalAmount || booking.basePrice || 0),

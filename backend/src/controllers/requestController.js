@@ -17,6 +17,8 @@ import { User } from '../models/User.js'
 import { LabourSubcategory } from '../models/LabourSubcategory.js'
 import { LabourCategory } from '../models/LabourCategory.js'
 import { LabourService } from '../models/LabourService.js'
+import { VendorCrewLabour } from '../models/VendorCrewLabour.js'
+import { checkVendorInventory } from '../services/vendorInventoryService.js'
 
 function parseLines(lines) {
   if (!Array.isArray(lines) || !lines.length) return null

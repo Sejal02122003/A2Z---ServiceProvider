@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useSearchParams, useLocation, Link } from 'react-router-dom'
+import { useSearchParams, useLocation, useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Package,
@@ -67,10 +67,12 @@ import {
 import { fetchAdminLabourCategoryTree } from '../../api/adminLabourCategoriesApi.js'
 
 export function AdminInventoryHubPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const location = useLocation()
+  const navigate = useNavigate()
   const pathTab = location.pathname.split('/admin/inventory/')[1]?.split('/')[0]
-  const activeTab = searchParams.get('tab') || pathTab || 'products'
+  // /admin/inventory (hub) opens the overview; /admin/inventory/<tab> opens that section
+  const activeTab = searchParams.get('tab') || pathTab || 'overview'
 
   const [stats, setStats] = useState(null)
   const [loadingStats, setLoadingStats] = useState(false)
@@ -98,10 +100,12 @@ export function AdminInventoryHubPage() {
   }, [loadStats])
 
   const setTab = (tabKey) => {
-    setSearchParams({ tab: tabKey })
+    // Keep the URL in sync with the sidebar entries
+    navigate(tabKey === 'overview' ? '/admin/inventory' : `/admin/inventory/${tabKey}`)
   }
 
   const TABS = [
+    { key: 'overview', label: 'Overview', icon: Package },
     { key: 'products', label: 'Products', icon: Tag, count: stats?.totalProducts },
     { key: 'service-materials', label: 'Service Materials', icon: Wrench },
     { key: 'material-requests', label: 'Material Requests', icon: ClipboardCheck, badge: stats?.pendingMaterialRequests },
@@ -201,6 +205,7 @@ export function AdminInventoryHubPage() {
       </div>
 
       {/* Tab Contents */}
+      {activeTab === 'overview' && <InventoryOverviewTab stats={stats} onOpen={setTab} />}
       {activeTab === 'products' && <ProductsTab onReloadStats={loadStats} onToast={showToast} />}
       {activeTab === 'service-materials' && <ServiceMaterialsTab onToast={showToast} />}
       {activeTab === 'material-requests' && <MaterialRequestsTab onReloadStats={loadStats} onToast={showToast} />}
@@ -208,6 +213,41 @@ export function AdminInventoryHubPage() {
       {activeTab === 'vendor-inventory' && <VendorInventoryTab onToast={showToast} />}
       {activeTab === 'transactions' && <TransactionsTab />}
       {activeTab === 'low-stock' && <LowStockTab onReloadStats={loadStats} onToast={showToast} onSwitchToStock={() => setTab('stock')} />}
+    </div>
+  )
+}
+
+function InventoryOverviewTab({ stats, onOpen }) {
+  const cards = [
+    { key: 'products', label: 'Products', icon: Tag, value: stats?.totalProducts ?? '—', hint: `${stats?.activeProducts ?? '—'} active items` },
+    { key: 'service-materials', label: 'Service Materials', icon: Wrench, value: 'Map', hint: 'Link materials to services' },
+    { key: 'material-requests', label: 'Material Requests', icon: ClipboardCheck, value: stats?.pendingMaterialRequests ?? '—', hint: 'Pending vendor requests', alert: stats?.pendingMaterialRequests > 0 },
+    { key: 'stock', label: 'Stock Management', icon: Boxes, value: `₹${Number(stats?.totalInventoryValue || 0).toLocaleString('en-IN')}`, hint: 'Total inventory value' },
+    { key: 'vendor-inventory', label: 'Vendor Inventory', icon: Users, value: stats?.materialsIssuedToday ?? 0, hint: 'Issued to vendors today' },
+    { key: 'transactions', label: 'Ledger Audit', icon: BarChart3, value: stats?.materialsUsedToday ?? 0, hint: 'Materials used today' },
+    { key: 'low-stock', label: 'Low Stock Alerts', icon: AlertTriangle, value: stats?.lowStockProducts ?? '—', hint: 'Products below threshold', alert: stats?.lowStockProducts > 0 },
+  ]
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {cards.map(({ key, label, icon: Icon, value, hint, alert }) => (
+        <button
+          key={key}
+          type="button"
+          onClick={() => onOpen(key)}
+          className="text-left"
+        >
+          <GlassPanel className={`flex h-full items-start justify-between gap-3 p-5 transition hover:-translate-y-0.5 hover:shadow-md ${alert ? 'ring-1 ring-rose-200' : ''}`}>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+              <p className={`mt-2 text-2xl font-black tabular-nums ${alert ? 'text-rose-600' : 'text-slate-900'}`}>{value}</p>
+              <p className="mt-1 text-xs font-medium text-slate-500">{hint}</p>
+            </div>
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-700 ring-1 ring-slate-200">
+              <Icon className="h-5 w-5" aria-hidden />
+            </span>
+          </GlassPanel>
+        </button>
+      ))}
     </div>
   )
 }

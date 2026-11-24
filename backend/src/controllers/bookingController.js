@@ -954,6 +954,8 @@ export const createBooking = asyncHandler(async (req, res) => {
   let booking
   try {
     booking = await Booking.create({
+      zoneId: matchingZone?._id,
+      zoneName: matchingZone?.name,
       userId: req.user._id,
       subcategoryId: bookingSubcategoryId,
       serviceId: bookingServiceId,
@@ -1469,6 +1471,7 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
       assignment.completedAt = new Date();
     } else {
       if (finalEndImg) booking.endWorkImage = finalEndImg;
+      booking.completedAt = new Date();
     }
   }
 

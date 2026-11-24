@@ -634,6 +634,11 @@ export function ActiveJob() {
         ) : null}
         <p className="mt-2 text-xs font-bold uppercase tracking-wider text-slate-500">Status</p>
         <p className="text-xl font-extrabold text-slate-900">{status.replace('_', ' ')}</p>
+        {(booking?._id || bookingId) && (
+          <p className="mt-1 text-xs font-bold text-slate-500">
+            Booking ID: <span className="font-extrabold text-brand">#{String(booking?._id || bookingId).slice(-6).toUpperCase()}</span>
+          </p>
+        )}
       </GlassPanel>
 
       {/* Pending Cash Collection Banner */}

@@ -151,12 +151,34 @@ export const createVendorMaterialRequest = asyncHandler(async (req, res) => {
 
     // If specific item quantities were adjusted by vendor
     if (Array.isArray(items) && items.length > 0) {
-      items.forEach((submitted) => {
+      for (const submitted of items) {
         const item = materialRequest.items.find((i) => String(i.productId) === String(submitted.productId))
-        if (item && submitted.quantityRequested !== undefined) {
-          item.quantityRequested = Math.max(1, Number(submitted.quantityRequested) || item.quantityRequired)
+        if (item) {
+          if (submitted.quantityRequested !== undefined) {
+            item.quantityRequested = Math.max(1, Number(submitted.quantityRequested) || item.quantityRequired)
+          }
+        } else if (submitted.productId) {
+          // Material not part of the service's mapped list: add it as an additional item
+          const product = await Product.findById(submitted.productId)
+          if (!product) continue
+          const reqQty = Math.max(1, Number(submitted.quantityRequested) || 1)
+          materialRequest.items.push({
+            productId: product._id,
+            quantityRequired: reqQty,
+            quantityRequested: reqQty,
+            quantityApproved: 0,
+            quantityIssued: 0,
+            quantityUsed: 0,
+            quantityReturned: 0,
+            unit: product.unit || 'Piece',
+            isMandatory: false,
+            isAdditional: true,
+            itemStatus: product.currentStock <= 0 ? 'OUT_OF_STOCK' : product.currentStock < reqQty ? 'PARTIALLY_AVAILABLE' : 'AVAILABLE',
+            shortageQuantity: Math.max(0, reqQty - Math.max(0, product.currentStock)),
+            remarks: 'Requested by service provider',
+          })
         }
-      })
+      }
     }
 
     await materialRequest.save()

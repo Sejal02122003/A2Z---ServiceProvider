@@ -715,7 +715,7 @@ export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
                       <button
                         type="button"
                         onClick={handlePayPenalty}
-                        disabled={payingPenalty || submitting || !selectedReason}
+                        disabled={payingPenalty || submitting}
                         className="w-full sm:flex-1 rounded-xl bg-slate-900 py-3 px-4 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition disabled:opacity-50 flex items-center justify-center gap-2"
                       >
                         {payingPenalty ? (

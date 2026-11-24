@@ -22,6 +22,8 @@ import {
 } from 'lucide-react'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx'
+import { useAuth } from '../../hooks/useAuth.js'
+import { bookingsApi } from '../../api/bookingsApi.js'
 import {
   fetchVendorMaterialRequests,
   fetchVendorMaterialRequestById,
@@ -40,6 +42,7 @@ export function VendorMaterialsPage() {
   // Modals
   const [usageModalReq, setUsageModalReq] = useState(null)
   const [additionalModalReq, setAdditionalModalReq] = useState(null)
+  const [newRequestOpen, setNewRequestOpen] = useState(false)
   const [availableProducts, setAvailableProducts] = useState([])
 
   const showToast = (msg) => {
@@ -127,6 +130,14 @@ export function VendorMaterialsPage() {
             </p>
           </div>
 
+          <div className="flex items-center gap-2">
+          <button
+            onClick={() => setNewRequestOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-900 shadow-sm hover:bg-slate-100 active:scale-95"
+          >
+            <Plus className="h-4 w-4" />
+            New Request
+          </button>
           <button
             onClick={loadRequests}
             className="rounded-xl border border-white/20 bg-white/10 p-2 text-white hover:bg-white/20 active:scale-95"
@@ -134,6 +145,7 @@ export function VendorMaterialsPage() {
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
+          </div>
         </div>
 
         {/* Quick Tabs Grid */}
@@ -215,6 +227,19 @@ export function VendorMaterialsPage() {
             setUsageModalReq(null)
             loadRequests()
             showToast('Material usage and central return recorded successfully')
+          }}
+        />
+      )}
+
+      {/* New Material Request Modal */}
+      {newRequestOpen && (
+        <NewMaterialRequestModal
+          products={availableProducts}
+          onClose={() => setNewRequestOpen(false)}
+          onSuccess={() => {
+            setNewRequestOpen(false)
+            loadRequests()
+            showToast('Material request submitted to admin for approval')
           }}
         />
       )}
@@ -765,6 +790,195 @@ function RequestAdditionalMaterialModal({ request, products, onClose, onSuccess 
             <button
               type="submit"
               disabled={busy}
+              className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-700 disabled:opacity-50"
+            >
+              {busy ? 'Submitting...' : 'Submit Request to Admin'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function NewMaterialRequestModal({ products, onClose, onSuccess }) {
+  const { user } = useAuth()
+  const [bookings, setBookings] = useState([])
+  const [loadingBookings, setLoadingBookings] = useState(true)
+  const [bookingId, setBookingId] = useState('')
+  const [lines, setLines] = useState([{ productId: '', quantityRequested: 1 }])
+  const [remarks, setRemarks] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    bookingsApi
+      .getMyBookings()
+      .then((res) => {
+        if (cancelled) return
+        const all = res?.data?.bookings || res?.bookings || []
+        const myId = String(user?._id || user?.id || '')
+        // Jobs I'm assigned to as the provider and that are still open
+        const mine = all.filter(
+          (b) =>
+            ['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED', 'PARTIALLY_ACCEPTED'].includes(b.status) &&
+            String(b.userId?._id || b.userId) !== myId,
+        )
+        setBookings(mine)
+        if (mine[0]) setBookingId(mine[0]._id)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoadingBookings(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
+  const bookingLabel = (b) => {
+    const name =
+      b.serviceId?.name ||
+      b.serviceName ||
+      b.multiServiceBooking?.items?.[0]?.serviceName ||
+      b.packageBooking?.packageName ||
+      'Service job'
+    const when = b.scheduledAt ? new Date(b.scheduledAt).toLocaleDateString() : b.type === 'INSTANT' ? 'Instant' : ''
+    return `#${String(b._id).slice(-6).toUpperCase()} • ${name}${when ? ` • ${when}` : ''}`
+  }
+
+  const updateLine = (idx, patch) => setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)))
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    const items = lines
+      .filter((l) => l.productId && Number(l.quantityRequested) > 0)
+      .map((l) => ({ productId: l.productId, quantityRequested: Number(l.quantityRequested) }))
+    if (!bookingId) return setError('Select the job this material is for')
+    if (items.length === 0) return setError('Add at least one material with a quantity')
+    setError('')
+    setBusy(true)
+    try {
+      await createVendorMaterialRequest({ bookingId, items, remarks })
+      onSuccess()
+    } catch (err) {
+      setError(err.message || 'Failed to submit material request')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">New Material Request</h3>
+            <p className="text-xs text-slate-500">Requires Admin Approval</p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
+            <XCircle className="h-5 w-5" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mt-3 flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700">For which job? *</label>
+            {loadingBookings ? (
+              <p className="mt-1 text-xs text-slate-500">Loading your jobs...</p>
+            ) : bookings.length === 0 ? (
+              <p className="mt-1 rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+                You have no active job to request materials for. Accept a job first.
+              </p>
+            ) : (
+              <select
+                value={bookingId}
+                onChange={(e) => setBookingId(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:bg-white"
+              >
+                {bookings.map((b) => (
+                  <option key={b._id} value={b._id}>
+                    {bookingLabel(b)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-700">Materials *</label>
+            {lines.map((line, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <select
+                  value={line.productId}
+                  onChange={(e) => updateLine(idx, { productId: e.target.value })}
+                  className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:bg-white"
+                >
+                  <option value="">Select material</option>
+                  {products.map((p) => (
+                    <option key={p._id} value={p._id}>
+                      {p.name} — Available: {p.currentStock} {p.unit}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min="1"
+                  value={line.quantityRequested}
+                  onChange={(e) => updateLine(idx, { quantityRequested: e.target.value })}
+                  className="w-16 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-900 focus:bg-white"
+                />
+                {lines.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setLines((prev) => prev.filter((_, i) => i !== idx))}
+                    className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50"
+                    aria-label="Remove material"
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setLines((prev) => [...prev, { productId: '', quantityRequested: 1 }])}
+              className="text-xs font-bold text-blue-600 hover:underline"
+            >
+              + Add another material
+            </button>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700">Remarks</label>
+            <textarea
+              rows="2"
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="Anything the admin should know about this request"
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 focus:bg-white"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={busy || bookings.length === 0}
               className="rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-700 disabled:opacity-50"
             >
               {busy ? 'Submitting...' : 'Submit Request to Admin'}

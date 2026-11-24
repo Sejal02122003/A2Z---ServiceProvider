@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
   ArrowUpRight,
@@ -16,6 +16,7 @@ import { ADMIN_NAV_SECTIONS } from '../../config/adminNavigation.js'
 import { apiRequest } from '../../api/http.js'
 
 export function AdminDashboardPage() {
+  const navigate = useNavigate()
   const reduce = useReducedMotion()
   
   const [stats, setStats] = useState(null)
@@ -43,6 +44,7 @@ export function AdminDashboardPage() {
   const QUICK_STATS = [
     { 
       label: 'Active bookings', 
+      to: '/admin/bookings',
       value: stats?.bookings?.active ?? '—', 
       hint: 'Currently in progress', 
       icon: ClipboardList, 
@@ -50,6 +52,7 @@ export function AdminDashboardPage() {
     },
     { 
       label: 'Service Providers on roster', 
+      to: '/admin/labour',
       value: stats?.users?.labourers ?? '—', 
       hint: 'Registered workforce', 
       icon: Users, 
@@ -57,6 +60,7 @@ export function AdminDashboardPage() {
     },
     { 
       label: 'Contractor accounts', 
+      to: '/admin/users',
       value: stats?.users?.contractors ?? '—', 
       hint: 'B2B Partners', 
       icon: Shield, 
@@ -64,6 +68,7 @@ export function AdminDashboardPage() {
     },
     { 
       label: 'Skill categories', 
+      to: '/admin/categories',
       value: stats?.system?.categories ?? '—', 
       hint: 'Platform managed', 
       icon: Layers, 
@@ -109,7 +114,8 @@ export function AdminDashboardPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: 0.05 * i }}
             >
-              <GlassPanel className={`relative h-full overflow-hidden p-5 bg-linear-to-br ${s.tone}`}>
+              <Link to={s.to} aria-label={`Open ${s.label}`} className="block h-full rounded-3xl outline-none transition hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-brand">
+              <GlassPanel className={`relative h-full cursor-pointer overflow-hidden p-5 bg-linear-to-br ${s.tone}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{s.label}</p>
@@ -121,6 +127,7 @@ export function AdminDashboardPage() {
                   </span>
                 </div>
               </GlassPanel>
+              </Link>
             </motion.div>
           ))}
         </div>
@@ -156,7 +163,10 @@ export function AdminDashboardPage() {
         </GlassPanel>
 
         <div className="space-y-6">
-          <GlassPanel className="h-fit p-6">
+          <GlassPanel
+            className="h-fit cursor-pointer p-6 transition hover:shadow-md"
+            onClick={() => navigate('/admin/complaints')}
+          >
             <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">Action Required</h2>
             <p className="mt-3 text-sm leading-relaxed text-slate-600">
               There are currently <span className="font-bold text-brand">{stats?.actionable?.openComplaints || 0}</span> open complaints and <span className="font-bold text-brand">{stats?.actionable?.pendingWithdrawals || 0}</span> pending withdrawal requests.
@@ -164,6 +174,7 @@ export function AdminDashboardPage() {
             <div className="flex flex-col gap-2 mt-5">
               <Link
                 to="/admin/complaints"
+                onClick={(e) => e.stopPropagation()}
                 className="inline-flex items-center gap-2 text-sm font-bold text-brand hover:underline"
               >
                 View complaints
@@ -171,6 +182,7 @@ export function AdminDashboardPage() {
               </Link>
               <Link
                 to="/admin/wallet-management/workers"
+                onClick={(e) => e.stopPropagation()}
                 className="inline-flex items-center gap-2 text-sm font-bold text-brand hover:underline"
               >
                 View worker recharge requests
@@ -178,6 +190,7 @@ export function AdminDashboardPage() {
               </Link>
               <Link
                 to="/admin/labour-wallet"
+                onClick={(e) => e.stopPropagation()}
                 className="inline-flex items-center gap-2 text-sm font-bold text-brand hover:underline"
               >
                 View withdrawal requests
@@ -186,13 +199,17 @@ export function AdminDashboardPage() {
             </div>
           </GlassPanel>
 
-          <GlassPanel className="h-fit p-6">
+          <GlassPanel
+            className="h-fit cursor-pointer p-6 transition hover:shadow-md"
+            onClick={() => navigate('/admin/labour')}
+          >
             <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">Today</h2>
             <p className="mt-3 text-sm leading-relaxed text-slate-600">
               Operational queues (contractor approvals, KYC, FCFS bookings) will surface here.
             </p>
             <Link
               to="/admin/labour"
+              onClick={(e) => e.stopPropagation()}
               className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-brand hover:underline"
             >
               Open workforce requests

@@ -92,6 +92,8 @@ const bookingSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
+    zoneId: { type: mongoose.Schema.Types.ObjectId, ref: 'Zone' },
+    zoneName: { type: String, trim: true },
     address: {
       locationText: { type: String, required: true, trim: true },
       // Could add lat/lng for geospatial querying
@@ -350,6 +352,7 @@ const bookingSchema = new mongoose.Schema(
 
     // Legacy fields (kept for backward compatibility or simple 1-to-1 bookings)
     startedAt: { type: Date },
+    completedAt: { type: Date },
     startOtp: { type: String },
     completionOtp: { type: String },
     startWorkImage: { type: String },

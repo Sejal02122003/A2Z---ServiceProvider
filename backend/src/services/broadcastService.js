@@ -10,6 +10,8 @@ import { Review } from '../models/Review.js'
 import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
 import { USER_ROLES } from '../constants/roles.js'
 import { getBookingLabourShareRate } from '../utils/labourShare.js'
+import { Zone } from '../models/Zone.js'
+import { providerMatchesBookingZone } from '../utils/zoneMatch.js'
 
 export const BROADCAST_TIMEOUT_MS = 90000 // 1.5 minutes (90 seconds) flash broadcast timeout
 
@@ -205,6 +207,16 @@ export async function startBroadcastCycle(bookingId) {
   if (matchOr.length > 0) {
     potentialLaborersRaw = await User.find({ ...baseQuery, $or: matchOr }).lean()
     console.log(`[BROADCAST] Skill-matched search found ${potentialLaborersRaw.length} providers`)
+
+    // Zone-wise dispatch: only providers in the booking's zone (skill match already applied above)
+    if (booking.zoneId && potentialLaborersRaw.length > 0) {
+      const activeZones = await Zone.find({ isActive: true }).lean()
+      const before = potentialLaborersRaw.length
+      potentialLaborersRaw = potentialLaborersRaw.filter((p) =>
+        providerMatchesBookingZone(p, booking.zoneId, activeZones)
+      )
+      console.log(`[BROADCAST] Zone filter (${booking.zoneName || booking.zoneId}): ${before} -> ${potentialLaborersRaw.length} providers`)
+    }
   } else {
     console.log('[BROADCAST] No matching criteria could be determined for booking. Skipping broadcast.')
   }
@@ -453,7 +465,8 @@ export async function startBroadcastCycle(bookingId) {
     const responseScore = responseRate * 10
 
     labor.matchScore = distScore + expScore + ratingScore + completedScore + responseScore
-    labor.approximateDistance = dist
+    // No GPS from this provider yet -> do not show a made-up distance
+    labor.approximateDistance = distData?.isApproximate ? undefined : dist
   })
 
   // Sort by highest score first

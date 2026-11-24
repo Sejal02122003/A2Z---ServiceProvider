@@ -819,7 +819,7 @@ export function BroadcastPopup() {
                     </span>
                   </div>
                 )}
-                {incoming.approximateDistance !== undefined && (
+                {Number.isFinite(Number(incoming.approximateDistance)) && incoming.approximateDistance !== null && (
                   <div className="flex items-center justify-between text-sm mt-1">
                     <span className="text-slate-500">Distance</span>
                     <span className="font-bold text-slate-800">

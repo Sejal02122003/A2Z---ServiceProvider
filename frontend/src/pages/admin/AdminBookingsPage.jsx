@@ -35,13 +35,10 @@ const BOOKING_STATUS_FILTERS = [
   { value: 'ALL', label: 'All' },
   { value: 'PENDING', label: 'Pending' },
   { value: 'CREATED', label: 'Created' },
-  { value: 'PARTIALLY_ACCEPTED', label: 'Partially Accepted' },
   { value: 'ACCEPTED', label: 'Accepted' },
   { value: 'ASSIGNED', label: 'Assigned' },
   { value: 'STARTED', label: 'Started' },
-  { value: 'PARTIALLY_COMPLETED', label: 'Partially Completed' },
   { value: 'COMPLETED', label: 'Completed' },
-  { value: 'PARTIALLY_CANCELLED', label: 'Partially Cancelled' },
   { value: 'CANCELLED', label: 'Cancelled' },
   { value: 'FAILED', label: 'Failed' },
   { value: 'REFUNDED', label: 'Refunded' },
@@ -506,12 +503,21 @@ function ContractorRequestsTab() {
 }
 
 function BookingDetailsModal({ booking, onClose }) {
+  const [previewImg, setPreviewImg] = useState(null)
   if (!booking) return null
 
   const completedBill = calculateCompletedBookingBill(booking)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+      {previewImg && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4" onClick={() => setPreviewImg(null)}>
+          <button type="button" onClick={() => setPreviewImg(null)} className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" aria-label="Close image">
+            <XCircle className="h-7 w-7" />
+          </button>
+          <img src={previewImg} alt="Full size" onClick={(e) => e.stopPropagation()} className="max-h-full max-w-full rounded-lg object-contain" />
+        </div>
+      )}
       <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
         <div className="flex items-center justify-between border-b pb-4 border-slate-100">
           <h2 className="text-lg font-extrabold text-slate-900">Booking Details</h2>
@@ -521,6 +527,20 @@ function BookingDetailsModal({ booking, onClose }) {
         </div>
         
         <div className="mt-4 space-y-4">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+            <p className="text-slate-500 text-xs">Booking ID</p>
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="font-extrabold text-brand">#{String(booking._id).slice(-6).toUpperCase()}</span>
+              <span className="font-mono text-[11px] text-slate-500 break-all select-all">{String(booking._id)}</span>
+              <button
+                type="button"
+                onClick={() => { try { navigator.clipboard?.writeText(String(booking._id)) } catch { /* ignore */ } }}
+                className="text-[11px] font-bold text-brand hover:underline"
+              >
+                Copy
+              </button>
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="col-span-2 sm:col-span-1">
               <p className="text-slate-500 text-xs">Service</p>
@@ -679,13 +699,13 @@ function BookingDetailsModal({ booking, onClose }) {
                             {a.startWorkImage && (
                                <div>
                                  <p className="text-slate-500 text-[10px] mb-1">Start Image</p>
-                                 <img src={a.startWorkImage} alt="Start Work" className="w-full h-16 object-cover rounded shadow-sm border border-slate-200" />
+                                 <img src={a.startWorkImage} alt="Start Work" onClick={() => setPreviewImg(a.startWorkImage)} className="w-full h-16 object-cover rounded shadow-sm border border-slate-200 cursor-zoom-in" />
                                </div>
                             )}
                             {a.endWorkImage && (
                                <div>
                                  <p className="text-slate-500 text-[10px] mb-1">End Image</p>
-                                 <img src={a.endWorkImage} alt="End Work" className="w-full h-16 object-cover rounded shadow-sm border border-slate-200" />
+                                 <img src={a.endWorkImage} alt="End Work" onClick={() => setPreviewImg(a.endWorkImage)} className="w-full h-16 object-cover rounded shadow-sm border border-slate-200 cursor-zoom-in" />
                                </div>
                             )}
                           </div>
@@ -724,11 +744,28 @@ function BookingDetailsModal({ booking, onClose }) {
                 </div>
               )}
 
+              {!booking.multiServiceBooking?.isMultiService && (
+                <div className="border-t border-slate-100 pt-4 grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-slate-500 text-xs">Service Start Time</p>
+                    <p className="font-semibold">{booking.startedAt ? new Date(booking.startedAt).toLocaleString() : 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 text-xs">Service End Time</p>
+                    <p className="font-semibold">
+                      {(booking.completedAt || (booking.status === 'COMPLETED' && booking.updatedAt))
+                        ? new Date(booking.completedAt || booking.updatedAt).toLocaleString()
+                        : 'N/A'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="border-t border-slate-100 pt-4 grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-slate-500 text-xs mb-2">Start Work Image</p>
                   {booking.startWorkImage ? (
-                    <img src={booking.startWorkImage} alt="Start Work" className="w-full h-auto rounded-lg shadow-sm border border-slate-200" />
+                    <img src={booking.startWorkImage} alt="Start Work" onClick={() => setPreviewImg(booking.startWorkImage)} className="w-full h-auto rounded-lg shadow-sm border border-slate-200 cursor-zoom-in" />
                   ) : (
                     <div className="w-full h-24 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center text-slate-400 text-xs italic">
                       Not uploaded
@@ -738,7 +775,7 @@ function BookingDetailsModal({ booking, onClose }) {
                 <div>
                   <p className="text-slate-500 text-xs mb-2">End Work Image</p>
                   {booking.endWorkImage ? (
-                    <img src={booking.endWorkImage} alt="End Work" className="w-full h-auto rounded-lg shadow-sm border border-slate-200" />
+                    <img src={booking.endWorkImage} alt="End Work" onClick={() => setPreviewImg(booking.endWorkImage)} className="w-full h-auto rounded-lg shadow-sm border border-slate-200 cursor-zoom-in" />
                   ) : (
                     <div className="w-full h-24 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center text-slate-400 text-xs italic">
                       Not uploaded
@@ -792,6 +829,10 @@ function BookingDetailsModal({ booking, onClose }) {
                       <div className="flex gap-2 text-[11px] text-slate-500">
                         {item.startOtp && <span>Start OTP: <strong className="font-mono text-slate-800">{item.startOtp}</strong></span>}
                         {item.completionOtp && <span>End OTP: <strong className="font-mono text-slate-800">{item.completionOtp}</strong></span>}
+                      </div>
+                      <div className="flex flex-col sm:items-end text-[11px] text-slate-500">
+                        <span>Start: <strong className="text-slate-800">{item.startedAt ? new Date(item.startedAt).toLocaleString() : 'N/A'}</strong></span>
+                        <span>End: <strong className="text-slate-800">{item.completedAt ? new Date(item.completedAt).toLocaleString() : 'N/A'}</strong></span>
                       </div>
                     </div>
                   </div>
@@ -933,6 +974,7 @@ function BookingsListTab({ type }) {
             <GlassPanel className="p-5">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div className="flex-1 min-w-0 space-y-1">
+                  <p className="text-[11px] font-extrabold text-brand">Booking ID: #{String(b._id).slice(-6).toUpperCase()}</p>
                   {b.multiServiceBooking?.isMultiService && b.multiServiceBooking?.items?.length > 0 ? (
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-[10px] font-black text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-md flex items-center gap-1">

@@ -355,7 +355,7 @@ export async function prepareCancellationPenaltyRecord({
       booking.cancellationBilling.additionalAmountPayable =
         (booking.cancellationBilling.totalPenaltyCharged || 0) - (booking.cancellationBilling.totalPenaltyPaid || 0)
       booking.cancellationBilling.totalOutstandingAmount = booking.cancellationBilling.additionalAmountPayable
-      await booking.save()
+      await booking.save({ validateModifiedOnly: true })
     }
   }
 
@@ -626,7 +626,7 @@ export async function verifyAndRestartCancellationPolicy({
   }
 
   // CRITICAL REQUIREMENT: Booking status MUST NOT be cancelled! Keep unchanged and active!
-  await booking.save()
+  await booking.save({ validateModifiedOnly: true })
 
   // 5. Create in-app customer notification
   try {
