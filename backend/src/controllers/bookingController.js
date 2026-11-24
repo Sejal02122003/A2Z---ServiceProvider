@@ -988,7 +988,8 @@ export const createBooking = asyncHandler(async (req, res) => {
       totalAmount: finalPayableAmount,
       commissionAmount,
       laborShare,
-      paymentMethod,
+      paymentMethod: finalPayableAmount === 0 && (walletDiscountData.applied || paymentMethod === 'WALLET') ? 'WALLET' : paymentMethod,
+      paymentStatus: finalPayableAmount === 0 && (walletDiscountData.applied || paymentMethod === 'WALLET') ? 'PAID' : 'PENDING',
       status: 'CREATED',
       startOtp,
       completionOtp

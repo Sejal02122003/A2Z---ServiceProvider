@@ -17,7 +17,7 @@ const DEFAULT_SETTINGS = {
   serviceCreditPercentage: 15,
   serviceCreditMaxAmount: 0,
   serviceCreditMinBookingAmount: 0,
-  serviceCreditApplicablePaymentMethods: ['ONLINE', 'CASH'],
+  serviceCreditApplicablePaymentMethods: ['ONLINE', 'CASH', 'WALLET'],
   serviceCreditVersion: 1,
 }
 

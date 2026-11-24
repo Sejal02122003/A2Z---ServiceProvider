@@ -190,7 +190,7 @@ const bookingSchema = new mongoose.Schema(
     laborShare: { type: Number, required: true },
     paymentMethod: {
       type: String,
-      enum: ['ONLINE', 'CASH'],
+      enum: ['ONLINE', 'CASH', 'WALLET'],
       required: true,
     },
     paymentStatus: {

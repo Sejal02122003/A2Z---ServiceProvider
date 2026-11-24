@@ -1034,7 +1034,7 @@ export function IndividualBookingFlowPage() {
       
       if (realUser?.role === 'contractor') {
         currentPaymentMethod = 'ONLINE'
-      } else {
+      } else if (currentPaymentMethod !== 'WALLET') {
         if (currentPaymentMethod === 'CASH' && !modes.cashEnabled && modes.onlineEnabled) {
           currentPaymentMethod = 'ONLINE'
         } else if (currentPaymentMethod === 'ONLINE' && !modes.onlineEnabled && modes.cashEnabled) {
@@ -1082,7 +1082,7 @@ export function IndividualBookingFlowPage() {
         locationText: draft.address.trim(),
         lat: draft.lat || 28.6139,
         lng: draft.lng || 77.2090,
-        paymentMethod: realUser?.role === 'contractor' ? 'ONLINE' : (draft.paymentMethod || 'CASH'),
+        paymentMethod: realUser?.role === 'contractor' ? 'ONLINE' : ((useWallet || draft.paymentMethod === 'WALLET') ? 'WALLET' : (draft.paymentMethod || 'CASH')),
         notes: draft.notes,
         durationKind: draft.durationKind,
         durationDays: days,
@@ -1091,7 +1091,7 @@ export function IndividualBookingFlowPage() {
         timeSlot: draft.timeSlot,
         scheduledAt: draft.serviceDate,
         imageNames: uploadedImageUrls,
-        useWallet: Boolean(useWallet && calculatedBill?.walletInfo?.actualWalletDiscount > 0),
+        useWallet: Boolean((useWallet || draft.paymentMethod === 'WALLET') && calculatedBill?.walletInfo?.actualWalletDiscount > 0),
         ...(realUser?.role === 'contractor' ? {
           contractorInfo: {
             companyName: draft.companyName,
@@ -2778,8 +2778,12 @@ export function IndividualBookingFlowPage() {
                               <label className="relative inline-flex items-center cursor-pointer">
                                 <input
                                   type="checkbox"
-                                  checked={useWallet}
-                                  onChange={(e) => setUseWallet(e.target.checked)}
+                                  checked={Boolean(useWallet || draft.paymentMethod === 'WALLET')}
+                                  onChange={(e) => {
+                                    const next = e.target.checked
+                                    setUseWallet(next)
+                                    syncDraft({ paymentMethod: next ? 'WALLET' : (calculatedBill?.paymentModes?.cashEnabled !== false && realUser?.role !== 'contractor' ? 'CASH' : 'ONLINE') })
+                                  }}
                                   className="sr-only peer"
                                 />
                                 <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
@@ -2860,34 +2864,105 @@ export function IndividualBookingFlowPage() {
 
               <div className="lc-booking-flow-card space-y-3">
                 <p className="lc-booking-flow-label font-bold text-slate-800">Payment Method</p>
-                <div className={`grid gap-3 ${calculatedBill?.paymentModes?.cashEnabled && calculatedBill?.paymentModes?.onlineEnabled && realUser?.role !== 'contractor' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                  {calculatedBill?.paymentModes?.cashEnabled !== false && realUser?.role !== 'contractor' && (
-                    <button
-                      type="button"
-                      onClick={() => syncDraft({ paymentMethod: 'CASH' })}
-                      className={`flex items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 font-bold transition-all ${(draft.paymentMethod || 'CASH') === 'CASH'
-                          ? 'border-brand bg-brand/5 text-brand'
-                          : 'border-slate-200 text-slate-500 hover:border-brand/30 hover:bg-slate-50'
-                        }`}
-                    >
-                      <IndianRupee className="h-5 w-5" />
-                      Cash
-                    </button>
-                  )}
-                  {calculatedBill?.paymentModes?.onlineEnabled !== false && (
-                    <button
-                      type="button"
-                      onClick={() => syncDraft({ paymentMethod: 'ONLINE' })}
-                      className={`flex items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 font-bold transition-all ${draft.paymentMethod === 'ONLINE' || (realUser?.role === 'contractor' && !draft.paymentMethod)
-                          ? 'border-brand bg-brand/5 text-brand'
-                          : 'border-slate-200 text-slate-500 hover:border-brand/30 hover:bg-slate-50'
-                        }`}
-                    >
-                      <Zap className="h-5 w-5" />
-                      Online
-                    </button>
-                  )}
-                </div>
+                {(() => {
+                  const walletInfo = calculatedBill?.walletInfo;
+                  const walletBalance = Number(walletInfo?.walletBalance ?? walletInfo?.availableBalance ?? 0);
+                  const actualWalletDiscount = Number(walletInfo?.actualWalletDiscount ?? 0);
+                  const canApplyWallet = (walletInfo?.enabled !== false) && walletBalance > 0 && actualWalletDiscount > 0;
+                  const isWalletSelected = Boolean((useWallet || draft.paymentMethod === 'WALLET') && canApplyWallet);
+
+                  if (isWalletSelected) {
+                    return (
+                      <div className="rounded-2xl border-2 border-emerald-500 bg-gradient-to-r from-emerald-50/90 via-teal-50/50 to-emerald-50/90 p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs">
+                              <Wallet className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-extrabold text-sm text-slate-900 truncate">A2Z Customer Wallet</span>
+                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-800 border border-emerald-200 shrink-0">
+                                  Selected
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-600 mt-0.5 font-medium truncate">
+                                Available: <span className="font-bold text-slate-900">{formatInr(walletBalance)}</span>
+                                {actualWalletDiscount > 0 ? ` • Deduction: -${formatInr(actualWalletDiscount)}` : ''}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUseWallet(false);
+                              syncDraft({ paymentMethod: calculatedBill?.paymentModes?.cashEnabled !== false && realUser?.role !== 'contractor' ? 'CASH' : 'ONLINE' });
+                            }}
+                            className="shrink-0 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
+                          >
+                            Change
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  const showCash = calculatedBill?.paymentModes?.cashEnabled !== false && realUser?.role !== 'contractor';
+                  const showOnline = calculatedBill?.paymentModes?.onlineEnabled !== false;
+                  const colsClass = canApplyWallet
+                    ? (showCash && showOnline ? 'grid-cols-3' : 'grid-cols-2')
+                    : (showCash && showOnline ? 'grid-cols-2' : 'grid-cols-1');
+
+                  return (
+                    <div className={`grid gap-3 ${colsClass}`}>
+                      {showCash && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUseWallet(false);
+                            syncDraft({ paymentMethod: 'CASH' });
+                          }}
+                          className={`flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-3 font-bold transition-all ${(draft.paymentMethod || 'CASH') === 'CASH' && !useWallet
+                              ? 'border-brand bg-brand/5 text-brand shadow-xs'
+                              : 'border-slate-200 text-slate-500 hover:border-brand/30 hover:bg-slate-50'
+                            }`}
+                        >
+                          <IndianRupee className="h-4 w-4" />
+                          Cash
+                        </button>
+                      )}
+                      {showOnline && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUseWallet(false);
+                            syncDraft({ paymentMethod: 'ONLINE' });
+                          }}
+                          className={`flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-3 font-bold transition-all ${draft.paymentMethod === 'ONLINE' && !useWallet
+                              ? 'border-brand bg-brand/5 text-brand shadow-xs'
+                              : 'border-slate-200 text-slate-500 hover:border-brand/30 hover:bg-slate-50'
+                            }`}
+                        >
+                          <Zap className="h-4 w-4" />
+                          Online
+                        </button>
+                      )}
+                      {canApplyWallet && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUseWallet(true);
+                            syncDraft({ paymentMethod: 'WALLET' });
+                          }}
+                          className="flex items-center justify-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-3 py-3 font-bold text-slate-600 hover:border-brand/30 hover:bg-brand/5 hover:text-brand transition-all shadow-2xs"
+                        >
+                          <Wallet className="h-4 w-4 text-amber-600" />
+                          Wallet
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="flex gap-2">
