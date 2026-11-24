@@ -1921,6 +1921,12 @@ export function IndividualBookingFlowPage() {
                     </div>
                   )}
 
+                  {completedBill.completedPlatformFee > 0 && (
+                    <div className="flex justify-between lc-booking-flow-muted">
+                      <span>Platform Fee</span>
+                      <span>₹{completedBill.completedPlatformFee.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between lc-booking-flow-muted">
                     <span>Taxes (GST)</span>
                     <span>₹{completedBill.completedTaxes.toLocaleString('en-IN')}</span>
@@ -1983,6 +1989,12 @@ export function IndividualBookingFlowPage() {
                 <div className="mt-1.5 flex justify-between text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100">
                   <span>Deductions (Unfulfilled slots)</span>
                   <span>-₹{completedBill.deductedBasePrice.toLocaleString('en-IN')}</span>
+                </div>
+              )}
+              {completedBill.completedPlatformFee > 0 && (
+                <div className="mt-1 flex justify-between lc-booking-flow-muted">
+                  <span>Platform Fee</span>
+                  <span>{formatInr(completedBill.completedPlatformFee)}</span>
                 </div>
               )}
               <div className="mt-1 flex justify-between lc-booking-flow-muted">
@@ -2727,6 +2739,12 @@ export function IndividualBookingFlowPage() {
                       <span>-{formatInr(calculatedBill.maxHourDiscount)}</span>
                     </div>
                   ) : null}
+                  {calculatedBill.platformFee > 0 && (
+                    <div className="mt-1 flex justify-between lc-booking-flow-muted">
+                      <span>Platform Fee</span>
+                      <span>{formatInr(calculatedBill.platformFee)}</span>
+                    </div>
+                  )}
                   <div className="mt-1 flex justify-between lc-booking-flow-muted">
                     <span>Taxes (GST)</span>
                     <span>{formatInr(calculatedBill.taxes || 0)}</span>

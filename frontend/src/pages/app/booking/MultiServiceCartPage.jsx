@@ -155,7 +155,7 @@ export function MultiServiceCartPage() {
   const platformFee = billData?.platformFee ?? 0
 
   const walletDiscountApplied = useWallet && canUseWallet ? actualWalletDiscount : 0
-  const totalAmount = Math.max(0, (billData?.totalAmount ?? subTotal + taxes) - (useWallet ? walletDiscountApplied : 0))
+  const totalAmount = Math.max(0, (billData?.totalAmount ?? subTotal + platformFee + taxes) - (useWallet ? walletDiscountApplied : 0))
 
   const handleCheckout = async () => {
     setSubmitError('')
@@ -796,6 +796,15 @@ export function MultiServiceCartPage() {
                 ₹{subTotal.toLocaleString('en-IN')}
               </span>
             </div>
+
+            {platformFee > 0 && (
+              <div className="flex justify-between text-slate-600 font-medium">
+                <span>Platform Fee</span>
+                <span className="font-semibold text-slate-900 font-mono">
+                  +₹{Math.round(platformFee).toLocaleString('en-IN')}
+                </span>
+              </div>
+            )}
 
             {taxes > 0 && (
               <div className="flex justify-between text-slate-600 font-medium">

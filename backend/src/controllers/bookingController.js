@@ -116,8 +116,8 @@ export const calculateBill = asyncHandler(async (req, res) => {
     }
 
     const taxes = gstPercentage > 0 ? (basePrice * gstPercentage) / 100 : 0
-    // Customer does not pay platform fee; customer pays basePrice + taxes
-    const totalAmount = basePrice + taxes
+    // Customer pays basePrice + platformFee + taxes (platform fee is part of the final bill)
+    const totalAmount = basePrice + platformFee + taxes
 
     let commissionAmount = 0
     if (settings.commission.isActive && settings.commission.type === 'global') {
@@ -185,7 +185,8 @@ export const calculateBill = asyncHandler(async (req, res) => {
         formattedDuration: formatDurationHuman(Number(pkg.estimatedDurationMins || 60) * (Number(quantity) || 1)),
         estimatedDurationMins: Number(pkg.estimatedDurationMins || 60) * (Number(quantity) || 1),
         commissionAmount,
-        laborShare: Math.round(Math.max(0, basePrice - commissionAmount - platformFee)),
+        // Platform fee is billed to the customer, so it is not deducted from the provider's share
+        laborShare: Math.round(Math.max(0, basePrice - commissionAmount)),
         paymentModes: settings.paymentModes || { cashEnabled: true, onlineEnabled: true },
         breakdown,
         walletInfo,
@@ -423,8 +424,8 @@ export const calculateBill = asyncHandler(async (req, res) => {
     }
   }
 
-  // Customer does not pay platform fee; customer pays basePrice + taxes
-  const totalAmount = basePrice + taxes
+  // Customer pays basePrice + platformFee + taxes (platform fee is part of the final bill)
+  const totalAmount = basePrice + platformFee + taxes
 
   // Also pre-calculate commission to show to admin internally, but user doesn't necessarily need to see it
   let commissionAmount = 0
@@ -468,7 +469,8 @@ export const calculateBill = asyncHandler(async (req, res) => {
       estimatedDurationMins: totalDurationMins,
       totalQuantity: servicesToCalculate.reduce((acc, it) => acc + (Number(it.quantity) || 1), 0),
       commissionAmount, // Internal calculation preview
-      laborShare: Math.round(Math.max(0, basePrice - commissionAmount - platformFee)),
+      // Platform fee is billed to the customer, so it is not deducted from the provider's share
+      laborShare: Math.round(Math.max(0, basePrice - commissionAmount)),
       paymentModes: settings.paymentModes || { cashEnabled: true, onlineEnabled: true },
       breakdown,
       isMultiService,
@@ -908,8 +910,8 @@ export const createBooking = asyncHandler(async (req, res) => {
     }
   }
 
-  // Customer does not pay platform fee; customer pays basePrice + taxes
-  const rawTotalAmount = basePrice + taxes
+  // Customer pays basePrice + platformFee + taxes (platform fee is part of the final bill)
+  const rawTotalAmount = basePrice + platformFee + taxes
   let finalPayableAmount = rawTotalAmount
   let walletDiscountData = { applied: false, amount: 0, percentage: 0, eligibleAmount: 0, walletTransactionId: null }
 
@@ -942,7 +944,8 @@ export const createBooking = asyncHandler(async (req, res) => {
     commissionAmount = (basePrice * settings.commission.globalPercentage) / 100
   }
 
-  const laborShare = Math.round(Math.max(0, basePrice - commissionAmount - platformFee))
+  // Platform fee is billed to the customer, so it is not deducted from the provider's share
+  const laborShare = Math.round(Math.max(0, basePrice - commissionAmount))
 
   const startOtp = Math.floor(1000 + Math.random() * 9000).toString()
   const completionOtp = Math.floor(1000 + Math.random() * 9000).toString()
