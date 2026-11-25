@@ -10,6 +10,7 @@ import { Review } from '../models/Review.js'
 import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
 import { USER_ROLES } from '../constants/roles.js'
 import { getBookingLabourShareRate, getBookingLabourPool } from '../utils/labourShare.js'
+import { resolvePackageScope, providerOffersPackage } from '../utils/packageMatch.js'
 import { Zone } from '../models/Zone.js'
 import { explainProviderZoneMatch } from '../utils/zoneMatch.js'
 
@@ -70,6 +71,7 @@ function shouldEnforceSchedule(labourProfile) {
 export async function startBroadcastCycle(bookingId) {
   const booking = await Booking.findById(bookingId).populate('userId', 'fullName phone')
   if (!booking || booking.status !== 'CREATED') return
+  const packageScope = booking.packageBooking?.isPackage ? await resolvePackageScope(booking) : null
 
   // 1. Get Radius Setting
   const settings = await SystemSetting.findOne({ configKey: 'master_config' })
@@ -175,6 +177,12 @@ export async function startBroadcastCycle(bookingId) {
       if (pkgServiceIds.length > 0) {
         matchOr.push({ 'labourProfile.serviceIds': { $in: pkgServiceIds } })
       }
+    }
+    // Packages are tied to a category / subcategory (their inclusions are often not linked services)
+    if (packageScope?.subcategoryId) {
+      matchOr.push({ 'labourProfile.subcategoryIds': packageScope.subcategoryId })
+    } else if (packageScope?.categoryId) {
+      matchOr.push({ 'labourProfile.categoryIds': packageScope.categoryId })
     }
     if (booking.serviceId) {
       matchOr.push({ 'labourProfile.serviceIds': booking.serviceId })
@@ -855,10 +863,8 @@ export async function startBroadcastCycle(bookingId) {
 
           let offersService = false
           if (booking.packageBooking?.isPackage && Array.isArray(booking.packageBooking.inclusions)) {
-            const pkgServiceIds = booking.packageBooking.inclusions.map(inc => String(inc.serviceId)).filter(Boolean)
-            offersService = laborServiceIds.length > 0
-              ? pkgServiceIds.some(sId => laborServiceIds.includes(sId))
-              : (booking.subcategoryId && laborSubcatIds.includes(String(booking.subcategoryId)))
+            offersService = providerOffersPackage(labor.labourProfile, packageScope, booking.packageBooking.inclusions)
+              || Boolean(laborServiceIds.length === 0 && booking.subcategoryId && laborSubcatIds.includes(String(booking.subcategoryId)))
           } else if (booking.serviceId) {
             offersService = laborServiceIds.length > 0
               ? laborServiceIds.includes(String(booking.serviceId))

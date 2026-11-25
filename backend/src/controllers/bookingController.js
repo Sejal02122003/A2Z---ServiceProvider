@@ -768,6 +768,8 @@ export const createBooking = asyncHandler(async (req, res) => {
     packageBookingData = {
       isPackage: true,
       packageId: pkg._id,
+      categoryId: pkg.categoryId,
+      subcategoryId: pkg.subcategoryId,
       packageName: pkg.name,
       packageSlug: pkg.slug,
       packagePrice: pkg.price,

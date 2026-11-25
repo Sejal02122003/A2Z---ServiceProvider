@@ -126,6 +126,8 @@ const bookingSchema = new mongoose.Schema(
     packageBooking: {
       isPackage: { type: Boolean, default: false, index: true },
       packageId: { type: mongoose.Schema.Types.ObjectId, ref: 'ServicePackage' },
+      categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'LabourCategory' },
+      subcategoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'LabourSubcategory' },
       packageName: { type: String, trim: true },
       packageSlug: { type: String, trim: true },
       packagePrice: { type: Number, default: 0 },

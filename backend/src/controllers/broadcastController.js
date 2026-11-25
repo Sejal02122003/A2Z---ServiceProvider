@@ -8,6 +8,8 @@ import { KYC_STATUS } from '../constants/roles.js'
 import { BROADCAST_TIMEOUT_MS } from '../services/broadcastService.js'
 import { getLabourStats } from '../services/labourStatsService.js'
 import { getBookingLabourShareRate, getBookingLabourPool } from '../utils/labourShare.js'
+import { resolvePackageScope, providerOffersPackage } from '../utils/packageMatch.js'
+import { ServicePackage } from '../models/ServicePackage.js'
 import { getProviderDistanceKm } from '../utils/providerDistance.js'
 
 function formatDurationHuman(mins) {
@@ -305,10 +307,12 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
 
     let offersService = false
     if (booking.packageBooking?.isPackage && Array.isArray(booking.packageBooking.inclusions)) {
-      const pkgServiceIds = booking.packageBooking.inclusions.map(inc => String(inc.serviceId)).filter(Boolean)
-      offersService = labourServiceIds.length > 0
-        ? pkgServiceIds.some(sId => labourServiceIds.includes(sId))
-        : (booking.subcategoryId && allSubcatIds.includes(String(booking.subcategoryId)))
+      const pkgScope = await resolvePackageScope(booking)
+      offersService = providerOffersPackage(
+        { serviceIds: labourServiceIds, subcategoryIds: labourSubcatIds, categoryIds: labourCatIds },
+        pkgScope,
+        booking.packageBooking.inclusions,
+      ) || Boolean(labourServiceIds.length === 0 && booking.subcategoryId && allSubcatIds.includes(String(booking.subcategoryId)))
     } else if (booking.serviceId) {
       offersService = labourServiceIds.length > 0
         ? labourServiceIds.includes(String(booking.serviceId))
@@ -747,6 +751,17 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
   if (labourServiceIds.length > 0) {
     serviceMatchConditions.push({ serviceId: { $in: labourServiceIds } })
     serviceMatchConditions.push({ 'packageBooking.inclusions.serviceId': { $in: labourServiceIds } })
+    // Packages tied to the provider's subcategories / categories (inclusions may have no linked service)
+    const myPackages = await ServicePackage.find({
+      $or: [
+        { subcategoryId: { $in: labourSubcatIds } },
+        { subcategoryId: { $exists: false }, categoryId: { $in: labourCatIds } },
+        { subcategoryId: null, categoryId: { $in: labourCatIds } },
+      ],
+    }).select('_id').lean()
+    if (myPackages.length > 0) {
+      serviceMatchConditions.push({ 'packageBooking.packageId': { $in: myPackages.map((pk) => pk._id) } })
+    }
     serviceMatchConditions.push({ 'multiServiceBooking.items': { $elemMatch: { status: 'PENDING', serviceId: { $in: labourServiceIds } } } })
     serviceMatchConditions.push({ 'contractorInfo.services.serviceId': { $in: labourServiceIds } })
   } else if (allSubcatIds.length > 0) {
@@ -936,10 +951,12 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
     // Single service / package booking: Strictly verify labourer offers this service
     let offersService = false
     if (booking.packageBooking?.isPackage && Array.isArray(booking.packageBooking.inclusions)) {
-      const pkgServiceIds = booking.packageBooking.inclusions.map(inc => String(inc.serviceId)).filter(Boolean)
-      offersService = labourServiceIds.length > 0
-        ? pkgServiceIds.some(sId => labourServiceIds.includes(sId))
-        : (booking.subcategoryId && allSubcatIds.includes(String(booking.subcategoryId)))
+      const pkgScope = await resolvePackageScope(booking)
+      offersService = providerOffersPackage(
+        { serviceIds: labourServiceIds, subcategoryIds: labourSubcatIds, categoryIds: labourCatIds },
+        pkgScope,
+        booking.packageBooking.inclusions,
+      ) || Boolean(labourServiceIds.length === 0 && booking.subcategoryId && allSubcatIds.includes(String(booking.subcategoryId)))
     } else if (booking.serviceId) {
       offersService = labourServiceIds.length > 0
         ? labourServiceIds.includes(String(booking.serviceId))

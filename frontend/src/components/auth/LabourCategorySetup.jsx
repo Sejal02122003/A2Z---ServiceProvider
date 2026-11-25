@@ -12,6 +12,8 @@ import {
   Wrench,
   X,
   Plus,
+  Package,
+  Clock,
 } from 'lucide-react'
 import { AppSearchBar } from '../app-ui/inputs/AppSearchBar.jsx'
 import { AppPrimaryButton } from '../app/AppPrimaryButton.jsx'
@@ -20,6 +22,7 @@ import { useAuth } from '../../hooks/useAuth.js'
 import { setUser } from '../../store/slices/authSlice.js'
 import { fetchLabourCategoriesGrouped } from '../../api/labourCategoriesApi.js'
 import { updateMyLabourCategories } from '../../api/userLabourApi.js'
+import { fetchPublicPackages } from '../../api/packagesApi.js'
 import { ApiError } from '../../api/http.js'
 
 function categoryId(c) {
@@ -135,6 +138,7 @@ export function LabourCategorySetup({ variant = 'app', onComplete }) {
   const [error, setError] = useState('')
   const [step, setStep] = useState('areas')
   const [activeGroupId, setActiveGroupId] = useState(null)
+  const [packages, setPackages] = useState([])
 
   const tradeCategoryIds = useMemo(() => {
     const s = new Set()
@@ -277,6 +281,38 @@ export function LabourCategorySetup({ variant = 'app', onComplete }) {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    fetchPublicPackages({ limit: 50 })
+      .then((res) => {
+        if (!cancelled) setPackages(res.data?.packages || [])
+      })
+      .catch(() => {
+        /* packages are informational here; ignore load errors */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const idOf = (v) => String(v?._id || v || '')
+
+  // A package is tied to a category / subcategory (its inclusions are often plain names, not linked
+  // services). You receive it when you work in that subcategory (or, if it has none, that category).
+  // Same rule the server uses to send package requests.
+  function packageStatus(pkg) {
+    const subId = idOf(pkg.subcategoryId)
+    const catId = idOf(pkg.categoryId)
+    const linkedIds = (pkg.inclusions || []).map((inc) => idOf(inc.serviceId)).filter(Boolean)
+    const linkedHit = linkedIds.some((id) => selected.has(id))
+
+    const matchingGroup = groups.find((g) => idOf(g._id) === catId) || null
+    const inScope = (c) => (subId ? idOf(c.subcategoryId) === subId : true)
+    const scopeServices = (matchingGroup?.categories || []).filter(inScope)
+    const scopeHit = scopeServices.some((c) => selected.has(idOf(c._id)))
+    return { covered: linkedHit || scopeHit, group: matchingGroup, scopeCount: scopeServices.length }
+  }
 
   useEffect(() => {
     if (step !== 'roles' || !activeGroupId || activeGroup) return
@@ -557,6 +593,101 @@ export function LabourCategorySetup({ variant = 'app', onComplete }) {
                   })
                 )}
               </div>
+
+              {/* Packages: bundles of services customers can book. A provider receives a package when
+                  they offer at least one of the services it includes. */}
+              {(() => {
+                const q = hubSearch.trim().toLowerCase()
+                const shown = packages.filter((pkg) =>
+                  !q ||
+                  String(pkg.name || '').toLowerCase().includes(q) ||
+                  (pkg.inclusions || []).some((inc) => String(inc.name || '').toLowerCase().includes(q)),
+                )
+                if (shown.length === 0) return null
+                return (
+                  <div className="space-y-2.5 pt-2">
+                    <div className="flex items-center gap-2 px-1">
+                      <Package className="h-4 w-4 text-brand" aria-hidden />
+                      <h3 className="text-sm font-black text-slate-900">Packages</h3>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">{shown.length}</span>
+                    </div>
+                    <p className="px-1 text-[11px] leading-relaxed text-slate-500">
+                      You receive a package request when you offer any service it includes.
+                    </p>
+                    {shown.map((pkg) => {
+                      const { covered, group: pkgGroup, scopeCount } = packageStatus(pkg)
+                      return (
+                        <div
+                          key={pkg._id}
+                          className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs"
+                        >
+                          <div className="flex items-start gap-3">
+                            {pkg.imageUrl ? (
+                              <img src={pkg.imageUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+                            ) : (
+                              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                                <Package className="h-6 w-6" aria-hidden />
+                              </span>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-sm font-extrabold leading-tight text-slate-900">{pkg.name}</p>
+                                <span
+                                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                    covered ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                                  }`}
+                                >
+                                  {covered ? 'You receive this' : 'Not enabled'}
+                                </span>
+                              </div>
+                              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] font-semibold text-slate-600">
+                                {pkg.price != null ? (
+                                  <span className="text-brand">₹{Number(pkg.price).toLocaleString('en-IN')}</span>
+                                ) : null}
+                                {pkg.estimatedDurationMins ? (
+                                  <span className="inline-flex items-center gap-1">
+                                    <Clock className="h-3 w-3" aria-hidden />
+                                    {pkg.estimatedDurationMins} mins
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+
+                          {(pkg.inclusions || []).length > 0 ? (
+                            <div className="mt-2.5 flex flex-wrap gap-1.5">
+                              {pkg.inclusions.map((inc, i) => (
+                                <span
+                                  key={idOf(inc.serviceId) || i}
+                                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-600"
+                                >
+                                  {inc.name}{inc.quantity > 1 ? ` ×${inc.quantity}` : ''}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
+
+                          {!covered && pkgGroup && scopeCount > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => openGroup(pkgGroup)}
+                              className="mt-3 inline-flex items-center gap-1 rounded-xl border border-brand/30 bg-brand/5 px-3 py-1.5 text-xs font-bold text-brand transition hover:bg-brand/10 active:scale-95"
+                            >
+                              <Plus className="h-3.5 w-3.5" aria-hidden />
+                              Choose services in {pkgGroup.name}
+                            </button>
+                          ) : null}
+                          {covered ? (
+                            <p className="mt-2.5 text-[11px] font-semibold text-emerald-700">
+                              Enabled because you offer services in this package's category.
+                            </p>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
             </motion.div>
           ) : (
             <motion.div
