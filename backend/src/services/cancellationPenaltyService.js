@@ -49,11 +49,52 @@ export async function getCancellationSettings() {
 /**
  * 2. Calculate cancellation penalty dynamically based on admin configuration
  */
+const PRE_ACCEPTANCE_STATUSES = new Set(['DRAFT', 'CREATED', 'BROADCASTING', 'FAILED'])
+const ACTIVE_PROVIDER_STATUSES = new Set(['ACCEPTED', 'EN_ROUTE', 'STARTED', 'COMPLETED'])
+
+/**
+ * True only once a service provider has accepted the booking (or the given service item).
+ * Cancellation penalties/fees must never apply before this point.
+ */
+export function hasProviderAccepted(booking, itemId = null) {
+  if (!booking) return false
+  const bookingStatus = String(booking.status || '').toUpperCase()
+  if (PRE_ACCEPTANCE_STATUSES.has(bookingStatus)) return false
+
+  if (itemId && booking.multiServiceBooking?.isMultiService && Array.isArray(booking.multiServiceBooking.items)) {
+    const item = booking.multiServiceBooking.items.find((it) => String(it._id) === String(itemId))
+    if (!item) return false
+    const itemStatus = String(item.status || '').toUpperCase()
+    if (ACTIVE_PROVIDER_STATUSES.has(itemStatus)) return true
+    return Boolean(item.assignedLabourId) && !['PENDING', 'CANCELLED', 'REJECTED'].includes(itemStatus)
+  }
+
+  if (Array.isArray(booking.assignments) && booking.assignments.some((a) => a?.labourId && ACTIVE_PROVIDER_STATUSES.has(String(a.status || 'ACCEPTED').toUpperCase()))) {
+    return true
+  }
+  if (booking.multiServiceBooking?.isMultiService && Array.isArray(booking.multiServiceBooking.items)
+    && booking.multiServiceBooking.items.some((it) => ACTIVE_PROVIDER_STATUSES.has(String(it.status || '').toUpperCase()))) {
+    return true
+  }
+  return Boolean(booking.laborId || booking.acceptedLabourId)
+}
+
 export function calculatePenaltyAmount({ booking, settings, itemId = null, overrideTime = null }) {
   if (booking.status === 'FAILED') {
     return {
       penaltyApplicable: false,
       reason: 'Booking is marked as failed. No cancellation penalty applies.',
+      calculatedPenaltyAmount: 0,
+      penaltyCalculationType: settings.customerPenaltyType || 'PERCENTAGE',
+      configuredPenaltyValue: settings.customerPenaltyValue || 0,
+    }
+  }
+
+  // No penalty before a service provider accepts the booking, whatever the admin condition is.
+  if (!hasProviderAccepted(booking, itemId)) {
+    return {
+      penaltyApplicable: false,
+      reason: 'No service provider has accepted this booking yet. Cancellation is free.',
       calculatedPenaltyAmount: 0,
       penaltyCalculationType: settings.customerPenaltyType || 'PERCENTAGE',
       configuredPenaltyValue: settings.customerPenaltyValue || 0,

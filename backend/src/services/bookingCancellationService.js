@@ -15,6 +15,7 @@ import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
 import { parseISTDateTime } from '../utils/dateHelper.js'
 import {
   calculatePenaltyAmount,
+  hasProviderAccepted,
   prepareCancellationPenaltyRecord,
   getOrCreateCurrentPolicyCycle,
 } from './cancellationPenaltyService.js'
@@ -1383,9 +1384,12 @@ export async function getCustomerCancellationEligibility(bookingId, customerId, 
   const cycle = await getOrCreateCurrentPolicyCycle({ bookingId: booking._id, customerId })
 
   // 7. Compute Fee & Disclosures
+  // Any fee (penalty or flat) applies only after a service provider has accepted the booking.
   const cancellationFee = penaltyCalc.penaltyApplicable
     ? penaltyCalc.calculatedPenaltyAmount
-    : Math.max(0, Number(settings.customerCancellationFee || 0))
+    : hasProviderAccepted(booking)
+      ? Math.max(0, Number(settings.customerCancellationFee || 0))
+      : 0
 
   const allowedReasons = settings.customerAllowedReasons && settings.customerAllowedReasons.length > 0
     ? settings.customerAllowedReasons
