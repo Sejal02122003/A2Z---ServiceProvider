@@ -9,7 +9,7 @@ import { UserSubscription } from '../models/UserSubscription.js'
 import { Review } from '../models/Review.js'
 import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
 import { USER_ROLES } from '../constants/roles.js'
-import { getBookingLabourShareRate } from '../utils/labourShare.js'
+import { getBookingLabourShareRate, getBookingLabourPool } from '../utils/labourShare.js'
 import { Zone } from '../models/Zone.js'
 import { explainProviderZoneMatch } from '../utils/zoneMatch.js'
 
@@ -866,7 +866,7 @@ export async function startBroadcastCycle(bookingId) {
             return
           }
 
-          const singleShare = Math.round(Number(booking.laborShare || booking.basePrice || 0))
+          const singleShare = Math.round(getBookingLabourPool(booking))
           const singleDurationMins = booking.totalDurationMins || Math.round(bookingHours * 60)
           const formattedSingleDuration = booking.formattedDuration || formatDurationHuman(singleDurationMins)
           const singleQty = booking.quantity || 1

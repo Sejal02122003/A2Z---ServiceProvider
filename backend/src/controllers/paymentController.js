@@ -5,7 +5,7 @@ import { WalletTransaction } from '../models/WalletTransaction.js'
 import { createOrder, verifyPaymentSignature } from '../services/paymentService.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
-import { getBookingLabourShareRate } from '../utils/labourShare.js'
+import { getBookingLabourShareRate, getBookingLabourPool } from '../utils/labourShare.js'
 
 export const initPayment = asyncHandler(async (req, res) => {
   const { amount, purpose, bookingId } = req.body
@@ -90,7 +90,7 @@ export const verifyPayment = asyncHandler(async (req, res) => {
            for (const a of booking.assignments) {
              if (a.status === 'COMPLETED' && a.labourId) {
                const lid = typeof a.labourId === 'object' ? a.labourId._id : a.labourId;
-               let workerShare = a.labourShare || (booking.laborShare ? Math.round(booking.laborShare / (booking.quantity || 1)) : 0)
+               let workerShare = a.labourShare || (getBookingLabourPool(booking) ? Math.round(getBookingLabourPool(booking) / (booking.quantity || 1)) : 0)
                if (booking.contractorInfo?.services?.length > 0) {
                  const s = booking.contractorInfo.services.find(svc => String(svc.serviceId?._id || svc.serviceId) === String(a.serviceId?._id || a.serviceId))
                  if (s && s.price) {
@@ -119,12 +119,12 @@ export const verifyPayment = asyncHandler(async (req, res) => {
          } else if (booking.laborId) {
            let wallet = await Wallet.findOne({ userId: booking.laborId })
            if (!wallet) wallet = new Wallet({ userId: booking.laborId })
-           wallet.selfBalance += booking.laborShare
+           wallet.selfBalance += getBookingLabourPool(booking)
            await wallet.save()
 
            await WalletTransaction.create({
               walletId: wallet._id,
-              amount: booking.laborShare,
+              amount: getBookingLabourPool(booking),
               type: 'CREDIT',
               targetWallet: 'SELF',
               context: 'PAYOUT',

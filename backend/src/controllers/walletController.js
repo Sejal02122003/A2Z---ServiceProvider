@@ -5,6 +5,7 @@ import { WithdrawalRequest } from '../models/WithdrawalRequest.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import mongoose from 'mongoose'
+import { getLabourEarnedShare } from '../utils/labourShare.js'
 
 import { getLabourWalletDetails, checkLabourBookingEligibility, rechargeLabourWallet } from '../services/labourWalletService.js'
 
@@ -44,62 +45,6 @@ export const rechargeMyWallet = asyncHandler(async (req, res) => {
   })
 })
 
-function calculateLabourBookingShare(b, userId) {
-  let share = b.laborShare || b.basePrice || 0
-
-  if (b.assignments && b.assignments.length > 0) {
-    if (b.contractorInfo?.services?.length > 0) {
-      let subTotal = 0
-      b.contractorInfo.services.forEach(s => {
-        subTotal += (s.price || 0) * (b.hours || 1) * (s.quantity || 1)
-      })
-      const ratio = subTotal > 0 ? (b.laborShare || 0) / subTotal : 0
-
-      let availableServices = []
-      b.contractorInfo.services.forEach(s => {
-        const sShare = (s.price || 0) * (b.hours || 1) * ratio
-        for (let i = 0; i < (s.quantity || 1); i++) {
-          availableServices.push({ serviceId: String(s.serviceId?._id || s.serviceId), share: sShare, assigned: false })
-        }
-      })
-
-      b.assignments.forEach(a => {
-        const labour = a.labourId
-        if (!labour) return
-        const labServiceIds = [
-          ...(labour.serviceIds || []),
-          ...(labour.labourProfile?.serviceIds || [])
-        ].map(id => String(id))
-        let matchedService = availableServices.find(as => !as.assigned && labServiceIds.includes(as.serviceId))
-        if (!matchedService) matchedService = availableServices.find(as => !as.assigned)
-        if (matchedService) {
-          matchedService.assigned = true
-          matchedService.labourIdStr = String(labour._id || labour)
-        }
-      })
-
-      const myService = availableServices.find(as => as.labourIdStr === String(userId))
-      if (myService) {
-        share = myService.share
-      } else {
-        share = b.laborShare / b.assignments.length
-      }
-    } else {
-      const mainLabId = typeof b.laborId === 'object' ? b.laborId?._id : b.laborId
-      if (String(mainLabId) !== String(userId) && !b.acceptedLabourIds?.some(id => String(id) === String(userId))) {
-        share = 0
-      }
-    }
-  } else {
-    const mainLabId = typeof b.laborId === 'object' ? b.laborId?._id : b.laborId
-    if (String(mainLabId) !== String(userId) && !b.acceptedLabourIds?.some(id => String(id) === String(userId))) {
-      share = 0
-    }
-  }
-
-  return share
-}
-
 export const getEarningsSummary = asyncHandler(async (req, res) => {
   const userId = req.user._id
 
@@ -119,10 +64,10 @@ export const getEarningsSummary = asyncHandler(async (req, res) => {
       { 'assignments.labourId': userId },
       { acceptedLabourIds: userId }
     ],
-    status: { $in: ['COMPLETED', 'ACCEPTED', 'ASSIGNED', 'STARTED'] }
+    // Only finished work is earned: accepted / in-progress / cancelled bookings earn nothing yet
+    status: { $in: ['COMPLETED', 'PARTIALLY_COMPLETED', 'STARTED', 'PARTIALLY_CANCELLED'] }
   })
-    .populate('assignments.labourId', 'serviceIds labourProfile')
-    .populate('contractorInfo.services.serviceId')
+    .lean()
 
   let earnedPaise = 0
   let todayPaise = 0
@@ -156,12 +101,14 @@ export const getEarningsSummary = asyncHandler(async (req, res) => {
   }
 
   completedBookings.forEach(b => {
-    const share = calculateLabourBookingShare(b, userId)
+    // earning = total amount − GST − platform fee − commission (see utils/labourShare.js)
+    const share = getLabourEarnedShare(b, userId)
     if (share > 0 && b.paymentMethod !== 'CASH') {
       const sharePaise = Math.round(share * 100)
       earnedPaise += sharePaise
 
-      const bookingDate = new Date(b.scheduledAt || b.createdAt)
+      // Credit the earning on the day the job was completed
+      const bookingDate = new Date(b.completedAt || b.updatedAt || b.scheduledAt || b.createdAt)
       const bDateStr = new Date(bookingDate.getTime() - bookingDate.getTimezoneOffset() * 60000).toISOString().split('T')[0]
 
       if (bDateStr === todayStr) {

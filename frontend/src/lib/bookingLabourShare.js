@@ -7,11 +7,11 @@ const idOf = (v) => String(typeof v === 'object' && v?._id ? v._id : (v || ''))
  */
 export function getBookingLabourRate(booking) {
   const base = Number(booking?.basePrice) || 0
-  const commission = Number(booking?.commissionAmount)
-  if (base > 0 && Number.isFinite(commission) && commission >= 0) {
-    return Math.min(1, Math.max(0, (base - commission) / base))
+  if (base > 0) {
+    // share of the base price left after: total − GST − platform fee − commission
+    return Math.min(1, Math.max(0, getBookingLabourPool(booking) / base))
   }
-  return 0.9 // legacy fallback for bookings without a commission snapshot
+  return 0.9 // legacy fallback for bookings without a price snapshot
 }
 
 /**
@@ -34,10 +34,14 @@ export function getLabourBookingShare(booking, userId) {
 
   if (assignments.length > 0) {
     // 1. Stored share on this worker's own assignment(s)
-    const mine = assignments.filter((a) => idOf(a.labourId) === uIdStr && a.status !== 'CANCELLED')
+    const live = assignments.filter((a) => a.status !== 'CANCELLED')
+    const mine = live.filter((a) => idOf(a.labourId) === uIdStr)
     if (mine.length > 0) {
-      const stored = mine.reduce((sum, a) => sum + (Number(a.labourShare) || 0), 0)
-      if (stored > 0) return Math.round(stored)
+      // Split the pool between workers in proportion to the share stored at acceptance
+      const pool = getBookingLabourPool(booking)
+      const myStored = mine.reduce((sum, a) => sum + (Number(a.labourShare) || 0), 0)
+      const allStored = live.reduce((sum, a) => sum + (Number(a.labourShare) || 0), 0)
+      if (myStored > 0 && allStored > 0) return Math.round(pool * (myStored / allStored))
     }
 
     // 2a. Legacy multi-service: items assigned to this worker
@@ -58,7 +62,7 @@ export function getLabourBookingShare(booking, userId) {
       booking.contractorInfo.services.forEach((s) => {
         subTotal += (Number(s.price) || 0) * (Number(booking.hours) || 1) * (Number(s.quantity) || 1)
       })
-      const ratio = subTotal > 0 ? (Number(booking.laborShare) || 0) / subTotal : 0
+      const ratio = subTotal > 0 ? getBookingLabourPool(booking) / subTotal : 0
 
       const availableServices = []
       booking.contractorInfo.services.forEach((s) => {
@@ -96,14 +100,60 @@ export function getLabourBookingShare(booking, userId) {
     }
 
     // 2c. Last resort: even split of the booking share between its assignments
-    return Math.round((Number(booking.laborShare) || 0) / (assignments.length || 1))
+    return Math.round(getBookingLabourPool(booking) / (assignments.length || 1))
   }
 
   // 3. Direct single worker booking
-  const share = Number(booking.laborShare) ||
-    (Number(booking.totalAmount) - (Number(booking.commissionAmount) || 0)) ||
-    Number(booking.basePrice) ||
-    0
+  return Math.round(getBookingLabourPool(booking))
+}
 
-  return Math.round(share)
+/**
+ * Provider earning pool of a booking:
+ *
+ *   total amount − GST − platform fee − commission
+ *
+ * Computed from the booking's own bill snapshot. Same rule as backend utils/labourShare.js.
+ */
+export function getBookingLabourPool(booking) {
+  const base = Number(booking?.basePrice) || 0
+  const platformFee = Number(booking?.platformFee) || 0
+  const gst = Number(booking?.taxes) || 0
+  const commission = Number(booking?.commissionAmount) || 0
+  const discount = Number(booking?.walletDiscount?.amount) || 0
+  const net = Number(booking?.totalAmount) || 0
+
+  // The bill total before any wallet discount (the wallet discount only lowers what the customer pays)
+  let total = net
+  if (discount > 0 && base > 0 && Math.abs(net + discount - (base + platformFee + gst)) < 1) {
+    total = net + discount
+  }
+
+  if (total > 0) {
+    // THE formula:  total amount − GST − platform fee − commission
+    return Math.max(0, total - gst - platformFee - commission)
+  }
+  // No usable total on the booking (very old data): fall back to the stored share
+  const stored = Number(booking?.laborShare)
+  if (Number.isFinite(stored) && stored > 0) return stored
+  return Math.max(0, base - commission)
+}
+
+/**
+ * What the worker has actually EARNED: only finished work counts. Accepted / in-progress /
+ * cancelled bookings earn nothing yet (mirrors backend getLabourEarnedShare).
+ */
+export function getLabourEarnedShare(booking, userId) {
+  if (!booking) return 0
+  const status = String(booking.status || '').toUpperCase()
+  if (status === 'COMPLETED') return getLabourBookingShare(booking, userId)
+
+  if (status === 'PARTIALLY_COMPLETED' || status === 'STARTED' || status === 'PARTIALLY_CANCELLED') {
+    const uid = idOf(userId)
+    const done = (booking.assignments || []).filter(
+      (a) => idOf(a.labourId) === uid && String(a.status).toUpperCase() === 'COMPLETED',
+    )
+    const stored = done.reduce((sum, a) => sum + (Number(a.labourShare) || 0), 0)
+    if (stored > 0) return Math.round(stored)
+  }
+  return 0
 }

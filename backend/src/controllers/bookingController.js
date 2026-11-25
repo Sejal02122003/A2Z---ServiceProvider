@@ -9,6 +9,7 @@ import { AdminWallet } from '../models/AdminWallet.js'
 import { Invoice } from '../models/Invoice.js'
 import { INVOICE_STATUS } from '../constants/workforceConstants.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
+import { getBookingLabourPool } from '../utils/labourShare.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { parseISTDateTime } from '../utils/dateHelper.js'
 import { recordLateFeeIncident, recordBounceIncident } from '../services/penaltyService.js'
@@ -1564,7 +1565,8 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
         }).catch(() => { })
 
         // Add laborShare to labor's self wallet
-        wallet.selfBalance += booking.laborShare
+        // Provider earning = total amount − GST − platform fee − commission
+        wallet.selfBalance += getBookingLabourPool(booking)
         wallet.balance = wallet.selfBalance // keep the mirror field in step with selfBalance
         await wallet.save()
 
@@ -1573,7 +1575,7 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
             walletId: wallet._id,
             userId: booking.laborId,
             status: 'COMPLETED',
-            amount: booking.laborShare,
+            amount: getBookingLabourPool(booking),
             type: 'CREDIT',
             targetWallet: 'SELF',
             context: 'PAYOUT',

@@ -7,7 +7,7 @@ import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { KYC_STATUS } from '../constants/roles.js'
 import { BROADCAST_TIMEOUT_MS } from '../services/broadcastService.js'
 import { getLabourStats } from '../services/labourStatsService.js'
-import { getBookingLabourShareRate } from '../utils/labourShare.js'
+import { getBookingLabourShareRate, getBookingLabourPool } from '../utils/labourShare.js'
 import { getProviderDistanceKm } from '../utils/providerDistance.js'
 
 function formatDurationHuman(mins) {
@@ -326,7 +326,7 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     }
 
     const bookingHours = booking.duration || booking.hours || 1
-    assignedLabourShare = booking.laborShare || 0
+    assignedLabourShare = getBookingLabourPool(booking)
     assignedPricePerHour = booking.basePrice ? Math.round(booking.basePrice / bookingHours) : 0
 
     // Fetch and resolve service name for single service or package booking
@@ -986,7 +986,7 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
         singleCategoryName = subcat.name
       }
     }
-    const singleShare = Math.round(Number(booking.laborShare || booking.basePrice || 0))
+    const singleShare = Math.round(getBookingLabourPool(booking))
     const singleDurationMins = booking.totalDurationMins || Math.round(bookingHours * 60)
     const formattedSingleDuration = booking.formattedDuration || formatDurationHuman(singleDurationMins)
     const singleQty = booking.quantity || 1

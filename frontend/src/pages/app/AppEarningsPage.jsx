@@ -1,3 +1,4 @@
+import { getLabourEarnedShare } from '../../lib/bookingLabourShare.js'
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Wallet, CheckCircle2, UploadCloud, Landmark, FileText, UserCircle, QrCode } from 'lucide-react'
@@ -74,63 +75,17 @@ export function AppEarningsPage() {
       })
       setPendingCashDues(Math.round(unsettledCash * 100) / 100)
 
+      // Earning per booking = total amount − GST − platform fee − commission, counted only once the
+      // work is completed. Cash jobs additionally need the cash handover (payment) to be confirmed.
       let onlineSum = 0
       let cashSum = 0
-      allBookings.forEach(b => {
-        if (b.paymentStatus === 'PAID') {
-          let share = b.laborShare || b.basePrice || 0
-          
-          // Bulk booking share split logic
-          if (b.assignments && b.assignments.length > 0) {
-            if (b.contractorInfo?.services?.length > 0) {
-              let subTotal = 0
-              b.contractorInfo.services.forEach(s => {
-                subTotal += (s.price || 0) * (b.hours || 1) * (s.quantity || 1)
-              })
-              const ratio = subTotal > 0 ? (b.laborShare || 0) / subTotal : 0
-              
-              let availableServices = []
-              b.contractorInfo.services.forEach(s => {
-                const sShare = (s.price || 0) * (b.hours || 1) * ratio
-                for (let i = 0; i < (s.quantity || 1); i++) {
-                  availableServices.push({ serviceId: String(s.serviceId?._id || s.serviceId), share: sShare, assigned: false })
-                }
-              })
-
-              b.assignments.forEach(a => {
-                const labour = a.labourId;
-                if (!labour) return;
-                const labServiceIds = [
-                  ...(labour.serviceIds || []),
-                  ...(labour.labourProfile?.serviceIds || [])
-                ].map(id => String(id));
-                let matchedService = availableServices.find(as => !as.assigned && labServiceIds.includes(as.serviceId));
-                if (!matchedService) matchedService = availableServices.find(as => !as.assigned);
-                if (matchedService) {
-                  matchedService.assigned = true;
-                  matchedService.labourIdStr = String(labour._id || labour);
-                }
-              })
-              
-              const myService = availableServices.find(as => as.labourIdStr === String(user?._id));
-              if (myService) {
-                share = myService.share;
-              } else {
-                share = b.laborShare / b.assignments.length;
-              }
-            } else {
-              const mainLabId = typeof b.laborId === 'object' ? b.laborId?._id : b.laborId
-              if (String(mainLabId) !== String(user?._id) && !b.acceptedLabourIds?.includes(user?._id)) {
-                share = 0
-              }
-            }
-          }
-
-          if (b.paymentMethod === 'CASH') {
-            cashSum += share * 100
-          } else {
-            onlineSum += share * 100 
-          }
+      allBookings.forEach((b) => {
+        const earned = getLabourEarnedShare(b, user?._id)
+        if (earned <= 0) return
+        if (b.paymentMethod === 'CASH') {
+          if (b.paymentStatus === 'PAID') cashSum += earned * 100
+        } else {
+          onlineSum += earned * 100
         }
       })
 
