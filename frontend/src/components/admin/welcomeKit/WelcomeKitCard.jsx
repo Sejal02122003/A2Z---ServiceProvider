@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useBranding } from '../../../context/BrandingContext.jsx'
+import { getWelcomeKitAmount } from '../../../lib/welcomeKitFee.js'
 import {
   Package,
   Check,
@@ -16,6 +18,7 @@ import { WelcomeKitModal } from './WelcomeKitModal.jsx'
 
 export function WelcomeKitCard({ user, onUpdate }) {
   const [modalOpen, setModalOpen] = useState(false)
+  const { welcomeKitFee } = useBranding()
   const kit = user?.welcomeKit || {}
   const status = getKitStatusDerived(kit)
   const paymentStatus = kit.status || 'PENDING_PAYMENT'
@@ -78,7 +81,7 @@ export function WelcomeKitCard({ user, onUpdate }) {
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Fee: ₹{kit.paymentAmount || 999}
+                  Fee: ₹{getWelcomeKitAmount(kit, welcomeKitFee)}
                 </span>
                 <span>•</span>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">

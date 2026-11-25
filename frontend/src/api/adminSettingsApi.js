@@ -23,6 +23,13 @@ export const adminSettingsApi = {
     })
   },
 
+  updateWelcomeKitFee: (payload) => {
+    return apiRequest('/admin/settings/welcome-kit-fee', {
+      method: 'PATCH',
+      body: payload,
+    })
+  },
+
   updateLabourCashLimit: (payload) => {
     return apiRequest('/admin/settings/labour-cash-limit', {
       method: 'PATCH',

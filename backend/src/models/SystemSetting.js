@@ -71,6 +71,12 @@ const systemSettingSchema = new mongoose.Schema(
       min: 0,
       default: 50,
     },
+    // One-time Welcome Kit fee charged to every new service partner (admin controlled)
+    welcomeKitFee: {
+      type: Number,
+      min: 0,
+      default: 999,
+    },
     globalBroadcastRadius: {
       type: Number,
       min: 1,

@@ -4,12 +4,14 @@ import { getPublicSettings } from '../api/adminSettingsApi.js'
 const BrandingContext = createContext({
   logoUrl: '/logo-transparent.png',
   faviconUrl: '/favicon.ico',
+  welcomeKitFee: 999,
 })
 
 export function BrandingProvider({ children }) {
   const [branding, setBranding] = useState({
     logoUrl: '/logo-transparent.png',
     faviconUrl: '/favicon.ico',
+    welcomeKitFee: 999,
   })
 
   useEffect(() => {
@@ -17,13 +19,17 @@ export function BrandingProvider({ children }) {
     getPublicSettings()
       .then(res => {
         if (!mounted) return
+        const fee = Number(res.data?.welcomeKitFee)
+        if (Number.isFinite(fee) && fee >= 0) {
+          setBranding((prev) => ({ ...prev, welcomeKitFee: fee }))
+        }
         const b = res.data?.branding
         if (b) {
-          const newBranding = {
+          setBranding((prev) => ({
+            ...prev,
             logoUrl: b.logoUrl || '/logo-transparent.png',
             faviconUrl: b.faviconUrl || '/favicon.ico',
-          }
-          setBranding(newBranding)
+          }))
           
           // Update favicon dynamically
           if (b.faviconUrl) {

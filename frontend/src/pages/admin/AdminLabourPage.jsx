@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useBranding } from '../../context/BrandingContext.jsx'
+import { getWelcomeKitAmount } from '../../lib/welcomeKitFee.js'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
   ArrowUpRight,
@@ -286,6 +288,7 @@ function extractKycMedia(detailUser) {
 }
 
 export function AdminLabourPage() {
+  const { welcomeKitFee } = useBranding()
   const reduce = useReducedMotion()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -1071,7 +1074,7 @@ export function AdminLabourPage() {
                                     className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer"
                                     title="Payment slip verified - click to view"
                                   >
-                                    <span>✓ View Slip (₹{u.welcomeKit?.paymentAmount || 999})</span>
+                                    <span>✓ View Slip (₹{getWelcomeKitAmount(u.welcomeKit, welcomeKitFee)})</span>
                                   </button>
                                 )}
                                 <span className="text-[10px] text-slate-400 font-mono truncate">
@@ -1301,7 +1304,7 @@ export function AdminLabourPage() {
                             </span>
                           ) : (
                             <span className="text-[10px] font-bold text-emerald-700 block">
-                              ✓ Slip Verified (₹{u.welcomeKit?.paymentAmount || 999})
+                              ✓ Slip Verified (₹{getWelcomeKitAmount(u.welcomeKit, welcomeKitFee)})
                             </span>
                           )}
                           <span className="text-[9px] text-slate-400 font-mono">
@@ -1313,7 +1316,7 @@ export function AdminLabourPage() {
                       <div className="mt-0.5">
                         {u.welcomeKit?.status === 'PAID' || u.welcomeKit?.status === 'DELIVERED' || u.welcomeKit?.status === 'DISPATCHED' ? (
                           <span className="text-[10px] font-bold text-emerald-700">
-                            ✓ ₹999 Verified (Direct)
+                            ✓ ₹{getWelcomeKitAmount(u.welcomeKit, welcomeKitFee)} Verified (Direct)
                           </span>
                         ) : (
                           <span className="text-[10px] text-slate-400 italic">

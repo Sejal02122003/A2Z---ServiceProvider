@@ -1,4 +1,6 @@
 import { useState, useId, useEffect, useRef } from 'react'
+import { useBranding } from '../../../context/BrandingContext.jsx'
+import { getWelcomeKitAmount } from '../../../lib/welcomeKitFee.js'
 import {
   X,
   Package,
@@ -47,7 +49,7 @@ const SAMPLE_SLIP_URL =
 
 const COMMON_REJECTION_REASONS = [
   'Screenshot is blurry or unreadable',
-  'Incorrect payment amount (₹999 required)',
+  'Incorrect payment amount (does not match the Welcome Kit fee)',
   'UTR / Transaction ID not visible or invalid',
   'Duplicate receipt or previously used screenshot',
   'Payment not credited to company bank account',
@@ -64,6 +66,8 @@ const COMMON_ADDRESS_CORRECTION_REASONS = [
 export function WelcomeKitModal({ user, onClose, onSuccess }) {
   const [activeTab, setActiveTab] = useState('verification') // 'verification' | 'address' | 'dispatch' | 'delivery' | 'audit'
   const [currentKit, setCurrentKit] = useState(user?.welcomeKit || {})
+  const { welcomeKitFee } = useBranding()
+  const kitAmount = getWelcomeKitAmount(currentKit, welcomeKitFee)
   const [uniformIssued, setUniformIssued] = useState(Boolean(user?.welcomeKit?.uniformIssued))
   const [idCardIssued, setIdCardIssued] = useState(Boolean(user?.welcomeKit?.idCardIssued))
   const [bagIssued, setBagIssued] = useState(Boolean(user?.welcomeKit?.bagIssued))
@@ -731,7 +735,7 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
                   <div>
                     <h3 className="text-sm font-bold text-slate-900">Payment Slip Verification</h3>
                     <p className="text-xs text-slate-500">
-                      Verify proof of ₹{currentKit?.paymentAmount || 999} welcome kit fee before unlocking delivery address.
+                      Verify proof of ₹{kitAmount} welcome kit fee before unlocking delivery address.
                     </p>
                   </div>
 
@@ -793,7 +797,7 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
                   </div>
                   <div>
                     <span className="text-[10px] uppercase font-bold text-slate-400 block">Required Fee</span>
-                    <span className="font-semibold text-slate-800">₹{currentKit?.paymentAmount || 999}</span>
+                    <span className="font-semibold text-slate-800">₹{kitAmount}</span>
                   </div>
                   <div>
                     <span className="text-[10px] uppercase font-bold text-slate-400 block">Submitted At</span>
@@ -823,7 +827,7 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
                       <div className="absolute top-2 left-2 pointer-events-none">
                         <span className="inline-flex items-center gap-1 rounded-md bg-slate-900/80 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs backdrop-blur-xs">
                           <Eye className="h-3 w-3 text-brand" />
-                          Proof Slip ₹{currentKit?.paymentAmount || 999}
+                          Proof Slip ₹{kitAmount}
                         </span>
                       </div>
                     </div>
@@ -1022,7 +1026,7 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
                       </div>
                       <h4 className="text-sm font-bold text-slate-900">No Payment Slip Uploaded Yet</h4>
                       <p className="text-xs text-slate-500 max-w-md mx-auto">
-                        This service partner has not uploaded their ₹999 payment screenshot yet. You can upload or attach a slip on their behalf, or approve direct hub cash.
+                        This service partner has not uploaded their ₹{kitAmount} payment screenshot yet. You can upload or attach a slip on their behalf, or approve direct hub cash.
                       </p>
                     </div>
 
@@ -1878,7 +1882,7 @@ export function WelcomeKitModal({ user, onClose, onSuccess }) {
             {/* Top Bar */}
             <div className="w-full flex items-center justify-between py-2 px-3 text-white">
               <div className="text-xs font-bold">
-                Payment Slip Proof • {user.fullName || 'Service Partner'} (₹{currentKit?.paymentAmount || 999})
+                Payment Slip Proof • {user.fullName || 'Service Partner'} (₹{kitAmount})
               </div>
               <div className="flex items-center gap-2">
                 <a

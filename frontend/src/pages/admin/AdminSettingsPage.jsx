@@ -125,6 +125,9 @@ export function AdminSettingsPage() {
   // Cancellation Penalty
   const [cancellationPenalty, setCancellationPenalty] = useState('')
 
+  // Welcome Kit fee (one price for every new service partner)
+  const [welcomeKitFee, setWelcomeKitFee] = useState('')
+
   // Simulated Opportunities Toggle
   const [simulatedOpportunitiesEnabled, setSimulatedOpportunitiesEnabled] = useState(true)
 
@@ -200,6 +203,7 @@ export function AdminSettingsPage() {
         }).catch(console.error)
 
         // Cancellation Penalty
+        setWelcomeKitFee(String(s.welcomeKitFee ?? 999))
         if (s.cancellationPenalty != null) {
           setCancellationPenalty(String(s.cancellationPenalty))
         }
@@ -757,6 +761,35 @@ export function AdminSettingsPage() {
             onClick={() => handleSave('Payment Modes', adminSettingsApi.updatePaymentModes, { cashEnabled, onlineEnabled })}
           >
             Save Payment Modes
+          </AppPrimaryButton>
+        </SettingsSection>
+
+        {/* Welcome Kit Fee */}
+        <SettingsSection
+          icon={IndianRupee}
+          title="Welcome Kit Fee"
+          description="One-time fee every new service partner pays for the Welcome Kit. Partners who already paid keep the amount they paid."
+        >
+          <div>
+            <label className={labelClass}>Welcome Kit Fee (₹)</label>
+            <input
+              className={inputClass + ' mt-1.5'}
+              type="number"
+              min={0}
+              placeholder="e.g. 999"
+              value={welcomeKitFee}
+              onChange={(e) => setWelcomeKitFee(e.target.value)}
+            />
+          </div>
+          <AppPrimaryButton
+            type="button"
+            loading={saving === 'Welcome Kit Fee'}
+            disabled={welcomeKitFee === '' || Number(welcomeKitFee) < 0}
+            onClick={() => handleSave('Welcome Kit Fee', adminSettingsApi.updateWelcomeKitFee, {
+              welcomeKitFee: Number(welcomeKitFee),
+            })}
+          >
+            Save Welcome Kit Fee
           </AppPrimaryButton>
         </SettingsSection>
 

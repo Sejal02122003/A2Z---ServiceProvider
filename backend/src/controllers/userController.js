@@ -1739,6 +1739,8 @@ export const getPartnerOnboardingStatus = asyncHandler(async (req, res) => {
         zones: availableZones,
         paymentComplete,
         welcomeKitPayment: {
+          // Fee the partner paid (locked at payment time) or, if unpaid, the current admin-set fee
+          amount: welcomeKit.paidAt ? (welcomeKit.paymentAmount ?? 999) : await getCurrentWelcomeKitFee(),
           status: welcomeKit.status || 'PENDING_PAYMENT',
           method: welcomeKit.paymentMethod || 'NONE',
           receiptUrl: welcomeKit.paymentReceiptUrl || '',
@@ -1953,6 +1955,13 @@ export const completePartnerTrial = asyncHandler(async (req, res) => {
  * POST /api/users/me/welcome-kit/payment
  * Submit payment for welcome kit (online confirmation or offline bill screenshot upload)
  */
+/** Current admin-configured Welcome Kit fee (falls back to 999) */
+async function getCurrentWelcomeKitFee() {
+  const { SystemSetting } = await import('../models/SystemSetting.js')
+  const s = await SystemSetting.findOne({ configKey: 'master_config' }).select('welcomeKitFee').lean()
+  return Number(s?.welcomeKitFee ?? 999)
+}
+
 export const submitPartnerWelcomeKitPayment = asyncHandler(async (req, res) => {
   const { paymentMethod, paymentReceiptUrl, paymentNotes, deliveryAddress, deliveryCity, deliveryPincode } = req.body
 
@@ -1979,6 +1988,8 @@ export const submitPartnerWelcomeKitPayment = asyncHandler(async (req, res) => {
   user.welcomeKit.paymentNotes = paymentNotes || ''
   user.welcomeKit.paymentRejectionReason = '' // Clear any previous rejection
   user.welcomeKit.paidAt = new Date()
+  // Lock in the fee that applied when this partner paid; later fee changes don't alter it
+  user.welcomeKit.paymentAmount = await getCurrentWelcomeKitFee()
 
   if (deliveryAddress) user.welcomeKit.deliveryAddress = String(deliveryAddress).trim()
   if (deliveryCity) user.welcomeKit.deliveryCity = String(deliveryCity).trim()
@@ -2002,7 +2013,7 @@ export const submitPartnerWelcomeKitPayment = asyncHandler(async (req, res) => {
   if (!isOnline) {
     notifyAdminWelcomeKitPaymentSubmitted({
       provider: user,
-      amount: 999,
+      amount: user.welcomeKit?.paymentAmount ?? 999,
       paymentReceiptUrl: user.welcomeKit?.paymentReceiptUrl || '',
     }).catch((err) => console.warn('[WelcomeKit Admin Notification Error]:', err?.message))
   }
@@ -2057,6 +2068,7 @@ export const verifyPartnerWelcomeKitPayment = asyncHandler(async (req, res) => {
     user.welcomeKit.paymentMethod = 'OFFLINE'
     user.welcomeKit.status = 'PAYMENT_SUBMITTED'
     user.welcomeKit.paidAt = new Date()
+    user.welcomeKit.paymentAmount = await getCurrentWelcomeKitFee()
     user.welcomeKit.paymentRejectionReason = ''
     user.welcomeKit.auditTrail.push({
       action: 'PAYMENT_SLIP_ATTACHED',
@@ -2115,6 +2127,8 @@ export const verifyPartnerWelcomeKitPayment = asyncHandler(async (req, res) => {
     user.welcomeKit.paymentVerifiedBy = req.user._id
     user.welcomeKit.paymentRejectionReason = ''
     if (!user.welcomeKit.paidAt) {
+      // Direct (hub cash) approval with no prior submission: record the current fee
+      user.welcomeKit.paymentAmount = await getCurrentWelcomeKitFee()
       user.welcomeKit.paidAt = new Date()
     }
     if (notes && notes.trim()) {

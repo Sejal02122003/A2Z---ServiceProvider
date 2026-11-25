@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useBranding } from '../../context/BrandingContext.jsx'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useDispatch } from 'react-redux'
@@ -126,6 +127,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const { user } = useAuth()
+  const { welcomeKitFee } = useBranding()
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -858,6 +860,9 @@ export function PartnerOnboardingStepper({ onFinish }) {
   const step3 = data?.step3 || {}
   const step4 = data?.step4 || {}
   const step5 = data?.step5 || {}
+
+  // Welcome Kit fee: amount from the server (admin-set, or locked-in once paid), else the public setting
+  const kitFee = Number(step4.welcomeKitPayment?.amount ?? welcomeKitFee)
 
   // Helper payment & address submitted states
   const kitPayment = step4.welcomeKitPayment || data?.welcomeKit || data?.user?.welcomeKit || user?.welcomeKit || {}
@@ -2326,7 +2331,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                                 </span>
                               </div>
                               <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-800 border border-emerald-200">
-                                ₹999 Paid ✓
+                                ₹{kitFee} Paid ✓
                               </span>
                             </div>
 
@@ -2385,7 +2390,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                             </div>
 
                             <p className="text-xs text-slate-700 leading-relaxed">
-                              Your welcome kit payment slip for <strong>₹999</strong> has been uploaded. An administrator is currently verifying your payment screenshot. Once approved, Step 5 will unlock immediately.
+                              Your welcome kit payment slip for <strong>₹{kitFee}</strong> has been uploaded. An administrator is currently verifying your payment screenshot. Once approved, Step 5 will unlock immediately.
                             </p>
 
                             {kitPaymentReceiptUrl && (
@@ -2549,7 +2554,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                                 Make Payment for Welcome Kit
                               </h4>
                             </div>
-                            <span className="text-xs font-black text-amber-700">₹999</span>
+                            <span className="text-xs font-black text-amber-700">₹{kitFee}</span>
                           </div>
 
                           <p className="text-[11px] text-slate-600 leading-snug">
@@ -2588,7 +2593,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                                 <QrCode className="h-8 w-8 text-slate-800 shrink-0" />
                                 <div className="text-[11px] leading-tight">
                                   <p className="font-bold text-slate-900">Center QR / Hub Payment</p>
-                                  <p className="text-slate-500 mt-0.5">Pay ₹999 at the center desk or scan QR, then upload the receipt screenshot.</p>
+                                  <p className="text-slate-500 mt-0.5">Pay ₹{kitFee} at the center desk or scan QR, then upload the receipt screenshot.</p>
                                 </div>
                               </div>
 
@@ -2649,7 +2654,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                             <div className="space-y-2.5">
                               <div className="rounded-xl bg-white p-2.5 border border-slate-200 text-xs text-slate-700">
                                 <p className="font-bold text-slate-900">Instant Online Activation</p>
-                                <p className="text-[11px] text-slate-500 mt-0.5">Pay ₹999 securely via UPI or Card to immediately authorize welcome kit dispatch.</p>
+                                <p className="text-[11px] text-slate-500 mt-0.5">Pay ₹{kitFee} securely via UPI or Card to immediately authorize welcome kit dispatch.</p>
                               </div>
 
                               <div>
@@ -2672,7 +2677,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-50"
                               >
                                 <CreditCard className="h-4 w-4" />
-                                <span>Pay ₹999 & Authorize Dispatch</span>
+                                <span>Pay ₹{kitFee} & Authorize Dispatch</span>
                               </button>
                             </div>
                           )}

@@ -18,7 +18,8 @@ router.get('/public', async (req, res) => {
     const freeTrialMessage = settings?.freeTrialMessage || 'Welcome! Enjoy your free trial period.'
     const paymentModes = settings?.paymentModes || { cashEnabled: true, onlineEnabled: true }
     const branding = settings?.branding || { logoUrl: null, faviconUrl: null }
-    return sendSuccess(res, { data: { timeSlots, freeTrialMessage, paymentModes, branding } })
+    const welcomeKitFee = settings?.welcomeKitFee ?? 999
+    return sendSuccess(res, { data: { timeSlots, freeTrialMessage, paymentModes, branding, welcomeKitFee } })
   } catch (e) {
     res.status(500).json({ success: false, message: 'Could not load public settings' })
   }
@@ -119,6 +120,15 @@ router.patch(
   ],
   validateRequest,
   settings.updateMaxHourDiscount,
+)
+
+router.patch(
+  '/welcome-kit-fee',
+  [
+    body('welcomeKitFee').isNumeric().withMessage('welcomeKitFee is required').custom((v) => Number(v) >= 0).withMessage('welcomeKitFee cannot be negative'),
+  ],
+  validateRequest,
+  settings.updateWelcomeKitFee,
 )
 
 router.patch(

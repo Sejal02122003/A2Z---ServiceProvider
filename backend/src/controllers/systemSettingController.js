@@ -150,6 +150,18 @@ export const updateMaxHourDiscount = asyncHandler(async (req, res) => {
   return sendSuccess(res, { message: 'Max-hour discount updated', data: { settings } })
 })
 
+export const updateWelcomeKitFee = asyncHandler(async (req, res) => {
+  const fee = Number(req.body.welcomeKitFee)
+  if (!Number.isFinite(fee) || fee < 0) {
+    return sendError(res, { message: 'Welcome kit fee must be a number of 0 or more', statusCode: HTTP_STATUS.BAD_REQUEST })
+  }
+  let settings = await SystemSetting.findOne({ configKey: 'master_config' })
+  if (!settings) settings = new SystemSetting({ configKey: 'master_config' })
+  settings.welcomeKitFee = Math.round(fee)
+  await settings.save()
+  return sendSuccess(res, { message: 'Welcome kit fee updated', data: { settings } })
+})
+
 export const updatePaymentModes = asyncHandler(async (req, res) => {
   const { cashEnabled, onlineEnabled } = req.body
   let settings = await SystemSetting.findOne({ configKey: 'master_config' })
