@@ -563,7 +563,7 @@ export function AdminLayout() {
           </div>
         )}
 
-        <header className="hide-on-print relative z-30 flex h-17 shrink-0 items-center gap-3 border-b border-slate-200/70 bg-white/80 px-3 shadow-[0_8px_30px_-18px_rgba(15,23,42,0.12)] backdrop-blur-xl md:gap-4 md:px-6">
+        <header className="hide-on-print relative z-30 flex h-17 shrink-0 items-center gap-3 border-b border-slate-200/70 bg-white px-3 shadow-[0_8px_30px_-18px_rgba(15,23,42,0.12)] md:gap-4 md:px-6">
           <button
             type="button"
             className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200/70 bg-white text-slate-700 shadow-sm transition hover:border-brand/30 hover:shadow-md md:hidden"
@@ -639,8 +639,8 @@ export function AdminLayout() {
                     transition={{ duration: 0.18 }}
                     className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(calc(100vw-2rem),24rem)] origin-top-right"
                   >
-                    <GlassPanel className="p-0 shadow-2xl ring-1 ring-slate-200/80 overflow-hidden rounded-2xl bg-white/95 backdrop-blur-xl">
-                      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-4 py-3">
+                    <GlassPanel className="p-0 shadow-2xl ring-1 ring-slate-200/80 overflow-hidden rounded-2xl bg-white">
+                      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-extrabold text-slate-900">Notifications</p>
                           {unreadCount > 0 && (
@@ -684,7 +684,7 @@ export function AdminLayout() {
                                   navigate('/admin/bookings')
                                 }
                               }}
-                              className={`flex cursor-pointer items-start gap-3 p-3.5 transition hover:bg-slate-50 ${!n.isRead ? 'bg-amber-50/40' : ''}`}
+                              className={`flex cursor-pointer items-start gap-3 p-3.5 transition hover:bg-slate-50 ${!n.isRead ? 'bg-amber-50' : 'bg-white'}`}
                             >
                               <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${!n.isRead ? 'bg-brand/15 text-brand' : 'bg-slate-100 text-slate-500'}`}>
                                 <Bell className="h-3.5 w-3.5" />
@@ -706,7 +706,7 @@ export function AdminLayout() {
                         )}
                       </div>
 
-                      <div className="border-t border-slate-100 bg-slate-50/50 p-2 text-center">
+                      <div className="border-t border-slate-100 bg-slate-50 p-2 text-center">
                         <Link
                           to="/admin/notifications"
                           onClick={() => setNotifOpen(false)}
