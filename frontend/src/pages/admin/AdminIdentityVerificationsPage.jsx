@@ -5,6 +5,8 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Clock,
   Eye,
   FileText,
@@ -31,6 +33,7 @@ import {
   suspendAdminUser,
 } from '../../api/identityVerificationApi.js'
 import { ApiError } from '../../api/http.js'
+import { useSessionState } from '../../hooks/useSessionState.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
 
@@ -82,13 +85,29 @@ function ConfidenceBadge({ confidence, score }) {
   )
 }
 
+const PAGE_SIZE_OPTIONS = [10, 15, 25, 50]
+
+/** Page numbers with ellipses, e.g. 1 … 4 5 [6] 7 8 … 20 */
+function getPageItems(current, totalPages) {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1)
+  const items = [1]
+  const start = Math.max(2, current - 1)
+  const end = Math.min(totalPages - 1, current + 1)
+  if (start > 2) items.push('left-gap')
+  for (let n = start; n <= end; n += 1) items.push(n)
+  if (end < totalPages - 1) items.push('right-gap')
+  items.push(totalPages)
+  return items
+}
+
 export function AdminIdentityVerificationsPage() {
   const reduce = useReducedMotion()
-  const [activeTab, setActiveTab] = useState('all')
-  const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState('all')
-  const [page, setPage] = useState(1)
-  const limit = 15
+  // Kept in sessionStorage so the admin auto-refresh doesn't reset the page or filters
+  const [activeTab, setActiveTab] = useSessionState('idv.tab', 'all')
+  const [search, setSearch] = useSessionState('idv.search', '')
+  const [roleFilter, setRoleFilter] = useSessionState('idv.role', 'all')
+  const [page, setPage] = useSessionState('idv.page', 1)
+  const [limit, setLimit] = useSessionState('idv.limit', 15)
 
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState([])
@@ -205,6 +224,16 @@ export function AdminIdentityVerificationsPage() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // If the current page no longer exists (records removed/filtered), fall back to the last page
+  useEffect(() => {
+    if (!loading && page > pages) setPage(pages)
+  }, [loading, page, pages])
+
+  const goToPage = (n) => {
+    setPage(Math.min(pages, Math.max(1, n)))
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   async function openDetailModal(item) {
     setSelectedRecord(item)
@@ -493,27 +522,86 @@ export function AdminIdentityVerificationsPage() {
         )}
 
         {/* Pagination Footer */}
-        {pages > 1 ? (
-          <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/50 px-5 py-3 text-xs font-semibold text-slate-600">
-            <span>
-              Showing {items.length} of {total} records (Page {page} of {pages})
-            </span>
-            <div className="flex items-center gap-2">
+        {!loading && total > 0 ? (
+          <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/50 px-5 py-3 text-xs font-semibold text-slate-600 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <span>
+                Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total} records
+              </span>
+              <label className="flex items-center gap-1.5">
+                <span className="text-slate-500">Rows</span>
+                <select
+                  value={limit}
+                  onChange={(e) => {
+                    setLimit(Number(e.target.value))
+                    setPage(1)
+                  }}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:border-brand"
+                >
+                  {PAGE_SIZE_OPTIONS.map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
                 disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                onClick={() => goToPage(1)}
+                aria-label="First page"
+                className="rounded-lg border border-slate-200 bg-white p-1.5 hover:bg-slate-100 disabled:opacity-40"
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => goToPage(page - 1)}
+                aria-label="Previous page"
                 className="rounded-lg border border-slate-200 bg-white p-1.5 hover:bg-slate-100 disabled:opacity-40"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
+
+              {getPageItems(page, pages).map((item) =>
+                typeof item === 'number' ? (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => goToPage(item)}
+                    aria-current={item === page ? 'page' : undefined}
+                    className={`min-w-8 rounded-lg border px-2 py-1.5 text-xs font-bold transition ${
+                      item === page
+                        ? 'border-brand bg-brand text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ) : (
+                  <span key={item} className="px-1 text-slate-400">…</span>
+                ),
+              )}
+
               <button
                 type="button"
                 disabled={page >= pages}
-                onClick={() => setPage((p) => Math.min(pages, p + 1))}
+                onClick={() => goToPage(page + 1)}
+                aria-label="Next page"
                 className="rounded-lg border border-slate-200 bg-white p-1.5 hover:bg-slate-100 disabled:opacity-40"
               >
                 <ChevronRight className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                disabled={page >= pages}
+                onClick={() => goToPage(pages)}
+                aria-label="Last page"
+                className="rounded-lg border border-slate-200 bg-white p-1.5 hover:bg-slate-100 disabled:opacity-40"
+              >
+                <ChevronsRight className="h-4 w-4" />
               </button>
             </div>
           </div>
