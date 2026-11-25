@@ -46,6 +46,7 @@ function loadRazorpay() {
 }
 import { uploadMedia, assetUrlFromUpload } from '../../../api/uploadApi.js'
 import { BookingFindingScreen } from '../../../components/app/booking/BookingFindingScreen.jsx'
+import { TimeInput12h } from '../../../components/app/booking/TimeInput12h.jsx'
 import { BookingTypeSheet } from '../../../components/app/booking/BookingTypeSheet.jsx'
 import { BookingStepProgress } from '../../../components/app/booking/BookingStepProgress.jsx'
 import { BookingServiceHighlight } from '../../../components/app/booking/BookingServiceHighlight.jsx'
@@ -2576,17 +2577,19 @@ export function IndividualBookingFlowPage() {
                 <div className="grid grid-cols-1 gap-4">
                   <motion.div>
                     <FieldLabel htmlFor="scheduled-time">Start Time</FieldLabel>
-                    <input
+                    <TimeInput12h
                       id="scheduled-time"
-                      name="timeSlot"
-                      type="time"
-                      min={draft.serviceDate === todayISODate()
-                        ? `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`
-                        : undefined}
                       value={draft.timeSlot || ''}
-                      onChange={(e) => syncDraft({ timeSlot: e.target.value })}
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-black outline-none focus:border-brand focus:ring-1"
+                      onChange={(timeSlot) => syncDraft({ timeSlot })}
+                      hasError={Boolean(
+                        draft.timeSlot &&
+                          draft.serviceDate === todayISODate() &&
+                          draft.timeSlot < `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`,
+                      )}
                     />
+                    <p className="mt-1 text-[11px] font-medium text-slate-500">
+                      Type the time, e.g. 9 : 30 and choose AM or PM.
+                    </p>
                   </motion.div>
                 </div>
               </div>
