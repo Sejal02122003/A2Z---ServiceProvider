@@ -455,7 +455,6 @@ export function AdminIdentityVerificationsPage() {
                   <th className="px-5 py-3.5">User Details</th>
                   <th className="px-4 py-3.5">Role</th>
                   <th className="px-4 py-3.5">Status</th>
-                  <th className="px-4 py-3.5">Name Comparison</th>
                   <th className="px-4 py-3.5">Document / Masked ID</th>
                   <th className="px-4 py-3.5">Submitted</th>
                   <th className="px-5 py-3.5 text-right">Actions</th>
@@ -482,9 +481,6 @@ export function AdminIdentityVerificationsPage() {
                     </td>
                     <td className="px-4 py-3.5">
                       <StatusBadge status={item.status} />
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <ConfidenceBadge confidence={item.nameMatchConfidence} score={item.nameMatchScore} />
                       {item.riskFlags?.length > 0 ? (
                         <div className="mt-1 flex flex-wrap gap-1">
                           {item.riskFlags.map((flag, idx) => (
