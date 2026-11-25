@@ -7,6 +7,7 @@ import { BOOT_ROUTES } from '../../constants/bootFlow.js'
 import { useAuth } from '../../hooks/useAuth.js'
 import { readBootRole } from '../../lib/bootPersona.js'
 import { getRoleHomePath } from '../../lib/roleHomePath.js'
+import { markAppLaunched, shouldShowSplash } from '../../lib/splashSession.js'
 
 /**
  * Boot splash — brand animation; Next → role select (or /app if role remembered).
@@ -17,6 +18,12 @@ export function SplashPage() {
   const { isAuthenticated, user, loading, token, realUser } = useAuth()
   const [brandReady, setBrandReady] = useState(false)
   const continuedRef = useRef(false)
+  // Decided once on mount: splash is for a fresh launch only (not reopen / recents / notification tap)
+  const [skipSplash] = useState(() => !shouldShowSplash())
+
+  useEffect(() => {
+    if (!skipSplash) markAppLaunched()
+  }, [skipSplash])
 
   const continueToNext = useCallback(() => {
     if (continuedRef.current) return
@@ -77,8 +84,19 @@ export function SplashPage() {
     return undefined
   }, [isAuthenticated, loading, navigate, realUser?.role, token, user?.role, location.state])
 
+  // Already launched this session (or opened from a notification): skip straight past the splash.
+  // Remembered-role / signed-in redirects are handled by the effect above.
+  useEffect(() => {
+    if (!skipSplash || loading || token || isAuthenticated || readBootRole()) return
+    continueToNext()
+  }, [skipSplash, loading, token, isAuthenticated, continueToNext])
+
   if (loading) {
     return <AppRouteLoader />
+  }
+
+  if (skipSplash) {
+    return null
   }
 
   if (isAuthenticated) {

@@ -194,7 +194,10 @@ self.addEventListener('notificationclick', (event) => {
   if (notifData.isBookingAlert && notifData.bookingId && !targetUrlStr.includes('incoming_booking=')) {
     targetUrlStr = `/serviceprovider?incoming_booking=${notifData.bookingId}`;
   }
-  const targetUrl = new URL(targetUrlStr, self.location.origin).href;
+  const targetUrlObj = new URL(targetUrlStr, self.location.origin);
+  // Tell the app it was opened from a notification so it never replays the splash screen
+  targetUrlObj.searchParams.set('from_notification', '1');
+  const targetUrl = targetUrlObj.href;
 
   if (!self.clients) return;
 
