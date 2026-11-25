@@ -2584,3 +2584,46 @@ export const rescheduleBookingController = asyncHandler(async (req, res) => {
 
 
 
+
+/**
+ * POST /bookings/:id/research
+ * Customer presses "Search again" after no service provider accepted (booking FAILED/expired).
+ * Restarts the broadcast for the SAME booking instead of creating a new one.
+ */
+export const researchBooking = asyncHandler(async (req, res) => {
+  const booking = await Booking.findById(req.params.id)
+  if (!booking) {
+    return sendError(res, { message: 'Booking not found', statusCode: HTTP_STATUS.NOT_FOUND })
+  }
+  if (String(booking.userId) !== String(req.user._id)) {
+    return sendError(res, { message: 'You can only search again for your own booking', statusCode: HTTP_STATUS.FORBIDDEN })
+  }
+
+  const status = String(booking.status || '').toUpperCase()
+  if (status === 'BROADCASTING') {
+    return sendSuccess(res, { message: 'Search is already in progress', data: { booking, alreadySearching: true } })
+  }
+  if (status !== 'FAILED') {
+    return sendError(res, {
+      message: 'Search again is only available when no service provider has accepted the booking',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+    })
+  }
+  if (booking.laborId || booking.acceptedLabourId || (booking.acceptedLabourIds && booking.acceptedLabourIds.length > 0)) {
+    return sendError(res, { message: 'A service provider has already accepted this booking', statusCode: HTTP_STATUS.BAD_REQUEST })
+  }
+
+  // Fresh search: let providers who earlier declined see it again, then restart the cycle
+  booking.status = 'CREATED'
+  booking.rejectedBy = []
+  booking.broadcastedTo = []
+  await booking.save()
+
+  const { startBroadcastCycle } = await import('../services/broadcastService.js')
+  startBroadcastCycle(booking._id).catch((err) => console.error('[RESEARCH_BROADCAST_ERROR]', err))
+
+  return sendSuccess(res, {
+    message: 'Searching for service providers again',
+    data: { booking: { ...booking.toObject(), status: 'BROADCASTING' } },
+  })
+})

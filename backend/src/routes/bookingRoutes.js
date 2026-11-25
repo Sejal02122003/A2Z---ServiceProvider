@@ -77,6 +77,12 @@ router.post(
 )
 
 router.post(
+  '/:id/research',
+  restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR),
+  booking.researchBooking
+)
+
+router.post(
   '/:id/reschedule',
   restrictTo(USER_ROLES.CUSTOMER, USER_ROLES.LABOUR, USER_ROLES.CONTRACTOR, USER_ROLES.ADMIN),
   [

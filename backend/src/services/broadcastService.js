@@ -94,7 +94,9 @@ export async function startBroadcastCycle(bookingId) {
   }
 
   booking.status = 'BROADCASTING'
+  booking.broadcastStartedAt = new Date()
   await booking.save()
+  const cycleStartedAtMs = booking.broadcastStartedAt.getTime()
 
   // 2. Pre-filter labourers by bounding box (rough estimate to avoid hitting Google Maps for everyone)
   const latDiff = radiusKm / 111
@@ -1006,6 +1008,8 @@ export async function startBroadcastCycle(bookingId) {
   // Set timeout to expire broadcast if no one accepts
   setTimeout(async () => {
     const currentBooking = await Booking.findById(booking._id)
+    // A newer search cycle (customer pressed "Search again") owns this booking now: leave it alone
+    if (currentBooking?.broadcastStartedAt && currentBooking.broadcastStartedAt.getTime() !== cycleStartedAtMs) return
     if (currentBooking && currentBooking.status === 'BROADCASTING') {
       if (currentBooking.acceptedLabourIds && currentBooking.acceptedLabourIds.length > 0) {
         // Partially accepted, but timeout reached. Let's just finalize the partial match.

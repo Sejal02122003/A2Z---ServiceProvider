@@ -232,6 +232,8 @@ const bookingSchema = new mongoose.Schema(
       ref: 'BookingCancellationRecord',
     },
     broadcastRadius: { type: Number },
+    // When the latest broadcast cycle started (re-search restarts the 90s window; createdAt does not)
+    broadcastStartedAt: { type: Date },
     eligibleLabourCount: { type: Number, default: 0 },
     // Providers this booking was actually dispatched to in the latest broadcast cycle.
     // The "active broadcast" poll only shows the offer to these providers.

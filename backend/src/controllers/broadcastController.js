@@ -820,7 +820,7 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
   const booking = activeBookings[0]
   const isMultiService = Boolean(booking.multiServiceBooking?.isMultiService && booking.multiServiceBooking?.items?.length > 0)
   const bookingHours = booking.duration || booking.hours || 1
-  const remainingMs = Math.max(5000, BROADCAST_TIMEOUT_MS - (Date.now() - new Date(booking.createdAt).getTime()))
+  const remainingMs = Math.max(5000, BROADCAST_TIMEOUT_MS - (Date.now() - new Date(booking.broadcastStartedAt || booking.createdAt).getTime()))
 
   let payload = null
 

@@ -124,6 +124,7 @@ export function IndividualBookingFlowPage() {
   }, [bookingIdParam, activeBookingId])
 
   const [noMatch, setNoMatch] = useState(false)
+  const [researching, setResearching] = useState(false)
   const [imageFiles, setImageFiles] = useState([])
   const [availableServicesList, setAvailableServicesList] = useState([])
 
@@ -1054,6 +1055,29 @@ export function IndividualBookingFlowPage() {
     }
   }
 
+  // "Search again": restart the provider search for the SAME booking (no duplicate booking)
+  const handleResearch = async () => {
+    const bookingIdToRetry = activeBookingId || activeBooking?._id
+    if (!bookingIdToRetry) {
+      setNoMatch(false)
+      confirmBooking()
+      return
+    }
+    setResearching(true)
+    try {
+      const res = await bookingsApi.researchBooking(bookingIdToRetry)
+      const fresh = res?.data?.booking
+      setActiveBooking((prev) => ({ ...(prev || {}), ...(fresh || {}), status: 'BROADCASTING' }))
+      setNoMatch(false)
+      goStep('searching')
+    } catch (err) {
+      console.error(err)
+      alert(err?.message || 'Could not restart the search. Please try again.')
+    } finally {
+      setResearching(false)
+    }
+  }
+
   const confirmBooking = async () => {
     if (!validateDetails()) return
     if (!realUser) {
@@ -1244,8 +1268,10 @@ export function IndividualBookingFlowPage() {
     )
   }
 
-  if (step === 'searching' && !noMatch) {
-    const isCancelled = ['CANCELLED', 'FAILED', 'REJECTED'].includes((activeBooking?.status || '').toUpperCase())
+  const isFailedBooking = (activeBooking?.status || '').toUpperCase() === 'FAILED'
+
+  if (step === 'searching' && !noMatch && !isFailedBooking) {
+    const isCancelled = ['CANCELLED', 'REJECTED'].includes((activeBooking?.status || '').toUpperCase())
     if (isCancelled) {
       return (
         <div className="flex min-h-[60vh] flex-col items-center justify-center space-y-4 py-16 px-4 text-center">
@@ -1349,7 +1375,7 @@ export function IndividualBookingFlowPage() {
     )
   }
 
-  if (noMatch) {
+  if (noMatch || (step === 'searching' && isFailedBooking)) {
     return (
       <div className="space-y-4 pb-8">
         <AppStackScreenHeader title="No match" onBack={() => { window.scrollTo(0, 0); navigate('/user') }} />
@@ -1358,8 +1384,8 @@ export function IndividualBookingFlowPage() {
           <p className="mt-3 text-sm font-bold text-slate-900">Service providers are currently not available</p>
           <p className="mt-2 text-xs text-slate-600">Please try searching again in a few minutes.</p>
           <motion.div className="mt-5 flex flex-col gap-2">
-            <BookingPrimaryButton type="button" onClick={() => { setNoMatch(false); confirmBooking() }}>
-              Retry search
+            <BookingPrimaryButton type="button" onClick={handleResearch} disabled={researching}>
+              {researching ? 'Searching…' : 'Search again'}
             </BookingPrimaryButton>
             <AppButton type="button" variant="secondary" onClick={() => { window.scrollTo(0, 0); navigate('/user') }}>
               Cancel

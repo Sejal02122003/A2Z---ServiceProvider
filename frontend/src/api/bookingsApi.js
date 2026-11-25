@@ -15,6 +15,11 @@ export const bookingsApi = {
     })
   },
 
+  // Restart the provider search for the same booking (after it expired with no acceptance)
+  researchBooking: (id) => {
+    return apiRequest(`/bookings/${id}/research`, { method: 'POST' })
+  },
+
   getBookingStatus: (id) => {
     return apiRequest(`/bookings/${id}`, { method: 'GET' })
   },
