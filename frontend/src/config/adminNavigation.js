@@ -180,6 +180,7 @@ export const ADMIN_NAV_SECTIONS = [
 ]
 
 const ROUTE_TITLES = [
+  { prefix: '/admin/notifications', title: 'Notifications' },
   { prefix: '/admin/wallet-management/all', title: 'Wallet Management — All Recharge Requests' },
   { prefix: '/admin/wallet-management/users', title: 'Wallet Management — User Recharge Requests' },
   { prefix: '/admin/wallet-management/workers', title: 'Wallet Management — Worker Recharge Requests' },

@@ -192,6 +192,15 @@ export const registerVerify = asyncHandler(async (req, res) => {
   let user
   try {
     user = await User.create(doc)
+    // Let admins know about every new signup (fire-and-forget)
+    import('../utils/pushNotificationHelper.js')
+      .then(({ sendNotificationToAdmins }) => sendNotificationToAdmins({
+        title: `👤 New ${targetRole === USER_ROLES.LABOUR ? 'Service Provider' : 'Customer'} Signup`,
+        body: `${doc.fullName || 'A new user'} (${doc.phone || 'no phone'}) just registered.`,
+        link: targetRole === USER_ROLES.LABOUR ? '/admin/labour' : '/admin/users',
+        data: { type: 'NEW_USER_SIGNUP', userId: String(user._id), role: String(targetRole), link: targetRole === USER_ROLES.LABOUR ? '/admin/labour' : '/admin/users' },
+      }))
+      .catch((err) => console.warn('[Admin signup notify warning]', err?.message))
   } catch (e) {
     if (e?.code === 11000) {
       const fallback = await User.findOne({ phone })

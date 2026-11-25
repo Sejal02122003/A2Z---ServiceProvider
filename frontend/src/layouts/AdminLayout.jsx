@@ -129,17 +129,33 @@ export function AdminLayout() {
       })
       .catch(() => {})
 
-    notificationApi.getMyNotifications({ limit: 10 })
+    notificationApi.getMyNotifications({ limit: 30 })
       .then((res) => {
         if (Array.isArray(res?.data?.notifications)) {
-          setNotifications(res.data.notifications)
+          // Backend stores the flag as `read`; the UI uses `isRead`
+          setNotifications(res.data.notifications.map((n) => ({ ...n, isRead: Boolean(n.isRead ?? n.read) })))
         }
       })
       .catch(() => {})
   }
 
+  const loadNotificationsRef = useRef(loadNotifications)
+  loadNotificationsRef.current = loadNotifications
+
   useEffect(() => {
-    loadNotifications()
+    loadNotificationsRef.current()
+    // Keep the bell in sync with the server (catches anything a live event missed)
+    const poll = setInterval(() => {
+      if (document.visibilityState === 'visible') loadNotificationsRef.current()
+    }, 60_000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') loadNotificationsRef.current()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(poll)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
 
   // Handle incoming live alerts from Sockets and FCM foreground events
@@ -195,8 +211,10 @@ export function AdminLayout() {
           isRead: false,
           metadata: { link, bookingId: data?.bookingId, requestId: data?.requestId },
         },
-        ...prev.slice(0, 19),
+        ...prev.slice(0, 29),
       ])
+      // Replace the optimistic local entry with the persisted server copy
+      setTimeout(() => loadNotificationsRef.current(), 1500)
     }
 
     if (socket) {
@@ -267,6 +285,18 @@ export function AdminLayout() {
         )
       }
 
+      // Generic admin notification (signups, complaints, withdrawals, ...). Events that already
+      // have a dedicated handler above only need a list refresh to avoid double popups/sounds.
+      const DEDICATED_TYPES = new Set(['NEW_BOOKING_ADMIN', 'BOOKING_STATUS_UPDATE_ADMIN', 'BOOKING_ACCEPTED_ADMIN'])
+      const onGenericAdminNotification = (data) => {
+        if (DEDICATED_TYPES.has(data?.type)) {
+          setTimeout(() => loadNotificationsRef.current(), 1500)
+          return
+        }
+        handleNewAlert(data, data?.title, data?.body, data?.link)
+      }
+
+      socket.on('ADMIN_NOTIFICATION', onGenericAdminNotification)
       socket.on('NEW_BOOKING_ALERT', onBookingAlert)
       socket.on('BOOKING_ACCEPTED_ADMIN', onAcceptedAlert)
       socket.on('BOOKING_STATUS_UPDATE_ADMIN', onStatusAlert)
@@ -276,6 +306,7 @@ export function AdminLayout() {
       socket.on('WELCOME_KIT_PAYMENT_SUBMITTED', onWelcomeKitAlert)
 
       return () => {
+        socket.off('ADMIN_NOTIFICATION', onGenericAdminNotification)
         socket.off('NEW_BOOKING_ALERT', onBookingAlert)
         socket.off('BOOKING_ACCEPTED_ADMIN', onAcceptedAlert)
         socket.off('BOOKING_STATUS_UPDATE_ADMIN', onStatusAlert)
@@ -315,8 +346,9 @@ export function AdminLayout() {
           isRead: false,
           metadata: { link: data?.link || '/admin/bookings', bookingId: data?.bookingId },
         },
-        ...prev.slice(0, 19),
+        ...prev.slice(0, 29),
       ])
+      setTimeout(() => loadNotificationsRef.current(), 1500)
     }
 
     window.addEventListener('a2z-push-notification', handlePushEvent)
@@ -676,11 +708,11 @@ export function AdminLayout() {
 
                       <div className="border-t border-slate-100 bg-slate-50/50 p-2 text-center">
                         <Link
-                          to="/admin/bookings"
+                          to="/admin/notifications"
                           onClick={() => setNotifOpen(false)}
                           className="text-xs font-bold text-brand hover:underline"
                         >
-                          View all Bookings & Alerts →
+                          View all notifications →
                         </Link>
                       </div>
                     </GlassPanel>

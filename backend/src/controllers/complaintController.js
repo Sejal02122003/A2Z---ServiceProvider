@@ -18,6 +18,15 @@ export const submitComplaint = asyncHandler(async (req, res) => {
     status: 'OPEN'
   })
 
+  import('../utils/pushNotificationHelper.js')
+    .then(({ sendNotificationToAdmins }) => sendNotificationToAdmins({
+      title: '⚠️ New Complaint Received',
+      body: `${title || 'A complaint'}${description ? ` — ${String(description).slice(0, 120)}` : ''}`,
+      link: '/admin/complaints',
+      data: { type: 'NEW_COMPLAINT', complaintId: String(complaint._id), bookingId: bookingId ? String(bookingId) : '', link: '/admin/complaints' },
+    }))
+    .catch((err) => console.warn('[Admin complaint notify warning]', err?.message))
+
   return sendSuccess(res, { message: 'Complaint submitted successfully', data: { complaint } }, HTTP_STATUS.CREATED)
 })
 

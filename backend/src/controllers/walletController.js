@@ -308,6 +308,16 @@ export const requestWithdrawal = asyncHandler(async (req, res) => {
     }], { session })
 
     await session.commitTransaction()
+
+    import('../utils/pushNotificationHelper.js')
+      .then(({ sendNotificationToAdmins }) => sendNotificationToAdmins({
+        title: `🏦 Withdrawal Request: ₹${numAmount}`,
+        body: `${req.user.fullName || req.user.phone || 'A service provider'} requested a withdrawal of ₹${numAmount}.`,
+        link: '/admin/wallet-management/workers',
+        data: { type: 'WITHDRAWAL_REQUEST', requestId: String(request[0]._id), link: '/admin/wallet-management/workers' },
+      }))
+      .catch((err) => console.warn('[Admin withdrawal notify warning]', err?.message))
+
     return sendSuccess(res, { message: 'Withdrawal request submitted successfully', data: { request: request[0], wallet } })
   } catch (error) {
     await session.abortTransaction()

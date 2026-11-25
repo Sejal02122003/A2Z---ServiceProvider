@@ -379,6 +379,20 @@ export async function sendNotificationToAdmins(payload) {
       console.warn('[FLOW: InAppNotification Admin Import/Save Warning]', inAppErr.message);
     }
 
+    // Generic live event so every open admin panel refreshes its notification list instantly
+    try {
+      const { emitToAdmins } = await import('../socket.js');
+      emitToAdmins('ADMIN_NOTIFICATION', {
+        title: payload.title,
+        body: payload.body,
+        link: payload.link || payload.data?.link || '/admin/bookings',
+        type: payload.data?.type || 'ADMIN_ALERT',
+        createdAt: new Date().toISOString(),
+      });
+    } catch (socketErr) {
+      console.warn('[FLOW: ADMIN_NOTIFICATION emit warning]', socketErr?.message);
+    }
+
     const dispatchPromises = admins.map(admin =>
       sendNotificationToUser(admin._id, {
         ...payload,

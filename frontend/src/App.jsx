@@ -34,6 +34,7 @@ import { AdminReportsPage } from './pages/admin/AdminReportsPage.jsx'
 import { AdminZoneManagementPage } from './pages/admin/AdminZoneManagementPage.jsx'
 import { AdminBannersPage } from './pages/admin/AdminBannersPage.jsx'
 import { AdminComplaintsPage } from './pages/admin/AdminComplaintsPage.jsx'
+import { AdminNotificationsPage } from './pages/admin/AdminNotificationsPage.jsx'
 import { AdminProfilePage } from './pages/admin/AdminProfilePage.jsx'
 import { AdminZonesPage } from './pages/admin/AdminZonesPage.jsx'
 import { AdminPlatformFeePage } from './pages/admin/AdminPlatformFeePage.jsx'
@@ -234,6 +235,7 @@ function App() {
                 <Route path="rewards/:tab" element={<AdminRewardsHubPage />} />
                 <Route path="wallet-rewards" element={<AdminWalletRewardsPage />} />
                 <Route path="banners" element={<AdminBannersPage />} />
+                <Route path="notifications" element={<AdminNotificationsPage />} />
                 <Route path="complaints" element={<AdminComplaintsPage />} />
                 <Route path="profile" element={<AdminProfilePage />} />
                 <Route path="reports" element={<AdminReportsPage />} />
