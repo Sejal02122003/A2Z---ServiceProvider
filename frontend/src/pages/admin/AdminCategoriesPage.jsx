@@ -16,6 +16,7 @@ import { getCategoryImageUrl } from '../../lib/labourCategoryDisplay.js'
 import { UPLOAD_FOLDERS } from '../../constants/uploadFolders.js'
 import { assetUrlFromUpload, uploadMedia } from '../../api/uploadApi.js'
 import { EditCategoryModal } from '../../components/admin/EditCategoryModal.jsx'
+import { AdminPagination } from '../../components/admin/AdminPagination.jsx'
 
 function AddCategoryModal({ open, onClose, onSaved, busy, setBusy }) {
   const [name, setName] = useState('')
@@ -532,6 +533,11 @@ export function AdminCategoriesPage() {
 
   const totalPages = Math.ceil(filteredCategories.length / limit) || 1
   const paginatedCategories = filteredCategories.slice((page - 1) * limit, page * limit)
+
+  // If the current page no longer exists (e.g. after deleting the last items), go to the last page
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
   const activeCount = categories.filter(c => c.isActive).length
 
   const isAllCurrentSelected = paginatedCategories.length > 0 && paginatedCategories.every(c => selectedIds.includes(c._id))
@@ -637,15 +643,6 @@ export function AdminCategoriesPage() {
             <option value="all">All Statuses</option>
             <option value="active">Active Only</option>
             <option value="hidden">Hidden Only</option>
-          </select>
-          <select
-            value={limit}
-            onChange={e => setLimit(Number(e.target.value))}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-brand/35"
-          >
-            <option value={10}>10 / page</option>
-            <option value={20}>20 / page</option>
-            <option value={50}>50 / page</option>
           </select>
         </div>
       </GlassPanel>
@@ -821,32 +818,20 @@ export function AdminCategoriesPage() {
           </table>
           
           {/* Pagination Controls */}
-          {totalPages > 1 && (
-             <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-4 py-3">
-               <p className="text-xs font-semibold text-slate-500">
-                 Showing {(page - 1) * limit + 1} to {Math.min(page * limit, filteredCategories.length)} of {filteredCategories.length}
-               </p>
-               <div className="flex items-center gap-2">
-                 <button
-                   onClick={() => setPage(p => Math.max(1, p - 1))}
-                   disabled={page === 1}
-                   className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                 >
-                   Prev
-                 </button>
-                 <span className="text-xs font-bold text-slate-700">
-                   {page} / {totalPages}
-                 </span>
-                 <button
-                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                   disabled={page === totalPages}
-                   className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                 >
-                   Next
-                 </button>
-               </div>
-             </div>
-          )}
+          <AdminPagination
+            page={page}
+            pageSize={limit}
+            total={filteredCategories.length}
+            itemLabel="categories"
+            onPageChange={(n) => {
+              setPage(n)
+              window.scrollTo({ top: 0, behavior: 'smooth' })
+            }}
+            onPageSizeChange={(n) => {
+              setLimit(n)
+              setPage(1)
+            }}
+          />
         </div>
       </GlassPanel>
 
