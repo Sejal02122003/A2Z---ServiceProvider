@@ -15,12 +15,11 @@ let isAutoplayBlocked = false
 const autoplayBlockedListeners = new Set()
 
 /**
- * Web-side alert sound is DISABLED everywhere.
- * The booking alert sound is played only by the Flutter app's native notification
- * (works in foreground, background AND killed state).
- * Set to true to re-enable the web sound.
+ * In-app (web) alert sound. The native notification channel only sounds for pushes
+ * delivered while the app is backgrounded/killed; when the accept/reject booking card
+ * is on screen in the foreground nothing native plays, so the web sound must be on.
  */
-const WEB_ALERT_SOUND_ENABLED = false
+const WEB_ALERT_SOUND_ENABLED = true
 
 function notifyAutoplayBlockedChange(blocked) {
   isAutoplayBlocked = blocked
