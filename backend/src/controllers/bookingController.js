@@ -921,27 +921,46 @@ export const createBooking = asyncHandler(async (req, res) => {
   let finalPayableAmount = rawTotalAmount
   let walletDiscountData = { applied: false, amount: 0, percentage: 0, eligibleAmount: 0, walletTransactionId: null }
 
-  if (req.body.useWallet && req.user?._id) {
+  // Wallet payment: the WHOLE bill is paid from the wallet and nothing else (no cash / online).
+  // If the wallet cannot cover it, the booking is rejected instead of silently charging the rest elsewhere.
+  const wantsWalletPayment = Boolean(req.body.useWallet) || String(req.body.paymentMethod || '').toUpperCase() === 'WALLET'
+  if (wantsWalletPayment && req.user?._id) {
+    const { calculateWalletDiscount, deductWalletForBooking } = await import('../services/userWalletService.js')
+    const walletCalc = await calculateWalletDiscount(req.user._id, rawTotalAmount)
+    if (!walletCalc.canPayFullBill) {
+      const why = !walletCalc.enabled
+        ? 'Wallet payment is currently unavailable.'
+        : walletCalc.meetsMinimum === false
+          ? `Wallet payment needs a minimum order of ₹${walletCalc.minimumBookingAmount}.`
+          : `Insufficient wallet balance. You need ₹${Math.ceil(walletCalc.shortfall)} more to pay this bill from your wallet.`
+      return sendError(res, { message: why, statusCode: HTTP_STATUS.BAD_REQUEST, code: 'WALLET_INSUFFICIENT' })
+    }
     try {
-      const { deductWalletForBooking } = await import('../services/userWalletService.js')
       const deductionRes = await deductWalletForBooking({
         userId: req.user._id,
         bookingId: null,
         eligibleBillAmount: rawTotalAmount,
         requestedUseWallet: true,
+        frozenWalletDeduction: rawTotalAmount, // the full bill
       })
-      if (deductionRes.applied && deductionRes.amount > 0) {
-        walletDiscountData = {
-          applied: true,
-          amount: deductionRes.amount,
-          percentage: deductionRes.percentage || deductionRes.walletUsagePercentage || 0,
-          eligibleAmount: rawTotalAmount,
-          walletTransactionId: deductionRes.walletTransactionId,
-        }
-        finalPayableAmount = Math.max(0, rawTotalAmount - deductionRes.amount)
+      if (!deductionRes.applied || !(deductionRes.amount > 0)) {
+        return sendError(res, {
+          message: 'Insufficient wallet balance to pay this bill from your wallet.',
+          statusCode: HTTP_STATUS.BAD_REQUEST,
+          code: 'WALLET_INSUFFICIENT',
+        })
       }
+      walletDiscountData = {
+        applied: true,
+        amount: deductionRes.amount,
+        percentage: 100,
+        eligibleAmount: rawTotalAmount,
+        walletTransactionId: deductionRes.walletTransactionId,
+      }
+      finalPayableAmount = 0
     } catch (err) {
-      console.error('[WALLET_ERROR] Error applying wallet discount during booking creation:', err)
+      console.error('[WALLET_ERROR] Error paying booking from wallet:', err)
+      return sendError(res, { message: 'Could not process the wallet payment. Please try again.', statusCode: HTTP_STATUS.SERVER_ERROR })
     }
   }
 

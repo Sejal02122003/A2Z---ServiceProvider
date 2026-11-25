@@ -70,6 +70,15 @@ export function Checkout() {
   const [saveAddress, setSaveAddress] = useState(true)
   const [paymentMethod, setPaymentMethod] = useState('CASH')
   const [useWallet, setUseWallet] = useState(false)
+  // Wallet payment = the WHOLE bill from the wallet (no cash / online). Needs enough balance.
+  const walletPayFull = Boolean(bill?.walletInfo?.canPayFullBill)
+  const walletFullAmount = Number(bill?.walletInfo?.walletPayAmount || 0)
+  const walletActive = Boolean(useWallet && walletPayFull)
+
+  // If the bill changes so the wallet can no longer cover it, switch the wallet toggle off
+  useEffect(() => {
+    if (bill && useWallet && !walletPayFull) setUseWallet(false)
+  }, [bill, useWallet, walletPayFull])
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [addressSheetOpen, setAddressSheetOpen] = useState(false)
@@ -284,14 +293,15 @@ export function Checkout() {
         lat,
         lng,
         saveAddress,
-        paymentMethod,
-        useWallet: Boolean(useWallet && ((bill?.walletInfo?.walletDeduction ?? 0) > 0 || (bill?.walletInfo?.actualWalletDiscount ?? 0) > 0)),
+        // Wallet on: the whole bill is paid from the wallet only
+        paymentMethod: walletActive ? 'WALLET' : paymentMethod,
+        useWallet: walletActive,
       })
 
       const booking = res.data?.booking
       if (!booking) throw new Error('Booking creation failed')
 
-      if (paymentMethod === 'CASH') {
+      if (walletActive || paymentMethod === 'CASH') {
         navigate(`/user/tracking/${booking._id}`, { replace: true })
         return
       }
@@ -347,7 +357,7 @@ export function Checkout() {
       setSubmitError(err instanceof ApiError ? err.message : err.message || 'Booking failed')
       setSubmitting(false)
     }
-  }, [address, lat, lng, paymentMethod, subcategoryId, subcategoryName, navigate, isGuest, location, scheduledTime, type])
+  }, [address, lat, lng, paymentMethod, walletActive, subcategoryId, subcategoryName, navigate, isGuest, location, scheduledTime, type])
 
   return (
     <div className="space-y-4 pb-8">
@@ -420,7 +430,7 @@ export function Checkout() {
                       </p>
                     </div>
                   </div>
-                  {((bill.walletInfo.walletBalance ?? bill.walletInfo.availableBalance ?? 0) > 0 && ((bill.walletInfo.walletDeduction ?? bill.walletInfo.actualWalletDiscount ?? 0) > 0)) ? (
+                  {walletPayFull ? (
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
                         type="checkbox"
@@ -432,7 +442,7 @@ export function Checkout() {
                     </label>
                   ) : (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200">
-                      {bill.walletInfo.meetsMinimum === false ? `Min bill ₹${bill.walletInfo.minimumBookingAmount}` : '₹0 Balance'}
+                      {bill.walletInfo.meetsMinimum === false ? `Min bill ₹${bill.walletInfo.minimumBookingAmount}` : `Need ${formatInr(bill.walletInfo.shortfall || 0)} more`}
                     </span>
                   )}
                 </div>
@@ -443,17 +453,13 @@ export function Checkout() {
                     <span>Eligible Order Amount:</span>
                     <span className="font-bold text-slate-800 dark:text-slate-200">{formatInr(bill.totalAmount)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Admin Wallet Usage Limit:</span>
-                    <span className="font-bold text-amber-700 dark:text-amber-400">
-                      {bill.walletInfo.walletUsagePercentage ?? bill.walletInfo.percentage ?? 0}% (Max {formatInr(bill.walletInfo.maxWalletUsage ?? bill.walletInfo.maxWalletDiscount ?? 0)})
-                    </span>
-                  </div>
-                  {useWallet && ((bill.walletInfo.walletDeduction ?? bill.walletInfo.actualWalletDiscount ?? 0) > 0) && (
+                  {walletActive ? (
                     <div className="flex justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400 pt-1 border-t border-amber-200/60">
-                      <span>Wallet Deduction Applied:</span>
-                      <span>-{formatInr(bill.walletInfo.walletDeduction ?? bill.walletInfo.actualWalletDiscount ?? 0)}</span>
+                      <span>Bill paid fully from wallet:</span>
+                      <span>-{formatInr(walletFullAmount)}</span>
                     </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-500">Turn this on to pay the whole bill from your wallet (cash / online are then not used).</p>
                   )}
                 </div>
               </div>
@@ -462,16 +468,12 @@ export function Checkout() {
             <div className="flex justify-between border-t border-slate-200 pt-2 text-base">
               <span className="font-extrabold text-slate-900">Total Payable</span>
               <span className="font-extrabold text-brand">
-                {formatInr(
-                  useWallet && ((bill.walletInfo?.walletDeduction ?? bill.walletInfo?.actualWalletDiscount ?? 0) > 0)
-                    ? (bill.walletInfo?.remainingPayable ?? Math.max(0, bill.totalAmount - (bill.walletInfo?.walletDeduction ?? bill.walletInfo?.actualWalletDiscount ?? 0)))
-                    : bill.totalAmount
-                )}
+                {formatInr(walletActive ? 0 : bill.totalAmount)}
               </span>
             </div>
-            {((bill.totalSavings > 0 || bill.serviceDiscount > 0) || (useWallet && bill.walletInfo?.actualWalletDiscount > 0)) && (
+            {(bill.totalSavings > 0 || bill.serviceDiscount > 0) && (
               <div className="mt-2.5 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/80 p-2 text-center text-xs font-bold text-emerald-800">
-                🎉 Total savings on this booking: {formatInr((bill.totalSavings || bill.serviceDiscount || 0) + (useWallet ? bill.walletInfo?.actualWalletDiscount || 0 : 0))}!
+                🎉 Total savings on this booking: {formatInr(bill.totalSavings || bill.serviceDiscount || 0)}!
               </div>
             )}
           </div>

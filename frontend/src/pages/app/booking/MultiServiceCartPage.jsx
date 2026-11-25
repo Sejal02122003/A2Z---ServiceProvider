@@ -169,10 +169,9 @@ export function MultiServiceCartPage() {
   // Wallet discount calculations
   const walletInfo = billData?.walletInfo
   const walletAvailable = Number(walletInfo?.walletBalance ?? walletInfo?.availableBalance ?? 0)
-  const actualWalletDiscount = Number(walletInfo?.walletDeduction ?? walletInfo?.actualWalletDiscount ?? 0)
-  const maxWalletDiscount = Number(walletInfo?.maxWalletUsage ?? walletInfo?.maxWalletDiscount ?? 0)
-  const discountPercentage = walletInfo?.walletUsagePercentage ?? walletInfo?.discountPercentage ?? walletInfo?.percentage ?? 20
-  const canUseWallet = (walletInfo?.enabled !== false) && walletAvailable > 0 && actualWalletDiscount > 0
+  // Wallet payment = the WHOLE bill from the wallet (no cash / online). Needs enough balance.
+  const canUseWallet = Boolean(walletInfo?.canPayFullBill)
+  const walletFullAmount = Number(walletInfo?.walletPayAmount || 0)
 
   const subTotal = billData?.subTotal ?? 0
   const originalSubTotal = billData?.originalSubTotal ?? subTotal
@@ -180,10 +179,14 @@ export function MultiServiceCartPage() {
   const taxes = billData?.taxes ?? 0
   const platformFee = billData?.platformFee ?? 0
 
-  const walletDiscountApplied = useWallet && canUseWallet ? actualWalletDiscount : 0
-  const totalAmount = Math.max(0, (billData?.totalAmount ?? subTotal + platformFee + taxes) - (useWallet ? walletDiscountApplied : 0))
+  const walletActive = Boolean(useWallet && canUseWallet)
+  const walletDiscountApplied = walletActive ? walletFullAmount : 0
+  const totalAmount = walletActive ? 0 : Math.max(0, billData?.totalAmount ?? subTotal + platformFee + taxes)
 
-  const walletCoversWholeBill = Boolean(useWallet && canUseWallet && totalAmount <= 0)
+  // If the bill changes so the wallet can no longer cover it, switch the wallet toggle off
+  useEffect(() => {
+    if (billData && useWallet && !canUseWallet) setUseWallet(false)
+  }, [billData, useWallet, canUseWallet])
 
   const handleCheckout = async () => {
     setSubmitError('')
@@ -235,10 +238,9 @@ export function MultiServiceCartPage() {
         locationText: locationText.trim(),
         lat: coordinates.lat || 28.6139,
         lng: coordinates.lng || 77.2090,
-        // Wallet only covers part of the bill (admin % limit). The method is WALLET only when it pays
-        // everything; otherwise the remaining amount is paid by the chosen Cash / Online method.
-        paymentMethod: walletCoversWholeBill ? 'WALLET' : (paymentMethod === 'WALLET' ? 'CASH' : paymentMethod),
-        useWallet: Boolean(useWallet && canUseWallet),
+        // Wallet on: the whole bill is paid from the wallet only. Otherwise Cash / Online as chosen.
+        paymentMethod: walletActive ? 'WALLET' : (paymentMethod === 'WALLET' ? 'CASH' : paymentMethod),
+        useWallet: walletActive,
         notes: notes.trim() || undefined,
       }
 
@@ -250,7 +252,7 @@ export function MultiServiceCartPage() {
       }
 
       // If payment is ONLINE, trigger Razorpay
-      if (paymentMethod === 'ONLINE' && createdBooking.totalAmount > 0) {
+      if (!walletActive && paymentMethod === 'ONLINE' && createdBooking.totalAmount > 0) {
         try {
           const payRes = await paymentsApi.initPayment({
             amount: createdBooking.totalAmount,
@@ -696,7 +698,7 @@ export function MultiServiceCartPage() {
                 <div>
                   <h3 className="text-xs font-bold text-amber-950">A2Z Customer Wallet</h3>
                   <p className="text-[11px] font-medium text-amber-800">
-                    Balance: ₹{walletAvailable}{actualWalletDiscount > 0 ? ` • Save up to ₹${actualWalletDiscount}` : ''}
+                    Balance: ₹{walletAvailable}{canUseWallet ? ' • Enough to pay this bill' : ''}
                   </p>
                 </div>
               </div>
@@ -712,13 +714,17 @@ export function MultiServiceCartPage() {
                 </label>
               ) : (
                 <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">
-                  Min order ₹{walletInfo?.minimumBookingAmount || 0}
+                  {walletInfo?.enabled === false
+                    ? 'Unavailable'
+                    : walletInfo?.meetsMinimum === false
+                      ? `Min order ₹${walletInfo?.minimumBookingAmount || 0}`
+                      : `Need ₹${Math.ceil(walletInfo?.shortfall || 0)} more`}
                 </span>
               )}
             </div>
             {useWallet && canUseWallet && (
               <div className="mt-2.5 pt-2 border-t border-amber-200/80 flex justify-between items-center text-xs font-bold text-emerald-800">
-                <span>✓ Wallet Discount Applied ({discountPercentage}% max)</span>
+                <span>✓ Bill paid fully from wallet</span>
                 <span className="font-mono text-sm">-₹{walletDiscountApplied}</span>
               </div>
             )}
@@ -753,11 +759,15 @@ export function MultiServiceCartPage() {
           <div className="grid gap-2 grid-cols-2">
             <button
               type="button"
+              disabled={walletActive}
+              aria-disabled={walletActive}
               onClick={() => setPaymentMethod('CASH')}
               className={`p-3 rounded-2xl border flex items-center gap-2 text-left transition ${
-                paymentMethod !== 'ONLINE'
-                  ? 'border-brand bg-brand/5 text-slate-900 ring-1 ring-brand/30 shadow-xs'
-                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                walletActive
+                  ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300 opacity-60'
+                  : paymentMethod !== 'ONLINE'
+                    ? 'border-brand bg-brand/5 text-slate-900 ring-1 ring-brand/30 shadow-xs'
+                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
               }`}
             >
               <Banknote className="h-4 w-4 text-emerald-600 shrink-0" />
@@ -769,11 +779,15 @@ export function MultiServiceCartPage() {
 
             <button
               type="button"
+              disabled={walletActive}
+              aria-disabled={walletActive}
               onClick={() => setPaymentMethod('ONLINE')}
               className={`p-3 rounded-2xl border flex items-center gap-2 text-left transition ${
-                paymentMethod === 'ONLINE'
-                  ? 'border-brand bg-brand/5 text-slate-900 ring-1 ring-brand/30 shadow-xs'
-                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                walletActive
+                  ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300 opacity-60'
+                  : paymentMethod === 'ONLINE'
+                    ? 'border-brand bg-brand/5 text-slate-900 ring-1 ring-brand/30 shadow-xs'
+                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
               }`}
             >
               <CreditCard className="h-4 w-4 text-blue-600 shrink-0" />
@@ -783,11 +797,9 @@ export function MultiServiceCartPage() {
               </div>
             </button>
           </div>
-          {useWallet && canUseWallet ? (
+          {walletActive ? (
             <p className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
-              {walletCoversWholeBill
-                ? 'Your wallet covers the full bill — nothing more to pay.'
-                : `Wallet pays ₹${walletDiscountApplied}. Remaining ₹${totalAmount} will be paid by ${paymentMethod === 'ONLINE' ? 'Online' : 'Cash on service'}.`}
+              The full bill of ₹{walletFullAmount.toLocaleString('en-IN')} will be paid from your A2Z Wallet. Turn the wallet off to pay by Cash or Online.
             </p>
           ) : null}
         </section>
@@ -862,7 +874,7 @@ export function MultiServiceCartPage() {
                 <WalletIcon className="h-3.5 w-3.5 text-amber-600" />
                 Wallet Deduction
               </span>
-              {useWallet && walletDiscountApplied > 0 ? (
+              {walletActive && walletDiscountApplied > 0 ? (
                 <span className="font-mono text-emerald-600 font-bold">
                   -₹{walletDiscountApplied.toLocaleString('en-IN')}
                 </span>

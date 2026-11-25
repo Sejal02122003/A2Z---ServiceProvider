@@ -364,6 +364,20 @@ export async function ensureWelcomeBonus(userId) {
  * remainingPayable = eligibleOrderAmount - actualWalletDeduction
  */
 export async function calculateWalletDiscount(userId, eligibleBillAmount) {
+  const base = await calculateWalletDiscountCapped(userId, eligibleBillAmount)
+  // Paying the WHOLE bill from the wallet: needs the wallet enabled, the minimum order met and
+  // enough balance for the full amount (the % cap only limits partial discounts, not this).
+  const bill = Number(eligibleBillAmount) || 0
+  const canPayFullBill = Boolean(base.enabled && base.meetsMinimum !== false && bill > 0 && base.walletBalance >= bill)
+  return {
+    ...base,
+    canPayFullBill,
+    walletPayAmount: canPayFullBill ? bill : 0,
+    shortfall: base.enabled && bill > 0 ? Math.max(0, Math.round((bill - base.walletBalance) * 100) / 100) : 0,
+  }
+}
+
+async function calculateWalletDiscountCapped(userId, eligibleBillAmount) {
   if (eligibleBillAmount === null || eligibleBillAmount === undefined || typeof eligibleBillAmount === 'boolean') {
     throw new Error('Invalid order amount: amount must be a valid number')
   }

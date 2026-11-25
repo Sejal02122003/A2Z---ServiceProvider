@@ -1063,6 +1063,16 @@ export function IndividualBookingFlowPage() {
     }
   }
 
+  // Wallet payment = the WHOLE bill from the wallet (no cash / online). Needs enough balance.
+  const walletPayFull = Boolean(calculatedBill?.walletInfo?.canPayFullBill)
+  const walletFullAmount = Number(calculatedBill?.walletInfo?.walletPayAmount || 0)
+  const walletActive = Boolean(useWallet && walletPayFull)
+
+  // If the bill changes so the wallet can no longer cover it, switch the wallet toggle off
+  useEffect(() => {
+    if (calculatedBill && useWallet && !walletPayFull) setUseWallet(false)
+  }, [calculatedBill, useWallet, walletPayFull])
+
   // "Search again": restart the provider search for the SAME booking (no duplicate booking)
   const handleResearch = async () => {
     const bookingIdToRetry = activeBookingId || activeBooking?._id
@@ -1105,8 +1115,6 @@ export function IndividualBookingFlowPage() {
       const days = durationKindToDays(draft.durationKind, draft.durationDays)
       const kind = draft.durationKind || 'few_hours'
       const hours = draft.bookingType === 'instant' ? (draft.hours || draft.minHours || 1) : (days > 0 ? days * 8 : (kind === 'few_hours' ? (draft.hours || draft.minHours || 1) : (kind === 'half_day' ? 4 : 8)))
-      const walletDeduction = Number(calculatedBill?.walletInfo?.actualWalletDiscount || 0)
-      const walletCoversWholeBill = Boolean(useWallet && walletDeduction > 0 && Number(calculatedBill?.totalAmount || 0) - walletDeduction <= 0)
       const payload = {
         serviceId: draft.serviceId || draft.categoryId,
         subServiceId: draft.subServiceId || undefined,
@@ -1116,10 +1124,12 @@ export function IndividualBookingFlowPage() {
         locationText: draft.address.trim(),
         lat: draft.lat || 28.6139,
         lng: draft.lng || 77.2090,
-        // WALLET only when the wallet pays the whole bill; otherwise the remainder is paid by Cash / Online
-        paymentMethod: realUser?.role === 'contractor'
-          ? 'ONLINE'
-          : (walletCoversWholeBill ? 'WALLET' : (draft.paymentMethod && draft.paymentMethod !== 'WALLET' ? draft.paymentMethod : 'CASH')),
+        // Wallet on: the whole bill is paid from the wallet only. Otherwise Cash / Online as chosen.
+        paymentMethod: walletActive
+          ? 'WALLET'
+          : (realUser?.role === 'contractor'
+            ? 'ONLINE'
+            : (draft.paymentMethod && draft.paymentMethod !== 'WALLET' ? draft.paymentMethod : 'CASH')),
         notes: draft.notes,
         durationKind: draft.durationKind,
         durationDays: days,
@@ -1128,7 +1138,7 @@ export function IndividualBookingFlowPage() {
         timeSlot: draft.timeSlot,
         scheduledAt: draft.serviceDate,
         imageNames: uploadedImageUrls,
-        useWallet: Boolean(useWallet && calculatedBill?.walletInfo?.actualWalletDiscount > 0),
+        useWallet: walletActive,
         ...(realUser?.role === 'contractor' ? {
           contractorInfo: {
             companyName: draft.companyName,
@@ -2790,9 +2800,7 @@ export function IndividualBookingFlowPage() {
                   {(() => {
                     const walletInfo = calculatedBill.walletInfo;
                     const walletBalance = Number(walletInfo?.walletBalance ?? walletInfo?.availableBalance ?? 0);
-                    const actualWalletDiscount = Number(walletInfo?.actualWalletDiscount ?? 0);
-                    const discountPercentage = walletInfo?.discountPercentage ?? walletInfo?.percentage ?? 20;
-                    const canApplyWallet = (walletInfo?.enabled !== false) && walletBalance > 0 && actualWalletDiscount > 0;
+                    const canApplyWallet = walletPayFull;
 
                     if (walletBalance > 0) {
                       return (
@@ -2806,7 +2814,7 @@ export function IndividualBookingFlowPage() {
                                 <p className="text-xs font-bold text-slate-900">A2Z Customer Wallet</p>
                                 <p className="text-[11px] font-medium text-amber-900">
                                   Available: <span className="font-bold">{formatInr(walletBalance)}</span>
-                                  {actualWalletDiscount > 0 ? ` • Save up to ${formatInr(actualWalletDiscount)}` : ''}
+                                  {walletPayFull ? ' • Enough to pay this bill' : ''}
                                 </p>
                               </div>
                             </div>
@@ -2822,7 +2830,11 @@ export function IndividualBookingFlowPage() {
                               </label>
                             ) : (
                               <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">
-                                Min order {formatInr(walletInfo?.minimumBookingAmount || 0)}
+                                {walletInfo?.enabled === false
+                                  ? 'Unavailable'
+                                  : walletInfo?.meetsMinimum === false
+                                    ? `Min order ${formatInr(walletInfo?.minimumBookingAmount || 0)}`
+                                    : `Need ${formatInr(walletInfo?.shortfall || 0)} more`}
                               </span>
                             )}
                           </div>
@@ -2830,9 +2842,9 @@ export function IndividualBookingFlowPage() {
                             <div className="flex justify-between items-center text-xs font-bold text-emerald-700 pt-2 border-t border-amber-200/80">
                               <span className="flex items-center gap-1">
                                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                Wallet Deduction Applied ({discountPercentage}% max):
+                                Bill paid fully from wallet:
                               </span>
-                              <span className="font-mono text-sm">-{formatInr(actualWalletDiscount)}</span>
+                              <span className="font-mono text-sm">-{formatInr(walletFullAmount)}</span>
                             </div>
                           )}
                         </div>
@@ -2867,9 +2879,9 @@ export function IndividualBookingFlowPage() {
                       <Wallet className="h-3.5 w-3.5 text-amber-600" />
                       Wallet Deduction
                     </span>
-                    {useWallet && (Number(calculatedBill.walletInfo?.actualWalletDiscount) > 0) ? (
+                    {walletActive ? (
                       <span className="font-mono text-emerald-600 font-bold">
-                        -{formatInr(calculatedBill.walletInfo?.actualWalletDiscount)}
+                        -{formatInr(walletFullAmount)}
                       </span>
                     ) : (
                       <span className="font-mono text-slate-400 font-medium">₹0</span>
@@ -2880,15 +2892,15 @@ export function IndividualBookingFlowPage() {
                     <span>Total Payable</span>
                     <span>
                       {formatInr(
-                        useWallet && calculatedBill.walletInfo?.actualWalletDiscount > 0
-                          ? Math.max(0, (calculatedBill.totalAmount || calculatedBill.subTotal || calculatedBill.basePrice || Number(draft.servicePrice || 0)) - calculatedBill.walletInfo.actualWalletDiscount)
+                        walletActive
+                          ? 0
                           : (calculatedBill.totalAmount || calculatedBill.subTotal || calculatedBill.basePrice || Number(draft.servicePrice || 0))
                       )}
                     </span>
                   </div>
-                  {((calculatedBill.totalSavings > 0 || calculatedBill.serviceDiscount > 0) || (useWallet && calculatedBill.walletInfo?.actualWalletDiscount > 0)) && (
+                  {(calculatedBill.totalSavings > 0 || calculatedBill.serviceDiscount > 0) && (
                     <div className="mt-2.5 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/80 p-2 text-center text-xs font-bold text-emerald-800">
-                      🎉 Total savings on this booking: {formatInr((calculatedBill.totalSavings || calculatedBill.serviceDiscount || 0) + (useWallet ? calculatedBill.walletInfo?.actualWalletDiscount || 0 : 0))}!
+                      🎉 Total savings on this booking: {formatInr(calculatedBill.totalSavings || calculatedBill.serviceDiscount || 0)}!
                     </div>
                   )}
                 </div>
@@ -2897,18 +2909,13 @@ export function IndividualBookingFlowPage() {
               <div className="lc-booking-flow-card space-y-3">
                 <p className="lc-booking-flow-label font-bold text-slate-800">Payment Method</p>
                 {(() => {
-                  const walletInfo = calculatedBill?.walletInfo;
-                  const walletDeduction = Number(walletInfo?.actualWalletDiscount ?? 0);
-                  const canApplyWallet = (walletInfo?.enabled !== false) && Number(walletInfo?.walletBalance ?? walletInfo?.availableBalance ?? 0) > 0 && walletDeduction > 0;
-                  const walletOn = Boolean(useWallet && canApplyWallet);
-                  const billTotal = Number(calculatedBill?.totalAmount || 0);
-                  const remaining = Math.max(0, billTotal - (walletOn ? walletDeduction : 0));
-                  const coversAll = walletOn && remaining <= 0;
+                  const walletOn = walletActive;
                   const method = draft.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH';
 
                   const showCash = calculatedBill?.paymentModes?.cashEnabled !== false && realUser?.role !== 'contractor';
                   const showOnline = calculatedBill?.paymentModes?.onlineEnabled !== false;
                   const colsClass = showCash && showOnline ? 'grid-cols-2' : 'grid-cols-1';
+                  const lockedClass = 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300 opacity-60';
 
                   return (
                     <>
@@ -2916,8 +2923,10 @@ export function IndividualBookingFlowPage() {
                         {showCash && (
                           <button
                             type="button"
+                            disabled={walletOn}
+                            aria-disabled={walletOn}
                             onClick={() => syncDraft({ paymentMethod: 'CASH' })}
-                            className={`flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-3 font-bold transition-all ${method === 'CASH'
+                            className={`flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-3 font-bold transition-all ${walletOn ? lockedClass : method === 'CASH'
                                 ? 'border-brand bg-brand/5 text-brand shadow-xs'
                                 : 'border-slate-200 text-slate-500 hover:border-brand/30 hover:bg-slate-50'
                               }`}
@@ -2929,8 +2938,10 @@ export function IndividualBookingFlowPage() {
                         {showOnline && (
                           <button
                             type="button"
+                            disabled={walletOn}
+                            aria-disabled={walletOn}
                             onClick={() => syncDraft({ paymentMethod: 'ONLINE' })}
-                            className={`flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-3 font-bold transition-all ${method === 'ONLINE'
+                            className={`flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-3 font-bold transition-all ${walletOn ? lockedClass : method === 'ONLINE'
                                 ? 'border-brand bg-brand/5 text-brand shadow-xs'
                                 : 'border-slate-200 text-slate-500 hover:border-brand/30 hover:bg-slate-50'
                               }`}
@@ -2942,9 +2953,7 @@ export function IndividualBookingFlowPage() {
                       </div>
                       {walletOn ? (
                         <p className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800">
-                          {coversAll
-                            ? 'Your wallet covers the full bill — nothing more to pay.'
-                            : `Wallet pays ${formatInr(walletDeduction)}. Remaining ${formatInr(remaining)} will be paid by ${method === 'ONLINE' ? 'Online' : 'Cash on service'}.`}
+                          The full bill of {formatInr(walletFullAmount)} will be paid from your A2Z Wallet. Turn the wallet off to pay by Cash or Online.
                         </p>
                       ) : null}
                     </>
