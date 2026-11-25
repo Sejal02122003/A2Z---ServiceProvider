@@ -183,6 +183,8 @@ export function MultiServiceCartPage() {
   const walletDiscountApplied = useWallet && canUseWallet ? actualWalletDiscount : 0
   const totalAmount = Math.max(0, (billData?.totalAmount ?? subTotal + platformFee + taxes) - (useWallet ? walletDiscountApplied : 0))
 
+  const walletCoversWholeBill = Boolean(useWallet && canUseWallet && totalAmount <= 0)
+
   const handleCheckout = async () => {
     setSubmitError('')
 
@@ -233,7 +235,9 @@ export function MultiServiceCartPage() {
         locationText: locationText.trim(),
         lat: coordinates.lat || 28.6139,
         lng: coordinates.lng || 77.2090,
-        paymentMethod,
+        // Wallet only covers part of the bill (admin % limit). The method is WALLET only when it pays
+        // everything; otherwise the remaining amount is paid by the chosen Cash / Online method.
+        paymentMethod: walletCoversWholeBill ? 'WALLET' : (paymentMethod === 'WALLET' ? 'CASH' : paymentMethod),
         useWallet: Boolean(useWallet && canUseWallet),
         notes: notes.trim() || undefined,
       }
@@ -700,12 +704,8 @@ export function MultiServiceCartPage() {
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={Boolean(useWallet || paymentMethod === 'WALLET')}
-                    onChange={(e) => {
-                      const nextVal = e.target.checked
-                      setUseWallet(nextVal)
-                      setPaymentMethod(nextVal ? 'WALLET' : 'CASH')
-                    }}
+                    checked={Boolean(useWallet)}
+                    onChange={(e) => setUseWallet(e.target.checked)}
                     className="sr-only peer"
                   />
                   <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
@@ -750,96 +750,46 @@ export function MultiServiceCartPage() {
             <CreditCard className="h-4 w-4 text-brand" />
             Payment Mode
           </h2>
-          {Boolean((paymentMethod === 'WALLET' || useWallet) && canUseWallet) ? (
-            <div className="rounded-2xl border-2 border-emerald-500 bg-gradient-to-r from-emerald-50/90 via-teal-50/50 to-emerald-50/90 p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs">
-                    <WalletIcon className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-sm text-slate-900 truncate">A2Z Customer Wallet</span>
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-800 border border-emerald-200 shrink-0">
-                        Selected
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-600 mt-0.5 font-medium truncate">
-                      Available: <span className="font-bold text-slate-900">₹{walletAvailable}</span>
-                      {actualWalletDiscount > 0 ? ` • Deduction: -₹${actualWalletDiscount}` : ''}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUseWallet(false);
-                    setPaymentMethod('CASH');
-                  }}
-                  className="shrink-0 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
-                >
-                  Change
-                </button>
+          <div className="grid gap-2 grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setPaymentMethod('CASH')}
+              className={`p-3 rounded-2xl border flex items-center gap-2 text-left transition ${
+                paymentMethod !== 'ONLINE'
+                  ? 'border-brand bg-brand/5 text-slate-900 ring-1 ring-brand/30 shadow-xs'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+              }`}
+            >
+              <Banknote className="h-4 w-4 text-emerald-600 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs font-bold leading-tight truncate">Cash</p>
+                <p className="text-[10px] text-slate-500 font-medium truncate">Pay on service</p>
               </div>
-            </div>
-          ) : (
-            <div className={`grid gap-2 ${canUseWallet ? 'grid-cols-3' : 'grid-cols-2'}`}>
-              <button
-                type="button"
-                onClick={() => {
-                  setUseWallet(false);
-                  setPaymentMethod('CASH');
-                }}
-                className={`p-3 rounded-2xl border flex items-center gap-2 text-left transition ${
-                  paymentMethod === 'CASH' && !useWallet
-                    ? 'border-brand bg-brand/5 text-slate-900 ring-1 ring-brand/30 shadow-xs'
-                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                }`}
-              >
-                <Banknote className="h-4 w-4 text-emerald-600 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-xs font-bold leading-tight truncate">Cash</p>
-                  <p className="text-[10px] text-slate-500 font-medium truncate">Pay on service</p>
-                </div>
-              </button>
+            </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setUseWallet(false);
-                  setPaymentMethod('ONLINE');
-                }}
-                className={`p-3 rounded-2xl border flex items-center gap-2 text-left transition ${
-                  paymentMethod === 'ONLINE' && !useWallet
-                    ? 'border-brand bg-brand/5 text-slate-900 ring-1 ring-brand/30 shadow-xs'
-                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                }`}
-              >
-                <CreditCard className="h-4 w-4 text-blue-600 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-xs font-bold leading-tight truncate">Online</p>
-                  <p className="text-[10px] text-slate-500 font-medium truncate">UPI & Cards</p>
-                </div>
-              </button>
-
-              {canUseWallet && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUseWallet(true);
-                    setPaymentMethod('WALLET');
-                  }}
-                  className="p-3 rounded-2xl border border-slate-200 bg-white flex items-center gap-2 text-left text-slate-700 hover:border-brand/30 hover:bg-brand/5 transition shadow-2xs"
-                >
-                  <WalletIcon className="h-4 w-4 text-amber-600 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold leading-tight truncate">Wallet</p>
-                    <p className="text-[10px] text-slate-500 font-medium truncate">Use balance</p>
-                  </div>
-                </button>
-              )}
-            </div>
-          )}
+            <button
+              type="button"
+              onClick={() => setPaymentMethod('ONLINE')}
+              className={`p-3 rounded-2xl border flex items-center gap-2 text-left transition ${
+                paymentMethod === 'ONLINE'
+                  ? 'border-brand bg-brand/5 text-slate-900 ring-1 ring-brand/30 shadow-xs'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+              }`}
+            >
+              <CreditCard className="h-4 w-4 text-blue-600 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs font-bold leading-tight truncate">Online</p>
+                <p className="text-[10px] text-slate-500 font-medium truncate">UPI & Cards</p>
+              </div>
+            </button>
+          </div>
+          {useWallet && canUseWallet ? (
+            <p className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+              {walletCoversWholeBill
+                ? 'Your wallet covers the full bill — nothing more to pay.'
+                : `Wallet pays ₹${walletDiscountApplied}. Remaining ₹${totalAmount} will be paid by ${paymentMethod === 'ONLINE' ? 'Online' : 'Cash on service'}.`}
+            </p>
+          ) : null}
         </section>
 
         {/* Price Breakdown Section */}

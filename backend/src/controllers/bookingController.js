@@ -995,7 +995,11 @@ export const createBooking = asyncHandler(async (req, res) => {
       totalAmount: finalPayableAmount,
       commissionAmount,
       laborShare,
-      paymentMethod: finalPayableAmount === 0 && (walletDiscountData.applied || paymentMethod === 'WALLET') ? 'WALLET' : paymentMethod,
+      // The wallet only covers part of a bill (admin % limit). WALLET is a valid method only when it pays
+      // everything; if anything is left to pay it must be collected as Cash (or Online) - never as 'WALLET'.
+      paymentMethod: finalPayableAmount === 0 && (walletDiscountData.applied || paymentMethod === 'WALLET')
+        ? 'WALLET'
+        : (paymentMethod === 'WALLET' ? 'CASH' : paymentMethod),
       paymentStatus: finalPayableAmount === 0 && (walletDiscountData.applied || paymentMethod === 'WALLET') ? 'PAID' : 'PENDING',
       status: 'CREATED',
       startOtp,
@@ -1380,6 +1384,15 @@ export const updatePaymentMethod = asyncHandler(async (req, res) => {
   // Only allow updating if it belongs to the user
   if (booking.userId.toString() !== req.user.id) {
     return sendError(res, { message: 'Not authorized', statusCode: HTTP_STATUS.FORBIDDEN })
+  }
+
+  // Only Cash / Online can be chosen for an amount still to be paid. WALLET is set at booking time and
+  // only when the wallet paid the whole bill, so it can't be applied to (or removed from) a booking later.
+  if (!['CASH', 'ONLINE'].includes(paymentMethod)) {
+    return sendError(res, { message: 'Payment method must be CASH or ONLINE', statusCode: HTTP_STATUS.BAD_REQUEST })
+  }
+  if (booking.paymentMethod === 'WALLET' && booking.paymentStatus === 'PAID') {
+    return sendError(res, { message: 'This booking is already fully paid from your wallet', statusCode: HTTP_STATUS.BAD_REQUEST })
   }
 
   booking.paymentMethod = paymentMethod
