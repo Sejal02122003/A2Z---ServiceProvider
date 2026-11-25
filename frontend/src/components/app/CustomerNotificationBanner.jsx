@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Bell, CheckCircle2, AlertTriangle, Sparkles, Loader2, ShieldCheck } from 'lucide-react'
+import { Bell, CheckCircle2, AlertTriangle, Sparkles, Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { registerFCMToken, showDesktopNotification } from '../../services/pushNotificationService.js'
 
@@ -134,34 +134,6 @@ export function CustomerNotificationBanner({ user }) {
                 <p className="mt-0.5 text-[11px] leading-relaxed text-rose-800">
                   You will not receive live partner arrival or booking updates. Click the 🔒 lock/tune icon in your browser address bar and set <strong>Notifications</strong> to <strong>Allow</strong>.
                 </p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {permission === 'granted' && (
-          <motion.div
-            key="customer-granted-banner"
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="overflow-hidden rounded-2xl border border-emerald-200/80 bg-gradient-to-r from-emerald-50/90 to-teal-50/70 p-2.5 shadow-2xs sm:p-3"
-          >
-            <div className="flex items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
-                  <ShieldCheck className="h-4 w-4" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <p className="text-xs font-bold text-emerald-950 truncate">
-                      Live Booking Notifications Active
-                    </p>
-                  </div>
-                  <p className="text-[10px] text-emerald-700 truncate">
-                    Ready for real-time booking updates on this device
-                  </p>
-                </div>
               </div>
             </div>
           </motion.div>
