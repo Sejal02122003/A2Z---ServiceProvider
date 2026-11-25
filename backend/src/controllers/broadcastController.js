@@ -987,9 +987,17 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       }
     }
     const singleShare = Math.round(getBookingLabourPool(booking))
-    const singleDurationMins = booking.totalDurationMins || Math.round(bookingHours * 60)
-    const formattedSingleDuration = booking.formattedDuration || formatDurationHuman(singleDurationMins)
     const singleQty = booking.quantity || 1
+    // Real duration of the booked sub-service (e.g. 30 min), not a fixed 60 mins
+    let singleDurationMins = booking.totalDurationMins || Math.round(bookingHours * 60)
+    if (booking.subServiceId && !booking.packageBooking?.isPackage) {
+      const srvDoc = await LabourService.findById(booking.serviceId).select('subServices').lean()
+      const bookedSub = srvDoc?.subServices?.find((ss) => String(ss._id) === String(booking.subServiceId))
+      if (Number(bookedSub?.estimatedDurationMins) > 0) {
+        singleDurationMins = Number(bookedSub.estimatedDurationMins) * singleQty
+      }
+    }
+    const formattedSingleDuration = formatDurationHuman(singleDurationMins)
 
     payload = {
       bookingId: booking._id,

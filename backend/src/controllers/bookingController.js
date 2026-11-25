@@ -871,7 +871,11 @@ export const createBooking = asyncHandler(async (req, res) => {
       const hrRate = await resolveHourlyRate(serviceId)
       subTotal = hrRate * hours * quantity
       totalQuantity = quantity
-      const srvUnitDuration = Number(service.estimatedDurationMins || 60)
+      // A chosen sub-service has its own duration (e.g. 30 min); only fall back to the parent service
+      const chosenSub = req.body.subServiceId && Array.isArray(service.subServices)
+        ? service.subServices.find((ss) => String(ss._id) === String(req.body.subServiceId))
+        : null
+      const srvUnitDuration = Number(chosenSub?.estimatedDurationMins || service.estimatedDurationMins || 60)
       computedTotalDurationMins = srvUnitDuration * (Number(quantity) || 1)
       bookingHours = Math.max(0.5, parseFloat((computedTotalDurationMins / 60).toFixed(1)))
     }

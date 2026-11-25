@@ -558,6 +558,7 @@ export async function startBroadcastCycle(bookingId) {
       let singleServiceDetail = ''
       let singleCategoryName = ''
       let singleSubServiceName = booking.subServiceName || ''
+      let resolvedSingleUnitDurationMins = 0 // per-unit duration of the booked sub-service
 
       if (booking.contractorInfo?.services?.length > 0) {
         const svcDocs = await LabourService.find({
@@ -578,6 +579,12 @@ export async function startBroadcastCycle(bookingId) {
           .lean()
         if (service) {
           singleServiceName = service.name
+          if (booking.subServiceId && Array.isArray(service.subServices)) {
+            const bookedSub = service.subServices.find((ss) => String(ss._id) === String(booking.subServiceId))
+            if (Number(bookedSub?.estimatedDurationMins) > 0) {
+              resolvedSingleUnitDurationMins = Number(bookedSub.estimatedDurationMins)
+            }
+          }
           if (booking.subServiceName) {
             singleServiceName = `${service.name} - ${booking.subServiceName}`
             singleServiceDetail = booking.subServiceName
@@ -867,9 +874,12 @@ export async function startBroadcastCycle(bookingId) {
           }
 
           const singleShare = Math.round(getBookingLabourPool(booking))
-          const singleDurationMins = booking.totalDurationMins || Math.round(bookingHours * 60)
-          const formattedSingleDuration = booking.formattedDuration || formatDurationHuman(singleDurationMins)
           const singleQty = booking.quantity || 1
+          // Real duration of the service/sub-service that was booked (not a fixed 60 mins)
+          const singleDurationMins = resolvedSingleUnitDurationMins
+            ? resolvedSingleUnitDurationMins * singleQty
+            : (booking.totalDurationMins || Math.round(bookingHours * 60))
+          const formattedSingleDuration = formatDurationHuman(singleDurationMins)
 
           import('../socket.js').then(({ emitToUser }) => {
             console.log(`[BROADCAST] Emitting BOOKING_RECEIVED to labour ${labor.fullName || labor.phone} (${labor._id}) for single-service booking ${booking._id}, service=${singleServiceName}, earnings=₹${singleShare}`)
