@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
+import { useBookingLiveSync } from '../../hooks/useBookingLiveSync.js'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
@@ -335,21 +336,28 @@ export function ActiveJob() {
     }
   }, [socket, bookingId, materialRequest?._id, booking, loadMaterialsData, user, redirectToHomeOnCancellation])
 
-  // Polling fallback to ensure labourer is redirected if customer cancels
-  useEffect(() => {
-    if (!bookingId) return
-    const pollId = setInterval(() => {
-      bookingsApi.getBookingStatus(bookingId)
-        .then((res) => {
-          const b = res.data?.booking
-          if (b && isBookingCancelledForLabour(b, user)) {
-            redirectToHomeOnCancellation(b.cancellationReason)
-          }
-        })
-        .catch(() => { })
-    }, 5000)
-    return () => clearInterval(pollId)
-  }, [bookingId, redirectToHomeOnCancellation, user])
+  // Live sync: keeps status, OTPs, payment and the next-step data current without a manual
+  // refresh, and redirects if the customer cancels.
+  const lastPaymentStatusRef = useRef(null)
+  const syncBooking = useCallback((b) => {
+    if (isBookingCancelledForLabour(b, user)) {
+      redirectToHomeOnCancellation(b.cancellationReason)
+      return
+    }
+    setBooking((prev) => (prev && JSON.stringify(prev) === JSON.stringify(b) ? prev : b))
+    const pay = String(b.paymentStatus || '').toUpperCase()
+    if (pay === 'PAID' && lastPaymentStatusRef.current && lastPaymentStatusRef.current !== 'PAID') {
+      setShowPaymentWaiting(true)
+    }
+    lastPaymentStatusRef.current = pay
+  }, [redirectToHomeOnCancellation, user])
+
+  const liveStatus = String(booking?.status || '').toUpperCase()
+  const liveSyncEnabled =
+    !loading &&
+    liveStatus !== 'CANCELLED' &&
+    !(liveStatus === 'COMPLETED' && String(booking?.paymentStatus || '').toUpperCase() === 'PAID')
+  useBookingLiveSync({ bookingId, enabled: liveSyncEnabled, intervalMs: 4000, onBooking: syncBooking })
 
   // Reactive redirect if local booking is marked CANCELLED
   useEffect(() => {

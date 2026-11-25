@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useBookingLiveSync } from '../../hooks/useBookingLiveSync.js'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
 import { motion, useReducedMotion } from 'framer-motion'
@@ -211,29 +212,38 @@ export function JobTracking() {
     }
   }, [socket, bookingId, dispatch])
 
-  // Polling fallback every 3s while searching for workers or until provider is assigned
+  // Live sync: keeps status, provider and the start/completion OTPs current for the whole
+  // lifetime of the booking (not just until a provider is assigned), so no manual refresh is needed.
+  const lastStatusRef = useRef(null)
   useEffect(() => {
-    if (!bookingId) return
-    const isPending =
-      !booking ||
-      ['CREATED', 'BROADCASTING', 'PARTIALLY_ACCEPTED'].includes((booking.status || '').toUpperCase()) ||
-      (!booking.laborId && !booking.acceptedLabourId && (!booking.assignments || booking.assignments.length === 0))
-    if (!isPending) return
+    lastStatusRef.current = booking?.status || null
+  }, [booking?.status])
 
-    const interval = setInterval(() => {
-      bookingsApi.getBookingStatus(bookingId)
-        .then((res) => {
-          const b = res.data?.booking
-          if (b) {
-            setBooking(b)
-            dispatch(setActiveBooking({ bookingId: b._id, status: b.status }))
-          }
-        })
-        .catch(() => {})
-    }, 3000)
+  const syncBooking = useCallback((b) => {
+    const prevStatus = lastStatusRef.current
+    lastStatusRef.current = b.status
+    setBooking((prev) => (prev && JSON.stringify(prev) === JSON.stringify(b) ? prev : b))
+    if (prevStatus !== b.status) {
+      dispatch(setActiveBooking({ bookingId: b._id, status: b.status }))
+      if (prevStatus && b.status === 'COMPLETED') {
+        if (isPaymentSettled(b)) setShowReview(true)
+        else navigate(`/user/booking/flow?bookingId=${b._id}&step=billing`, { replace: true })
+      }
+    }
+  }, [dispatch, navigate])
 
-    return () => clearInterval(interval)
-  }, [bookingId, booking, dispatch])
+  const bookingStatus = String(booking?.status || '').toUpperCase()
+  const isPendingProvider =
+    !booking ||
+    ['CREATED', 'BROADCASTING', 'PARTIALLY_ACCEPTED'].includes(bookingStatus) ||
+    (!booking.laborId && !booking.acceptedLabourId && (!booking.assignments || booking.assignments.length === 0))
+  const bookingFinished = bookingStatus === 'CANCELLED' || (bookingStatus === 'COMPLETED' && isPaymentSettled(booking))
+  useBookingLiveSync({
+    bookingId,
+    enabled: !loading && !bookingFinished && !showReview,
+    intervalMs: isPendingProvider ? 3000 : 4000,
+    onBooking: syncBooking,
+  })
 
   const currentStepIndex = useMemo(() => {
     if (!booking) return 0
