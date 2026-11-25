@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, Loader2, User, Phone, Mail, Building2, MapPin, Briefcase, FileCheck, IndianRupee, Award, Ban, ShieldCheck } from 'lucide-react'
+import { X, Loader2, User, Phone, Mail, Building2, MapPin, Briefcase, FileCheck, IndianRupee, Award, Ban, ShieldCheck, CalendarCheck, ClipboardList } from 'lucide-react'
 import { fetchAdminUserById, updateAdminUserStatus } from '../../../api/adminUsersApi.js'
 import { WelcomeKitCard } from '../../../components/admin/welcomeKit/WelcomeKitCard.jsx'
 import { formatTrialTimeSlot } from '../../../lib/formatTrialTimeSlot.js'
@@ -126,6 +126,46 @@ export function AdminUserViewModal({ userId, onClose, onStatusChange }) {
                   </div>
                 </div>
               </div>
+
+              {/* Booking summary: shown for customers / contractors, or anyone who has made bookings */}
+              {(user.role === 'customer' || user.role === 'contractor' || (user.bookingStats?.totalBookings ?? 0) > 0) && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                  <h4 className="flex items-center gap-2 font-bold text-slate-700">
+                    <ClipboardList className="size-5 text-brand" /> Booking Summary
+                  </h4>
+                  {user.bookingStats ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div className="rounded-lg border border-slate-200 bg-white p-3">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Total Bookings</p>
+                        <p className="mt-1 text-2xl font-black text-slate-800">{user.bookingStats.totalBookings}</p>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-white p-3">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Total Booking Amount</p>
+                        <p className="mt-1 flex items-center text-2xl font-black text-slate-800">
+                          <IndianRupee className="size-5" />
+                          {Number(user.bookingStats.totalAmount || 0).toLocaleString('en-IN')}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                        <p className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                          <CalendarCheck className="size-3.5" /> Confirmed Bookings
+                        </p>
+                        <p className="mt-1 text-2xl font-black text-emerald-800">{user.bookingStats.confirmedBookings}</p>
+                        <p className="text-[11px] font-semibold text-emerald-700">
+                          ₹{Number(user.bookingStats.confirmedAmount || 0).toLocaleString('en-IN')} confirmed
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500">Booking summary is unavailable right now.</p>
+                  )}
+                  {user.bookingStats ? (
+                    <p className="text-[11px] text-slate-500">
+                      Confirmed = accepted by a service provider. Completed: {user.bookingStats.completedBookings} · Cancelled: {user.bookingStats.cancelledBookings}
+                    </p>
+                  ) : null}
+                </div>
+              )}
 
               {/* Contractor Profile */}
               {user.role === 'contractor' && user.contractorProfile && (

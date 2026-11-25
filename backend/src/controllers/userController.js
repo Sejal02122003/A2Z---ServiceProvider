@@ -1018,8 +1018,45 @@ export const getUserById = asyncHandler(async (req, res) => {
   if (user.identityVerificationRef) {
     safeUser.identityVerification = user.identityVerificationRef
   }
+
+  // Booking summary for the admin User Details view
+  try {
+    safeUser.bookingStats = await getUserBookingStats(user._id)
+  } catch (statsErr) {
+    console.warn('[getUserById] booking stats failed:', statsErr?.message)
+  }
+
   return sendSuccess(res, { data: { user: safeUser } })
 })
+
+// A booking counts as "confirmed" once a service provider has accepted it
+const CONFIRMED_BOOKING_STATUSES = ['ACCEPTED', 'PARTIALLY_ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED', 'PARTIALLY_COMPLETED', 'COMPLETED']
+
+async function getUserBookingStats(userId) {
+  const { Booking } = await import('../models/Booking.js')
+  const [row] = await Booking.aggregate([
+    { $match: { userId: new mongoose.Types.ObjectId(String(userId)), status: { $ne: 'DRAFT' } } },
+    {
+      $group: {
+        _id: null,
+        totalBookings: { $sum: 1 },
+        totalAmount: { $sum: { $ifNull: ['$totalAmount', 0] } },
+        confirmedBookings: { $sum: { $cond: [{ $in: ['$status', CONFIRMED_BOOKING_STATUSES] }, 1, 0] } },
+        confirmedAmount: { $sum: { $cond: [{ $in: ['$status', CONFIRMED_BOOKING_STATUSES] }, { $ifNull: ['$totalAmount', 0] }, 0] } },
+        completedBookings: { $sum: { $cond: [{ $eq: ['$status', 'COMPLETED'] }, 1, 0] } },
+        cancelledBookings: { $sum: { $cond: [{ $in: ['$status', ['CANCELLED', 'PARTIALLY_CANCELLED', 'REFUNDED']] }, 1, 0] } },
+      },
+    },
+  ])
+  return {
+    totalBookings: row?.totalBookings || 0,
+    totalAmount: row?.totalAmount || 0,
+    confirmedBookings: row?.confirmedBookings || 0,
+    confirmedAmount: row?.confirmedAmount || 0,
+    completedBookings: row?.completedBookings || 0,
+    cancelledBookings: row?.cancelledBookings || 0,
+  }
+}
 
 function displayNameFromFullName(fullName) {
   const t = (fullName || '').trim()
