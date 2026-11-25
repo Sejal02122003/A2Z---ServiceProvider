@@ -5,6 +5,7 @@ import { WalletSetting } from '../models/WalletSetting.js'
 import { AdminWallet } from '../models/AdminWallet.js'
 import { Booking } from '../models/Booking.js'
 import { getWalletSettings } from './userWalletService.js'
+import { getBookingLabourPool, getLabourShareRatio } from '../utils/labourShare.js'
 
 /**
  * Get or create Labour Wallet
@@ -208,32 +209,10 @@ export async function releaseCashBookingCharges({ labourId, bookingId = null, am
 }
 
 /**
- * Perform atomic and idempotent cash booking settlement upon completion.
- * Recovers exact existing platform charges: commission + platformFee + taxes (GST).
- * Labour retains the full cash received from customer.
+ * Settle one worker's proportional share of platform charges for a cash booking.
  */
-export async function settleCashBookingPayment({ bookingId, labourId = null, session = null }) {
-  const booking = await Booking.findById(bookingId).session(session)
-  if (!booking) {
-    throw new Error('Booking not found for settlement')
-  }
-
-  if (booking.paymentMethod !== 'CASH') {
-    return {
-      settled: true,
-      isCash: false,
-      message: 'Not a cash booking; settlement follows online payout workflow.',
-    }
-  }
-
-  const effectiveLabourId = labourId || booking.laborId || booking.acceptedLabourId
-  if (!effectiveLabourId) {
-    throw new Error('No labourer assigned to booking for settlement')
-  }
-
-  const idempotencyKey = `SETTLE_CASH_${booking._id}_${effectiveLabourId}`
-
-  // Check if settlement transaction already exists (idempotent protection)
+async function settleSingleWorkerCashShare({ booking, workerId, ratio, session }) {
+  const idempotencyKey = `SETTLE_CASH_${booking._id}_${workerId}`
   const existingTx = await WalletTransaction.findOne({ idempotencyKey }).session(session)
   if (existingTx) {
     return {
@@ -245,31 +224,24 @@ export async function settleCashBookingPayment({ bookingId, labourId = null, ses
     }
   }
 
-  // Exact canonical charges calculated by the existing billing engine
-  const commission = Number(booking.commissionAmount || 0)
-  const platformFee = Number(booking.platformFee || 0)
-  const gst = Number(booking.taxes || 0)
+  const commission = Math.round(Number(booking.commissionAmount || 0) * ratio)
+  const platformFee = Math.round(Number(booking.platformFee || 0) * ratio)
+  const gst = Math.round(Number(booking.taxes || 0) * ratio)
   const totalCharges = commission + platformFee + gst
 
-  const wallet = await getOrCreateLabourWallet(effectiveLabourId, session)
-
+  const wallet = await getOrCreateLabourWallet(workerId, session)
   const balanceBefore = Number(wallet.selfBalance !== undefined ? wallet.selfBalance : (wallet.balance || 0))
   let deductionAmount = totalCharges
   let unpaidDues = 0
 
-  // If wallet balance is less than total charges, deduct down to 0 and record outstanding dues in adminBalance
   if (balanceBefore < totalCharges) {
     deductionAmount = Math.max(0, balanceBefore)
     unpaidDues = totalCharges - deductionAmount
   }
 
   const balanceAfter = Math.max(0, balanceBefore - deductionAmount)
+  const newReservedBalance = Math.max(0, (wallet.reservedBalance || 0) - totalCharges)
 
-  // Release held reservation if any
-  const reservationToRelease = totalCharges
-  const newReservedBalance = Math.max(0, (wallet.reservedBalance || 0) - reservationToRelease)
-
-  // Update wallet atomically
   wallet.selfBalance = balanceAfter
   wallet.balance = balanceAfter
   wallet.reservedBalance = newReservedBalance
@@ -278,14 +250,13 @@ export async function settleCashBookingPayment({ bookingId, labourId = null, ses
   }
   await wallet.save({ session })
 
-  // Record immutable ledger entry
-  const txNumber = `WTX_${Date.now()}_${String(booking._id).slice(-4)}`
+  const txNumber = `WTX_${Date.now()}_${String(booking._id).slice(-4)}_${String(workerId).slice(-3)}`
   const tx = await WalletTransaction.create(
     [
       {
         walletId: wallet._id,
-        userId: effectiveLabourId,
-        labourId: effectiveLabourId,
+        userId: workerId,
+        labourId: workerId,
         bookingId: booking._id,
         transactionId: txNumber,
         amount: totalCharges,
@@ -310,33 +281,6 @@ export async function settleCashBookingPayment({ bookingId, labourId = null, ses
     { session }
   )
 
-  // Update AdminWallet splits
-  if (platformFee > 0 || commission > 0 || booking.basePrice > 0 || gst > 0) {
-    let adminWallet = await AdminWallet.findOne().session(session)
-    if (!adminWallet) {
-      adminWallet = new AdminWallet()
-    }
-    adminWallet.totalPlatformFeesCollected += platformFee
-    adminWallet.totalCommissionsCollected += commission
-    adminWallet.totalTaxesCollected += gst
-    adminWallet.totalServiceAmountCollected += booking.basePrice || 0
-    await adminWallet.save({ session })
-  }
-
-  // Update booking status
-  booking.adminSettlementStatus = 'SETTLED'
-  booking.paymentStatus = 'PAID'
-  booking.walletReservationStatus = 'SETTLED'
-  await booking.save({ session })
-
-  // Update WalletReservation if one exists
-  import('../models/WalletReservation.js').then(({ WalletReservation }) => {
-    WalletReservation.findOneAndUpdate(
-      { bookingId: booking._id, status: 'RESERVED' },
-      { $set: { status: 'SETTLED', settledAmount: commission, settledAt: new Date() } }
-    ).catch(() => {})
-  })
-
   return {
     settled: true,
     alreadySettled: false,
@@ -352,6 +296,204 @@ export async function settleCashBookingPayment({ bookingId, labourId = null, ses
     balanceBefore,
     balanceAfter,
     bookingId: booking._id,
+  }
+}
+
+/**
+ * Perform atomic and idempotent cash booking settlement upon completion.
+ * Recovers exact existing platform charges: commission + platformFee + taxes (GST),
+ * split proportionally across assigned service providers in multi-service bookings.
+ */
+export async function settleCashBookingPayment({ bookingId, labourId = null, session = null }) {
+  const booking = await Booking.findById(bookingId).session(session)
+  if (!booking) {
+    throw new Error('Booking not found for settlement')
+  }
+
+  if (booking.paymentMethod !== 'CASH') {
+    return {
+      settled: true,
+      isCash: false,
+      message: 'Not a cash booking; settlement follows online payout workflow.',
+    }
+  }
+
+  const liveAssignments = Array.isArray(booking.assignments)
+    ? booking.assignments.filter((a) => a.status !== 'CANCELLED' && a.labourId)
+    : []
+
+  let lastResult = null
+
+  if (liveAssignments.length > 0) {
+    const targetIds = labourId
+      ? [String(typeof labourId === 'object' ? labourId._id : labourId)]
+      : [...new Set(liveAssignments.map((a) => String(typeof a.labourId === 'object' ? a.labourId._id : a.labourId)))]
+
+    for (const lid of targetIds) {
+      const ratio = getLabourShareRatio(booking, lid)
+      lastResult = await settleSingleWorkerCashShare({
+        booking,
+        workerId: lid,
+        ratio: ratio > 0 ? ratio : 1 / targetIds.length,
+        session,
+      })
+    }
+  } else {
+    const effectiveLabourId = labourId || booking.laborId || booking.acceptedLabourId
+    if (!effectiveLabourId) {
+      throw new Error('No labourer assigned to booking for settlement')
+    }
+    lastResult = await settleSingleWorkerCashShare({
+      booking,
+      workerId: effectiveLabourId,
+      ratio: 1,
+      session,
+    })
+  }
+
+  // Record AdminWallet splits once per booking (when full booking is paid)
+  const allAssignmentsPaid = liveAssignments.length === 0 || liveAssignments.every((a) => a.paymentStatus === 'PAID')
+  if ((allAssignmentsPaid || booking.paymentStatus === 'PAID') && booking.adminSettlementStatus !== 'SETTLED') {
+    const commission = Number(booking.commissionAmount || 0)
+    const platformFee = Number(booking.platformFee || 0)
+    const gst = Number(booking.taxes || 0)
+    if (platformFee > 0 || commission > 0 || booking.basePrice > 0 || gst > 0) {
+      let adminWallet = await AdminWallet.findOne().session(session)
+      if (!adminWallet) {
+        adminWallet = new AdminWallet()
+      }
+      adminWallet.totalPlatformFeesCollected += platformFee
+      adminWallet.totalCommissionsCollected += commission
+      adminWallet.totalTaxesCollected += gst
+      adminWallet.totalServiceAmountCollected += booking.basePrice || 0
+      await adminWallet.save({ session })
+    }
+    booking.adminSettlementStatus = 'SETTLED'
+    booking.paymentStatus = 'PAID'
+    booking.walletReservationStatus = 'SETTLED'
+    await booking.save({ session })
+  }
+
+  // Update WalletReservation if one exists
+  import('../models/WalletReservation.js').then(({ WalletReservation }) => {
+    WalletReservation.findOneAndUpdate(
+      { bookingId: booking._id, status: 'RESERVED' },
+      { $set: { status: 'SETTLED', settledAmount: Number(booking.commissionAmount || 0), settledAt: new Date() } }
+    ).catch(() => {})
+  })
+
+  return lastResult
+}
+
+/**
+ * Credit online/wallet payout to each provider who has completed their service(s),
+ * split proportionally by their assignment's labourShare. Idempotent per assignment/worker.
+ */
+export async function creditOnlineBookingPayout({ booking, session = null }) {
+  if (!booking || booking.paymentStatus !== 'PAID') return
+  if (booking.paymentMethod !== 'ONLINE' && booking.paymentMethod !== 'WALLET') return
+
+  const pool = getBookingLabourPool(booking)
+  const assignments = Array.isArray(booking.assignments) ? booking.assignments : []
+  const live = assignments.filter((a) => a.status !== 'CANCELLED' && a.labourId)
+
+  if (live.length > 0) {
+    const allStored = live.reduce((sum, a) => sum + (Number(a.labourShare) || 0), 0)
+    const completed = live.filter((a) => String(a.status).toUpperCase() === 'COMPLETED')
+
+    for (const a of completed) {
+      const lid = String(typeof a.labourId === 'object' ? a.labourId._id : a.labourId)
+      const idempotencyKey = `PAYOUT_ONLINE_${booking._id}_${a._id}`
+      const existing = await WalletTransaction.findOne({ idempotencyKey }).session(session)
+      if (existing) continue
+
+      let workerShare = 0
+      if (allStored > 0 && Number(a.labourShare) > 0) {
+        workerShare = Math.round(pool * (Number(a.labourShare) / allStored))
+      } else {
+        workerShare = Math.round(pool / live.length)
+      }
+
+      if (workerShare > 0) {
+        const wallet = await getOrCreateLabourWallet(lid, session)
+        const balanceBefore = Number(wallet.selfBalance !== undefined ? wallet.selfBalance : (wallet.balance || 0))
+        wallet.selfBalance = balanceBefore + workerShare
+        wallet.balance = wallet.selfBalance
+        await wallet.save({ session })
+
+        await WalletTransaction.create(
+          [
+            {
+              walletId: wallet._id,
+              userId: lid,
+              labourId: lid,
+              bookingId: booking._id,
+              status: 'COMPLETED',
+              amount: workerShare,
+              type: 'CREDIT',
+              targetWallet: 'SELF',
+              context: 'PAYOUT',
+              balanceBefore,
+              balanceAfter: wallet.selfBalance,
+              referenceType: 'BOOKING',
+              referenceId: booking._id,
+              idempotencyKey,
+              description: `Online Payout for ${a.serviceName || 'Service'}`,
+            },
+          ],
+          { session }
+        )
+      }
+    }
+  } else if (booking.laborId) {
+    const lid = String(typeof booking.laborId === 'object' ? booking.laborId._id : booking.laborId)
+    const idempotencyKey = `PAYOUT_ONLINE_${booking._id}_${lid}`
+    const existing = await WalletTransaction.findOne({ idempotencyKey }).session(session)
+    if (!existing && pool > 0) {
+      const wallet = await getOrCreateLabourWallet(lid, session)
+      const balanceBefore = Number(wallet.selfBalance !== undefined ? wallet.selfBalance : (wallet.balance || 0))
+      wallet.selfBalance = balanceBefore + pool
+      wallet.balance = wallet.selfBalance
+      await wallet.save({ session })
+
+      await WalletTransaction.create(
+        [
+          {
+            walletId: wallet._id,
+            userId: lid,
+            labourId: lid,
+            bookingId: booking._id,
+            status: 'COMPLETED',
+            amount: pool,
+            type: 'CREDIT',
+            targetWallet: 'SELF',
+            context: 'PAYOUT',
+            balanceBefore,
+            balanceAfter: wallet.selfBalance,
+            referenceType: 'BOOKING',
+            referenceId: booking._id,
+            idempotencyKey,
+            description: 'Payout for Online Booking',
+          },
+        ],
+        { session }
+      )
+    }
+  }
+
+  // Record AdminWallet splits once when the full booking is completed
+  if (booking.status === 'COMPLETED' && booking.adminSettlementStatus !== 'SETTLED') {
+    if (booking.platformFee > 0 || booking.commissionAmount > 0 || booking.basePrice > 0 || booking.taxes > 0) {
+      let adminWallet = await AdminWallet.findOne().session(session)
+      if (!adminWallet) adminWallet = new AdminWallet()
+      adminWallet.totalPlatformFeesCollected += (booking.platformFee || 0)
+      adminWallet.totalCommissionsCollected += (booking.commissionAmount || 0)
+      adminWallet.totalTaxesCollected += (booking.taxes || 0)
+      adminWallet.totalServiceAmountCollected += (booking.basePrice || 0)
+      await adminWallet.save({ session })
+    }
+    booking.adminSettlementStatus = 'SETTLED'
+    await booking.save({ session })
   }
 }
 

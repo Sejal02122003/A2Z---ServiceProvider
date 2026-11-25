@@ -1576,19 +1576,18 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
 
   await booking.save()
 
-  // Phase 4: Handle Commission if Cash Payment and Completed
+  // Phase 4: Handle Commission & Split Payouts upon Completion
   if (status === 'COMPLETED') {
-    let wallet = await Wallet.findOne({ userId: booking.laborId })
-    if (!wallet) wallet = new Wallet({ userId: booking.laborId })
-
     if (booking.paymentMethod === 'CASH') {
       // NOTE: For CASH bookings, settlement and marking paymentStatus as 'PAID'
       // is performed when the service provider or customer explicitly confirms cash collection via confirmCashPayment.
-      if (booking.paymentStatus === 'PAID') {
+      if (booking.paymentStatus === 'PAID' || assignment?.paymentStatus === 'PAID') {
         try {
           const { settleCashBookingPayment } = await import('../services/labourWalletService.js')
-          const effectiveLabourId = booking.laborId || booking.acceptedLabourId || (booking.assignments && booking.assignments.find(a => a.labourId)?.labourId)
-          await settleCashBookingPayment({ bookingId: booking._id, labourId: effectiveLabourId })
+          await settleCashBookingPayment({
+            bookingId: booking._id,
+            labourId: assignment ? req.user._id : null,
+          })
         } catch (settleErr) {
           console.error('[Cash Settlement Error in updateBookingStatus]:', settleErr)
         }
@@ -1602,36 +1601,11 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
           settleBookingCommission({ bookingId: booking._id }).catch(err => console.error('[Online Settlement Error]:', err))
         }).catch(() => { })
 
-        // Add laborShare to labor's self wallet
-        // Provider earning = total amount − GST − platform fee − commission
-        wallet.selfBalance += getBookingLabourPool(booking)
-        wallet.balance = wallet.selfBalance // keep the mirror field in step with selfBalance
-        await wallet.save()
-
-        import('../models/WalletTransaction.js').then(({ WalletTransaction }) => {
-          WalletTransaction.create({
-            walletId: wallet._id,
-            userId: booking.laborId,
-            status: 'COMPLETED',
-            amount: getBookingLabourPool(booking),
-            type: 'CREDIT',
-            targetWallet: 'SELF',
-            context: 'PAYOUT',
-            referenceId: booking._id,
-            description: 'Payout for Online Booking'
-          }).catch(err => console.error('WalletTx error:', err))
-        })
-
-        // Log splits to AdminWallet for Platform Fee, Commission and total business
-        if (booking.platformFee > 0 || booking.commissionAmount > 0 || booking.basePrice > 0 || booking.taxes > 0) {
-          let adminWallet = await AdminWallet.findOne()
-          if (!adminWallet) adminWallet = new AdminWallet()
-
-          adminWallet.totalPlatformFeesCollected += (booking.platformFee || 0)
-          adminWallet.totalCommissionsCollected += (booking.commissionAmount || 0)
-          adminWallet.totalTaxesCollected += (booking.taxes || 0)
-          adminWallet.totalServiceAmountCollected += (booking.basePrice || 0)
-          await adminWallet.save()
+        try {
+          const { creditOnlineBookingPayout } = await import('../services/labourWalletService.js')
+          await creditOnlineBookingPayout({ booking })
+        } catch (payoutErr) {
+          console.error('[Online Split Payout Error in updateBookingStatus]:', payoutErr)
         }
       }
 
@@ -1931,7 +1905,7 @@ export const confirmCashPayment = asyncHandler(async (req, res) => {
     return sendError(res, { message: 'Unauthorized to confirm cash payment for this booking', statusCode: HTTP_STATUS.FORBIDDEN })
   }
 
-  if (!['STARTED', 'COMPLETED'].includes(booking.status)) {
+  if (!['STARTED', 'PARTIALLY_COMPLETED', 'COMPLETED'].includes(booking.status)) {
     return sendError(res, { message: 'Booking must be started or completed before confirming cash payment', statusCode: HTTP_STATUS.BAD_REQUEST })
   }
 
@@ -1943,34 +1917,61 @@ export const confirmCashPayment = asyncHandler(async (req, res) => {
     return sendSuccess(res, { message: 'Already paid', data: { booking } })
   }
 
-  booking.paymentStatus = 'PAID'
+  const hasAssignments = Array.isArray(booking.assignments) && booking.assignments.length > 0
+  const liveAssignments = hasAssignments ? booking.assignments.filter(a => a.status !== 'CANCELLED') : []
+  const reqUid = String(req.user._id)
+
+  let settleTargetLabourId = null
+  if (hasAssignments && isAssignedLabour && !isCustomer && !isAdmin) {
+    liveAssignments.forEach((a) => {
+      const lid = String(typeof a.labourId === 'object' ? a.labourId?._id : a.labourId)
+      if (lid === reqUid) {
+        a.paymentStatus = 'PAID'
+      }
+    })
+    const allPaid = liveAssignments.length > 0 && liveAssignments.every(a => a.paymentStatus === 'PAID')
+    if (allPaid) {
+      booking.paymentStatus = 'PAID'
+    }
+    settleTargetLabourId = req.user._id
+  } else {
+    liveAssignments.forEach((a) => {
+      a.paymentStatus = 'PAID'
+    })
+    booking.paymentStatus = 'PAID'
+  }
   await booking.save()
 
-  // Perform atomic cash booking settlement (recovering exact commission + platform fee + taxes)
+  // Perform atomic cash booking settlement (recovering proportional commission + platform fee + taxes)
   try {
     const { settleCashBookingPayment } = await import('../services/labourWalletService.js')
-    await settleCashBookingPayment({ bookingId: booking._id, labourId: booking.laborId || booking.acceptedLabourId })
+    await settleCashBookingPayment({ bookingId: booking._id, labourId: settleTargetLabourId })
   } catch (err) {
     console.error('[Cash Settlement Error in confirmCashPayment]:', err)
   }
 
-  // Award automatic 15% (or configured %) service completion credit to customer wallet
-  try {
-    const { awardServiceCompletionWalletCredit } = await import('../services/userWalletService.js')
-    await awardServiceCompletionWalletCredit(booking._id)
-  } catch (creditErr) {
-    console.error('[Service Completion Wallet Credit Error in confirmCashPayment]:', creditErr)
+  // Award automatic 15% (or configured %) service completion credit to customer wallet once fully paid
+  if (booking.paymentStatus === 'PAID') {
+    try {
+      const { awardServiceCompletionWalletCredit } = await import('../services/userWalletService.js')
+      await awardServiceCompletionWalletCredit(booking._id)
+    } catch (creditErr) {
+      console.error('[Service Completion Wallet Credit Error in confirmCashPayment]:', creditErr)
+    }
   }
 
-  // Notify both
+  // Notify relevant parties
   import('../socket.js').then(({ emitToUser }) => {
-    emitToUser(booking.laborId, 'BOOKING_STATUS_UPDATE', { bookingId: booking._id, status: booking.status, paymentStatus: 'PAID' })
-    emitToUser(booking.userId, 'BOOKING_STATUS_UPDATE', { bookingId: booking._id, status: booking.status, paymentStatus: 'PAID' })
-    if (booking.assignments && booking.assignments.length > 0) {
+    emitToUser(booking.userId, 'BOOKING_STATUS_UPDATE', { bookingId: booking._id, status: booking.status, paymentStatus: booking.paymentStatus })
+    if (hasAssignments) {
       booking.assignments.forEach(a => {
         const lid = typeof a.labourId === 'object' ? a.labourId._id : a.labourId;
-        if (lid) emitToUser(lid, 'BOOKING_STATUS_UPDATE', { bookingId: booking._id, status: booking.status, paymentStatus: 'PAID' })
+        if (lid && (!settleTargetLabourId || String(lid) === String(settleTargetLabourId) || booking.paymentStatus === 'PAID')) {
+          emitToUser(lid, 'BOOKING_STATUS_UPDATE', { bookingId: booking._id, status: booking.status, paymentStatus: a.paymentStatus || booking.paymentStatus })
+        }
       });
+    } else if (booking.laborId) {
+      emitToUser(booking.laborId, 'BOOKING_STATUS_UPDATE', { bookingId: booking._id, status: booking.status, paymentStatus: booking.paymentStatus })
     }
   }).catch(err => console.error(err))
 

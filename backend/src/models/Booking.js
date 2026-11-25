@@ -262,6 +262,11 @@ const bookingSchema = new mongoose.Schema(
         enum: ['ACCEPTED', 'EN_ROUTE', 'STARTED', 'COMPLETED', 'REJECTED', 'CANCELLED'],
         default: 'ACCEPTED'
       },
+      paymentStatus: {
+        type: String,
+        enum: ['PENDING', 'PAID'],
+        default: 'PENDING'
+      },
       startOtp: String,
       completionOtp: String,
       startWorkImage: String,

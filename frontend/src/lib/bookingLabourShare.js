@@ -157,3 +157,49 @@ export function getLabourEarnedShare(booking, userId) {
   }
   return 0
 }
+
+/**
+ * Fraction [0, 1] of a booking that belongs to a given worker, based on their assigned
+ * services/items in multi-service or multi-assignment bookings. Returns 1 for single-worker bookings.
+ */
+export function getLabourShareRatio(booking, userId) {
+  if (!booking) return 0
+  const uid = idOf(userId)
+  const assignments = Array.isArray(booking.assignments) ? booking.assignments : []
+
+  if (assignments.length > 0) {
+    const live = assignments.filter((a) => a.status !== 'CANCELLED')
+    const mine = live.filter((a) => idOf(a.labourId) === uid)
+    if (mine.length > 0) {
+      const myStored = mine.reduce((sum, a) => sum + (Number(a.labourShare) || 0), 0)
+      const allStored = live.reduce((sum, a) => sum + (Number(a.labourShare) || 0), 0)
+      if (myStored > 0 && allStored > 0) return myStored / allStored
+    }
+
+    const items = booking.multiServiceBooking?.items
+    if (booking.multiServiceBooking?.isMultiService && Array.isArray(items)) {
+      const activeItems = items.filter((it) => it.status !== 'CANCELLED')
+      const myItems = activeItems.filter((it) => idOf(it.assignedLabourId) === uid)
+      const myTotal = myItems.reduce((sum, it) => sum + (Number(it.itemTotal) || 0), 0)
+      const allTotal = activeItems.reduce((sum, it) => sum + (Number(it.itemTotal) || 0), 0)
+      if (myTotal > 0 && allTotal > 0) return myTotal / allTotal
+    }
+
+    if (mine.length > 0 && live.length > 0) {
+      return mine.length / live.length
+    }
+    return 0
+  }
+
+  return 1
+}
+
+/**
+ * Cash amount a specific worker should collect from the customer for a COD booking.
+ * Splits the total bill proportionally according to the worker's service share.
+ */
+export function getLabourCashCollectAmount(booking, userId) {
+  if (!booking) return 0
+  const totalBill = Number(booking.totalAmount ?? booking.basePrice ?? 0)
+  return Math.round(totalBill * getLabourShareRatio(booking, userId))
+}

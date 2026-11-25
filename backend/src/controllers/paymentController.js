@@ -84,53 +84,13 @@ export const verifyPayment = asyncHandler(async (req, res) => {
       await booking.save()
       
       // In Phase 4, Online Payment commission handling:
-      // Since platform receives the money, the labor's selfWallet is credited the laborShare
-      if (booking.status === 'COMPLETED') {
-         if (booking.assignments && booking.assignments.length > 0) {
-           for (const a of booking.assignments) {
-             if (a.status === 'COMPLETED' && a.labourId) {
-               const lid = typeof a.labourId === 'object' ? a.labourId._id : a.labourId;
-               let workerShare = a.labourShare || (getBookingLabourPool(booking) ? Math.round(getBookingLabourPool(booking) / (booking.quantity || 1)) : 0)
-               if (booking.contractorInfo?.services?.length > 0) {
-                 const s = booking.contractorInfo.services.find(svc => String(svc.serviceId?._id || svc.serviceId) === String(a.serviceId?._id || a.serviceId))
-                 if (s && s.price) {
-                   const hrs = (booking.duration || booking.hours || 1) + (a.extraHours || 0)
-                   workerShare = (s.price * hrs) * getBookingLabourShareRate(booking)
-                 }
-               }
-               if (workerShare > 0) {
-                 let wallet = await Wallet.findOne({ userId: lid })
-                 if (!wallet) wallet = new Wallet({ userId: lid })
-                 wallet.selfBalance += workerShare
-                 await wallet.save()
-
-                 await WalletTransaction.create({
-                   walletId: wallet._id,
-                   amount: workerShare,
-                   type: 'CREDIT',
-                   targetWallet: 'SELF',
-                   context: 'PAYOUT',
-                   referenceId: booking._id,
-                   description: 'Online Payment Payout for Completed Assignment'
-                 })
-               }
-             }
-           }
-         } else if (booking.laborId) {
-           let wallet = await Wallet.findOne({ userId: booking.laborId })
-           if (!wallet) wallet = new Wallet({ userId: booking.laborId })
-           wallet.selfBalance += getBookingLabourPool(booking)
-           await wallet.save()
-
-           await WalletTransaction.create({
-              walletId: wallet._id,
-              amount: getBookingLabourPool(booking),
-              type: 'CREDIT',
-              targetWallet: 'SELF',
-              context: 'PAYOUT',
-              referenceId: booking._id,
-              description: 'Online Payment Payout for Booking'
-           })
+      // Since platform receives the money, each completed provider's selfWallet is credited their split share
+      if (['COMPLETED', 'PARTIALLY_COMPLETED'].includes(booking.status)) {
+         try {
+           const { creditOnlineBookingPayout } = await import('../services/labourWalletService.js')
+           await creditOnlineBookingPayout({ booking })
+         } catch (payoutErr) {
+           console.error('[Online Split Payout Error in verifyPayment]:', payoutErr)
          }
          
          // Notify both labour and client

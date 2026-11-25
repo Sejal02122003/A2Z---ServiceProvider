@@ -43,7 +43,7 @@ import {
   fetchServiceProductMappings,
 } from '../../api/inventoryApi.js'
 import { LabourBounceCancelModal } from '../../components/labour/LabourBounceCancelModal.jsx'
-import { getLabourBookingShare, getBookingLabourRate } from '../../lib/bookingLabourShare.js'
+import { getLabourBookingShare, getBookingLabourRate, getLabourCashCollectAmount } from '../../lib/bookingLabourShare.js'
 
 function formatDateTime(val) {
   if (!val) return '—'
@@ -195,14 +195,26 @@ export function ActiveJob() {
     setConfirmingCash(true)
     setCashConfirmError('')
     try {
-      await bookingsApi.confirmCashPayment(bookingId)
-      setBooking((prev) => (prev ? { ...prev, paymentStatus: 'PAID' } : prev))
+      const res = await bookingsApi.confirmCashPayment(bookingId)
+      const updated = res?.data?.booking
+      setBooking((prev) => {
+        if (!prev) return updated || prev
+        if (updated) return updated
+        const uid = String(user?._id || '')
+        const nextAssignments = Array.isArray(prev.assignments)
+          ? prev.assignments.map((a) => {
+              const lid = String(typeof a.labourId === 'object' ? a.labourId?._id : a.labourId)
+              return lid === uid ? { ...a, paymentStatus: 'PAID' } : a
+            })
+          : prev.assignments
+        return { ...prev, assignments: nextAssignments, paymentStatus: prev.assignments?.length ? prev.paymentStatus : 'PAID' }
+      })
     } catch (err) {
       setCashConfirmError(err instanceof ApiError ? err.message : 'Failed to confirm cash payment')
     } finally {
       setConfirmingCash(false)
     }
-  }, [bookingId])
+  }, [bookingId, user?._id])
 
   // Material Management State
   const [materialRequest, setMaterialRequest] = useState(null)
@@ -648,24 +660,34 @@ export function ActiveJob() {
       </GlassPanel>
 
       {/* Pending Cash Collection Banner */}
-      {isCompleted && booking?.paymentMethod === 'CASH' && booking?.paymentStatus !== 'PAID' && (
-        <GlassPanel className="p-4 border-emerald-300 bg-emerald-50/90 text-center space-y-2.5 shadow-sm">
-          <div className="flex items-center justify-center gap-2 text-emerald-800 font-extrabold text-sm">
-            <Banknote className="h-5 w-5 text-emerald-600" />
-            <span>Pending COD Handover: ₹{Math.round(booking?.totalAmount || booking?.basePrice || 0).toLocaleString('en-IN')}</span>
-          </div>
-          <p className="text-xs text-emerald-700">
-            Job is completed! Please collect cash from the customer and confirm handover.
-          </p>
-          <button
-            type="button"
-            onClick={() => setShowPaymentWaiting(true)}
-            className="w-full rounded-xl bg-emerald-600 py-3 text-xs font-black uppercase tracking-wider text-white shadow-md hover:bg-emerald-700 active:scale-95 transition"
-          >
-            Collect &amp; Confirm Cash Received
-          </button>
-        </GlassPanel>
-      )}
+      {(() => {
+        if (!isCompleted || booking?.paymentMethod !== 'CASH') return null
+        const uid = String(user?._id || '')
+        const myAssignments = Array.isArray(booking?.assignments)
+          ? booking.assignments.filter((a) => String(typeof a.labourId === 'object' ? a.labourId?._id : a.labourId) === uid && a.status !== 'CANCELLED')
+          : []
+        const isMyCashPaid = booking?.paymentStatus === 'PAID' || (myAssignments.length > 0 && myAssignments.every((a) => a.paymentStatus === 'PAID'))
+        if (isMyCashPaid) return null
+        const cashToCollect = getLabourCashCollectAmount(booking, user?._id) || Math.round(booking?.totalAmount || booking?.basePrice || 0)
+        return (
+          <GlassPanel className="p-4 border-emerald-300 bg-emerald-50/90 text-center space-y-2.5 shadow-sm">
+            <div className="flex items-center justify-center gap-2 text-emerald-800 font-extrabold text-sm">
+              <Banknote className="h-5 w-5 text-emerald-600" />
+              <span>Pending COD Handover: ₹{cashToCollect.toLocaleString('en-IN')}</span>
+            </div>
+            <p className="text-xs text-emerald-700">
+              Job is completed! Please collect cash from the customer and confirm handover.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowPaymentWaiting(true)}
+              className="w-full rounded-xl bg-emerald-600 py-3 text-xs font-black uppercase tracking-wider text-white shadow-md hover:bg-emerald-700 active:scale-95 transition"
+            >
+              Collect &amp; Confirm Cash Received
+            </button>
+          </GlassPanel>
+        )
+      })()}
 
       {/* Progress Steps */}
       <GlassPanel className="p-4">
@@ -1491,14 +1513,21 @@ export function ActiveJob() {
       />
 
       {/* Payment Waiting Modal */}
-      {showPaymentWaiting && (
+      {showPaymentWaiting && (() => {
+        const uid = String(user?._id || '')
+        const myAssignments = Array.isArray(booking?.assignments)
+          ? booking.assignments.filter((a) => String(typeof a.labourId === 'object' ? a.labourId?._id : a.labourId) === uid && a.status !== 'CANCELLED')
+          : []
+        const isMyPaymentDone = booking?.paymentStatus === 'PAID' || (myAssignments.length > 0 && myAssignments.every((a) => a.paymentStatus === 'PAID'))
+        const cashToCollect = getLabourCashCollectAmount(booking, user?._id) || Math.round(booking?.totalAmount || booking?.basePrice || 0)
+        return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl text-center"
           >
-            {booking?.paymentStatus === 'PAID' ? (
+            {isMyPaymentDone ? (
               <>
                 <div className="relative mx-auto mb-8 mt-4 flex h-24 w-24 items-center justify-center">
                   <motion.div
@@ -1566,7 +1595,7 @@ export function ActiveJob() {
                 <div className="mb-5 rounded-2xl bg-emerald-50 border border-emerald-200 p-4">
                   <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Total Cash to Collect</p>
                   <p className="text-3xl font-black text-emerald-950 mt-1">
-                    ₹{Math.round(booking?.totalAmount || booking?.basePrice || 0).toLocaleString('en-IN')}
+                    ₹{cashToCollect.toLocaleString('en-IN')}
                   </p>
                 </div>
 
@@ -1636,7 +1665,8 @@ export function ActiveJob() {
             )}
           </motion.div>
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

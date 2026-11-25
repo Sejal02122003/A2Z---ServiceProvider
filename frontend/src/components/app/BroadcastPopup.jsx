@@ -720,8 +720,13 @@ export function BroadcastPopup() {
                                   )}
                                 </div>
                               </div>
-                              <div className="shrink-0 text-right">
-                                <span className="inline-block rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-800 border border-slate-200">
+                              <div className="shrink-0 text-right space-y-1">
+                                {svc.estimatedEarnings != null && (
+                                  <p className="font-black text-emerald-700 text-xs">
+                                    ₹{formatFixedAmount(svc.estimatedEarnings)}
+                                  </p>
+                                )}
+                                <span className="inline-block rounded-lg bg-slate-100 px-2.5 py-0.5 text-[11px] font-black text-slate-800 border border-slate-200">
                                   Qty: {svc.quantity || 1}
                                 </span>
                               </div>
