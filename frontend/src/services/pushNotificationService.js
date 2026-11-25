@@ -296,13 +296,21 @@ export async function registerFCMToken(forceUpdate = false) {
 // Unregister and disassociate FCM token from backend upon logout
 export async function unregisterFCMToken() {
   try {
-    const nativeToken = localStorage.getItem(NATIVE_TOKEN_KEY);
-    if (nativeToken) {
-      await apiRequest('/fcm-tokens/remove', {
-        method: 'DELETE',
-        body: { token: nativeToken, platform: 'android' },
-      }).catch((err) => console.warn('[PUSH][Flutter] Native token removal failed:', err?.message || err));
+    // Remove both the token we recorded and the device's live native token (they can differ
+    // if local storage was cleared or the token rotated), so nothing is left behind.
+    const nativeTokens = new Set();
+    const recorded = localStorage.getItem(NATIVE_TOKEN_KEY);
+    if (recorded) nativeTokens.add(recorded);
+    if (isFlutterWrapper()) {
+      const live = await getNativeFcmToken();
+      if (live) nativeTokens.add(live);
     }
+    await Promise.all([...nativeTokens].map((t) =>
+      apiRequest('/fcm-tokens/remove', {
+        method: 'DELETE',
+        body: { token: t, platform: 'android' },
+      }).catch((err) => console.warn('[PUSH][Flutter] Native token removal failed:', err?.message || err)),
+    ));
   } catch (err) {
     console.warn('[PUSH][Flutter] unregister native token error:', err?.message || err);
   } finally {

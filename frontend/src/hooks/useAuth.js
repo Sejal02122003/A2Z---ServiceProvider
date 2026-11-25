@@ -5,6 +5,7 @@ import { clearSession, setCredentials } from '../store/slices/authSlice.js'
 import { baseApi } from '../store/api/baseApi.js'
 import { apiRequest } from '../api/http.js'
 import { registerFCMToken, unregisterFCMToken } from '../services/pushNotificationService.js'
+import { stopBookingAlertSound } from '../utils/bookingSound.js'
 
 export function useAuth() {
   const dispatch = useDispatch()
@@ -29,6 +30,12 @@ export function useAuth() {
   }, [])
 
   const logout = useCallback(async () => {
+    try {
+      // Silence any ringing booking alert and dismiss its notifications
+      stopBookingAlertSound()
+    } catch {
+      // ignore
+    }
     try {
       // Disassociate and clean up FCM token from backend
       await unregisterFCMToken()

@@ -63,6 +63,14 @@ export const saveToken = asyncHandler(async (req, res) => {
     ? { $addToSet: { fcmTokenMobile: token, fcmTokens: token } }
     : { $addToSet: { fcmTokens: token } }
 
+  // A device token belongs to exactly one account at a time. Detach it from any other user
+  // (e.g. the previous account that logged in on this phone) so logged-out accounts stop
+  // receiving booking alerts on a device they no longer use.
+  await User.updateMany(
+    { _id: { $ne: userId }, $or: [{ fcmTokens: token }, { fcmTokenMobile: token }] },
+    { $pull: { fcmTokens: token, fcmTokenMobile: token } },
+  )
+
   // Atomically append token into array if not present
   const updatedUser = await User.findByIdAndUpdate(
     userId,
@@ -112,16 +120,15 @@ export const removeToken = asyncHandler(async (req, res) => {
     })
   }
 
-  const userId = req.user?._id
-  if (!userId) {
-    return sendSuccess(res, { message: 'FCM token removed' })
-  }
-
+  // Remove the token from every account that holds it, not only the authenticated one.
+  // Logout often happens with an expired/missing session; a device token identifies a single
+  // device, so it must never keep receiving pushes after that device logs out.
   // Mobile/native tokens are saved into BOTH fcmTokenMobile and fcmTokens (see saveToken),
-  // so pull from both — otherwise a logged-out phone keeps receiving pushes as a "web" token.
-  await User.findByIdAndUpdate(userId, {
-    $pull: { fcmTokens: token, fcmTokenMobile: token },
-  })
+  // so pull from both.
+  await User.updateMany(
+    { $or: [{ fcmTokens: token }, { fcmTokenMobile: token }] },
+    { $pull: { fcmTokens: token, fcmTokenMobile: token } },
+  )
 
   console.log(`[FCM] Invalidation complete: token removed for device logout`)
   return sendSuccess(res, { message: 'FCM token removed' })
