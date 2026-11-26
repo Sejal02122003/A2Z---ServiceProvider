@@ -2138,6 +2138,26 @@ export const generateMyInvoice = asyncHandler(async (req, res) => {
 
   let invoice = await Invoice.findOne({ requestId: id }).lean()
 
+  // Repair invoices generated before the platform fee was stored on them.
+  if (
+    invoice &&
+    !Number(invoice.platformFee) &&
+    Number(booking.platformFee) > 0 &&
+    !(booking.contractorInfo?.services?.length > 0)
+  ) {
+    const fee = Number(booking.platformFee)
+    invoice = await Invoice.findByIdAndUpdate(
+      invoice._id,
+      {
+        $set: {
+          platformFee: fee,
+          total: (invoice.subtotal || 0) + (invoice.gstTotal || 0) + fee,
+        },
+      },
+      { new: true },
+    ).lean()
+  }
+
   if (!invoice) {
     let lines = []
     if (booking.contractorInfo?.services?.length > 0) {
@@ -2190,6 +2210,7 @@ export const generateMyInvoice = asyncHandler(async (req, res) => {
         lines,
         subtotal,
         gstTotal,
+        platformFee,
         total,
         issuedAt: new Date(),
         dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
@@ -2206,6 +2227,9 @@ export const generateMyInvoice = asyncHandler(async (req, res) => {
         }
       ]
 
+      // Gross bill = base + platform fee + taxes. (booking.totalAmount is the amount still payable,
+      // which is 0 for wallet-paid bookings, so it can't be used as the invoice total.)
+      const normalPlatformFee = Number(booking.platformFee || 0)
       invoice = await Invoice.create({
         invoiceNumber: generateInvoiceNumber(),
         contractorId: undefined,
@@ -2216,7 +2240,8 @@ export const generateMyInvoice = asyncHandler(async (req, res) => {
         lines,
         subtotal: booking.basePrice || 0,
         gstTotal: booking.taxes || 0,
-        total: booking.totalAmount || 0,
+        platformFee: normalPlatformFee,
+        total: (booking.basePrice || 0) + normalPlatformFee + (booking.taxes || 0),
         issuedAt: new Date(),
         dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
       })
