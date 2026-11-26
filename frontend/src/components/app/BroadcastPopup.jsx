@@ -58,9 +58,18 @@ export function BroadcastPopup() {
   const [eligibilityData, setEligibilityData] = useState(null)
   const [checkingEligibility, setCheckingEligibility] = useState(false)
   const [autoplayBlocked, setAutoplayBlocked] = useState(() => getAutoplayBlockedStatus())
+  // Captured on the very first render (before any route redirect can drop the query string):
+  // set when the app was opened by tapping a new-request notification.
+  const [launchBooking, setLaunchBooking] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('incoming_booking') || null
+    } catch {
+      return null
+    }
+  })
 
   // Page behind the new-request popup must not scroll
-  useLockBodyScroll(Boolean(incoming))
+  useLockBodyScroll(Boolean(incoming) || Boolean(launchBooking))
 
   useEffect(() => {
     return subscribeAutoplayBlocked(setAutoplayBlocked)
@@ -198,21 +207,36 @@ export function BroadcastPopup() {
 
   // If opened directly from push notification click with ?incoming_booking=...
   useEffect(() => {
-    if (!isLabour) return
-    const params = new URLSearchParams(window.location.search)
-    const bookingParam = params.get('incoming_booking')
-    if (bookingParam && !dismissedBookingsRef.current.has(bookingParam)) {
-      console.log('[BroadcastPopup] Launched from push notification click for booking:', bookingParam)
-      playBookingAlertSound(bookingParam)
-      broadcastsApi.getActiveBroadcast(bookingParam).then((res) => {
-        if (res?.data?.broadcast && !dismissedBookingsRef.current.has(res.data.broadcast.bookingId)) {
-          handleBroadcast(res.data.broadcast)
-        }
-      }).catch(() => { })
-      const cleanUrl = window.location.pathname
-      window.history.replaceState({}, '', cleanUrl)
+    if (!isLabour || !launchBooking) return
+    const bookingParam = launchBooking
+    if (dismissedBookingsRef.current.has(bookingParam)) {
+      setLaunchBooking(null)
+      return
     }
-  }, [isLabour, handleBroadcast])
+    console.log('[BroadcastPopup] Launched from push notification click for booking:', bookingParam)
+    playBookingAlertSound(bookingParam)
+    broadcastsApi.getActiveBroadcast(bookingParam).then((res) => {
+      if (res?.data?.broadcast && !dismissedBookingsRef.current.has(res.data.broadcast.bookingId)) {
+        handleBroadcast(res.data.broadcast)
+      }
+    }).catch(() => { }).finally(() => {
+      // Request is now showing (or has expired): lift the loading cover
+      setLaunchBooking(null)
+    })
+    const cleanUrl = window.location.pathname
+    window.history.replaceState({}, '', cleanUrl)
+  }, [isLabour, launchBooking, handleBroadcast])
+
+  // Never keep the cover up forever (e.g. signed out, not a provider, or network failure)
+  useEffect(() => {
+    if (!launchBooking) return undefined
+    const t = setTimeout(() => setLaunchBooking(null), 12000)
+    return () => clearTimeout(t)
+  }, [launchBooking])
+
+  useEffect(() => {
+    if (launchBooking && user && !isLabour) setLaunchBooking(null)
+  }, [launchBooking, user, isLabour])
 
   // Countdown timer
   useEffect(() => {
@@ -395,6 +419,17 @@ export function BroadcastPopup() {
       broadcastsApi.rejectBroadcast(bId).catch(() => { })
     }
   }, [incoming])
+
+  // Opened from a request notification: show a loader instead of the home page while the
+  // user/session loads and the request is fetched, so the request appears straight away.
+  if (launchBooking && !incoming) {
+    return (
+      <div className="fixed inset-0 z-[10000] flex flex-col items-center justify-center gap-3 bg-slate-900">
+        <Loader2 className="h-9 w-9 animate-spin text-amber-400" aria-hidden />
+        <p className="text-sm font-semibold text-white/90">Loading your new request...</p>
+      </div>
+    )
+  }
 
   if (!isLabour) return null
 
