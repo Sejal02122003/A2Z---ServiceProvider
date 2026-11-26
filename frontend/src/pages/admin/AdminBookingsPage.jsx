@@ -90,6 +90,19 @@ function BookingDetailsModal({ booking, onClose }) {
   const crewAssignments = multiItems.length > 0 ? allAssignments.filter((a) => !usedAssignments.has(a)) : allAssignments
   // Package bookings show the package itself instead of a generic Service / Category
   const pkg = booking.packageBooking?.isPackage ? booking.packageBooking : null
+  const rescheduleHistory = Array.isArray(booking.rescheduleHistory) ? booking.rescheduleHistory : []
+  const formatIST = (value, withTime = false) => {
+    if (!value) return '—'
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return '—'
+    return d.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      ...(withTime ? { hour: '2-digit', minute: '2-digit' } : {}),
+    })
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
@@ -313,8 +326,56 @@ function BookingDetailsModal({ booking, onClose }) {
                   ? new Date(booking.scheduledAt).toLocaleString()
                   : 'N/A'}
               </p>
+              {(booking.isRescheduled || rescheduleHistory.length > 0) && (
+                <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-800">
+                  Rescheduled
+                </span>
+              )}
             </div>
           </div>
+
+          {(booking.isRescheduled || rescheduleHistory.length > 0) && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-amber-900">
+                  <Calendar className="h-4 w-4" aria-hidden /> Rescheduled
+                </p>
+                <span className="rounded-full bg-amber-200/80 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-900">
+                  {Math.max(Number(booking.rescheduleCount) || 0, rescheduleHistory.length)}× rescheduled
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {[...rescheduleHistory].reverse().map((h, i) => (
+                  <div key={h._id || i} className="rounded-lg border border-amber-100 bg-white p-3 text-xs">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold text-slate-800">
+                      <span className="text-slate-500 line-through">
+                        {formatIST(h.oldScheduledAt)}{h.oldTimeSlot ? ` (${h.oldTimeSlot})` : ''}
+                      </span>
+                      <span className="text-amber-600">→</span>
+                      <span className="text-emerald-700">
+                        {formatIST(h.newScheduledAt)}{h.newTimeSlot ? ` (${h.newTimeSlot})` : ''}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      By <span className="font-bold text-slate-700">{h.rescheduledBy || 'Customer'}</span>
+                      {h.rescheduledAt ? ` on ${formatIST(h.rescheduledAt, true)}` : ''}
+                    </p>
+                    {h.reason ? <p className="mt-0.5 text-[11px] text-slate-600">Reason: {h.reason}</p> : null}
+                  </div>
+                ))}
+                {rescheduleHistory.length === 0 && (
+                  <div className="rounded-lg border border-amber-100 bg-white p-3 text-xs text-slate-700">
+                    <p className="text-[11px] text-slate-500">
+                      By <span className="font-bold text-slate-700">{booking.rescheduledBy || 'Customer'}</span>
+                      {booking.rescheduledAt ? ` on ${formatIST(booking.rescheduledAt, true)}` : ''}
+                    </p>
+                    {booking.rescheduleReason ? <p className="mt-0.5 text-[11px] text-slate-600">Reason: {booking.rescheduleReason}</p> : null}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="border-t border-slate-100 pt-4">
             <p className="text-slate-500 text-xs mb-1">User Information</p>
