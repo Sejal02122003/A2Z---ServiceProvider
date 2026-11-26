@@ -508,6 +508,26 @@ function BookingDetailsModal({ booking, onClose }) {
 
   const completedBill = calculateCompletedBookingBill(booking)
 
+  // For multi-service bookings the crew and the booked items describe the same people/work.
+  // Merge each assignment into its matching item card so details are shown only once.
+  const idOf = (v) => String(v?._id || v || '')
+  const allAssignments = Array.isArray(booking.assignments) ? booking.assignments : []
+  const multiItems = booking.multiServiceBooking?.isMultiService ? (booking.multiServiceBooking?.items || []) : []
+  const itemAssignments = new Map()
+  const usedAssignments = new Set()
+  multiItems.forEach((item, i) => {
+    const lid = idOf(item.assignedLabourId)
+    if (!lid) return
+    const candidates = allAssignments.filter((a) => !usedAssignments.has(a) && idOf(a.labourId) === lid)
+    const pick =
+      candidates.find((a) => a.serviceId && idOf(a.serviceId) === idOf(item.serviceId)) || candidates[0]
+    if (pick) {
+      itemAssignments.set(i, pick)
+      usedAssignments.add(pick)
+    }
+  })
+  const crewAssignments = multiItems.length > 0 ? allAssignments.filter((a) => !usedAssignments.has(a)) : allAssignments
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
       {previewImg && (
@@ -669,12 +689,12 @@ function BookingDetailsModal({ booking, onClose }) {
             )}
           </div>
 
-          {booking.assignments && booking.assignments.length > 0 ? (
+          {crewAssignments.length > 0 ? (
             <div className="border-t border-slate-100 pt-4">
               <p className="text-slate-500 text-xs mb-2">Assigned Service Provider Crew</p>
               <div className="grid grid-cols-1 gap-4">
                 {(() => {
-                  return booking.assignments.map((a, idx) => {
+                  return crewAssignments.map((a, idx) => {
                     // Use stored labourShare from assignment if available (set at acceptance time)
                     // Fall back to proportional calculation for old bookings without stored share
                     let share = 0;
@@ -763,7 +783,7 @@ function BookingDetailsModal({ booking, onClose }) {
                 })()}
               </div>
             </div>
-          ) : booking.laborId && (
+          ) : allAssignments.length === 0 && booking.laborId && (
             <div className="border-t border-slate-100 pt-4">
               <p className="text-slate-500 text-xs mb-1">Assigned Service Provider</p>
               <p className="font-semibold">{booking.laborId?.fullName}</p>
@@ -839,7 +859,15 @@ function BookingDetailsModal({ booking, onClose }) {
                 <span>✨</span> Booked Service Items ({booking.multiServiceBooking.items.length})
               </p>
               <div className="space-y-2.5">
-                {booking.multiServiceBooking.items.map((item, idx) => (
+                {booking.multiServiceBooking.items.map((item, idx) => {
+                  const asg = itemAssignments.get(idx)
+                  const partner = (item.assignedLabourId && typeof item.assignedLabourId === 'object' ? item.assignedLabourId : null) || (asg?.labourId && typeof asg.labourId === 'object' ? asg.labourId : null)
+                  const partnerShare = asg
+                    ? (asg.labourShare > 0 ? asg.labourShare : Math.round((item.itemTotal || 0) * getBookingLabourRate(booking)))
+                    : null
+                  const startImg = asg?.startWorkImage
+                  const endImg = asg?.endWorkImage
+                  return (
                   <div key={item._id || idx} className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-start gap-3">
                       {item.iconUrl ? (
@@ -857,10 +885,22 @@ function BookingDetailsModal({ booking, onClose }) {
                         <p className="text-[11px] text-slate-500 mt-0.5">
                           Qty: <span className="font-semibold text-slate-700">{item.quantity || 1}</span> · Price: <span className="font-semibold text-slate-700">₹{item.unitPrice || 0}</span> · Total: <span className="font-bold text-slate-900">₹{item.itemTotal || 0}</span>
                         </p>
-                        {item.assignedLabourId && (
+                        {(item.assignedLabourId || asg) && (
                           <p className="text-xs text-indigo-700 font-semibold mt-1">
-                            Partner: {item.assignedLabourId.fullName || item.assignedLabourId.phone || 'Assigned'}
+                            Service Provider: {partner?.fullName || partner?.phone || 'Assigned'}
+                            {partner?.fullName && partner?.phone ? <span className="font-normal text-slate-500"> · {partner.phone}</span> : null}
                           </p>
+                        )}
+                        {partnerShare != null && (
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Service Provider Share: <span className="font-bold text-brand">₹{Math.round(partnerShare).toLocaleString('en-IN')}</span>
+                          </p>
+                        )}
+                        {(startImg || endImg) && (
+                          <div className="flex gap-2 mt-2">
+                            {startImg && <img src={startImg} alt="Start Work" onClick={() => setPreviewImg(startImg)} className="h-14 w-20 object-cover rounded border border-slate-200 cursor-zoom-in" />}
+                            {endImg && <img src={endImg} alt="End Work" onClick={() => setPreviewImg(endImg)} className="h-14 w-20 object-cover rounded border border-slate-200 cursor-zoom-in" />}
+                          </div>
                         )}
                         {item.cancellationReason && (
                           <p className="text-xs text-rose-600 font-semibold mt-1">
@@ -883,7 +923,8 @@ function BookingDetailsModal({ booking, onClose }) {
                       </div>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}
