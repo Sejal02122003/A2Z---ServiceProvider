@@ -11,6 +11,27 @@ export default function InvoicePrintView({ data }) {
   const invoiceNumber = invoice?.invoiceNumber || 'INV-000000'
   const date = new Date(invoice?.createdAt || Date.now()).toLocaleDateString('en-IN')
 
+  const rawPaymentStatus = String(booking?.paymentStatus || '').toUpperCase()
+  const isPaid = rawPaymentStatus === 'PAID'
+  const paymentLabel = isPaid
+    ? 'PAID'
+    : rawPaymentStatus === 'REFUNDED'
+      ? 'REFUNDED'
+      : rawPaymentStatus === 'FAILED'
+        ? 'FAILED'
+        : 'PAYMENT PENDING'
+  const paymentTone = isPaid
+    ? 'border-emerald-600 text-emerald-700'
+    : rawPaymentStatus === 'FAILED'
+      ? 'border-rose-600 text-rose-700'
+      : rawPaymentStatus === 'REFUNDED'
+        ? 'border-sky-600 text-sky-700'
+        : 'border-amber-600 text-amber-700'
+  const paymentMethodLabel = booking?.paymentMethod
+    ? String(booking.paymentMethod).replace(/_/g, ' ').toUpperCase()
+    : ''
+  const paidOn = isPaid && booking?.paidAt ? new Date(booking.paidAt).toLocaleDateString('en-IN') : ''
+
   return (
     <div className="bg-white text-black p-6 print:px-8 print:py-4 mx-auto w-full min-h-[297mm]">
       {/* Header */}
@@ -19,6 +40,17 @@ export default function InvoicePrintView({ data }) {
           <h1 className="text-4xl font-bold text-gray-900 tracking-tighter">INVOICE</h1>
           <p className="text-sm text-gray-500 mt-1">Invoice #{invoiceNumber}</p>
           <p className="text-sm text-gray-500">Date: {date}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-block rounded-md border-2 px-3 py-1 text-xs font-extrabold tracking-wider ${paymentTone}`}
+            >
+              {paymentLabel}
+            </span>
+            {paymentMethodLabel && (
+              <span className="text-xs font-semibold text-gray-500">via {paymentMethodLabel}</span>
+            )}
+          </div>
+          {paidOn && <p className="mt-1 text-xs text-gray-500">Paid on {paidOn}</p>}
         </div>
         <div className="text-right">
           <h2 className="text-xl font-bold text-gray-800">A2Z Platform</h2>
@@ -109,6 +141,10 @@ export default function InvoicePrintView({ data }) {
           <div className="flex justify-between py-4 text-lg font-bold text-gray-900 border-b-2 border-gray-900">
             <span>Total Amount</span>
             <span>₹{(invoice?.total || booking?.totalAmount || 0).toLocaleString('en-IN')}</span>
+          </div>
+          <div className="flex justify-between py-2 text-sm font-semibold text-gray-700">
+            <span>Payment Status</span>
+            <span className={isPaid ? 'text-emerald-700' : 'text-amber-700'}>{paymentLabel}</span>
           </div>
         </div>
       </div>
