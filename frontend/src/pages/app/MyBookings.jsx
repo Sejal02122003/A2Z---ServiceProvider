@@ -30,6 +30,7 @@ export function MyBookings() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState('active')
+  const [pastFilter, setPastFilter] = useState('all') // all | completed | cancelled
 
   useEffect(() => {
     let cancelled = false
@@ -62,7 +63,18 @@ export function MyBookings() {
     return { activeBookings: active, pastBookings: past }
   }, [bookings])
 
-  const displayed = tab === 'active' ? activeBookings : pastBookings
+  const completedCount = useMemo(
+    () => pastBookings.filter((b) => (b.status || '').toUpperCase() === 'COMPLETED').length,
+    [pastBookings],
+  )
+  const cancelledCount = pastBookings.length - completedCount
+
+  const displayed = useMemo(() => {
+    if (tab === 'active') return activeBookings
+    if (pastFilter === 'all') return pastBookings
+    const want = pastFilter === 'completed' ? 'COMPLETED' : 'CANCELLED'
+    return pastBookings.filter((b) => (b.status || '').toUpperCase() === want)
+  }, [tab, pastFilter, activeBookings, pastBookings])
 
   const handleBookingUpdated = (updatedBooking) => {
     setBookings((prev) =>
@@ -95,6 +107,31 @@ export function MyBookings() {
         </div>
       </GlassPanel>
 
+      {tab === 'past' && !loading && !error && pastBookings.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Filter past bookings">
+          {[
+            { id: 'all', label: 'All', count: pastBookings.length },
+            { id: 'completed', label: 'Completed', count: completedCount },
+            { id: 'cancelled', label: 'Cancelled', count: cancelledCount },
+          ].map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              role="tab"
+              aria-selected={pastFilter === f.id}
+              onClick={() => setPastFilter(f.id)}
+              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-bold transition ${
+                pastFilter === f.id
+                  ? 'border-brand bg-brand text-white shadow-sm'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {f.label} ({f.count})
+            </button>
+          ))}
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-brand" />
@@ -107,7 +144,13 @@ export function MyBookings() {
         <GlassPanel className="p-8 text-center">
           <Sparkles className="mx-auto h-10 w-10 text-slate-300" aria-hidden />
           <p className="mt-3 text-sm font-semibold text-slate-600">
-            {tab === 'active' ? 'No active bookings' : 'No past bookings'}
+            {tab === 'active'
+              ? 'No active bookings'
+              : pastFilter === 'completed'
+                ? 'No completed bookings'
+                : pastFilter === 'cancelled'
+                  ? 'No cancelled bookings'
+                  : 'No past bookings'}
           </p>
           <p className="mt-1 text-xs text-slate-500">
             {tab === 'active' ? 'Book a service to get started!' : 'Your completed bookings will appear here.'}
