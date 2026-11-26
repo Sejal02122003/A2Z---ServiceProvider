@@ -474,16 +474,6 @@ export function AppProfilePage() {
     }
   }, [editNameValue, editPhoneValue, editEmailValue, editPermanentAddress, editCurrentLocation, editCity, editState, editCountry, editExperienceYears, user, dispatch])
 
-  const handleToggleRole = useCallback(async () => {
-    const newRole = user?.role === USER_ROLES.CUSTOMER ? USER_ROLES.CONTRACTOR : USER_ROLES.CUSTOMER
-    try {
-      const res = await patchCurrentUser({ role: newRole })
-      dispatch(setUser(res.data.user))
-    } catch (err) {
-      console.error(err)
-    }
-  }, [user, dispatch])
-
   const location = useLocation()
   const isLabour = location.pathname.startsWith('/serviceprovider')
   const homePath = isLabour ? '/serviceprovider' : '/user'
@@ -1099,24 +1089,6 @@ export function AppProfilePage() {
           <ChevronRight className="h-4 w-4 text-slate-400" />
         </button>
       </GlassPanel>
-
-      {(user?.role === USER_ROLES.CUSTOMER || user?.role === USER_ROLES.CONTRACTOR) && (
-        <GlassPanel className="border-slate-200/90 p-4 ring-1 ring-slate-100/90 flex flex-col items-center justify-center text-center">
-          <Building2 className="h-8 w-8 text-brand mb-2" />
-          <h3 className="text-sm font-bold text-slate-900 mb-1">
-            {user?.role === USER_ROLES.CUSTOMER ? 'Looking for bulk bookings?' : 'Looking for individual bookings?'}
-          </h3>
-          <p className="text-xs text-slate-500 mb-4">
-            {user?.role === USER_ROLES.CUSTOMER
-              ? 'Switch to Contractor mode to book multiple service providers and manage bulk projects.'
-              : 'Switch to Individual mode for regular home services and single bookings.'}
-          </p>
-          <AppButton type="button" variant="secondary" onClick={handleToggleRole} className="w-full">
-            Switch to {user?.role === USER_ROLES.CUSTOMER ? 'Contractor Mode' : 'Individual Mode'}
-          </AppButton>
-        </GlassPanel>
-      )}
-
 
       {isLabour ? (
         <GlassPanel className="border-slate-200/90 p-4 ring-1 ring-slate-100/90">
