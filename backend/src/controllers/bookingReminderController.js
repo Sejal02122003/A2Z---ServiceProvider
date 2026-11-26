@@ -8,7 +8,28 @@ import {
   getReminderOverviewStats,
   retryReminderManually,
   processDueReminders,
+  resolveBookingServiceLabel,
 } from '../services/bookingReminderService.js'
+
+// Booking fields needed to work out the real service / package label for a reminder row
+const REMINDER_BOOKING_POPULATE = {
+  path: 'bookingId',
+  select: 'status type scheduledAt timeSlot address totalAmount packageBooking multiServiceBooking contractorInfo serviceId subServiceName',
+  populate: [
+    { path: 'serviceId', select: 'name' },
+    { path: 'contractorInfo.services.serviceId', select: 'name' },
+  ],
+}
+
+// Replace the (possibly stale / wrong) saved service name with the live booking's real label
+function withLiveServiceName(reminders) {
+  return reminders.map((r) => {
+    const booking = r.bookingId && typeof r.bookingId === 'object' ? r.bookingId : null
+    if (!booking) return r
+    const label = resolveBookingServiceLabel(booking, r.metadata?.serviceName || 'Home Service')
+    return { ...r, metadata: { ...(r.metadata || {}), serviceName: label } }
+  })
+}
 
 /**
  * =========================================================================
@@ -73,7 +94,7 @@ export const getUpcomingReminders = asyncHandler(async (req, res) => {
 
   const total = await BookingReminder.countDocuments(query)
   const reminders = await BookingReminder.find(query)
-    .populate('bookingId', 'status type scheduledAt timeSlot address totalAmount')
+    .populate(REMINDER_BOOKING_POPULATE)
     .populate('recipientId', 'fullName phone email role profileImageUrl')
     .sort({ scheduledAt: 1 })
     .skip(skip)
@@ -82,7 +103,7 @@ export const getUpcomingReminders = asyncHandler(async (req, res) => {
 
   return sendSuccess(res, {
     data: {
-      reminders,
+      reminders: withLiveServiceName(reminders),
       pagination: {
         total,
         page: Number(page),
@@ -124,7 +145,7 @@ export const getReminderHistory = asyncHandler(async (req, res) => {
 
   const total = await BookingReminder.countDocuments(query)
   const reminders = await BookingReminder.find(query)
-    .populate('bookingId', 'status type scheduledAt timeSlot address totalAmount')
+    .populate(REMINDER_BOOKING_POPULATE)
     .populate('recipientId', 'fullName phone email role profileImageUrl')
     .sort({ createdAt: -1 })
     .skip(skip)
@@ -133,7 +154,7 @@ export const getReminderHistory = asyncHandler(async (req, res) => {
 
   return sendSuccess(res, {
     data: {
-      reminders,
+      reminders: withLiveServiceName(reminders),
       pagination: {
         total,
         page: Number(page),

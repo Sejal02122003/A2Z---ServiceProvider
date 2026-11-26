@@ -134,6 +134,47 @@ export function calculateBookingAppointmentTime(booking) {
 /**
  * Format a Date for human readable notification display in IST
  */
+/**
+ * Human label for what was booked, for every booking type:
+ * package -> package name, multi-service -> its services, contractor -> its services,
+ * single -> service (+ sub-service). Works with populated docs or plain/lean objects.
+ */
+export function resolveBookingServiceLabel(booking, fallback = 'Home Service') {
+  if (!booking) return fallback
+
+  if (booking.packageBooking?.isPackage && booking.packageBooking.packageName) {
+    return booking.packageBooking.packageName
+  }
+
+  const joinNames = (names) => {
+    const unique = [...new Set(names.filter(Boolean))]
+    if (unique.length === 0) return ''
+    if (unique.length <= 2) return unique.join(' + ')
+    return `${unique[0]} + ${unique.length - 1} more`
+  }
+
+  const multiItems = booking.multiServiceBooking?.isMultiService ? booking.multiServiceBooking.items || [] : []
+  if (multiItems.length > 0) {
+    const label = joinNames(
+      multiItems.map((it) =>
+        it.subServiceName ? `${it.serviceName} - ${it.subServiceName}` : it.serviceName,
+      ),
+    )
+    if (label) return label
+  }
+
+  const contractorServices = booking.contractorInfo?.services || []
+  if (contractorServices.length > 0) {
+    const label = joinNames(contractorServices.map((s) => s.serviceId?.name || s.serviceName))
+    if (label) return label
+  }
+
+  const base = booking.serviceId?.name
+  if (base) return booking.subServiceName ? `${base} - ${booking.subServiceName}` : base
+
+  return fallback
+}
+
 export function formatAppointmentDateTimeIST(date) {
   if (!date || isNaN(new Date(date).getTime())) return 'Scheduled Time'
   const d = new Date(date)
@@ -159,6 +200,7 @@ export function formatAppointmentDateTimeIST(date) {
 export async function scheduleRemindersForBooking(bookingId) {
   const booking = await Booking.findById(bookingId)
     .populate('serviceId', 'name')
+    .populate('contractorInfo.services.serviceId', 'name')
     .populate('userId', 'fullName phone email')
     .populate('laborId', 'fullName phone email')
     .populate('assignments.labourId', 'fullName phone email')
@@ -194,7 +236,7 @@ export async function scheduleRemindersForBooking(bookingId) {
     return { success: false, reason: 'GLOBAL_REMINDERS_DISABLED' }
   }
 
-  const serviceName = booking.serviceId?.name || 'Home Service'
+  const serviceName = resolveBookingServiceLabel(booking)
   const customerName = booking.userId?.fullName || 'Customer'
   const locationText = booking.address?.locationText || ''
   const appointmentFormatted = formatAppointmentDateTimeIST(appointmentTime)
@@ -477,6 +519,7 @@ export async function processDueReminders() {
       // 1. Verify live booking status & eligibility
       const booking = await Booking.findById(reminder.bookingId)
         .populate('serviceId', 'name')
+        .populate('contractorInfo.services.serviceId', 'name')
         .populate('userId', 'fullName phone')
         .populate('laborId', 'fullName phone')
 
@@ -513,7 +556,7 @@ export async function processDueReminders() {
       }
 
       // 2. Format title and body based on interval template
-      const serviceName = booking.serviceId?.name || reminder.metadata?.serviceName || 'Home Service'
+      const serviceName = resolveBookingServiceLabel(booking, reminder.metadata?.serviceName || 'Home Service')
       const apptFormatted = formatAppointmentDateTimeIST(reminder.appointmentTime)
       const locationText = booking.address?.locationText || reminder.metadata?.locationText || ''
 
