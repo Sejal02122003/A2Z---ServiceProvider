@@ -14,13 +14,11 @@ import { adminComplaintsApi } from '../../api/adminComplaintsApi.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 
 const STATUS_FILTERS = ['ALL', 'OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']
-const ROLE_FILTERS = ['ALL', 'customer', 'labour', 'contractor', 'contractor']
+const ROLE_FILTERS = ['ALL', 'customer', 'labour']
 const ROLE_LABELS = {
   ALL: 'All Roles',
-  individual: 'Individuals',
-  labour: 'Service Provider',
-  contractor: 'Contractor',
-  contractor: 'Vendors'
+  customer: 'Customers',
+  labour: 'Service Providers',
 }
 
 const STATUS_META = {
