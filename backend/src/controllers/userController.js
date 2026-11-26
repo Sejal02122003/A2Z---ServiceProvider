@@ -176,8 +176,22 @@ export const updateMe = asyncHandler(async (req, res) => {
     }
   }
 
+  const onlyPhotoChange =
+    req.body.profileImageUrl !== undefined &&
+    Object.keys(req.body).every((k) => k === 'profileImageUrl')
+
   try {
-    await user.save()
+    if (onlyPhotoChange) {
+      // Write just this field. A full user.save() re-validates the whole document, and older
+      // service-provider records (schedule, KYC, addresses, welcome kit) can fail that for
+      // reasons unrelated to the photo.
+      await User.updateOne(
+        { _id: user._id },
+        { $set: { profileImageUrl: user.profileImageUrl || null } },
+      )
+    } else {
+      await user.save()
+    }
   } catch (err) {
     if (err.code === 11000) {
       const field = Object.keys(err.keyPattern || {})[0]
@@ -189,7 +203,7 @@ export const updateMe = asyncHandler(async (req, res) => {
     }
     throw err
   }
-  
+
   await populateLabourCategories(user)
   return sendSuccess(res, {
     message: 'Profile updated',

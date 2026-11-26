@@ -321,7 +321,8 @@ export function AppProfilePage() {
         dispatch(setUser(res.data.user))
         setLocalPreview(null)
       } catch (e) {
-        setPhotoErr(e instanceof ApiError ? e.message : 'Could not save profile photo')
+        console.error('[Profile photo] save failed:', e)
+        setPhotoErr(`Photo uploaded but could not be saved: ${e instanceof ApiError ? e.message : 'please try again.'}`)
         setLocalPreview(null)
       } finally {
         setPhotoSaving(false)
@@ -359,7 +360,8 @@ export function AppProfilePage() {
         }
         await saveProfilePhoto(url)
       } catch (err) {
-        setPhotoErr(err instanceof ApiError ? err.message : 'Could not upload photo.')
+        console.error('[Profile photo] upload failed:', err)
+        setPhotoErr(`Photo upload failed: ${err instanceof ApiError ? err.message : 'check your connection and try again.'}`)
         setLocalPreview(null)
       } finally {
         URL.revokeObjectURL(previewUrl)
