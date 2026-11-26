@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, Image as ImageIcon, Loader2, Video as VideoIcon } from 'lucide-react'
+import { Plus, Trash2, Eye, Image as ImageIcon, Loader2, Video as VideoIcon } from 'lucide-react'
 import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
 import { fetchAdminBanners, createAdminBanner, deleteAdminBanner } from '../../api/adminBannersApi.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
@@ -129,13 +129,32 @@ export function AdminBannersPage() {
                   />
                 )}
               </div>
-              <button
-                onClick={() => handleDelete(banner._id)}
-                className="absolute right-2 top-2 rounded-full bg-white/90 p-2 text-red-600 opacity-0 shadow-sm transition hover:bg-red-50 group-hover:opacity-100"
-                title="Delete Banner"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-3 py-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {banner.mediaType === 'video' ? 'Video' : 'Image'}
+                </span>
+                <div className="flex items-center gap-1">
+                  <a
+                    href={banner.imageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg p-2 text-slate-600 transition hover:bg-slate-100 hover:text-brand"
+                    title="View"
+                    aria-label="View"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(banner._id)}
+                    className="rounded-lg p-2 text-red-600 transition hover:bg-red-50"
+                    title="Delete"
+                    aria-label="Delete"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
             </GlassPanel>
           ))}
         </div>
