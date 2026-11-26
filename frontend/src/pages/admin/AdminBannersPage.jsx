@@ -69,7 +69,7 @@ export function AdminBannersPage() {
         <h1 className="text-2xl font-bold text-slate-900">Banners</h1>
         <input 
           type="file" 
-          accept={activeTab === 'EXPLORE' ? "image/*,video/mp4,video/webm,video/quicktime" : "image/*"} 
+          accept="image/*,video/mp4,video/webm,video/quicktime"
           className="hidden" 
           ref={fileInputRef}
           onChange={handleFileChange}
@@ -80,7 +80,7 @@ export function AdminBannersPage() {
           ) : (
             <Plus className="mr-2 h-4 w-4" />
           )}
-          Upload {activeTab === 'EXPLORE' ? 'Media' : 'Banner'}
+          Upload Image / Video
         </AppPrimaryButton>
       </div>
 
