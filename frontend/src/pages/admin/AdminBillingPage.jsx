@@ -24,7 +24,7 @@ export function AdminBillingPage() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('ALL')
-  const [typeFilter, setTypeFilter] = useState('ALL') // ALL, contractor, individual
+  const [typeFilter, setTypeFilter] = useState('ALL') // ALL, individual
   const [page, setPage] = useState(1)
   const limit = 15
 
@@ -96,7 +96,7 @@ export function AdminBillingPage() {
       <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 hide-on-print">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Payments & Billing Transactions</h1>
-        <p className="text-gray-500 mt-1">Manage transaction details, customer and contractor bookings, and generate invoices</p>
+        <p className="text-gray-500 mt-1">Manage transaction details and customer bookings, and generate invoices</p>
       </div>
 
       {genMsg.text && (
@@ -137,7 +137,6 @@ export function AdminBillingPage() {
            >
              <option value="ALL">All Clients</option>
              <option value="individual">Customer (Individual)</option>
-             <option value="contractor">Contractor (Bulk)</option>
            </select>
           <button
             onClick={loadBookings}
@@ -186,8 +185,7 @@ export function AdminBillingPage() {
                     </td>
                     <td className="px-4 py-3.5">
                       <p className="text-sm text-gray-800 font-medium">
-                         {b.userId?.fullName || 'Unknown'} 
-                         {b.contractorInfo?.services?.length > 0 ? <span className="ml-1 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Contractor</span> : ''}
+                         {b.userId?.fullName || 'Unknown'}
                       </p>
                     </td>
                     <td className="px-4 py-3.5">

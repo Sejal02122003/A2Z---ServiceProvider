@@ -59,14 +59,6 @@ export function AdminDashboardPage() {
       tone: 'from-sky-500/15 to-slate-50' 
     },
     { 
-      label: 'Contractor accounts', 
-      to: '/admin/users',
-      value: stats?.users?.contractors ?? '—', 
-      hint: 'B2B Partners', 
-      icon: Shield, 
-      tone: 'from-violet-500/15 to-slate-50' 
-    },
-    { 
       label: 'Skill categories', 
       to: '/admin/categories',
       value: stats?.system?.categories ?? '—', 
@@ -205,7 +197,7 @@ export function AdminDashboardPage() {
           >
             <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400">Today</h2>
             <p className="mt-3 text-sm leading-relaxed text-slate-600">
-              Operational queues (contractor approvals, KYC, FCFS bookings) will surface here.
+              Operational queues (KYC, FCFS bookings) will surface here.
             </p>
             <Link
               to="/admin/labour"

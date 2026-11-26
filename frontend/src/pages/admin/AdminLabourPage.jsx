@@ -230,7 +230,7 @@ function isPdfUrl(url) {
 
 function extractKycMedia(detailUser) {
   if (!detailUser) return { documents: [], videos: [] }
-  const profile = detailUser.contractorProfile || detailUser.labourProfile || {}
+  const profile = detailUser.labourProfile || {}
   const idDoc = detailUser.identityVerification || detailUser.identityVerificationRef || {}
 
   const documents = []
@@ -301,7 +301,6 @@ export function AdminLabourPage() {
   const [locationFilter, setLocationFilter] = useState(() => searchParams.get('location') || '')
   const [debouncedLocation, setDebouncedLocation] = useState(() => searchParams.get('location') || '')
   const [page, setPage] = useState(() => Math.max(1, Number(searchParams.get('page')) || 1))
-  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') === 'contractor' ? 'contractor' : 'labour')
   const limit = 12
 
   const [items, setItems] = useState([])
@@ -525,7 +524,7 @@ export function AdminLabourPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch, debouncedLocation, kycFilter, kitFilter, trialFilter, status, activeTab])
+  }, [debouncedSearch, debouncedLocation, kycFilter, kitFilter, trialFilter, status])
 
   useEffect(() => {
     const next = new URLSearchParams()
@@ -535,10 +534,9 @@ export function AdminLabourPage() {
     if (trialFilter !== 'all') next.set('trial', trialFilter)
     if (status !== 'all') next.set('status', status)
     if (debouncedLocation) next.set('location', debouncedLocation)
-    if (activeTab === 'contractor') next.set('tab', 'contractor')
     if (page > 1) next.set('page', String(page))
     setSearchParams(next, { replace: true })
-  }, [debouncedSearch, debouncedLocation, kycFilter, kitFilter, trialFilter, status, activeTab, page, setSearchParams])
+  }, [debouncedSearch, debouncedLocation, kycFilter, kitFilter, trialFilter, status, page, setSearchParams])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -546,7 +544,7 @@ export function AdminLabourPage() {
     try {
       const data = await fetchAdminUsers({
         search: debouncedSearch,
-        role: activeTab === 'contractor' ? USER_ROLES.CONTRACTOR : USER_ROLES.LABOUR,
+        role: USER_ROLES.LABOUR,
         status,
         kycStatus: kycFilter,
         kitStatus: kitFilter,
@@ -566,7 +564,7 @@ export function AdminLabourPage() {
     } finally {
       setLoading(false)
     }
-  }, [debouncedSearch, kycFilter, kitFilter, trialFilter, status, debouncedLocation, page, limit, activeTab])
+  }, [debouncedSearch, kycFilter, kitFilter, trialFilter, status, debouncedLocation, page, limit])
 
   const handleTrialEvaluateSubmit = async (e) => {
     if (e) e.preventDefault()
@@ -581,7 +579,7 @@ export function AdminLabourPage() {
       setItems((prev) =>
         prev.map((item) => {
           if (item._id !== trialModalUser._id) return item
-          const profileKey = item.role === USER_ROLES.CONTRACTOR ? 'contractorProfile' : 'labourProfile'
+          const profileKey = 'labourProfile'
           const currentProfile = item[profileKey] || {}
           return {
             ...item,
@@ -695,7 +693,7 @@ export function AdminLabourPage() {
     },
     {
       key: 'total',
-      label: activeTab === 'contractor' ? 'Contractor accounts' : 'Service Provider accounts',
+      label: 'Service Provider accounts',
       value: kycStats?.total ?? '—',
       hint: 'Search + account status',
       icon: Users,
@@ -741,29 +739,6 @@ export function AdminLabourPage() {
           </button>
         </div>
       </motion.div>
-
-      <div className="flex border-b border-slate-200/90 mb-4">
-        <button
-          onClick={() => setActiveTab('labour')}
-          className={`pb-2.5 px-4 text-sm font-bold uppercase tracking-wide transition-colors ${
-            activeTab === 'labour'
-              ? 'border-b-2 border-brand text-brand'
-              : 'border-b-2 border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          Service Provider
-        </button>
-        <button
-          onClick={() => setActiveTab('contractor')}
-          className={`pb-2.5 px-4 text-sm font-bold uppercase tracking-wide transition-colors ${
-            activeTab === 'contractor'
-              ? 'border-b-2 border-brand text-brand'
-              : 'border-b-2 border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          Contractor
-        </button>
-      </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {statCards.map((c, i) => {
@@ -972,7 +947,7 @@ export function AdminLabourPage() {
                 <th className="px-4 py-3">KYC</th>
                 <th className="px-4 py-3">Trial Demo</th>
                 <th className="px-4 py-3 min-w-[210px]">Kit & Payment Slip</th>
-                {activeTab !== 'contractor' && <th className="px-4 py-3">Skill</th>}
+                <th className="px-4 py-3">Skill</th>
                 <th className="px-4 py-3">Location</th>
                 <th className="px-4 py-3">Review</th>
                 <th className="px-4 py-3">Status</th>
@@ -983,7 +958,7 @@ export function AdminLabourPage() {
               {loading
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i} className="border-b border-slate-100">
-                      {Array.from({ length: activeTab === 'contractor' ? 9 : 10 }).map((__, j) => (
+                      {Array.from({ length: 10 }).map((__, j) => (
                         <td key={j} className="px-4 py-3">
                           <div className="h-4 animate-pulse rounded bg-slate-200/80" />
                         </td>
@@ -1000,11 +975,11 @@ export function AdminLabourPage() {
                         {u.phone ? `+91 ${u.phone}` : '—'}
                       </td>
                       <td className="px-4 py-3">
-                        <KycPill status={(u.contractorProfile || u.labourProfile)?.kycStatus} submittedAt={(u.contractorProfile || u.labourProfile)?.kycSubmittedAt} />
+                        <KycPill status={u.labourProfile?.kycStatus} submittedAt={u.labourProfile?.kycSubmittedAt} />
                       </td>
                       <td className="px-4 py-3">
                         <TrialSlotBadge
-                          trialSlot={(u.contractorProfile || u.labourProfile)?.trialSlot}
+                          trialSlot={u.labourProfile?.trialSlot}
                           onEvaluate={() => {
                             setTrialModalUser(u)
                             setEvalDecision('passed')
@@ -1097,18 +1072,16 @@ export function AdminLabourPage() {
                           )}
                         </div>
                       </td>
-                      {activeTab !== 'contractor' && (
-                        <td className="max-w-[280px] px-4 py-3 text-xs text-slate-600">
-                          <div className="font-medium text-slate-800">{formatSkillLine(u)}</div>
-                          <div className="mt-0.5 text-slate-500">{formatServiceLine(u)}</div>
-                        </td>
-                      )}
+                      <td className="max-w-[280px] px-4 py-3 text-xs text-slate-600">
+                        <div className="font-medium text-slate-800">{formatSkillLine(u)}</div>
+                        <div className="mt-0.5 text-slate-500">{formatServiceLine(u)}</div>
+                      </td>
                       <td className="px-4 py-3 text-xs text-slate-700">
                         {u.city || u.welcomeKit?.confirmedAddressSnapshot?.city || u.welcomeKit?.address?.city || u.welcomeKit?.deliveryCity || u.currentLocation || '—'}
                       </td>
                       <td className="px-4 py-3">
                         {(() => {
-                          const profile = u.contractorProfile || u.labourProfile
+                          const profile = u.labourProfile
                           const hasDocs = Boolean(
                             profile?.kycSubmittedAt ||
                             profile?.kycVideoUrl ||
@@ -1258,7 +1231,7 @@ export function AdminLabourPage() {
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <KycPill status={(u.contractorProfile || u.labourProfile)?.kycStatus} submittedAt={(u.contractorProfile || u.labourProfile)?.kycSubmittedAt} />
+                  <KycPill status={u.labourProfile?.kycStatus} submittedAt={u.labourProfile?.kycSubmittedAt} />
                   <span className="text-[11px] text-slate-500">Last: {formatLastLoginDisplay(u.lastLoginAt) || '—'}</span>
                 </div>
                 <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
@@ -1267,7 +1240,7 @@ export function AdminLabourPage() {
                     <span>Demo:</span>
                   </div>
                   <TrialSlotBadge
-                    trialSlot={(u.contractorProfile || u.labourProfile)?.trialSlot}
+                    trialSlot={u.labourProfile?.trialSlot}
                     onEvaluate={() => {
                       setTrialModalUser(u)
                       setEvalDecision('passed')
@@ -1342,7 +1315,7 @@ export function AdminLabourPage() {
                   </button>
                 </div>
                 {(() => {
-                  const profile = u.contractorProfile || u.labourProfile
+                  const profile = u.labourProfile
                   const hasDocs = Boolean(
                     profile?.kycSubmittedAt ||
                     profile?.kycVideoUrl ||
@@ -1369,12 +1342,10 @@ export function AdminLabourPage() {
                     </button>
                   )
                 })()}
-                {activeTab !== 'contractor' && (
-                  <div className="mt-3 rounded bg-slate-50 p-2">
-                    <p className="text-xs font-medium text-slate-800">{formatSkillLine(u)}</p>
-                    <p className="mt-0.5 text-[11px] text-slate-500">{formatServiceLine(u)}</p>
-                  </div>
-                )}
+                <div className="mt-3 rounded bg-slate-50 p-2">
+                  <p className="text-xs font-medium text-slate-800">{formatSkillLine(u)}</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">{formatServiceLine(u)}</p>
+                </div>
                 <p className="mt-2 text-[11px] text-slate-500">
                   Location: <span className="font-medium text-slate-700">{u.city || u.welcomeKit?.confirmedAddressSnapshot?.city || u.welcomeKit?.address?.city || u.welcomeKit?.deliveryCity || u.currentLocation || '—'}</span>
                 </p>
@@ -1469,7 +1440,7 @@ export function AdminLabourPage() {
               ) : detailUser ? (
                 <>
                   {(() => {
-                    const profile = detailUser.contractorProfile || detailUser.labourProfile || {}
+                    const profile = detailUser.labourProfile || {}
                     const kycMedia = extractKycMedia(detailUser)
                     const status = profile?.kycStatus || KYC_STATUS.PENDING
 
@@ -1481,7 +1452,7 @@ export function AdminLabourPage() {
                             <div>
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                  {detailUser.role === USER_ROLES.CONTRACTOR ? 'Contractor Partner' : 'Service Partner'}
+                                  Service Partner
                                 </span>
                                 <KycPill status={status} submittedAt={profile?.kycSubmittedAt} />
                                 <StatusPill active={detailUser.isActive !== false} />
@@ -1954,13 +1925,13 @@ export function AdminLabourPage() {
                   <div>
                     <span className="text-slate-400 font-semibold block uppercase text-[9px]">Booked Slot Date</span>
                     <span className="font-bold text-slate-900">
-                      {(trialModalUser.contractorProfile || trialModalUser.labourProfile)?.trialSlot?.date || 'Not booked'}
+                      {trialModalUser.labourProfile?.trialSlot?.date || 'Not booked'}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-400 font-semibold block uppercase text-[9px]">Timing & Hub</span>
                     <span className="font-bold text-slate-900">
-                      {formatTrialTimeSlot((trialModalUser.contractorProfile || trialModalUser.labourProfile)?.trialSlot?.timeSlot) || '—'}
+                      {formatTrialTimeSlot(trialModalUser.labourProfile?.trialSlot?.timeSlot) || '—'}
                     </span>
                   </div>
                 </div>
