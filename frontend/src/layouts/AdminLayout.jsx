@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Fragment } from 'react'
-import { useAutoRefreshKey } from '../hooks/useAutoRefreshKey.js'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
@@ -35,7 +33,6 @@ const STORAGE_KEY = 'lc-admin-sidebar-collapsed'
 
 export function AdminLayout() {
   const { pathname } = useLocation()
-  const refreshKey = useAutoRefreshKey(pathname)
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const socket = useSocket()
@@ -814,7 +811,7 @@ export function AdminLayout() {
             animate={{ opacity: 1, y: 0 }}
             transition={reduce ? { duration: 0 } : appSpring}
           >
-            <Fragment key={refreshKey}><Outlet /></Fragment>
+            <Outlet />
           </motion.div>
         </main>
       </div>
