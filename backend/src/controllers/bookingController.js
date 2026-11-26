@@ -2301,10 +2301,14 @@ export const cancelBookingItem = asyncHandler(async (req, res) => {
   // Check cancellation penalty applicability for individual item
   const { getBookingCancellationSettings } = await import('../services/bookingCancellationService.js')
   const settings = await getBookingCancellationSettings()
-  const { calculatePenaltyAmount, prepareCancellationPenaltyRecord } = await import('../services/cancellationPenaltyService.js')
+  const { calculatePenaltyAmount, prepareCancellationPenaltyRecord, hasPaidCancellationPenalty } = await import('../services/cancellationPenaltyService.js')
   const calc = calculatePenaltyAmount({ booking, settings, itemId })
 
-  if (calc.penaltyApplicable && !req.body.bypassPenalty) {
+  // The penalty can only be skipped if it has actually been paid (verified server-side),
+  // never through a client-supplied flag.
+  const penaltyAlreadyPaid = calc.penaltyApplicable ? await hasPaidCancellationPenalty(booking._id, itemId) : false
+
+  if (calc.penaltyApplicable && !penaltyAlreadyPaid) {
     const penaltyRes = await prepareCancellationPenaltyRecord({
       booking,
       customerId: req.user._id,

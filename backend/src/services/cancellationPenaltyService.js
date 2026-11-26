@@ -79,6 +79,23 @@ export function hasProviderAccepted(booking, itemId = null) {
   return Boolean(booking.laborId || booking.acceptedLabourId)
 }
 
+/**
+ * True when the customer has already paid the cancellation penalty for this booking
+ * (or for the given service item). Only a verified, PAID penalty record counts, so a
+ * penalty can never be skipped by a client-supplied flag.
+ */
+export async function hasPaidCancellationPenalty(bookingId, itemId = null) {
+  if (!bookingId) return false
+  const query = {
+    bookingId,
+    paymentStatus: PENALTY_PAYMENT_STATUS.PAID,
+    penaltyStatus: PENALTY_STATUS.PAID,
+  }
+  query['metadata.itemId'] = itemId ? String(itemId) : null
+  const paid = await BookingCancellationPenalty.findOne(query).select('_id').lean()
+  return Boolean(paid)
+}
+
 export function calculatePenaltyAmount({ booking, settings, itemId = null, overrideTime = null }) {
   if (booking.status === 'FAILED') {
     return {

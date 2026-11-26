@@ -16,6 +16,7 @@ import { parseISTDateTime } from '../utils/dateHelper.js'
 import {
   calculatePenaltyAmount,
   hasProviderAccepted,
+  hasPaidCancellationPenalty,
   prepareCancellationPenaltyRecord,
   getOrCreateCurrentPolicyCycle,
 } from './cancellationPenaltyService.js'
@@ -1380,14 +1381,29 @@ export async function getCustomerCancellationEligibility(bookingId, customerId, 
   }
 
   // 6. Dynamic Penalty Calculation & Billing Breakdown
-  const penaltyCalc = calculatePenaltyAmount({ booking, settings, overrideTime })
+  const rawPenaltyCalc = calculatePenaltyAmount({ booking, settings, overrideTime })
+  // Once the cancellation penalty has been paid, the customer may cancel without being charged again.
+  const penaltyAlreadyPaid = rawPenaltyCalc.penaltyApplicable
+    ? await hasPaidCancellationPenalty(booking._id)
+    : false
+  const penaltyCalc = penaltyAlreadyPaid
+    ? {
+        ...rawPenaltyCalc,
+        penaltyApplicable: false,
+        calculatedPenaltyAmount: 0,
+        billingSummary: null,
+        reason: 'Cancellation penalty has already been paid for this booking.',
+      }
+    : rawPenaltyCalc
   const cycle = await getOrCreateCurrentPolicyCycle({ bookingId: booking._id, customerId })
 
   // 7. Compute Fee & Disclosures
   // Any fee (penalty or flat) applies only after a service provider has accepted the booking.
   const cancellationFee = penaltyCalc.penaltyApplicable
     ? penaltyCalc.calculatedPenaltyAmount
-    : hasProviderAccepted(booking)
+    : penaltyAlreadyPaid
+      ? 0
+      : hasProviderAccepted(booking)
       ? Math.max(0, Number(settings.customerCancellationFee || 0))
       : 0
 
@@ -1539,7 +1555,9 @@ export async function processCustomerCancellation({
       overrideTime,
     })
 
-    if (!forceCancel) {
+    // The penalty must be paid first. `forceCancel` is client-controlled and is deliberately
+    // NOT honoured here, otherwise a penalty could be skipped entirely.
+    {
       return {
         success: true,
         penaltyRequired: true,

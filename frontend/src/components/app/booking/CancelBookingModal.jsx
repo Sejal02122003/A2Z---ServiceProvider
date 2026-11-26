@@ -486,7 +486,7 @@ export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => executeCancellation(isPenaltyApplicable)}
+                    onClick={() => executeCancellation(false)}
                     disabled={submitting}
                     className="flex-1 rounded-xl border border-rose-300 bg-rose-50 py-3 text-sm font-bold text-rose-700 hover:bg-rose-100 transition disabled:opacity-50 flex items-center justify-center gap-2"
                   >
@@ -693,44 +693,25 @@ export function CancelBookingModal({ open, booking, onClose, onSuccess }) {
                   </button>
 
                   {isPenaltyApplicable ? (
-                    <>
-                      {/* Cancel This Service button */}
-                      <button
-                        type="button"
-                        onClick={() => handleCancelService(true)}
-                        disabled={submitting || payingPenalty || !selectedReason}
-                        className="w-full sm:flex-1 rounded-xl bg-rose-600 py-3 px-4 text-sm font-bold text-white shadow-sm hover:bg-rose-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
-                      >
-                        {submitting ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin text-white" />
-                            <span>Cancelling...</span>
-                          </>
-                        ) : (
-                          <span>Cancel This Service</span>
-                        )}
-                      </button>
-
-                      {/* Pay & Restart button */}
-                      <button
-                        type="button"
-                        onClick={handlePayPenalty}
-                        disabled={payingPenalty || submitting}
-                        className="w-full sm:flex-1 rounded-xl bg-slate-900 py-3 px-4 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition disabled:opacity-50 flex items-center justify-center gap-2"
-                      >
-                        {payingPenalty ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
-                            <span>Processing Payment...</span>
-                          </>
-                        ) : (
-                          <>
-                            <CreditCard className="h-4 w-4 text-amber-400" />
-                            <span>Pay ₹{billingSummary?.additionalAmountPayable || penaltyDetails?.calculatedPenaltyAmount || 0} & Restart</span>
-                          </>
-                        )}
-                      </button>
-                    </>
+                    /* The cancellation penalty must be paid before the booking can be cancelled */
+                    <button
+                      type="button"
+                      onClick={handlePayPenalty}
+                      disabled={payingPenalty || submitting || !selectedReason}
+                      className="w-full sm:flex-1 rounded-xl bg-slate-900 py-3 px-4 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {payingPenalty ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
+                          <span>Processing Payment...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="h-4 w-4 text-amber-400" />
+                          <span>Pay ₹{billingSummary?.additionalAmountPayable || penaltyDetails?.calculatedPenaltyAmount || 0} to Cancel</span>
+                        </>
+                      )}
+                    </button>
                   ) : (
                     <button
                       type="button"
