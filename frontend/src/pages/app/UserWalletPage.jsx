@@ -148,26 +148,26 @@ export default function UserWalletPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 pb-6 space-y-6">
       {/* Top Bar - Sticky Header */}
-      <div className="sticky top-0 z-30 -mx-4 px-4 pt-2 pb-2 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md">
-        <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 shadow-sm flex items-center justify-between">
+      <div className="sticky top-0 z-30 -mx-4 px-4 pt-2 pb-2 bg-slate-50/95 backdrop-blur-md">
+        <div className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm flex items-center justify-between">
           <div className="flex items-center gap-3.5">
             <button
               type="button"
               onClick={() => navigate('/user')}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 shadow-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-95"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-700 shadow-sm transition-colors hover:bg-slate-50 active:scale-95"
               aria-label="Back to home"
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
             <div>
-              <h1 className="text-lg font-black tracking-tight text-slate-900 dark:text-white leading-tight">My Wallet</h1>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Save instantly on service bookings</p>
+              <h1 className="text-lg font-black tracking-tight text-slate-900 leading-tight">My Wallet</h1>
+              <p className="text-xs font-semibold text-slate-500">Save instantly on service bookings</p>
             </div>
           </div>
           <button
             onClick={() => loadData(true)}
             disabled={refreshing}
-            className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-primary-600 rounded-xl transition-all disabled:opacity-50"
+            className="p-2.5 bg-slate-100 text-slate-600 hover:text-primary-600 rounded-xl transition-all disabled:opacity-50"
             title="Refresh Balance"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-primary-600' : ''}`} />
@@ -270,24 +270,24 @@ export default function UserWalletPage() {
       )}
 
       {/* How it works info box */}
-      <div className="bg-gradient-to-r from-amber-50 to-indigo-50 dark:from-amber-950/20 dark:to-indigo-950/20 border border-amber-200/80 dark:border-amber-800/40 rounded-2xl p-4 flex gap-3 items-start">
-        <Sparkles className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-        <div className="space-y-1.5 text-xs text-slate-800 dark:text-slate-200">
-          <p className="font-bold text-amber-900 dark:text-amber-200">Wallet Rewards & Benefits</p>
-          <ul className="list-disc pl-4 space-y-1 text-slate-700 dark:text-slate-300 leading-relaxed">
+      <div className="bg-gradient-to-r from-amber-50 to-indigo-50 border border-amber-200/90 rounded-2xl p-4 flex gap-3 items-start shadow-xs">
+        <Sparkles className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+        <div className="space-y-1.5 text-xs text-slate-800">
+          <p className="font-bold text-amber-950 text-sm">Wallet Rewards &amp; Benefits</p>
+          <ul className="list-disc pl-4 space-y-1 text-slate-700 leading-relaxed">
             {settings.welcomeBonusEnabled !== false && (
               <li>
                 <strong>₹{Number(settings.welcomeBonusAmount || 1000).toLocaleString('en-IN')} Welcome Bonus:</strong> Credited automatically to your wallet on registration to save on your service bookings.
               </li>
             )}
             <li>
-              <strong>Instant Wallet Recharge:</strong> Scan our official Admin QR, submit UTR & receipt screenshot, and get credited once approved.
+              <strong>Instant Wallet Recharge:</strong> Scan our official Admin QR, submit UTR &amp; receipt screenshot, and get credited once approved.
             </li>
             <li>
-              <strong>15% Automatic Service Credit:</strong> Receive 15% of the eligible service charge credited directly to your wallet every time a booking is completed.
+              <strong>{Number(settings.serviceCreditPercentage || 15)}% Automatic Service Credit:</strong> Receive {Number(settings.serviceCreditPercentage || 15)}% of the eligible service charge credited directly to your wallet every time a booking is completed.
             </li>
             <li>
-              <strong>Instant Checkout Discount:</strong> Toggle <strong>"Use Wallet Balance"</strong> during checkout to save up to <strong>{settings.walletDiscountPercentage || 20}%</strong> on your bill.
+              <strong>Instant Checkout Discount:</strong> Toggle <strong>"Use Wallet Balance"</strong> during checkout to save up to <strong>{Number(settings.walletDiscountPercentage || 20)}%</strong> on your bill.
             </li>
           </ul>
         </div>
