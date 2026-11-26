@@ -12,6 +12,7 @@ let activeGainNode = null
 let chimeInterval = null
 let keepAliveSource = null
 let isAutoplayBlocked = false
+let audioPrimed = false
 const autoplayBlockedListeners = new Set()
 
 /**
@@ -149,8 +150,12 @@ export function unlockAudioContext() {
       audioElement.volume = 1.0
     }
 
-    // Prime the audio element with a brief gesture-initiated play/pause
-    if (audioElement && !isPlaying) {
+    // Prime the audio element ONCE with a muted, gesture-initiated play/pause so later alerts can play.
+    // It must be muted: if the click opens a blocking dialog (e.g. window.confirm) the pause below cannot
+    // run until the dialog closes, and an unmuted prime would ring the alert tone the whole time.
+    if (audioElement && !isPlaying && !audioPrimed) {
+      audioPrimed = true
+      audioElement.muted = true
       const primePromise = audioElement.play()
       if (primePromise !== undefined) {
         primePromise
@@ -159,8 +164,14 @@ export function unlockAudioContext() {
               audioElement.pause()
               audioElement.currentTime = 0
             }
+            if (audioElement) audioElement.muted = false
           })
-          .catch(() => {})
+          .catch(() => {
+            audioPrimed = false
+            if (audioElement) audioElement.muted = false
+          })
+      } else {
+        audioElement.muted = false
       }
     }
 
@@ -316,6 +327,8 @@ function playFallbackAudio() {
       audioElement.volume = 1.0
     }
     audioElement.loop = true
+    // A real alert must be audible even if the muted priming play is still settling
+    audioElement.muted = false
     // Already ringing: do not restart it (that is what made it sound doubled)
     if (!audioElement.paused) return
 
