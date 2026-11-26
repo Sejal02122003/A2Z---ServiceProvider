@@ -666,9 +666,10 @@ export async function startBroadcastCycle(bookingId) {
           const servicesPayload = matchingMulti
 
           const totalEarnings = servicesPayload.reduce((sum, s) => sum + (s.estimatedEarnings || 0), 0)
-          const totalBookingDuration = booking.totalDurationMins || Math.round(bookingHours * 60)
-          const formattedBookingDuration = booking.formattedDuration || formatDurationHuman(totalBookingDuration)
-          const totalBookingQty = (booking.multiServiceBooking?.items || []).reduce((acc, it) => acc + (it.quantity || 1), 0) || booking.quantity || 1
+          // Totals reflect only the services offered to THIS provider (not the whole booking)
+          const totalBookingDuration = servicesPayload.reduce((acc, s) => acc + (Number(s.totalDurationMins) || 0), 0) || Math.round(bookingHours * 60)
+          const formattedBookingDuration = formatDurationHuman(totalBookingDuration)
+          const totalBookingQty = servicesPayload.reduce((acc, s) => acc + (Number(s.quantity) || 1), 0) || 1
 
           import('../socket.js').then(({ emitToUser }) => {
             console.log(`[BROADCAST] Emitting BOOKING_RECEIVED to labour ${labor.fullName || labor.phone} (${labor._id}) for multi-service booking ${booking._id}, earnings=₹${totalEarnings}`)
