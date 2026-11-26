@@ -43,6 +43,7 @@ import {
 import { adminInitials, formatLastLoginRelative } from '../../lib/formatAdminLastLogin.js'
 import { assetUrlFromUpload, uploadMedia } from '../../api/uploadApi.js'
 import { UPLOAD_FOLDERS } from '../../constants/uploadFolders.js'
+import { looksLikeImage, prepareImageForUpload } from '../../lib/prepareImageUpload.js'
 import { AppBadge } from '../../components/app-ui/data-display/AppBadge.jsx'
 import { AppSectionHeader } from '../../components/app-ui/layout/AppSectionHeader.jsx'
 import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx'
@@ -335,14 +336,21 @@ export function AppProfilePage() {
       e.target.value = ''
       setPhotoErr('')
       if (!file) return
-      if (!file.type.startsWith('image/')) {
+      if (!looksLikeImage(file)) {
         setPhotoErr('Please choose a photo (JPG, PNG, or WebP) from your device.')
         return
       }
-      const previewUrl = URL.createObjectURL(file)
+      let upload
+      try {
+        upload = await prepareImageForUpload(file)
+      } catch (prepErr) {
+        setPhotoErr(prepErr.message || 'Could not read this photo.')
+        return
+      }
+      const previewUrl = URL.createObjectURL(upload)
       setLocalPreview(previewUrl)
       try {
-        const uploaded = await uploadMedia(file, UPLOAD_FOLDERS.PROFILES)
+        const uploaded = await uploadMedia(upload, UPLOAD_FOLDERS.PROFILES)
         const url = assetUrlFromUpload(uploaded)
         if (!url) {
           setPhotoErr('Upload failed — no URL returned.')
@@ -562,7 +570,7 @@ export function AppProfilePage() {
           <input
             ref={photoInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/*"
+            accept="image/*"
             className="sr-only"
             onChange={(e) => void onPickPhoto(e)}
           />
