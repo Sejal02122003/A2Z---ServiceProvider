@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -224,50 +225,64 @@ export function VendorMaterialsPage() {
 
       {/* Record Usage & Return Modal */}
       {usageModalReq && (
-        <RecordUsageModal
-          request={usageModalReq}
-          onClose={() => setUsageModalReq(null)}
-          onSuccess={() => {
-            setUsageModalReq(null)
-            loadRequests()
-            showToast('Material usage and central return recorded successfully')
-          }}
-        />
+        <ModalPortal>
+          <RecordUsageModal
+            request={usageModalReq}
+            onClose={() => setUsageModalReq(null)}
+            onSuccess={() => {
+              setUsageModalReq(null)
+              loadRequests()
+              showToast('Material usage and central return recorded successfully')
+            }}
+          />
+        </ModalPortal>
       )}
 
       {/* New Material Request Modal */}
       {newRequestOpen && (
-        <NewMaterialRequestModal
-          products={availableProducts}
-          initialBookingId={presetBookingId}
-          onClose={() => {
-            setNewRequestOpen(false)
-            if (presetBookingId) setSearchParams({}, { replace: true })
-          }}
-          onSuccess={() => {
-            setNewRequestOpen(false)
-            if (presetBookingId) setSearchParams({}, { replace: true })
-            loadRequests()
-            showToast('Material request submitted to admin for approval')
-          }}
-        />
+        <ModalPortal>
+          <NewMaterialRequestModal
+            products={availableProducts}
+            initialBookingId={presetBookingId}
+            onClose={() => {
+              setNewRequestOpen(false)
+              if (presetBookingId) setSearchParams({}, { replace: true })
+            }}
+            onSuccess={() => {
+              setNewRequestOpen(false)
+              if (presetBookingId) setSearchParams({}, { replace: true })
+              loadRequests()
+              showToast('Material request submitted to admin for approval')
+            }}
+          />
+        </ModalPortal>
       )}
 
       {/* Additional Material Request Modal */}
       {additionalModalReq && (
-        <RequestAdditionalMaterialModal
-          request={additionalModalReq}
-          products={availableProducts}
-          onClose={() => setAdditionalModalReq(null)}
-          onSuccess={() => {
-            setAdditionalModalReq(null)
-            loadRequests()
-            showToast('Additional material request submitted to admin')
-          }}
-        />
+        <ModalPortal>
+          <RequestAdditionalMaterialModal
+            request={additionalModalReq}
+            products={availableProducts}
+            onClose={() => setAdditionalModalReq(null)}
+            onSuccess={() => {
+              setAdditionalModalReq(null)
+              loadRequests()
+              showToast('Additional material request submitted to admin')
+            }}
+          />
+        </ModalPortal>
       )}
     </div>
   )
+}
+
+/**
+ * Render modals on <body>. Inside the page they sit in the app shell's z-10 stacking context,
+ * so the fixed bottom navigation (z-30) paints over the modal footer / submit button.
+ */
+function ModalPortal({ children }) {
+  return createPortal(children, document.body)
 }
 
 function PendingCollectionSection({ requests, onRequest, onOpenAdditional }) {
@@ -610,7 +625,7 @@ function RecordUsageModal({ request, onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
             <h3 className="text-base font-bold text-slate-900">Record Job Material Usage & Returns</h3>
@@ -730,7 +745,7 @@ function RequestAdditionalMaterialModal({ request, products, onClose, onSuccess 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
             <h3 className="text-base font-bold text-slate-900">Request Additional Material</h3>
