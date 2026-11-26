@@ -1744,11 +1744,15 @@ export function AdminServicesPage() {
     }
 
     if (zoneFilter !== 'all') {
+      // Every service is saved with isAllZones=true, so that flag cannot be used to decide
+      // membership. Use the real zone entries instead: a service with no zone entries is
+      // global (shown in every zone); otherwise it must include the selected zone.
       result = result.filter(s => {
-        if (s.isAllZones) return true;
-        return (s.zones || []).some(z => {
+        const entries = s.zones || [];
+        if (entries.length === 0) return s.isAllZones !== false;
+        return entries.some(z => {
           const zid = typeof z === 'string' ? z : (typeof z.zone === 'object' ? z.zone?._id : z.zone);
-          return String(zid) === zoneFilter;
+          return String(zid) === String(zoneFilter);
         });
       });
     }
