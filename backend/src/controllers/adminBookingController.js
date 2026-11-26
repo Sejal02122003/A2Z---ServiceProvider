@@ -393,6 +393,7 @@ export const generateBookingInvoiceAdmin = asyncHandler(async (req, res) => {
     lines,
     subtotal: booking.basePrice || 0,
     gstTotal: booking.taxes || 0,
+    platformFee: booking.platformFee || 0,
     total: booking.totalAmount || 0,
     issuedAt: new Date(),
     dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
