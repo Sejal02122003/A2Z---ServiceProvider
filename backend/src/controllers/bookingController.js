@@ -1914,6 +1914,11 @@ export const confirmCashPayment = asyncHandler(async (req, res) => {
   }
 
   if (booking.paymentStatus === 'PAID') {
+    try {
+      await booking.populate('assignments.labourId', 'fullName phone profileImageUrl serviceIds labourProfile rating experienceYears')
+    } catch (popErr) {
+      console.error('[confirmCashPayment populate error]:', popErr)
+    }
     return sendSuccess(res, { message: 'Already paid', data: { booking } })
   }
 
@@ -1974,6 +1979,13 @@ export const confirmCashPayment = asyncHandler(async (req, res) => {
       emitToUser(booking.laborId, 'BOOKING_STATUS_UPDATE', { bookingId: booking._id, status: booking.status, paymentStatus: booking.paymentStatus })
     }
   }).catch(err => console.error(err))
+
+  // Populate team member details so clients can render names after payment
+  try {
+    await booking.populate('assignments.labourId', 'fullName phone profileImageUrl serviceIds labourProfile rating experienceYears')
+  } catch (popErr) {
+    console.error('[confirmCashPayment populate error]:', popErr)
+  }
 
   return sendSuccess(res, { message: 'Cash payment confirmed', data: { booking } })
 })

@@ -600,7 +600,23 @@ function BookingDetailsModal({ booking, onClose }) {
             </div>
             <div>
               <p className="text-slate-500 text-xs">Category</p>
-              <p className="font-semibold">{booking.subcategoryId?.categoryId?.name || booking.categoryId?.name || booking.subcategoryId?.name || 'N/A'}</p>
+              {(() => {
+                const fallback = booking.subcategoryId?.categoryId?.name || booking.categoryId?.name || booking.subcategoryId?.name || 'N/A'
+                const items = booking.multiServiceBooking?.isMultiService ? (booking.multiServiceBooking?.items || []) : []
+                const names = []
+                items.forEach((it) => {
+                  const n = it.categoryName || it.categoryId?.name || it.subcategoryName || it.subcategoryId?.name
+                  if (n && !names.includes(n)) names.push(n)
+                })
+                if (names.length === 0) return <p className="font-semibold">{fallback}</p>
+                return (
+                  <div className="flex flex-wrap gap-1 mt-0.5">
+                    {names.map((n) => (
+                      <span key={n} className="font-semibold text-[11px] bg-slate-100 px-2 py-0.5 rounded-md">{n}</span>
+                    ))}
+                  </div>
+                )
+              })()}
             </div>
             <div>
               <p className="text-slate-500 text-xs">Zone</p>

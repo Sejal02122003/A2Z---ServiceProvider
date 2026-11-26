@@ -199,7 +199,24 @@ export function ActiveJob() {
       const updated = res?.data?.booking
       setBooking((prev) => {
         if (!prev) return updated || prev
-        if (updated) return updated
+        if (updated) {
+          // Keep already-populated team member details if the response only has raw ids
+          const prevById = new Map(
+            (prev.assignments || [])
+              .filter((a) => a?.labourId && typeof a.labourId === 'object')
+              .map((a) => [String(a.labourId._id), a.labourId])
+          )
+          const mergedAssignments = Array.isArray(updated.assignments)
+            ? updated.assignments.map((a) => {
+                if (a?.labourId && typeof a.labourId !== 'object') {
+                  const known = prevById.get(String(a.labourId))
+                  if (known) return { ...a, labourId: known }
+                }
+                return a
+              })
+            : updated.assignments
+          return { ...prev, ...updated, assignments: mergedAssignments }
+        }
         const uid = String(user?._id || '')
         const nextAssignments = Array.isArray(prev.assignments)
           ? prev.assignments.map((a) => {
