@@ -27,6 +27,9 @@ export function AdminMartBannersTab() {
   const [newBannerFile, setNewBannerFile] = useState(null)
   const [newBannerPreview, setNewBannerPreview] = useState('')
   const [busy, setBusy] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -78,7 +81,7 @@ export function AdminMartBannersTab() {
       setNewBannerPreview('')
       load()
     } catch (err) {
-      alert(err.message || 'Error creating banner')
+      setErrorMsg(err.message || 'Error creating banner')
     } finally {
       setBusy(false)
     }
@@ -113,20 +116,29 @@ export function AdminMartBannersTab() {
       setNewBannerPreview('')
       load()
     } catch (err) {
-      alert(err.message || 'Error updating banner')
+      setErrorMsg(err.message || 'Error updating banner')
     } finally {
       setBusy(false)
     }
   }
 
-  const handleDelete = async (banner) => {
-    if (!window.confirm('Are you sure you want to delete this banner?')) return
+  // In-page confirm (native confirm()/alert() trigger the OS alert tone)
+  const handleDelete = (banner) => setPendingDelete(banner)
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return
+    setDeleting(true)
     try {
-      const backendId = banner._id || banner.id
+      const backendId = pendingDelete._id || pendingDelete.id
       await deleteAdminMartBanner(backendId)
+      setErrorMsg('')
+      setPendingDelete(null)
       load()
     } catch (err) {
-      alert(err.message || 'Error deleting banner')
+      setErrorMsg(err.message || 'Error deleting banner')
+      setPendingDelete(null)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -134,9 +146,10 @@ export function AdminMartBannersTab() {
     try {
       const backendId = banner._id || banner.id
       await patchAdminMartBanner(backendId, { active: !banner.active })
+      setErrorMsg('')
       load()
     } catch (err) {
-      alert(err.message || 'Error updating banner status')
+      setErrorMsg(err.message || 'Error updating banner status')
     }
   }
 
@@ -161,6 +174,48 @@ export function AdminMartBannersTab() {
           Create Banner
         </button>
       </div>
+
+      {errorMsg && (
+        <div className="flex items-start justify-between gap-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+          <span>{errorMsg}</span>
+          <button type="button" onClick={() => setErrorMsg('')} aria-label="Dismiss">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {pendingDelete && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-900/40"
+            onClick={() => !deleting && setPendingDelete(null)}
+          />
+          <div className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-800">Delete this banner?</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              "{pendingDelete.title || 'Banner'}" will be removed. This cannot be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setPendingDelete(null)}
+                className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={confirmDelete}
+                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* List */}
       {loading ? (
