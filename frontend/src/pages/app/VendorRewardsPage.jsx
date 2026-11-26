@@ -22,6 +22,54 @@ import {
 import { rewardApi } from '../../api/rewardApi';
 import { AppStackScreenHeader } from '../../components/app/AppStackScreenHeader.jsx';
 
+const TARGET_LABELS = {
+  BOOKING_COUNT: 'Jobs',
+  SERVICE_REVENUE: 'Revenue (₹)',
+  NEW_CUSTOMERS: 'New customers',
+  REPEAT_CUSTOMERS: 'Repeat customers',
+  CATEGORY_TARGET: 'Category target',
+  ZONE_TARGET: 'Zone target',
+};
+
+/** Map the API's campaign + progress shape onto what the cards render. */
+function adaptCampaign(item) {
+  const camp = item.campaign || {};
+  const rules = camp.businessRules || {};
+  const p = item.progress || {};
+  const live = Boolean(item.rewardDetails); // real progress snapshot exists
+  const targetType = rules.targetType;
+
+  const campaign = {
+    ...camp,
+    rewardType: camp.category === 'BUSINESS' ? rules.rewardType : 'FIXED',
+    percentageConfig: { percentage: rules.percentage },
+    businessTiers: (rules.tiers || []).map((t, i) => ({
+      tierName: t.label || `Tier ${t.tierNumber || i + 1}`,
+      targetValue: t.targetValue,
+      targetMetric: targetType,
+      rewardAmount: t.rewardAmount,
+    })),
+  };
+
+  const progress = {
+    percentage: p.achievedPercentage ?? 0,
+    remainingToTarget: p.remainingRequired > 0 ? `${p.remainingRequired} ${p.unit || ''}`.trim() : null,
+  };
+  if (live) {
+    progress.currentCompletedBookings = p.completedBookings;
+    if (camp.category === 'PERFORMANCE') progress.currentRating = p.averageRating;
+    if (targetType === 'SERVICE_REVENUE') progress.currentRevenue = p.totalRevenue;
+    if (targetType === 'NEW_CUSTOMERS') progress.currentNewCustomers = p.newCustomersCount;
+  }
+
+  return {
+    campaign,
+    status: item.rewardStatus,
+    progress,
+    potentialReward: item.rewardAmount,
+  };
+}
+
 export default function VendorRewardsPage() {
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'history' | 'tiers'
   const [loading, setLoading] = useState(true);
@@ -35,18 +83,25 @@ export default function VendorRewardsPage() {
   const fetchVendorRewardsData = async () => {
     try {
       setError(null);
-      const [summaryRes, campaignsRes, historyRes] = await Promise.all([
-        rewardApi.getVendorRewardSummary(),
-        rewardApi.getVendorActiveCampaigns(),
-        rewardApi.getVendorRewardHistory()
-      ]);
+      // One endpoint returns { summary, activeCampaigns, rewardHistory }
+      const res = await rewardApi.getVendorRewardsOverview();
+      const data = res?.data ?? {};
+      const rewardHistory = Array.isArray(data.rewardHistory) ? data.rewardHistory : [];
 
-      if (summaryRes?.success) setSummary(summaryRes.data);
-      if (campaignsRes?.success) setCampaigns(campaignsRes.data || []);
-      if (historyRes?.success) setHistory(historyRes.data || []);
+      setSummary({
+        totalEarned: data.summary?.totalEarnedIncentives ?? 0,
+        pendingApprovalAmount: data.summary?.pendingRewardAmount ?? 0,
+        pendingApprovalCount: rewardHistory.filter((r) =>
+          ['QUALIFIED', 'PENDING_APPROVAL'].includes(r.status),
+        ).length,
+        activeCampaignsCount: data.summary?.activeCampaignsCount ?? 0,
+        completedRewardsCount: rewardHistory.filter((r) => r.status === 'CREDITED').length,
+      });
+      setCampaigns((data.activeCampaigns || []).map(adaptCampaign));
+      setHistory(rewardHistory);
     } catch (err) {
       console.error('Failed to load vendor rewards:', err);
-      setError(err?.response?.data?.message || 'Unable to load reward programs. Please try again.');
+      setError(err?.message || 'Unable to load reward programs. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -307,7 +362,7 @@ export default function VendorRewardsPage() {
                           {campaign.businessTiers.map((tier, idx) => (
                             <div key={idx} className="flex justify-between text-xs items-center py-1 border-b border-gray-200/50 last:border-0">
                               <span className="text-gray-700 font-medium">
-                                {tier.tierName || `Tier ${idx + 1}`}: {tier.targetValue} {tier.targetMetric === 'COMPLETED_BOOKINGS' ? 'Jobs' : 'Revenue'}
+                                {tier.tierName || `Tier ${idx + 1}`}: {tier.targetValue} {TARGET_LABELS[tier.targetMetric] || 'Target'}
                               </span>
                               <span className="font-bold text-emerald-600">+{formatCurrency(tier.rewardAmount)}</span>
                             </div>
@@ -380,11 +435,11 @@ export default function VendorRewardsPage() {
                   {history.map((rew) => (
                     <tr key={rew._id} className="hover:bg-gray-50/60 transition">
                       <td className="px-6 py-4 font-bold text-gray-900">
-                        {rew.campaign?.name || 'Campaign'}
-                        <span className="block text-xs font-normal text-gray-400">{rew.campaign?.category}</span>
+                        {rew.campaignId?.name || 'Campaign'}
+                        <span className="block text-xs font-normal text-gray-400">{rew.campaignId?.category || rew.category}</span>
                       </td>
                       <td className="px-6 py-4 text-xs font-medium text-gray-600">
-                        {new Date(rew.periodStart).toLocaleDateString()} - {new Date(rew.periodEnd).toLocaleDateString()}
+                        {rew.evaluationPeriod || '—'}
                       </td>
                       <td className="px-6 py-4 font-black text-emerald-600 text-base">
                         {formatCurrency(rew.rewardAmount)}
@@ -405,9 +460,9 @@ export default function VendorRewardsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 font-mono text-xs text-gray-400">
-                        {rew.creditTransactionId ? (
+                        {rew.creditDetails?.walletTransactionId ? (
                           <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                            {rew.creditTransactionId.slice(-8)}
+                            {String(rew.creditDetails.walletTransactionId).slice(-8)}
                           </span>
                         ) : (
                           '—'
@@ -453,25 +508,39 @@ export default function VendorRewardsPage() {
                       {selectedCampaign.performanceRules?.minAverageRating && (
                         <li>Minimum Average Rating: <strong>{selectedCampaign.performanceRules.minAverageRating} / 5.0</strong></li>
                       )}
-                      {selectedCampaign.performanceRules?.minEligibleReviews && (
-                        <li>Minimum Verified Reviews: <strong>{selectedCampaign.performanceRules.minEligibleReviews} reviews</strong></li>
+                      {selectedCampaign.performanceRules?.minReviewsCount && (
+                        <li>Minimum Verified Reviews: <strong>{selectedCampaign.performanceRules.minReviewsCount} reviews</strong></li>
                       )}
                       {selectedCampaign.performanceRules?.minCompletedBookings && (
                         <li>Minimum Completed Bookings: <strong>{selectedCampaign.performanceRules.minCompletedBookings} jobs</strong></li>
                       )}
-                      {selectedCampaign.performanceRules?.maxCancellationRate !== undefined && (
-                        <li>Max Cancellation Rate: <strong>{selectedCampaign.performanceRules.maxCancellationRate}%</strong></li>
+                      {selectedCampaign.performanceRules?.maxCancellationRatePct !== undefined && (
+                        <li>Max Cancellation Rate: <strong>{selectedCampaign.performanceRules.maxCancellationRatePct}%</strong></li>
+                      )}
+                      {selectedCampaign.performanceRules?.minOnTimeCompletionRatePct !== undefined && (
+                        <li>Min On-time Completion: <strong>{selectedCampaign.performanceRules.minOnTimeCompletionRatePct}%</strong></li>
                       )}
                     </>
                   )}
 
                   {selectedCampaign.category === 'BUSINESS' && (
                     <>
-                      {selectedCampaign.businessTiers?.map((tier, i) => (
-                        <li key={i}>
-                          Tier {i + 1}: Reach <strong>{tier.targetValue} {tier.targetMetric}</strong> to earn <strong>{formatCurrency(tier.rewardAmount)}</strong>
+                      {selectedCampaign.businessTiers?.length > 0 ? (
+                        selectedCampaign.businessTiers.map((tier, i) => (
+                          <li key={i}>
+                            {tier.tierName}: Reach <strong>{tier.targetValue} {TARGET_LABELS[tier.targetMetric] || ''}</strong> to earn <strong>{formatCurrency(tier.rewardAmount)}</strong>
+                          </li>
+                        ))
+                      ) : selectedCampaign.businessRules?.targetThreshold ? (
+                        <li>
+                          Reach <strong>{selectedCampaign.businessRules.targetThreshold} {TARGET_LABELS[selectedCampaign.businessRules.targetType] || ''}</strong> to earn{' '}
+                          <strong>
+                            {selectedCampaign.businessRules.rewardType === 'PERCENTAGE'
+                              ? `${selectedCampaign.businessRules.percentage || 0}% bonus`
+                              : formatCurrency(selectedCampaign.businessRules.fixedAmount)}
+                          </strong>
                         </li>
-                      ))}
+                      ) : null}
                     </>
                   )}
                 </ul>
