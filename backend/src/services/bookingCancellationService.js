@@ -2174,6 +2174,18 @@ export async function evaluateCustomerCancellationPolicy(customerId, overrideTim
     restriction: restrictionCheck.restriction,
     warningMessage: settings.customerWarningMessage,
     restrictionMessage: settings.customerRestrictionMessage,
+    // Customer-facing cancellation terms (shown before booking is confirmed)
+    terms: {
+      cancellationEnabled: settings.customerCancellationEnabled !== false,
+      cutoffMinutes: Number(settings.customerCutoffMinutes ?? 60),
+      cancellationFee: Number(settings.customerCancellationFee || 0),
+      penaltyEnabled: settings.customerPenaltyEnabled !== false,
+      penaltyType: settings.customerPenaltyType || 'PERCENTAGE',
+      penaltyValue: Number(settings.customerPenaltyValue || 0),
+      minPenaltyAmount: Number(settings.customerMinPenaltyAmount || 0),
+      maxPenaltyAmount: Number(settings.customerMaxPenaltyAmount || 0),
+      penaltyCondition: settings.customerPenaltyCondition || 'WITHIN_CUTOFF',
+    },
   }
 }
 

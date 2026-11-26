@@ -48,6 +48,7 @@ import { uploadMedia, assetUrlFromUpload } from '../../../api/uploadApi.js'
 import { BookingFindingScreen } from '../../../components/app/booking/BookingFindingScreen.jsx'
 import { TimeInput12h } from '../../../components/app/booking/TimeInput12h.jsx'
 import { BookingTypeSheet } from '../../../components/app/booking/BookingTypeSheet.jsx'
+import { BookingCancellationInfo } from '../../../components/app/booking/BookingCancellationInfo.jsx'
 import { BookingStepProgress } from '../../../components/app/booking/BookingStepProgress.jsx'
 import { BookingServiceHighlight } from '../../../components/app/booking/BookingServiceHighlight.jsx'
 import { BookingReviewModal } from '../../../components/app/booking/BookingReviewModal.jsx'
@@ -2963,6 +2964,8 @@ export function IndividualBookingFlowPage() {
                   );
                 })()}
               </div>
+
+              <BookingCancellationInfo bookingType={draft.bookingType} />
 
               <div className="flex gap-2">
                 <button type="button" className="lc-booking-btn-secondary flex-1" onClick={() => { setCalculatedBill(null); goStep('details'); }}>
