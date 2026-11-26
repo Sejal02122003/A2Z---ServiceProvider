@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { fetchActiveBanners } from '../../../api/bannersApi.js'
+import { useSwipe } from '../../../hooks/useSwipe.js'
 
 export function IndividualHomeHeroCarousel({ onBook }) {
   const [index, setIndex] = useState(0)
@@ -31,6 +32,11 @@ export function IndividualHomeHeroCarousel({ onBook }) {
     return () => window.clearInterval(id)
   }, [banners.length])
 
+  const swipe = useSwipe({
+    onNext: () => setIndex((i) => (banners.length ? (i + 1) % banners.length : 0)),
+    onPrev: () => setIndex((i) => (banners.length ? (i - 1 + banners.length) % banners.length : 0)),
+  })
+
   if (loading) {
     return (
       <section className="mb-1 animate-pulse">
@@ -47,7 +53,10 @@ export function IndividualHomeHeroCarousel({ onBook }) {
 
   return (
     <section aria-label="Offers" className="mb-1">
-      <article className="lc-home-hero-slide !min-h-0 !bg-transparent aspect-[21/9] relative overflow-hidden rounded-[1.25rem]">
+      <article
+        {...swipe}
+        className="lc-home-hero-slide !min-h-0 !bg-transparent aspect-[21/9] relative overflow-hidden rounded-[1.25rem] select-none"
+      >
         {slide.mediaType === 'video' ? (
           <video
             key={slide._id}

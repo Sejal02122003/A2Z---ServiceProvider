@@ -35,6 +35,7 @@ import { fetchLabourCategoriesGrouped } from '../../../api/labourCategoriesApi.j
 import { readAppUserLocation } from '../../../lib/appUserLocationStorage.js'
 import { IndividualHomeCategoryRail } from '../../../components/app/individual/IndividualHomeCategoryRail.jsx'
 import { IndividualHomeHeroCarousel } from '../../../components/app/individual/IndividualHomeHeroCarousel.jsx'
+import { IndividualHomeExploreBanner } from '../../../components/app/individual/IndividualHomeExploreBanner.jsx'
 import { IndividualHomeRecentlyBooked } from '../../../components/app/individual/IndividualHomeRecentlyBooked.jsx'
 import { IndividualHomeWorkerCarousel } from '../../../components/app/individual/IndividualHomeWorkerCarousel.jsx'
 import { IndividualHomeServiceSections } from '../../../components/app/individual/IndividualHomeServiceSections.jsx'
@@ -92,7 +93,7 @@ export function IndividualHomeScreen({ user }) {
   const [quickBookCategory, setQuickBookCategory] = useState(null)
   const [bookingsLoading, setBookingsLoading] = useState(true)
   const [bookings, setBookings] = useState([])
-  const [exploreBanner, setExploreBanner] = useState(null)
+  const [exploreBanners, setExploreBanners] = useState([])
   const [bannerLoading, setBannerLoading] = useState(true)
 
   const enrichedLabours = useMemo(() => {
@@ -271,7 +272,7 @@ export function IndividualHomeScreen({ user }) {
     fetchActiveBanners('EXPLORE')
       .then((res) => {
         if (!cancelled && res.data?.banners?.length > 0) {
-          setExploreBanner(res.data.banners[0])
+          setExploreBanners(res.data.banners)
         }
       })
       .catch(console.error)
@@ -324,19 +325,11 @@ export function IndividualHomeScreen({ user }) {
       </div>
 
       <section className="lc-individual-home-sheet space-y-6">
-        <div className="relative w-full overflow-hidden rounded-[1.25rem] bg-transparent shadow-sm flex items-center justify-center aspect-[2/1]">
-          {bannerLoading ? (
-            <div className="w-full h-full bg-slate-100 animate-pulse" />
-          ) : exploreBanner ? (
-            exploreBanner.mediaType === 'video' ? (
-              <video src={exploreBanner.imageUrl} className="w-full h-full object-cover" autoPlay loop muted playsInline />
-            ) : (
-              <img src={exploreBanner.imageUrl} alt="Explore Skills" className="w-full h-full object-cover" />
-            )
-          ) : (
-            <img src={heroImg} alt="Explore Skills" className="w-full h-full object-contain" />
-          )}
-        </div>
+        <IndividualHomeExploreBanner
+          banners={exploreBanners}
+          loading={bannerLoading}
+          fallbackSrc={heroImg}
+        />
 
         <CustomerNotificationBanner user={user} />
 
