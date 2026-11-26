@@ -17,6 +17,7 @@ import { AppBadge } from '../components/app-ui/data-display/AppBadge.jsx'
 import { adminInitials } from '../lib/formatAdminLastLogin.js'
 import { readAppUserLocation } from '../lib/appUserLocationStorage.js'
 import { AppUserLocationModal } from '../components/app/AppUserLocationModal.jsx'
+import { LocationLaunchPrompt } from '../components/app/LocationLaunchPrompt.jsx'
 import { SelectAddressSheet } from '../components/app/address/SelectAddressSheet.jsx'
 import { BOOT_ROUTES } from '../constants/bootFlow.js'
 import { APP_HOME_LOCATION, APP_HOME_PATH, hasBookingFlowQuery } from '../lib/bookingFlowNavigation.js'
@@ -550,6 +551,14 @@ export function AppShell() {
           open={locationModalOpen}
           onClose={() => setLocationModalOpen(false)}
           onSelectAddress={() => setAppLocation(readAppUserLocation())}
+        />
+      ) : null}
+
+      {/* Asks for location every time the user app is opened (once per launch) */}
+      {isIndividualAppHome ? (
+        <LocationLaunchPrompt
+          onChooseManually={() => setLocationModalOpen(true)}
+          onLocated={() => setAppLocation(readAppUserLocation())}
         />
       ) : null}
 
