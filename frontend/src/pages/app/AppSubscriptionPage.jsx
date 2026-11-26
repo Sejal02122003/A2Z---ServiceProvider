@@ -91,9 +91,9 @@ export function AppSubscriptionPage() {
   const [recentRejectedRefund, setRecentRejectedRefund] = useState(null)
   const [hideRejectedRefund, setHideRejectedRefund] = useState(false)
 
-  const loadData = async () => {
+  const loadData = async (silent = false) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       const [res, plansRes] = await Promise.all([
         userSubscriptionApi.getMySubscription(),
         userSubscriptionApi.getPlans()
@@ -107,7 +107,7 @@ export function AppSubscriptionPage() {
     } catch (err) {
       console.error(err)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
@@ -115,7 +115,19 @@ export function AppSubscriptionPage() {
     loadData()
     // Update current hour every minute
     const interval = setInterval(() => setCurrentHour(getCurrentISTHour()), 60_000)
-    return () => clearInterval(interval)
+    // Keep the booking / offer counts fresh without a spinner
+    const refresh = setInterval(() => {
+      if (document.visibilityState === 'visible') loadData(true)
+    }, 30_000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') loadData(true)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(interval)
+      clearInterval(refresh)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
 
   const { subscriptionStartHour, subscriptionEndHour, dailySubscriptionPrice } = settings
@@ -364,8 +376,8 @@ export function AppSubscriptionPage() {
           </motion.div>
         )}
 
-        {/* ── SUBSCRIBED TODAY ── */}
-        {!trialActive && isSubscribedToday && (
+        {/* ── SUBSCRIBED TODAY (also shown during a free trial if a plan was bought) ── */}
+        {isSubscribedToday && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -373,7 +385,9 @@ export function AppSubscriptionPage() {
           >
             <div className="flex items-center gap-3 bg-gradient-to-r from-brand to-blue-900 px-5 py-3">
               <CheckCircle2 className="h-5 w-5 text-white" />
-              <h2 className="text-base font-bold text-white">Subscription Active Today</h2>
+              <h2 className="text-base font-bold text-white">
+                {activeSubscription.planId?.name ? `${activeSubscription.planId.name} Active` : 'Subscription Active Today'}
+              </h2>
             </div>
             <div className="p-5">
               <div className="grid grid-cols-3 gap-3 text-center">
@@ -384,12 +398,19 @@ export function AppSubscriptionPage() {
                 <div className="rounded-xl bg-slate-50 p-3">
                   <p className="text-xs font-semibold text-slate-500">Bookings</p>
                   <p className="mt-0.5 text-lg font-black text-slate-900">{activeSubscription.bookingsReceived || 0}</p>
+                  <p className="text-[10px] text-slate-400">accepted</p>
                 </div>
                 <div className="rounded-xl bg-slate-50 p-3">
                   <p className="text-xs font-semibold text-slate-500">Offers</p>
                   <p className="mt-0.5 text-lg font-black text-slate-900">{activeSubscription.bookingOpportunitiesOffered || 0}</p>
+                  <p className="text-[10px] text-slate-400">received</p>
                 </div>
               </div>
+              {activeSubscription.durationDays > 1 && (
+                <p className="mt-2 text-center text-[11px] font-medium text-slate-500">
+                  Counts are for this plan ({activeSubscription.date} to {activeSubscription.endDate}).
+                </p>
+              )}
 
               <div className="mt-4 flex items-center gap-2 rounded-xl bg-slate-50 p-3">
                 <Clock className="h-4 w-4 shrink-0 text-slate-400" />
@@ -401,13 +422,15 @@ export function AppSubscriptionPage() {
                 </p>
               </div>
 
-              {/* Refund info */}
-              <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-100 bg-amber-50 p-3">
-                <RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                <p className="text-xs font-medium text-amber-800">
-                  If you receive <strong>zero bookings</strong> today, your ₹{activeSubscription.amountPaid} will be automatically refunded to your wallet after {formatHour(subscriptionEndHour)}.
-                </p>
-              </div>
+              {/* Refund info (daily pass only) */}
+              {(activeSubscription.durationDays || 1) === 1 && (
+                <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-100 bg-amber-50 p-3">
+                  <RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                  <p className="text-xs font-medium text-amber-800">
+                    If you receive <strong>zero bookings</strong> today, your ₹{activeSubscription.amountPaid} will be automatically refunded to your wallet after {formatHour(subscriptionEndHour)}.
+                  </p>
+                </div>
+              )}
 
               {/* Buy Another Plan Action */}
               <button
