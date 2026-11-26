@@ -270,11 +270,11 @@ export default function UserWalletPage() {
       )}
 
       {/* How it works info box */}
-      <div className="bg-gradient-to-r from-amber-50 to-indigo-50 border border-amber-200/90 rounded-2xl p-4 flex gap-3 items-start shadow-xs">
+      <div className="w-full bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex gap-3 items-start shadow-sm">
         <Sparkles className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-        <div className="space-y-1.5 text-xs text-slate-800">
-          <p className="font-bold text-amber-950 text-sm">Wallet Rewards &amp; Benefits</p>
-          <ul className="list-disc pl-4 space-y-1 text-slate-700 leading-relaxed">
+        <div className="min-w-0 flex-1 space-y-1.5 text-xs text-slate-900">
+          <p className="font-bold text-amber-900 text-sm">Wallet Rewards &amp; Benefits</p>
+          <ul className="list-disc pl-4 space-y-1 text-slate-800 leading-relaxed marker:text-amber-600">
             {settings.welcomeBonusEnabled !== false && (
               <li>
                 <strong>₹{Number(settings.welcomeBonusAmount || 1000).toLocaleString('en-IN')} Welcome Bonus:</strong> Credited automatically to your wallet on registration to save on your service bookings.
