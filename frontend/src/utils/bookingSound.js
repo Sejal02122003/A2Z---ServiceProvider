@@ -60,30 +60,38 @@ function safeVibrate(pattern) {
  * Preload and decode /alert.mp3 into an in-memory AudioBuffer.
  * AudioBuffers play instantly and are immune to HTMLMediaElement background throttling.
  */
-async function loadAndDecodeAlertBuffer(ctx) {
-  if (decodedAlertBuffer || isBufferLoading) return decodedAlertBuffer
+let bufferLoadPromise = null
+
+function loadAndDecodeAlertBuffer(ctx) {
+  if (decodedAlertBuffer) return Promise.resolve(decodedAlertBuffer)
+  // Concurrent callers share one load, so whoever asked first is not the only one who can start playback
+  if (bufferLoadPromise) return bufferLoadPromise
   isBufferLoading = true
-  try {
-    const urls = ['/alert.mp3', alertSoundSrc]
-    for (const url of urls) {
-      try {
-        const response = await fetch(url)
-        if (response.ok) {
-          const arrayBuffer = await response.arrayBuffer()
-          decodedAlertBuffer = await ctx.decodeAudioData(arrayBuffer)
-          console.log('[BookingSound] Preloaded & decoded alert.mp3 buffer successfully')
-          break
+  bufferLoadPromise = (async () => {
+    try {
+      const urls = ['/alert.mp3', alertSoundSrc]
+      for (const url of urls) {
+        try {
+          const response = await fetch(url)
+          if (response.ok) {
+            const arrayBuffer = await response.arrayBuffer()
+            decodedAlertBuffer = await ctx.decodeAudioData(arrayBuffer)
+            console.log('[BookingSound] Preloaded & decoded alert.mp3 buffer successfully')
+            break
+          }
+        } catch {
+          // Try fallback
         }
-      } catch {
-        // Try fallback
       }
+    } catch (err) {
+      console.warn('[BookingSound] Buffer decode warning:', err)
+    } finally {
+      isBufferLoading = false
+      bufferLoadPromise = null
     }
-  } catch (err) {
-    console.warn('[BookingSound] Buffer decode warning:', err)
-  } finally {
-    isBufferLoading = false
-  }
-  return decodedAlertBuffer
+    return decodedAlertBuffer
+  })()
+  return bufferLoadPromise
 }
 
 /**
@@ -248,8 +256,110 @@ export function playWebAudioChime() {
 let currentPlayingId = null
 let lastPlayTimestamp = 0
 
+function stopChimeLoop() {
+  if (chimeInterval) {
+    clearInterval(chimeInterval)
+    chimeInterval = null
+  }
+}
+
+function pauseFallbackAudio() {
+  if (!audioElement) return
+  try {
+    audioElement.pause()
+    audioElement.currentTime = 0
+    audioElement.loop = false
+  } catch {}
+}
+
 /**
- * Internal execution of actual audio pipelines (WebAudio buffer, HTML5 audio, chime, vibration).
+ * Start the Web Audio looped buffer (the preferred, background-safe source).
+ * Once it is running the HTML5 fallback and the chime are silenced so only ONE sound rings.
+ */
+function startBufferSource(buf) {
+  if (!isPlaying || activeBufferSource || !buf) return false
+  if (!audioContext || audioContext.state === 'closed') return false
+  try {
+    const source = audioContext.createBufferSource()
+    source.buffer = buf
+    source.loop = true
+
+    const gainNode = audioContext.createGain()
+    gainNode.gain.setValueAtTime(1.0, audioContext.currentTime)
+
+    source.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+    source.start(0)
+
+    activeBufferSource = source
+    activeGainNode = gainNode
+
+    pauseFallbackAudio()
+    stopChimeLoop()
+    notifyAutoplayBlockedChange(false)
+    return true
+  } catch (err) {
+    console.warn('[BookingSound] WebAudio buffer play warning:', err)
+    return false
+  }
+}
+
+/**
+ * Fallback only: plain HTML5 audio loop, used while the buffer is still decoding or when
+ * Web Audio is unavailable. Never runs alongside the Web Audio buffer.
+ */
+function playFallbackAudio() {
+  try {
+    if (!audioElement) {
+      audioElement = new Audio('/alert.mp3')
+      audioElement.preload = 'auto'
+      audioElement.volume = 1.0
+    }
+    audioElement.loop = true
+    // Already ringing: do not restart it (that is what made it sound doubled)
+    if (!audioElement.paused) return
+
+    activePlayPromise = audioElement.play()
+    if (activePlayPromise !== undefined) {
+      activePlayPromise
+        .then(() => {
+          notifyAutoplayBlockedChange(false)
+          // The buffer may have taken over while this was starting
+          if (activeBufferSource || !isPlaying) pauseFallbackAudio()
+        })
+        .catch((err) => {
+          if (err?.name === 'NotAllowedError') {
+            console.warn('[BookingSound] Autoplay blocked by browser policy. Awaiting user tap to unblock.')
+            notifyAutoplayBlockedChange(true)
+          }
+          // mp3 cannot play at all: use the synthesized chime so the provider still hears something
+          startChimeFallback()
+        })
+    }
+  } catch (err) {
+    console.warn('[BookingSound] HTML5 Audio error:', err)
+    notifyAutoplayBlockedChange(true)
+    startChimeFallback()
+  }
+}
+
+/** Last-resort synthesized chime, only when no mp3 source is actually playing. */
+function startChimeFallback() {
+  if (!isPlaying || activeBufferSource || chimeInterval) return
+  playWebAudioChime()
+  chimeInterval = setInterval(() => {
+    if (isPlaying && !activeBufferSource) {
+      playWebAudioChime()
+    } else {
+      stopChimeLoop()
+    }
+  }, 2000)
+}
+
+/**
+ * Internal execution of the alert audio. Idempotent: calling it again while the alert is
+ * already ringing (focus, tap, visibility change, duplicate push/socket events) does nothing,
+ * so exactly one sound plays at a time.
  */
 function executeAudioPlayback() {
   if (!isPlaying) return
@@ -268,94 +378,25 @@ function executeAudioPlayback() {
     })
   }
 
-  // 2. Play Web Audio BufferSource (if decoded)
+  // 2. Already ringing through Web Audio: nothing more to start
+  if (activeBufferSource) return
+
+  // 3. Prefer the Web Audio buffer
   if (audioContext && audioContext.state !== 'closed') {
-    try {
-      if (activeBufferSource) {
-        try { activeBufferSource.stop(0) } catch {}
-        try { activeBufferSource.disconnect() } catch {}
-        activeBufferSource = null
-      }
-
-      if (decodedAlertBuffer) {
-        const source = audioContext.createBufferSource()
-        source.buffer = decodedAlertBuffer
-        source.loop = true
-
-        const gainNode = audioContext.createGain()
-        gainNode.gain.setValueAtTime(1.0, audioContext.currentTime)
-
-        source.connect(gainNode)
-        gainNode.connect(audioContext.destination)
-        source.start(0)
-
-        activeBufferSource = source
-        activeGainNode = gainNode
-        notifyAutoplayBlockedChange(false)
-      } else {
-        // If buffer not decoded yet, load it now and play
-        loadAndDecodeAlertBuffer(audioContext).then((buf) => {
-          if (buf && isPlaying && !activeBufferSource && audioContext && audioContext.state !== 'closed') {
-            const source = audioContext.createBufferSource()
-            source.buffer = buf
-            source.loop = true
-            const gain = audioContext.createGain()
-            gain.gain.setValueAtTime(1.0, audioContext.currentTime)
-            source.connect(gain)
-            gain.connect(audioContext.destination)
-            source.start(0)
-            activeBufferSource = source
-            activeGainNode = gain
-            notifyAutoplayBlockedChange(false)
-          }
-        }).catch(() => {})
-      }
-    } catch (err) {
-      console.warn('[BookingSound] WebAudio buffer play warning:', err)
+    if (decodedAlertBuffer && startBufferSource(decodedAlertBuffer)) {
+      safeVibrate([500, 200, 500, 200, 500, 200, 800])
+      return
     }
+    // Buffer still decoding: swap over to it as soon as it is ready (the fallback is silenced then)
+    loadAndDecodeAlertBuffer(audioContext)
+      .then((buf) => { startBufferSource(buf) })
+      .catch(() => {})
   }
 
-  // 3. Play HTML5 Audio element in parallel as backup
-  try {
-    if (!audioElement) {
-      audioElement = new Audio('/alert.mp3')
-      audioElement.preload = 'auto'
-      audioElement.volume = 1.0
-    }
-    audioElement.loop = true
-    audioElement.currentTime = 0
-    activePlayPromise = audioElement.play()
-    if (activePlayPromise !== undefined) {
-      activePlayPromise
-        .then(() => {
-          notifyAutoplayBlockedChange(false)
-        })
-        .catch((err) => {
-          if (err?.name === 'NotAllowedError') {
-            console.warn('[BookingSound] Autoplay blocked by browser policy. Awaiting user tap to unblock.')
-            notifyAutoplayBlockedChange(true)
-          }
-        })
-    }
-  } catch (err) {
-    console.warn('[BookingSound] HTML5 Audio error:', err)
-    notifyAutoplayBlockedChange(true)
-  }
+  // 4. Fallback sound while waiting for the buffer / when Web Audio is unavailable
+  playFallbackAudio()
 
-  // 4. Play synthesizer chime immediately and on loop as acoustic reinforcement
-  playWebAudioChime()
-  if (!chimeInterval) {
-    chimeInterval = setInterval(() => {
-      if (isPlaying) {
-        playWebAudioChime()
-      } else {
-        clearInterval(chimeInterval)
-        chimeInterval = null
-      }
-    }, 2000)
-  }
-
-  // 5. Trigger vibration if device supports it (phones / Android) safely
+  // 5. Vibration (phones / Android)
   safeVibrate([500, 200, 500, 200, 500, 200, 800])
 }
 
