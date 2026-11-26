@@ -1556,9 +1556,9 @@ export function AdminSubServicesPage() {
 
       {/* Filters Bar */}
       <GlassPanel className="p-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
+        <div className="flex flex-col gap-3">
+          <div className="relative w-full">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Search by sub-service, parent service, or description..."
@@ -1567,13 +1567,13 @@ export function AdminSubServicesPage() {
                 setSearch(e.target.value)
                 setPage(1)
               }}
-              className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 py-2 text-xs font-medium text-slate-800 outline-none focus:border-brand focus:ring-1 focus:ring-brand shadow-2xs transition"
+              className="w-full rounded-xl border border-slate-200 bg-white pl-12 pr-10 py-3 text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-brand/20 shadow-2xs transition"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch('')}
-                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
                 <X className="h-4 w-4" />
               </button>
