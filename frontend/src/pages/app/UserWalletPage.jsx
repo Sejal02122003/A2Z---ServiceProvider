@@ -111,19 +111,19 @@ export default function UserWalletPage() {
   const getContextLabel = (tx) => {
     switch (tx.context) {
       case 'WALLET_RECHARGE':
-        return { label: '💳 Wallet Recharge', color: 'bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300' };
+        return { label: '💳 Wallet Recharge', color: 'bg-teal-100 text-teal-800' };
       case 'SERVICE_CREDIT':
-        return { label: `🎁 ${tx.metadata?.percentage || settings.serviceCreditPercentage || 15}% Service Reward`, color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300' };
+        return { label: `🎁 ${tx.metadata?.percentage || settings.serviceCreditPercentage || 15}% Service Reward`, color: 'bg-indigo-100 text-indigo-800' };
       case 'WELCOME_BONUS':
-        return { label: '🎉 Welcome Bonus', color: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300' };
+        return { label: '🎉 Welcome Bonus', color: 'bg-amber-100 text-amber-800' };
       case 'SERVICE_DISCOUNT':
-        return { label: '🏷️ Booking Discount', color: 'bg-primary-100 text-primary-800 dark:bg-primary-950/60 dark:text-primary-300' };
+        return { label: '🏷️ Booking Discount', color: 'bg-brand-muted text-brand' };
       case 'REFUND':
-        return { label: '↩️ Booking Refund', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' };
+        return { label: '↩️ Booking Refund', color: 'bg-emerald-100 text-emerald-800' };
       case 'REVERSAL':
-        return { label: '↩️ Credit Reversal', color: 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300' };
+        return { label: '↩️ Credit Reversal', color: 'bg-rose-100 text-rose-800' };
       case 'ADMIN_ADJUSTMENT':
-        return { label: '⚖️ Manual Adjustment', color: 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300' };
+        return { label: '⚖️ Manual Adjustment', color: 'bg-purple-100 text-purple-800' };
       default:
         return {
           label: tx.type === 'CREDIT' ? 'Credit' : 'Debit',
@@ -138,7 +138,7 @@ export default function UserWalletPage() {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
         <div className="flex flex-col items-center gap-3">
-          <RefreshCw className="w-8 h-8 animate-spin text-primary-500" />
+          <RefreshCw className="w-8 h-8 animate-spin text-brand" />
           <p className="text-sm font-medium text-slate-500">Loading your wallet...</p>
         </div>
       </div>
@@ -167,10 +167,10 @@ export default function UserWalletPage() {
           <button
             onClick={() => loadData(true)}
             disabled={refreshing}
-            className="p-2.5 bg-slate-100 text-slate-600 hover:text-primary-600 rounded-xl transition-all disabled:opacity-50"
+            className="p-2.5 bg-slate-100 text-slate-600 hover:text-brand rounded-xl transition-all disabled:opacity-50"
             title="Refresh Balance"
           >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-primary-600' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-brand' : ''}`} />
           </button>
         </div>
       </div>
@@ -200,9 +200,9 @@ export default function UserWalletPage() {
       )}
 
       {/* Hero Wallet Card */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-primary-950 to-primary-900 text-white p-6 md:p-8 shadow-xl shadow-primary-950/20 border border-white/10">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand via-[#017b89] to-brand-bright text-white p-6 md:p-8 shadow-xl shadow-brand/25 border border-white/10">
         {/* Glow circles */}
-        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-44 h-44 bg-primary-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-44 h-44 bg-white/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 -mb-8 -ml-8 w-44 h-44 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col justify-between min-h-[170px]">
@@ -252,7 +252,7 @@ export default function UserWalletPage() {
 
       {/* Pending Recharge Notification Banner */}
       {pendingRechargesCount > 0 && (
-        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 text-amber-900 dark:text-amber-200 flex items-center justify-between gap-3 text-xs">
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2.5">
             <Clock className="w-4 h-4 text-amber-600 shrink-0" />
             <span>
@@ -262,7 +262,7 @@ export default function UserWalletPage() {
           <button
             type="button"
             onClick={() => setActiveHistoryTab('recharges')}
-            className="font-bold underline text-amber-800 dark:text-amber-300 shrink-0 hover:text-amber-950"
+            className="font-bold underline text-amber-800 shrink-0 hover:text-amber-950"
           >
             View Status
           </button>
@@ -295,15 +295,15 @@ export default function UserWalletPage() {
 
       {/* History Section: Ledger vs Recharges Tab */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-2">
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setActiveHistoryTab('transactions')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
                 activeHistoryTab === 'transactions'
-                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
               <Clock className="w-3.5 h-3.5" />
@@ -315,8 +315,8 @@ export default function UserWalletPage() {
               onClick={() => setActiveHistoryTab('recharges')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
                 activeHistoryTab === 'recharges'
-                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
               <FileText className="w-3.5 h-3.5" />
@@ -332,15 +332,15 @@ export default function UserWalletPage() {
         {activeHistoryTab === 'transactions' && (
           <div>
             {transactions.length === 0 ? (
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-8 text-center space-y-2">
-                <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
+              <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-2">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
                   <Clock className="w-6 h-6" />
                 </div>
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No transactions yet</p>
+                <p className="text-sm font-semibold text-slate-700">No transactions yet</p>
                 <p className="text-xs text-slate-400">Your credits and discounts will appear right here.</p>
               </div>
             ) : (
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800/60 overflow-hidden shadow-xs">
+              <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden shadow-xs">
                 {transactions.map((tx) => {
                   const badge = getContextLabel(tx);
                   const isCredit = tx.type === 'CREDIT';
@@ -348,13 +348,13 @@ export default function UserWalletPage() {
                   const eligibleAmt = tx.metadata?.eligibleAmount || tx.bookingId?.basePrice;
 
                   return (
-                    <div key={tx._id} className="p-4 flex items-center justify-between hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                    <div key={tx._id} className="p-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
                       <div className="flex items-center gap-3.5">
                         <div
                           className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                             isCredit
-                              ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
-                              : 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400'
+                              ? 'bg-emerald-50 text-emerald-600'
+                              : 'bg-rose-50 text-rose-600'
                           }`}
                         >
                           {isCredit ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
@@ -362,7 +362,7 @@ export default function UserWalletPage() {
 
                         <div className="space-y-0.5">
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-bold text-slate-900 dark:text-white">
+                            <p className="text-sm font-bold text-slate-900">
                               {tx.description || tx.reason || (isCredit ? 'Wallet Credit' : 'Service Discount')}
                             </p>
                           </div>
@@ -402,7 +402,7 @@ export default function UserWalletPage() {
                       <div className="text-right">
                         <div
                           className={`text-base font-black ${
-                            isCredit ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'
+                            isCredit ? 'text-emerald-600' : 'text-slate-900'
                           }`}
                         >
                           {isCredit ? '+' : '-'} ₹{tx.amount}
@@ -423,11 +423,11 @@ export default function UserWalletPage() {
         {activeHistoryTab === 'recharges' && (
           <div>
             {rechargeRequests.length === 0 ? (
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-8 text-center space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
+              <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
                   <FileText className="w-6 h-6" />
                 </div>
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No recharge requests yet</p>
+                <p className="text-sm font-semibold text-slate-700">No recharge requests yet</p>
                 <p className="text-xs text-slate-400 max-w-sm mx-auto">
                   Scan the Admin QR and submit your payment proof to top up your wallet.
                 </p>
@@ -440,14 +440,14 @@ export default function UserWalletPage() {
                 </button>
               </div>
             ) : (
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800/60 overflow-hidden shadow-xs">
+              <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden shadow-xs">
                 {rechargeRequests.map((r) => {
                   const isPending = r.status === 'PENDING';
                   const isApproved = r.status === 'APPROVED';
                   const isRejected = r.status === 'REJECTED';
 
                   return (
-                    <div key={r._id} className="p-4 space-y-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                    <div key={r._id} className="p-4 space-y-3 hover:bg-slate-50/50 transition-colors">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div
@@ -470,7 +470,7 @@ export default function UserWalletPage() {
 
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="text-base font-black text-slate-900 dark:text-white">
+                              <span className="text-base font-black text-slate-900">
                                 ₹{Number(r.amount).toLocaleString('en-IN')}
                               </span>
                               <span
@@ -487,7 +487,7 @@ export default function UserWalletPage() {
                             </div>
 
                             <p className="text-xs text-slate-400 font-medium">
-                              UTR: <code className="font-mono text-slate-600 dark:text-slate-300 font-bold">{r.utrNumber}</code> •{' '}
+                              UTR: <code className="font-mono text-slate-600 font-bold">{r.utrNumber}</code> •{' '}
                               {new Date(r.createdAt).toLocaleDateString('en-IN', {
                                 day: '2-digit',
                                 month: 'short',
@@ -503,7 +503,7 @@ export default function UserWalletPage() {
                           <button
                             type="button"
                             onClick={() => setPreviewScreenshot(r.paymentScreenshot)}
-                            className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:ring-2 hover:ring-teal-500 transition"
+                            className="p-1 rounded-lg border border-slate-200 hover:ring-2 hover:ring-teal-500 transition"
                             title="View receipt"
                           >
                             <img
@@ -517,43 +517,43 @@ export default function UserWalletPage() {
 
                       {/* User's own submitted note if present */}
                       {(r.notes || r.userRemarks) && (
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 flex items-start gap-1">
-                          <span className="font-semibold text-slate-600 dark:text-slate-300 shrink-0">Your Note:</span>
-                          <span className="text-slate-700 dark:text-slate-300 italic">"{r.notes || r.userRemarks}"</span>
+                        <p className="text-[11px] text-slate-500 mt-1 flex items-start gap-1">
+                          <span className="font-semibold text-slate-600 shrink-0">Your Note:</span>
+                          <span className="text-slate-700 italic">"{r.notes || r.userRemarks}"</span>
                         </p>
                       )}
 
                       {/* Display admin rejection reason if request was rejected */}
                       {isRejected && (
-                        <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-xs text-rose-900 dark:text-rose-200 space-y-1">
+                        <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-900 space-y-1">
                           <p className="font-bold flex items-center gap-1.5">
                             <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
                             Rejection Reason:
                           </p>
                           <p className="pl-5 font-medium">{r.rejectionReason || 'Receipt could not be verified'}</p>
                           {r.adminRemarks && r.adminRemarks !== r.rejectionReason && (
-                            <p className="pl-5 text-[11px] text-rose-700 dark:text-rose-300">Admin Remark: {r.adminRemarks}</p>
+                            <p className="pl-5 text-[11px] text-rose-700">Admin Remark: {r.adminRemarks}</p>
                           )}
                         </div>
                       )}
 
                       {/* Display approval credit confirmation with admin remarks */}
                       {isApproved && (
-                        <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40 text-xs text-emerald-800 dark:text-emerald-300 font-medium space-y-1.5">
-                          <div className="flex items-center gap-1.5 font-bold text-emerald-800 dark:text-emerald-300">
+                        <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-medium space-y-1.5">
+                          <div className="flex items-center gap-1.5 font-bold text-emerald-800">
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                             <span>Recharge Approved & Credited</span>
                           </div>
                           {r.adminRemarks && (
-                            <div className="p-2 rounded-lg bg-white/90 dark:bg-slate-800/90 border border-emerald-200 dark:border-emerald-900/50 text-[11px] flex items-start gap-1.5">
+                            <div className="p-2 rounded-lg bg-white/90 border border-emerald-200 text-[11px] flex items-start gap-1.5">
                               <MessageSquare className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
                               <div>
-                                <span className="font-bold text-emerald-800 dark:text-emerald-300">Admin Remark: </span>
-                                <span className="text-slate-800 dark:text-slate-200">{r.adminRemarks}</span>
+                                <span className="font-bold text-emerald-800">Admin Remark: </span>
+                                <span className="text-slate-800">{r.adminRemarks}</span>
                               </div>
                             </div>
                           )}
-                          <p className="text-[10px] text-emerald-600 dark:text-emerald-400 pl-5">
+                          <p className="text-[10px] text-emerald-600 pl-5">
                             Amount credited to your wallet balance.
                           </p>
                         </div>
