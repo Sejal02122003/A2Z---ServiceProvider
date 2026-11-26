@@ -10,9 +10,12 @@ function ScrollToTopOnEnter() {
   const navType = useNavigationType()
   useLayoutEffect(() => {
     if (navType === 'POP') return
-    window.scrollTo(0, 0)
-    document.documentElement.scrollTop = 0
-    document.body.scrollTop = 0
+    // html has `scroll-behavior: smooth`; force an instant jump so the animation
+    // can't be interrupted by the page transition / layout and leave us mid-page.
+    const toTop = () => window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    toTop()
+    const raf = requestAnimationFrame(toTop) // once more after first paint (content may have grown)
+    return () => cancelAnimationFrame(raf)
   }, [navType])
   return null
 }
