@@ -840,7 +840,14 @@ export function BroadcastPopup() {
                     }
                   </span>
                 </div>
-                {(incoming.date || incoming.time) && (
+                {String(incoming.type || '').toUpperCase() !== 'SCHEDULED' ? (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500 font-medium">Booking Type</span>
+                    <span className="inline-flex items-center gap-1 font-bold text-brand">
+                      <Zap className="h-3.5 w-3.5" aria-hidden /> Instant (ASAP)
+                    </span>
+                  </div>
+                ) : (incoming.date || incoming.time) && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500 font-medium">Schedule</span>
                     <span className="font-bold text-slate-800">

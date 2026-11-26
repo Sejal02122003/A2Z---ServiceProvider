@@ -687,7 +687,7 @@ export async function startBroadcastCycle(bookingId) {
               totalDurationMins: totalBookingDuration,
               formattedDuration: formattedBookingDuration,
               date: booking.scheduledAt || booking.createdAt,
-              time: booking.timeSlot || 'Earliest available',
+              time: String(booking.type || '').toUpperCase() === 'SCHEDULED' ? (booking.timeSlot || 'Earliest available') : 'Earliest available',
               duration: bookingHours,
               customerLocation: booking.address?.locationText || 'Service Location',
               approximateDistance: labor.approximateDistance,
@@ -793,7 +793,7 @@ export async function startBroadcastCycle(bookingId) {
               isContractorBooking: true,
               requiresServiceSelection: servicesPayload.length > 1,
               date: booking.scheduledAt || booking.createdAt,
-              time: booking.timeSlot || 'Earliest available',
+              time: String(booking.type || '').toUpperCase() === 'SCHEDULED' ? (booking.timeSlot || 'Earliest available') : 'Earliest available',
               duration: bookingHours,
               customerLocation: booking.address?.locationText || 'Service Location',
               approximateDistance: labor.approximateDistance,
@@ -921,7 +921,7 @@ export async function startBroadcastCycle(bookingId) {
                 description: inc.description || ''
               })) : undefined,
               date: booking.scheduledAt || booking.createdAt,
-              time: booking.timeSlot || 'Earliest available',
+              time: String(booking.type || '').toUpperCase() === 'SCHEDULED' ? (booking.timeSlot || 'Earliest available') : 'Earliest available',
               duration: bookingHours,
               customerLocation: booking.address?.locationText || 'Service Location',
               approximateDistance: labor.approximateDistance,
@@ -967,7 +967,7 @@ export async function startBroadcastCycle(bookingId) {
             ? `New Package Booking: ${booking.packageBooking.packageName}! 📦`
             : (isSingleScheduled ? 'New Scheduled Job Offer! ⏰' : 'New Job Offer! ⚡')
           const singleNotifBody = booking.packageBooking?.isPackage
-            ? `Package appointment for ${booking.timeSlot || 'Scheduled Time'}. Includes ${booking.packageBooking.inclusions?.length || 0} services. Estimated earnings: ₹${singleShare}. Tap to accept!`
+            ? `${isSingleScheduled ? `Package appointment for ${booking.timeSlot || 'Scheduled Time'}` : 'Instant package job available near you'}. Includes ${booking.packageBooking.inclusions?.length || 0} services. Estimated earnings: ₹${singleShare}. Tap to accept!`
             : (isSingleScheduled
               ? `New ${singleServiceName} appointment scheduled for ${booking.timeSlot || 'Scheduled Time'}. Estimated earnings: ₹${singleShare}. Tap to accept!`
               : `New ${singleServiceName} job available near you. Estimated earnings: ₹${singleShare}`)
