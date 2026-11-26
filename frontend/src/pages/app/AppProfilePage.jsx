@@ -523,7 +523,7 @@ export function AppProfilePage() {
 
   return (
     <motion.div
-      className="w-full min-w-0 max-w-full space-y-5 overflow-x-hidden bg-linear-to-b from-slate-50/95 via-white to-blue-50/15 pb-28 pt-1"
+      className="w-full min-w-0 max-w-full space-y-5 overflow-x-hidden bg-linear-to-b from-slate-50/95 via-white to-blue-50/15 pb-28"
       initial={reduce ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
     >

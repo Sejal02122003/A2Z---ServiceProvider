@@ -519,7 +519,10 @@ export function AppShell() {
             pathname.includes('/sub-category')
               ? `p-0 ${cartCount > 0 ? 'pb-36' : isFromOnboardingSupport ? 'pb-8' : 'pb-28'}`
               : `px-4 ${cartCount > 0 ? 'pb-48' : 'pb-32'} ${hideShellHeader
-                  ? 'pt-[max(0.5rem,env(safe-area-inset-top,0px))]'
+                  ? /\/(profile|bookings|my-bookings)\/?$/.test(pathname)
+                    // these pages render AppStackScreenHeader, which already adds the safe-area inset
+                    ? 'pt-0'
+                    : 'pt-[max(0.5rem,env(safe-area-inset-top,0px))]'
                   : isIndividualAppHome
                     ? 'pt-0'
                     : 'pt-4'
