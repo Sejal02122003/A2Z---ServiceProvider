@@ -6,6 +6,7 @@ import { LabourSubcategory } from '../models/LabourSubcategory.js'
 import { SystemSetting } from '../models/SystemSetting.js'
 import { getRoadDistances } from '../utils/googleMapsDistance.js'
 import { UserSubscription } from '../models/UserSubscription.js'
+import { incrementActiveSubscriptionStats } from './subscriptionStatsService.js'
 import { Review } from '../models/Review.js'
 import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
 import { USER_ROLES } from '../constants/roles.js'
@@ -1003,11 +1004,8 @@ export async function startBroadcastCycle(bookingId) {
 
         auditSet(labor._id, 'SENT', 'Offer sent', { distanceKm: labor.approximateDistance })
 
-        const sub = activeSubsMap[labor._id]
-        if (sub) {
-          sub.bookingsReceived += 1
-          sub.save().catch(err => console.error('Failed to increment bookingsReceived', err))
-        }
+        // Count this as an offer on the provider's active subscription (accepted bookings are counted on accept)
+        incrementActiveSubscriptionStats(labor._id, { bookingOpportunitiesOffered: 1 })
 
         laborUpdates.push(
           User.findByIdAndUpdate(labor._id, {

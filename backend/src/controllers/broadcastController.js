@@ -7,6 +7,7 @@ import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { KYC_STATUS } from '../constants/roles.js'
 import { BROADCAST_TIMEOUT_MS } from '../services/broadcastService.js'
 import { getLabourStats } from '../services/labourStatsService.js'
+import { incrementActiveSubscriptionStats } from '../services/subscriptionStatsService.js'
 import { getBookingLabourShareRate, getBookingLabourPool } from '../utils/labourShare.js'
 import { resolvePackageScope, providerOffersPackage } from '../utils/packageMatch.js'
 import { ServicePackage } from '../models/ServicePackage.js'
@@ -492,13 +493,9 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     })
     .catch(err => console.error('[Import Error]', err))
 
-  // Increment subscription bookingsAccepted count
-  if (accessCheck.subscription) {
-    const { UserSubscription } = await import('../models/UserSubscription.js')
-    await UserSubscription.findByIdAndUpdate(accessCheck.subscription._id, {
-      $inc: { bookingsReceived: 1, bookingOpportunitiesAccepted: 1 },
-    })
-  }
+  // Count the accepted booking on the provider's active subscription. This works whether or not
+  // subscriptions are enforced / the provider is in a trial, so the admin counts stay accurate.
+  await incrementActiveSubscriptionStats(labour._id, { bookingsReceived: 1, bookingOpportunitiesAccepted: 1 })
 
   // Increment lifetime broadcasts accepted
   await User.findByIdAndUpdate(labour._id, {
@@ -678,33 +675,8 @@ export const rejectBroadcast = asyncHandler(async (req, res) => {
     return sendSuccess(res, { message: 'Booking already handled or no longer broadcasting' })
   }
 
-  // Track booking opportunities offered to this labour (even if rejected)
-  // Per spec: a booking offered but rejected still counts as an opportunity
-  try {
-    const { SystemSetting } = await import('../models/SystemSetting.js')
-    const { UserSubscription } = await import('../models/UserSubscription.js')
-    const settings = await SystemSetting.findOne({ configKey: 'master_config' })
-    const isSubEnabled = settings?.isUserSubscriptionEnabled ?? true
-
-    if (isSubEnabled) {
-      const trialEndsAt = labour.labourProfile?.trialEndsAt
-      const inTrial = trialEndsAt && new Date(trialEndsAt) > new Date()
-      if (!inTrial) {
-        const todayIST = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
-        await UserSubscription.findOneAndUpdate(
-          {
-            labour: labour._id,
-            status: 'active',
-            date: { $lte: todayIST },
-            endDate: { $gte: todayIST }
-          },
-          { $inc: { bookingOpportunitiesOffered: 1 } }
-        )
-      }
-    }
-  } catch (e) {
-    console.error('[broadcastController] Failed to track booking opportunity:', e)
-  }
+  // Note: the offer itself is already counted when it is sent (broadcastService), so a rejection
+  // must not add to bookingOpportunitiesOffered again.
 
   // If everyone eligible has rejected it, fail it
   const rejectedCount = Array.isArray(booking.rejectedBy) ? booking.rejectedBy.length : 0
