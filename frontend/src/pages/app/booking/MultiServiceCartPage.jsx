@@ -26,7 +26,7 @@ import { bookingsApi } from '../../../api/bookingsApi.js'
 import { paymentsApi } from '../../../api/paymentsApi.js'
 import { readAppUserLocation } from '../../../lib/appUserLocationStorage.js'
 import { GlassPanel } from '../../../components/ui/GlassPanel.jsx'
-import { getCategoryImageUrl } from '../../../lib/labourCategoryDisplay.js'
+import { getCategoryImageUrl, onCategoryImgError } from '../../../lib/labourCategoryDisplay.js'
 import { SelectAddressSheet } from '../../../components/app/address/SelectAddressSheet.jsx'
 
 const SCHEDULE_SLOTS = [
@@ -478,6 +478,7 @@ export function MultiServiceCartPage() {
                         src={getCategoryImageUrl({ name: item.serviceName, imageUrl: item.iconUrl })}
                         alt={item.serviceName}
                         className="h-full w-full object-cover"
+                        onError={onCategoryImgError}
                       />
                     ) : (
                       <div className="h-full w-full flex items-center justify-center text-slate-300">

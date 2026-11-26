@@ -9,7 +9,7 @@ import {
   AppBottomSheetPanel,
 } from '../../app-ui/feedback/AppBottomSheet.jsx'
 import { appSpring } from '../appMotion.js'
-import { getCategoryImageUrl } from '../../../lib/labourCategoryDisplay.js'
+import { getCategoryImageUrl, onCategoryImgError } from '../../../lib/labourCategoryDisplay.js'
 import { buildBookingFlowPath } from '../../../lib/bookingFlowNavigation.js'
 import { readBookingDraft, writeBookingDraft } from '../../../lib/individualBookingDraft.js'
 
@@ -186,7 +186,7 @@ export function CategoryPickBottomSheet({ open, onClose, tradeGroups, groupsLoad
                               }`}
                             >
                               <motion.div className="relative aspect-[4/3] bg-slate-100">
-                                <img src={img} alt="" className="h-full w-full object-cover" loading="lazy" />
+                                <img src={img} alt="" className="h-full w-full object-cover" loading="lazy" onError={onCategoryImgError} />
                                 <span className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-lg bg-white/90 text-brand shadow-sm">
                                   <Briefcase className="h-3.5 w-3.5" aria-hidden />
                                 </span>

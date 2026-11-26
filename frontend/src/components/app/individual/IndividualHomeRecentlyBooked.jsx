@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import { AppListSkeleton } from '../../app-ui/feedback/AppListSkeleton.jsx'
-import { getCategoryImageUrl } from '../../../lib/labourCategoryDisplay.js'
+import { getCategoryImageUrl, onCategoryImgError } from '../../../lib/labourCategoryDisplay.js'
 
 const FALLBACK_BOOKING_IMG =
   'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=400&q=70'
@@ -66,7 +66,7 @@ export function IndividualHomeRecentlyBooked({ bookings, loading, formatDay }) {
               to={`/user/tracking/${b._id}`}
               className="flex w-[280px] shrink-0 snap-start items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm transition hover:border-brand/30 hover:shadow-md"
             >
-              <img src={img} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" loading="lazy" />
+              <img src={img} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" loading="lazy" onError={onCategoryImgError} />
               <div className="flex-1 min-w-0">
                 <p className="line-clamp-1 text-sm font-bold text-slate-900">{itemLabel}</p>
                 <p className="mt-0.5 line-clamp-1 text-[11px] font-medium text-slate-500">

@@ -1,6 +1,6 @@
 import { ChevronRight, Loader2, Wrench, Sparkles, Tag, Flame } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { getCategoryImageUrl } from '../../../lib/labourCategoryDisplay.js'
+import { getCategoryImageUrl, onCategoryImgError } from '../../../lib/labourCategoryDisplay.js'
 import { getServiceOfferDetails } from '../../../lib/serviceOfferUtils.js'
 import { ServiceOfferBadge } from '../services/ServiceOfferBadge.jsx'
 
@@ -65,6 +65,7 @@ function ServiceImage({ src, alt, className = '' }) {
       loading="lazy"
       decoding="async"
       onLoad={(e) => e.currentTarget.classList.add('lc-img-loaded')}
+      onError={onCategoryImgError}
     />
   )
 }

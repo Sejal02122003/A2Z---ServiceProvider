@@ -5,6 +5,7 @@ import {
   flattenTradeSubcategories,
   getCategoryImageUrl,
   getGroupImageUrl,
+  onCategoryImgError,
 } from '../../../lib/labourCategoryDisplay.js'
 import { buildBookingFlowPath } from '../../../lib/bookingFlowNavigation.js'
 import { readBookingDraft, writeBookingDraft } from '../../../lib/individualBookingDraft.js'
@@ -31,6 +32,7 @@ function SwiggyGroupTile({ label, imageSrc, active, onClick }) {
           loading="lazy"
           decoding="async"
           onLoad={(e) => e.currentTarget.classList.add('lc-img-loaded')}
+          onError={onCategoryImgError}
         />
       </span>
       <span className="lc-swiggy-cat-label">{label}</span>
@@ -51,7 +53,7 @@ function SkillCard({ category, active, showGroupName, onClick }) {
       data-active={active ? 'true' : 'false'}
     >
       <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden">
-        <img src={img} alt="" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" loading="lazy" decoding="async" />
+        <img src={img} alt="" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" loading="lazy" decoding="async" onError={onCategoryImgError} />
         {hasOffers && maxDiscount > 0 && (
           <div className="absolute top-1 left-1">
             <span className="rounded-full bg-rose-600 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-white shadow-sm">

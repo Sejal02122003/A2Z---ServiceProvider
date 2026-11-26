@@ -1,6 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import { ArrowRight, Loader2, Wrench } from 'lucide-react'
-import { getCategoryImageUrl } from '../../../lib/labourCategoryDisplay.js'
+import { getCategoryImageUrl, onCategoryImgError } from '../../../lib/labourCategoryDisplay.js'
 
 function CategoryImage({ src, name }) {
   return (
@@ -12,6 +12,7 @@ function CategoryImage({ src, name }) {
         loading="lazy"
         decoding="async"
         onLoad={(e) => e.currentTarget.classList.add('lc-img-loaded')}
+        onError={onCategoryImgError}
       />
       <span
         className="pointer-events-none absolute inset-x-0 bottom-0 bg-slate-900/55 px-2.5 py-2 text-left text-[11px] font-bold leading-tight text-white"

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Sparkles, Flame, ChevronRight, Tag } from 'lucide-react'
-import { getCategoryImageUrl } from '../../../lib/labourCategoryDisplay.js'
+import { getCategoryImageUrl, onCategoryImgError } from '../../../lib/labourCategoryDisplay.js'
 import { getServiceOfferDetails } from '../../../lib/serviceOfferUtils.js'
 import { ServiceOfferBadge } from '../services/ServiceOfferBadge.jsx'
 
@@ -71,6 +71,7 @@ export function IndividualHomeServiceOffers({ tradeGroups, loading, onSelectServ
                   alt={item.name}
                   className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                   loading="lazy"
+                  onError={onCategoryImgError}
                 />
                 <div className="absolute top-2 left-2">
                   <ServiceOfferBadge label={offer.offerBadge} variant="ribbon" />

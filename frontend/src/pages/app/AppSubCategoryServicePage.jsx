@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useLocation, useNavigate, useParams, Navigate } from 'react-router-dom'
 import { ArrowLeft, Wrench, ChevronDown, ChevronUp, Loader2, Sparkles, Tag, Flame, Clock, CheckCircle2, XCircle, Check, X, Plus, Minus, Wallet } from 'lucide-react'
-import { getCategoryImageUrl } from '../../lib/labourCategoryDisplay.js'
+import { getCategoryImageUrl, onCategoryImgError } from '../../lib/labourCategoryDisplay.js'
 import { BookingTypeSheet } from '../../components/app/booking/BookingTypeSheet.jsx'
 import { readBookingDraft, writeBookingDraft } from '../../lib/individualBookingDraft.js'
 import { buildBookingFlowPath } from '../../lib/bookingFlowNavigation.js'
@@ -341,6 +341,7 @@ export function AppSubCategoryServicePage() {
                             src={getCategoryImageUrl({ name: service.name, imageUrl: service.iconUrl })}
                             alt={service.name}
                             className="h-full w-full object-cover"
+                            onError={onCategoryImgError}
                           />
                         ) : (
                           <div className="h-full w-full flex items-center justify-center">
