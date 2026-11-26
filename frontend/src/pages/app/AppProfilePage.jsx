@@ -642,6 +642,7 @@ export function AppProfilePage() {
       {isLabour ? (
         <Link
           to="/serviceprovider/partner-onboarding"
+          state={{ from: 'profile' }}
           className="flex items-center justify-between gap-3 rounded-2xl border border-brand/30 bg-gradient-to-r from-brand/10 via-white to-blue-50/50 p-4 shadow-sm transition hover:border-brand/50 active:scale-[0.99]"
         >
           <span className="flex items-center gap-3">

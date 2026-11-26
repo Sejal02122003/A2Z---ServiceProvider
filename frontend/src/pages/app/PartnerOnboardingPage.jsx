@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Headphones, LogOut } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../hooks/useAuth.js'
@@ -7,11 +7,17 @@ import { PartnerOnboardingStepper } from '../../components/labour/PartnerOnboard
 
 export function PartnerOnboardingPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { logout } = useAuth()
   const [showExitModal, setShowExitModal] = useState(false)
 
-  // Intercept hardware / browser back button to show exit modal
+  // Opened on purpose from Profile → "Steps for Service Partner Registration": Back should just
+  // return there. The exit prompt is only for providers who are forced into onboarding.
+  const openedFromProfile = location.state?.from === 'profile'
+
+  // Intercept hardware / browser back button to show exit modal (forced onboarding only)
   useEffect(() => {
+    if (openedFromProfile) return undefined
     window.history.pushState({ partnerOnboardingBackGuard: true }, '')
 
     const handlePopState = () => {
@@ -23,7 +29,7 @@ export function PartnerOnboardingPage() {
     return () => {
       window.removeEventListener('popstate', handlePopState)
     }
-  }, [])
+  }, [openedFromProfile])
 
   const handleExitApp = async () => {
     setShowExitModal(false)
@@ -50,7 +56,11 @@ export function PartnerOnboardingPage() {
       <div className="sticky top-0 z-40 flex items-center justify-between border-b border-slate-200/80 bg-white/95 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 backdrop-blur-md">
         <button
           type="button"
-          onClick={() => setShowExitModal(true)}
+          onClick={() =>
+            openedFromProfile
+              ? navigate('/serviceprovider/profile', { replace: true })
+              : setShowExitModal(true)
+          }
           className="flex items-center gap-1.5 rounded-full p-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition cursor-pointer"
           aria-label="Back"
         >
