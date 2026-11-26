@@ -420,17 +420,17 @@ export function AppShell() {
             className={`sticky top-0 z-40 hide-on-print transition-colors duration-200 ${
               isIndividualAppHome
                 ? isScrolled
-                  ? 'bg-[#012227]/95 backdrop-blur-md px-4 py-2.5 shadow-md border-b border-white/10'
-                  : 'bg-transparent px-4 pb-1 pt-3'
-                : 'px-3 pt-3 bg-white/95 backdrop-blur-md shadow-xs'
+                  ? 'bg-[#012227]/95 backdrop-blur-md px-3 min-[380px]:px-4 pb-2.5 pt-[max(0.625rem,env(safe-area-inset-top,0px))] shadow-md border-b border-white/10'
+                  : 'bg-transparent px-3 min-[380px]:px-4 pb-1 pt-[max(0.75rem,env(safe-area-inset-top,0px))]'
+                : 'px-3 pt-[max(0.75rem,env(safe-area-inset-top,0px))] bg-white/95 backdrop-blur-md shadow-xs'
             }`}
           >
             {isIndividualAppHome ? (
-              <div className="flex items-center gap-2 text-white">
+              <div className="flex items-center gap-1.5 min-[360px]:gap-2 text-white">
                 <button
                   type="button"
                   onClick={() => setDrawerOpen(true)}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition active:scale-95 hover:bg-white/25"
+                  className="flex h-9 w-9 min-[360px]:h-10 min-[360px]:w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition active:scale-95 hover:bg-white/25"
                   aria-label="Open menu"
                 >
                   <Menu className="h-5 w-5" />
@@ -447,7 +447,7 @@ export function AppShell() {
                   <div className="min-w-0 flex-1">
                     <p className="text-[11px] font-semibold text-white/80">Your location</p>
                     <div className="flex items-center gap-0.5">
-                      <span className="truncate text-sm font-extrabold tracking-tight sm:text-[0.95rem]">
+                      <span className="truncate text-[13px] min-[360px]:text-sm font-extrabold tracking-tight sm:text-[0.95rem]">
                         {individualLocationTitle}
                       </span>
                       <ChevronDown className="h-3.5 w-3.5 shrink-0 text-white/80" aria-hidden />
@@ -457,7 +457,7 @@ export function AppShell() {
                 </button>
                 <Link
                   to={isServiceProviderPortal ? '/serviceprovider/notifications' : '/user/notifications'}
-                  className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition active:scale-95 hover:bg-white/25"
+                  className="relative flex h-9 w-9 min-[360px]:h-10 min-[360px]:w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition active:scale-95 hover:bg-white/25"
                   aria-label="Notifications"
                 >
                   <Bell className="h-5 w-5" aria-hidden />
@@ -469,7 +469,7 @@ export function AppShell() {
                 </Link>
                 <Link
                   to={isServiceProviderPortal ? '/serviceprovider/profile' : '/user/profile'}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition active:scale-95 hover:bg-white/25 overflow-hidden"
+                  className="flex h-9 w-9 min-[360px]:h-10 min-[360px]:w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition active:scale-95 hover:bg-white/25 overflow-hidden"
                   aria-label="Open profile"
                 >
                   {profileImageUrl ? (
@@ -487,17 +487,17 @@ export function AppShell() {
                 </Link>
               </div>
             ) : (
-              <GlassPanel className="flex items-center gap-3 px-3 py-2.5 ">
+              <GlassPanel className="flex items-center gap-2 min-[360px]:gap-3 px-2.5 min-[360px]:px-3 py-2.5 ">
                 <button
                   type="button"
                   onClick={() => setDrawerOpen(true)}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200/70 bg-white/90 text-slate-700 shadow-sm transition hover:border-brand/30 hover:text-slate-900 active:scale-95"
+                  className="flex h-10 w-10 min-[360px]:h-11 min-[360px]:w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200/70 bg-white/90 text-slate-700 shadow-sm transition hover:border-brand/30 hover:text-slate-900 active:scale-95"
                   aria-label="Open menu"
                 >
                   <Menu className="h-5 w-5" />
                 </button>
                 <div className="min-w-0 flex-1">
-                  <h1 className="truncate text-lg font-extrabold tracking-tight text-slate-900">{title}</h1>
+                  <h1 className="truncate text-base min-[360px]:text-lg font-extrabold tracking-tight text-slate-900">{title}</h1>
                   <p className="truncate text-xs font-medium leading-snug text-slate-500">{headerTagline}</p>
                 </div>
                 <motion.div
