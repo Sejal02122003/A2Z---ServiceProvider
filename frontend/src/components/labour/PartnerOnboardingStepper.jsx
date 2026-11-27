@@ -123,6 +123,29 @@ function getCategoryVisual(name) {
   }
 }
 
+// Kept apart from the photo picker: mixing PDF into `accept` makes phones open a file chooser
+// instead of the gallery, where selecting several photos at once often isn't possible.
+function KycPdfPicker({ onChange, disabled }) {
+  return (
+    <label
+      className={`flex items-center justify-center gap-1.5 cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-600 hover:border-brand hover:bg-slate-50 transition ${
+        disabled ? 'opacity-60 pointer-events-none' : ''
+      }`}
+    >
+      <FileText className="h-4 w-4 text-rose-500" />
+      Have PDF files? Upload PDF
+      <input
+        type="file"
+        multiple
+        accept="application/pdf,.pdf"
+        onChange={onChange}
+        disabled={disabled}
+        className="hidden"
+      />
+    </label>
+  )
+}
+
 export function PartnerOnboardingStepper({ onFinish }) {
   const navigate = useNavigate()
   const dispatch = useDispatch()
@@ -1637,7 +1660,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                                   <Plus className="h-5 w-5 text-brand mb-1" />
                                 )}
                                 <span className="text-[11px] font-bold text-brand leading-tight">
-                                  {uploadingKyc ? 'Uploading…' : '+ Add Photo'}
+                                  {uploadingKyc ? 'Uploading…' : '+ Add Photos'}
                                 </span>
                                 <span className="text-[9px] text-slate-400 mt-0.5">
                                   Aadhaar back / PAN
@@ -1645,7 +1668,7 @@ export function PartnerOnboardingStepper({ onFinish }) {
                                 <input
                                   type="file"
                                   multiple
-                                  accept="image/*,application/pdf,.pdf,image/jpeg,image/png,image/webp,image/jpg"
+                                  accept="image/*"
                                   onChange={handleKycFileUpload}
                                   disabled={uploadingKyc}
                                   className="hidden"
@@ -1654,13 +1677,14 @@ export function PartnerOnboardingStepper({ onFinish }) {
                             </div>
 
                             <p className="text-[11px] text-slate-500">
-                              Tip: You can select and upload multiple documents at once (e.g. Aadhaar Front, Aadhaar Back, and PAN Card).
+                              Tip: Select all photos together from your gallery (Aadhaar Front, Aadhaar Back and PAN Card).
                             </p>
+                            <KycPdfPicker onChange={handleKycFileUpload} disabled={uploadingKyc} />
                           </div>
                         ) : (
-                          <div className="flex items-center gap-2">
+                          <div className="space-y-2">
                             <label
-                              className={`flex flex-1 flex-col items-center justify-center gap-1.5 cursor-pointer rounded-2xl border-2 border-dashed border-slate-300 p-5 text-xs text-slate-600 hover:border-brand hover:bg-slate-50 transition ${
+                              className={`flex flex-col items-center justify-center gap-1.5 cursor-pointer rounded-2xl border-2 border-dashed border-slate-300 p-5 text-xs text-slate-600 hover:border-brand hover:bg-slate-50 transition ${
                                 uploadingKyc ? 'opacity-60 pointer-events-none' : ''
                               }`}
                             >
@@ -1672,23 +1696,24 @@ export function PartnerOnboardingStepper({ onFinish }) {
                               <span className="font-bold text-slate-800 text-xs sm:text-sm">
                                 {uploadingKyc
                                   ? uploadProgressText || 'Uploading documents…'
-                                  : 'Upload Aadhaar & PAN Document Photos'}
+                                  : 'Choose Aadhaar & PAN Photos from Gallery'}
                               </span>
                               <span className="text-[11px] text-slate-500 text-center font-normal">
-                                Select multiple documents together (Front & Back of Aadhaar, PAN card) or upload one by one
+                                Select Aadhaar Front, Aadhaar Back and PAN card together in one go
                               </span>
                               <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                                Supports JPG, PNG, WebP & PDF (Select multiple at once)
+                                Supports JPG, PNG & WebP
                               </span>
                               <input
                                 type="file"
                                 multiple
-                                accept="image/*,application/pdf,.pdf,image/jpeg,image/png,image/webp,image/jpg"
+                                accept="image/*"
                                 onChange={handleKycFileUpload}
                                 disabled={uploadingKyc}
                                 className="hidden"
                               />
                             </label>
+                            <KycPdfPicker onChange={handleKycFileUpload} disabled={uploadingKyc} />
                           </div>
                         )}
                       </div>
