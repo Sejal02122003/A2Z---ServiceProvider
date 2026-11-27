@@ -208,8 +208,8 @@ export const createSimulatedOpportunity = asyncHandler(async (req, res) => {
         await InAppNotification.create({
           recipientId: vendorId,
           recipientRole: 'VENDOR',
-          title: `⚡ Urgent Lead: ${serviceType} (₹${numAmount})`,
-          body: `New incoming booking available near you. Estimated earning: ₹${numAmount}. Respond quickly!`,
+          title: `⚠️ Practice Job: ${serviceType}`,
+          body: 'This is a practice request, not a real booking. Open the app to test your response.',
           type: 'SIMULATED_OPPORTUNITY',
           metadata: {
             opportunityId: String(opportunity._id),
@@ -223,8 +223,8 @@ export const createSimulatedOpportunity = asyncHandler(async (req, res) => {
 
       // Firebase Push Notification
       sendNotificationToUser(vendorId, {
-        title: `⚡ New Booking Alert! (₹${numAmount})`,
-        body: `${serviceType} lead nearby. Open app now to claim before other partners!`,
+        title: `⚠️ Practice Job: ${serviceType}`,
+        body: 'This is a practice request, not a real booking. Open the app to test your response.',
         data: {
           type: 'SIMULATED_OPPORTUNITY',
           opportunityId: String(opportunity._id),
@@ -658,7 +658,7 @@ export const acceptSimulatedOpportunity = asyncHandler(async (req, res) => {
 
     if (existing.status === 'ACCEPTED') {
       return sendError(res, {
-        message: 'This opportunity has already been taken by another vendor.',
+        message: 'This practice request is already closed. No booking was made.',
         statusCode: HTTP_STATUS.CONFLICT,
       })
     }
@@ -693,7 +693,7 @@ export const acceptSimulatedOpportunity = asyncHandler(async (req, res) => {
   const winningVendorName = opportunity.acceptedBy?.fullName || 'Another vendor'
   const takenPayload = {
     opportunityId: opportunity._id,
-    message: 'This opportunity has already been taken.',
+    message: 'This practice request is closed. No booking was made.',
     acceptedBy: winningVendorName,
   }
 
@@ -711,7 +711,7 @@ export const acceptSimulatedOpportunity = asyncHandler(async (req, res) => {
   } catch {}
 
   return sendSuccess(res, {
-    message: 'Opportunity accepted successfully! You secured this opportunity.',
+    message: 'Practice request completed. No booking was made.',
     data: { opportunity },
   })
 })
