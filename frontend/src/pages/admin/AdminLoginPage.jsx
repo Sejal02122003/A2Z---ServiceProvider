@@ -7,12 +7,14 @@ import { useAuth } from '../../hooks/useAuth.js'
 import { ApiError } from '../../api/http.js'
 import { USER_ROLES } from '../../constants/userRoles.js'
 
+const PANEL_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SUB_ADMIN]
+
 export function AdminLoginPage() {
   const navigate = useNavigate()
   const { applySession, isAuthenticated, user, loading } = useAuth()
 
   useEffect(() => {
-    if (!loading && isAuthenticated && user?.role === USER_ROLES.ADMIN) {
+    if (!loading && isAuthenticated && PANEL_ROLES.includes(user?.role)) {
       navigate('/admin', { replace: true })
     }
   }, [isAuthenticated, user, loading, navigate])
@@ -30,7 +32,7 @@ export function AdminLoginPage() {
     try {
       const res = await adminEmailLogin({ email: email.trim(), password })
       const { token, user } = res.data
-      if (user.role !== USER_ROLES.ADMIN) {
+      if (!PANEL_ROLES.includes(user.role)) {
         setMessage('Access denied. Not an administrator account.')
         return
       }

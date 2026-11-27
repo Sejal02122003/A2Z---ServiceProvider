@@ -322,6 +322,9 @@ const userSchema = new mongoose.Schema(
       unique: true,
     },
     passwordHash: { type: String, select: false },
+    // Sub-admins only: granted admin panel sections, and when the admin last reset the password
+    adminPermissions: { type: [String], default: undefined },
+    passwordChangedAt: { type: Date },
     role: {
       type: String,
       enum: Object.values(USER_ROLES),

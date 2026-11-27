@@ -3,8 +3,11 @@ import { User, Lock, Loader2, CheckCircle, Eye, EyeOff } from 'lucide-react'
 import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
 import { getAdminProfile, updateAdminProfile, changeAdminPassword } from '../../api/adminProfileApi.js'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
+import { useAuth } from '../../hooks/useAuth.js'
+import { USER_ROLES } from '../../constants/userRoles.js'
 
 export function AdminProfilePage() {
+  const { user } = useAuth()
   const [profile, setProfile] = useState({ fullName: '', email: '' })
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
   const [showPasswords, setShowPasswords] = useState({ current: false, new: false, confirm: false })
@@ -73,6 +76,24 @@ export function AdminProfilePage() {
     } finally {
       setPasswordSaving(false)
     }
+  }
+
+  // A sub-admin's login details are set by the main admin
+  if (user?.role === USER_ROLES.SUB_ADMIN) {
+    return (
+      <div className="mx-auto max-w-lg p-6">
+        <GlassPanel className="space-y-3 p-6">
+          <h1 className="flex items-center gap-2 text-lg font-bold text-gray-900">
+            <User className="w-5 h-5 text-brand-primary" />
+            My Account
+          </h1>
+          <p className="text-sm text-gray-700"><span className="font-medium">Name:</span> {user.fullName || '—'}</p>
+          <p className="break-all text-sm text-gray-700"><span className="font-medium">Email:</span> {user.email || '—'}</p>
+          <p className="text-sm text-gray-700"><span className="font-medium">Role:</span> Sub-Admin</p>
+          <p className="text-xs text-gray-500">To change your email, password or access, contact the main admin.</p>
+        </GlassPanel>
+      </div>
+    )
   }
 
   if (loading) {

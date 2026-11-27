@@ -3,6 +3,7 @@ export const USER_ROLES = {
   CUSTOMER: 'customer',
   LABOUR: 'labour',
   ADMIN: 'admin',
+  SUB_ADMIN: 'sub_admin',
 }
 
 /** Same as backend `ROLE_LIST` */
@@ -23,6 +24,7 @@ export const ROLE_LABELS = {
   [USER_ROLES.CUSTOMER]: 'Customer',
   [USER_ROLES.LABOUR]: 'Service Provider',
   [USER_ROLES.ADMIN]: 'Administrator',
+  [USER_ROLES.SUB_ADMIN]: 'Sub-Admin',
 }
 
 export const KYC_STATUS = {

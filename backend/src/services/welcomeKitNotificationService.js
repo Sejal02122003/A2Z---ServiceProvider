@@ -59,7 +59,8 @@ async function dispatchSafeNotification({ userId, title, body, type = NOTIFICATI
  */
 async function notifyAdmins({ title, body, metadata = {}, idempotencyKey = null }) {
   try {
-    const admins = await User.find({ role: USER_ROLES.ADMIN, isActive: true }).select('_id').lean()
+    const { findAdminRecipients } = await import('./adminRecipients.js')
+    const admins = await findAdminRecipients(metadata.link || '/admin/labour')
     const promises = admins.map((admin) =>
       dispatchSafeNotification({
         userId: admin._id,

@@ -17,6 +17,7 @@ import {
   Image,
   MessageSquare,
   UserCog,
+  UserPlus,
   Tag,
   Wrench,
   ListTree,
@@ -173,6 +174,7 @@ export const ADMIN_NAV_SECTIONS = [
     title: 'System',
     items: [
       { to: '/admin/profile', label: 'Profile', icon: UserCog },
+      { to: '/admin/sub-admins', label: 'Sub-Admins', icon: UserPlus },
       { to: '/admin/settings', label: 'Settings', icon: Settings },
       { to: '/admin/reviews', label: 'Reviews & Ratings', icon: Star },
     ],
@@ -205,6 +207,7 @@ const ROUTE_TITLES = [
   { prefix: '/admin/vendor-trials/settings', title: 'Vendor Management — Trial Settings' },
   { prefix: '/admin/vendor-trials', title: 'Vendor Management — Trial Management' },
   { prefix: '/admin/profile', title: 'Profile' },
+  { prefix: '/admin/sub-admins', title: 'Sub-Admins' },
   { prefix: '/admin/complaints', title: 'Complaints' },
   { prefix: '/admin/settings', title: 'Settings' },
   { prefix: '/admin/banners', title: 'Banners' },

@@ -18,6 +18,7 @@ import { AdminServicesPage } from './pages/admin/AdminServicesPage.jsx'
 import { AdminSubServicesPage } from './pages/admin/AdminSubServicesPage.jsx'
 import { AdminPackagesPage } from './pages/admin/AdminPackagesPage.jsx'
 import { AdminLoginPage } from './pages/admin/AdminLoginPage.jsx'
+import { AdminSubAdminsPage } from './pages/admin/AdminSubAdminsPage.jsx'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage.jsx'
 import { AdminInventoryHubPage } from './pages/admin/AdminInventoryHubPage.jsx'
 import { AdminUsersPage } from './pages/admin/AdminUsersPage.jsx'
@@ -198,7 +199,7 @@ function App() {
               <Route
                 path="/admin"
                 element={
-                  <ProtectedRoute roles={[USER_ROLES.ADMIN]}>
+                  <ProtectedRoute roles={[USER_ROLES.ADMIN, USER_ROLES.SUB_ADMIN]}>
                     <ErrorBoundary>
                       <AdminLayout />
                     </ErrorBoundary>
@@ -238,6 +239,7 @@ function App() {
                 <Route path="notifications" element={<AdminNotificationsPage />} />
                 <Route path="complaints" element={<AdminComplaintsPage />} />
                 <Route path="profile" element={<AdminProfilePage />} />
+                <Route path="sub-admins" element={<AdminSubAdminsPage />} />
                 <Route path="reports" element={<AdminReportsPage />} />
                 <Route path="settings" element={<AdminSettingsPage />} />
                 <Route path="zones" element={<AdminZonesPage />} />

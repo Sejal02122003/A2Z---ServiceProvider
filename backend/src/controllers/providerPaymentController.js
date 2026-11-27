@@ -314,10 +314,11 @@ export const submitPayment = asyncHandler(async (req, res) => {
 
     // 2. Real-time notification to admins
     try {
+      const { emitToAdmins } = await import('../socket.js')
       const io = getIo()
       if (io) {
         if (payment.purpose === PAYMENT_PURPOSE.WALLET_TOPUP) {
-          io.emit('WALLET_RECHARGE_REQUEST_SUBMITTED', {
+          emitToAdmins('WALLET_RECHARGE_REQUEST_SUBMITTED', {
             requestId: rechargeRequest ? rechargeRequest._id : payment._id,
             paymentId: payment._id,
             userId: providerId,
@@ -330,7 +331,7 @@ export const submitPayment = asyncHandler(async (req, res) => {
           })
         }
 
-        io.emit('PROVIDER_PAYMENT_SUBMITTED', {
+        emitToAdmins('PROVIDER_PAYMENT_SUBMITTED', {
           paymentId: payment._id,
           requestId: rechargeRequest ? rechargeRequest._id : payment._id,
           providerId: payment.providerId,
@@ -348,7 +349,8 @@ export const submitPayment = asyncHandler(async (req, res) => {
 
     // 3. Create In-App Notification and FCM Push Notification for all Admins
     try {
-      const admins = await User.find({ role: 'admin' }).select('_id').lean()
+      const { findAdminRecipients } = await import('../services/adminRecipients.js')
+      const admins = await findAdminRecipients('/admin/wallet-management/workers')
       const notifTitle = `💰 Worker Wallet Recharge Request: ₹${payment.amount}`
       const notifBody = `${providerName} (Service Provider) submitted a wallet recharge request of ₹${payment.amount} (UTR: ${cleanUtr}). Tap to review & approve.`
       const notifLink = '/admin/wallet-management/workers'

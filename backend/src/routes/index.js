@@ -32,6 +32,7 @@ import adminSubscriptionRoutes from './adminSubscriptionRoutes.js'
 import policyRoutes from './policyRoutes.js'
 import fcmTokenRoutes from './fcmTokenRoutes.js'
 import adminProfileRoutes from './adminProfileRoutes.js'
+import subAdminRoutes from './subAdminRoutes.js'
 import notificationsRoutes from './notificationsRoutes.js'
 import simulatedOpportunityRoutes from './simulatedOpportunityRoutes.js'
 
@@ -99,6 +100,7 @@ router.use('/admin/reports', adminReportsRoutes)
 router.use('/admin/bookings', adminBookingRoutes)
 router.use('/admin/labour-subscriptions', adminSubscriptionRoutes)
 router.use('/admin/profile', adminProfileRoutes)
+router.use('/admin/sub-admins', subAdminRoutes)
 router.use('/admin', adminLabourCategoryRoutes)
 router.use('/admin/payments', adminPaymentConfigRoutes)
 

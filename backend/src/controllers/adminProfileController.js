@@ -1,13 +1,13 @@
 import bcrypt from 'bcryptjs'
 import { User } from '../models/User.js'
-import { USER_ROLES } from '../constants/roles.js'
+import { ADMIN_ROLES, USER_ROLES } from '../constants/roles.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 
 /** GET /admin/profile — returns the logged-in admin's safe profile */
 export const getAdminProfile = asyncHandler(async (req, res) => {
   const admin = await User.findById(req.user._id).select('+email')
-  if (!admin || admin.role !== USER_ROLES.ADMIN) {
+  if (!admin || !ADMIN_ROLES.includes(admin.role)) {
     return sendError(res, { message: 'Not found', statusCode: HTTP_STATUS.NOT_FOUND })
   }
   return sendSuccess(res, {

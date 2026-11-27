@@ -12,12 +12,15 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
-import { ADMIN_NAV_SECTIONS } from '../../config/adminNavigation.js'
+import { canAccessAdminPath, getAdminNavSections } from '../../config/adminPermissions.js'
+import { useAuth } from '../../hooks/useAuth.js'
 import { apiRequest } from '../../api/http.js'
 
 export function AdminDashboardPage() {
   const navigate = useNavigate()
   const reduce = useReducedMotion()
+  const { user } = useAuth()
+  const canOpen = (path) => canAccessAdminPath(user, path)
   
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -37,7 +40,7 @@ export function AdminDashboardPage() {
     fetchStats()
   }, [])
 
-  const flatLinks = ADMIN_NAV_SECTIONS.flatMap((s) =>
+  const flatLinks = getAdminNavSections(user).flatMap((s) =>
     s.items.filter((i) => i.to !== '/admin').map((i) => ({ ...i, section: s.title })),
   ).slice(0, 6)
 
@@ -99,7 +102,7 @@ export function AdminDashboardPage() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {QUICK_STATS.map((s, i) => (
+          {QUICK_STATS.filter((s) => canOpen(s.to)).map((s, i) => (
             <motion.div
               key={s.label}
               initial={reduce ? false : { opacity: 0, y: 12 }}
@@ -155,6 +158,7 @@ export function AdminDashboardPage() {
         </GlassPanel>
 
         <div className="space-y-6">
+          {canOpen('/admin/complaints') && (
           <GlassPanel
             className="h-fit cursor-pointer p-6 transition hover:shadow-md"
             onClick={() => navigate('/admin/complaints')}
@@ -172,6 +176,7 @@ export function AdminDashboardPage() {
                 View complaints
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
+              {canOpen('/admin/wallet-management/workers') && (
               <Link
                 to="/admin/wallet-management/workers"
                 onClick={(e) => e.stopPropagation()}
@@ -180,6 +185,8 @@ export function AdminDashboardPage() {
                 View worker recharge requests
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
+              )}
+              {canOpen('/admin/labour-wallet') && (
               <Link
                 to="/admin/labour-wallet"
                 onClick={(e) => e.stopPropagation()}
@@ -188,9 +195,12 @@ export function AdminDashboardPage() {
                 View withdrawal requests
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
+              )}
             </div>
           </GlassPanel>
+          )}
 
+          {canOpen('/admin/labour') && (
           <GlassPanel
             className="h-fit cursor-pointer p-6 transition hover:shadow-md"
             onClick={() => navigate('/admin/labour')}
@@ -208,6 +218,7 @@ export function AdminDashboardPage() {
               <ArrowUpRight className="h-4 w-4" />
             </Link>
           </GlassPanel>
+          )}
         </div>
       </div>
     </div>

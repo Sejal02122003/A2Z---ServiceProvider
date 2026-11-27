@@ -1,8 +1,8 @@
 import { body, param } from 'express-validator'
-import { ROLE_LIST, USER_ROLES } from '../constants/roles.js'
+import { ADMIN_ROLES, ROLE_LIST, USER_ROLES } from '../constants/roles.js'
 import { normalizeIndianPhone } from '../utils/phone.js'
 
-const appRegisterRoles = ROLE_LIST.filter((r) => r !== USER_ROLES.ADMIN)
+const appRegisterRoles = ROLE_LIST.filter((r) => !ADMIN_ROLES.includes(r))
 
 export const validateAuthGroup = body('authGroup')
   .optional()

@@ -349,7 +349,11 @@ export async function sendNotificationToUser(userId, payload, includeMobile = tr
  */
 export async function sendNotificationToAdmins(payload) {
   try {
-    const admins = await User.find({ role: 'admin' }, '_id fullName email fcmTokens fcmTokenMobile');
+    const { adminRecipientFilter } = await import('../services/adminRecipients.js');
+    const admins = await User.find(
+      adminRecipientFilter(payload.link || payload.data?.link || '/admin/bookings'),
+      '_id fullName email fcmTokens fcmTokenMobile',
+    );
     if (!admins || admins.length === 0) {
       console.log('[FLOW: FCM_ADMIN_DISPATCH] No admin users found in database');
       return { success: false, reason: 'NO_ADMINS_FOUND' };

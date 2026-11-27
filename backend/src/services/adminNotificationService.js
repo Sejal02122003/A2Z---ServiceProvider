@@ -1,7 +1,6 @@
 import { InAppNotification, NOTIFICATION_TYPES } from '../models/InAppNotification.js'
 import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
-import { User } from '../models/User.js'
-import { USER_ROLES } from '../constants/roles.js'
+import { findAdminRecipients } from './adminRecipients.js'
 
 /**
  * Notify all active admins when a Service Provider submits an approval / KYC verification request
@@ -20,7 +19,7 @@ export async function notifyAdminProviderApprovalRequest({
     const link = '/admin/identity-verifications'
 
     // 1. Fetch all active admins
-    const admins = await User.find({ role: USER_ROLES.ADMIN, isActive: true }).select('_id').lean()
+    const admins = await findAdminRecipients(link)
     if (!admins.length) {
       console.warn('[Admin Notification] No active admins found in database.')
     }
@@ -64,7 +63,7 @@ export async function notifyAdminProviderApprovalRequest({
 
     // 3. Emit real-time Socket.IO alert to "admins" room and global broadcast
     try {
-      const { emitToAdmins, getIo } = await import('../socket.js')
+      const { emitToAdmins } = await import('../socket.js')
       const payload = {
         partnerId: provider._id,
         partnerName: providerName,
@@ -77,10 +76,6 @@ export async function notifyAdminProviderApprovalRequest({
         link,
       }
       emitToAdmins('PROVIDER_APPROVAL_REQUEST', payload)
-      const io = getIo()
-      if (io) {
-        io.emit('PROVIDER_APPROVAL_REQUEST', payload)
-      }
       console.log(`[FLOW: NOTIFY_ADMIN] Dispatched PROVIDER_APPROVAL_REQUEST for partner ${provider._id} to ${admins.length} admins`)
     } catch (socketErr) {
       console.warn('[Socket Warning] Could not emit PROVIDER_APPROVAL_REQUEST:', socketErr?.message)
@@ -105,7 +100,7 @@ export async function notifyAdminWelcomeKitPaymentSubmitted({
     const body = `${providerName} (${providerPhone}) submitted payment receipt of ₹${amount} for Welcome Kit verification.`
     const link = '/admin/labour'
 
-    const admins = await User.find({ role: USER_ROLES.ADMIN, isActive: true }).select('_id').lean()
+    const admins = await findAdminRecipients(link)
     const promises = admins.map(async (admin) => {
       try {
         await InAppNotification.create({
@@ -141,7 +136,7 @@ export async function notifyAdminWelcomeKitPaymentSubmitted({
     await Promise.allSettled(promises)
 
     try {
-      const { emitToAdmins, getIo } = await import('../socket.js')
+      const { emitToAdmins } = await import('../socket.js')
       const payload = {
         userName: providerName,
         phone: providerPhone,
@@ -153,10 +148,6 @@ export async function notifyAdminWelcomeKitPaymentSubmitted({
         createdAt: new Date().toISOString(),
       }
       emitToAdmins('PROVIDER_PAYMENT_SUBMITTED', payload)
-      const io = getIo()
-      if (io) {
-        io.emit('PROVIDER_PAYMENT_SUBMITTED', payload)
-      }
     } catch (socketErr) {
       console.warn('[Socket Warning] Could not emit PROVIDER_PAYMENT_SUBMITTED:', socketErr?.message)
     }

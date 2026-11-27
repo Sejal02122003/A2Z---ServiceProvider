@@ -4,7 +4,7 @@ import { Zone } from '../models/Zone.js'
 import { SystemSetting } from '../models/SystemSetting.js'
 import { LabourCategory } from '../models/LabourCategory.js'
 import { LabourCategoryGroup, LABOUR_GROUP_KIND } from '../models/LabourCategoryGroup.js'
-import { KYC_STATUS, ROLE_LIST, USER_ROLES } from '../constants/roles.js'
+import { ADMIN_ROLES, KYC_STATUS, ROLE_LIST, USER_ROLES } from '../constants/roles.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { populateLabourCategories } from '../utils/populateLabourCategories.js'
@@ -695,6 +695,10 @@ function mergeAnd(base, extraClauses) {
 }
 
 /** Admin: list users with search, role, active/inactive, optional labour KYC filter, pagination */
+/** A sub-admin can never read or change a main admin or another sub-admin */
+const isHiddenAdminAccount = (req, target) =>
+  req.user.role === USER_ROLES.SUB_ADMIN && ADMIN_ROLES.includes(target.role)
+
 export const listUsers = asyncHandler(async (req, res) => {
   const { search, role, status, kycStatus, freeTrialStatus, trialSlotStatus, categoryId, location, kitStatus, page = 1, limit = 20 } = req.query
   const q = {}
@@ -719,6 +723,10 @@ export const listUsers = asyncHandler(async (req, res) => {
       code: 'INVALID_STATUS',
     })
   }
+
+  // Sub-admins are managed on their own page; and they must not see admin accounts at all
+  const hiddenRoles = req.user.role === USER_ROLES.SUB_ADMIN ? ADMIN_ROLES : [USER_ROLES.SUB_ADMIN]
+  andParts.push({ role: { $nin: hiddenRoles } })
 
   const searchTrim = typeof search === 'string' ? search.trim() : ''
   if (searchTrim.length > MAX_SEARCH_LEN) {
@@ -1024,7 +1032,7 @@ export const listUsers = asyncHandler(async (req, res) => {
 /** Admin: get one user (includes KYC document data URLs and identity verification for review) */
 export const getUserById = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id).populate('identityVerificationRef')
-  if (!user) {
+  if (!user || isHiddenAdminAccount(req, user)) {
     return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND, code: 'NOT_FOUND' })
   }
   await populateLabourCategories(user)
@@ -1414,7 +1422,7 @@ export const updateUserStatus = asyncHandler(async (req, res) => {
   const { isActive, status } = req.body
 
   const user = await User.findById(id)
-  if (!user) {
+  if (!user || isHiddenAdminAccount(req, user)) {
     return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
   }
 
@@ -1461,7 +1469,7 @@ export const updateUserStatus = asyncHandler(async (req, res) => {
 
 export const deleteUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id)
-  if (!user) {
+  if (!user || isHiddenAdminAccount(req, user)) {
     return sendError(res, { message: 'User not found', statusCode: HTTP_STATUS.NOT_FOUND })
   }
 

@@ -117,7 +117,8 @@ export async function createRechargeRequest({
   try {
     const io = getIo()
     if (io) {
-      io.emit('WALLET_RECHARGE_REQUEST_SUBMITTED', {
+      const { emitToAdmins } = await import('../socket.js')
+      emitToAdmins('WALLET_RECHARGE_REQUEST_SUBMITTED', {
         requestId: rechargeRequest._id,
         userId: user._id,
         userName: user.fullName || user.phone,
@@ -132,7 +133,10 @@ export async function createRechargeRequest({
     const { User } = await import('../models/User.js')
     const { InAppNotification } = await import('../models/InAppNotification.js')
     const { sendNotificationToUser } = await import('../utils/pushNotificationHelper.js')
-    const admins = await User.find({ role: 'admin' }).select('_id').lean()
+    const { findAdminRecipients } = await import('./adminRecipients.js')
+    const admins = await findAdminRecipients(
+      accountType === 'WORKER' ? '/admin/wallet-management/workers' : '/admin/wallet-management/users',
+    )
     const senderName = user.fullName || user.phone || (accountType === 'WORKER' ? 'Service Provider' : 'User')
     const notifTitle = `💰 ${accountType === 'WORKER' ? 'Worker' : 'User'} Wallet Recharge: ₹${numAmount}`
     const notifBody = `${senderName} submitted a wallet recharge request of ₹${numAmount.toLocaleString('en-IN')} (UTR: ${cleanUtr}). Tap to review & approve.`

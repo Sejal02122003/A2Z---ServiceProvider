@@ -1,6 +1,20 @@
 import { Server } from 'socket.io'
 import jwt from 'jsonwebtoken'
 import { User } from './models/User.js'
+import { USER_ROLES } from './constants/roles.js'
+import { ADMIN_PERMISSION_KEYS, permissionsForAdminLink } from './constants/adminPermissions.js'
+import { isStaleSession } from './middleware/auth.js'
+
+const permissionRoom = (key) => `admin-section:${key}`
+
+/** Sections interested in a live admin event that carries no page link */
+const EVENT_PERMISSIONS = {
+  NEW_BOOKING_ALERT: ['bookings'],
+  BOOKING_ACCEPTED_ADMIN: ['bookings'],
+  BOOKING_STATUS_UPDATE_ADMIN: ['bookings'],
+  WALLET_RECHARGE_REQUEST_SUBMITTED: ['wallet_recharge', 'provider_wallet', 'payments'],
+  PROVIDER_PAYMENT_SUBMITTED: ['wallet_recharge', 'provider_wallet', 'payments'],
+}
 
 let io
 
@@ -38,6 +52,9 @@ export const initSocket = (httpServer) => {
       const user = await User.findById(decoded.sub)
       
       if (!user) return next(new Error('Authentication error: User not found'))
+      if (user.role === USER_ROLES.SUB_ADMIN && (!user.isActive || isStaleSession(user, decoded))) {
+        return next(new Error('Authentication error: Session expired'))
+      }
       
       socket.user = user
       next()
@@ -66,6 +83,11 @@ export const initSocket = (httpServer) => {
     socket.on('disconnect', () => {
       console.log(`Socket disconnected: ${socket.id}`)
     })
+
+    // Sub-admins only receive alerts for the sections they were given
+    if (socket.user.role === USER_ROLES.SUB_ADMIN) {
+      for (const key of socket.user.adminPermissions || []) socket.join(permissionRoom(key))
+    }
 
     // Listen for live location updates from labourer
     socket.on('LABOUR_LOCATION_UPDATE', (data) => {
@@ -109,8 +131,23 @@ export const emitToAdmins = (eventName, payload) => {
     const room = io.sockets.adapter.rooms.get('admins')
     const activeSockets = room ? room.size : 0
     console.log(`[FLOW: SOCKET_EMIT_ADMIN] event="${eventName}" (active sockets in "admins" room: ${activeSockets})`)
-    io.to('admins').emit(eventName, payload)
+    const sections = payload?.link
+      ? permissionsForAdminLink(payload.link)
+      : EVENT_PERMISSIONS[eventName] || []
+    // A socket in several target rooms still receives the event once
+    io.to(['admins', ...sections.map(permissionRoom)]).emit(eventName, payload)
   }
+}
+
+export const disconnectUser = (userId) => {
+  io?.in(String(userId)).disconnectSockets(true)
+}
+
+export const syncSubAdminRooms = (userId, permissions) => {
+  if (!io) return
+  const sockets = io.in(String(userId))
+  sockets.socketsLeave(ADMIN_PERMISSION_KEYS.map(permissionRoom))
+  if (permissions?.length) io.in(String(userId)).socketsJoin(permissions.map(permissionRoom))
 }
 
 

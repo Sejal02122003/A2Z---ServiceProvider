@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs'
 import { User } from '../models/User.js'
-import { USER_ROLES } from '../constants/roles.js'
+import { ADMIN_ROLES, USER_ROLES } from '../constants/roles.js'
 import { IDENTITY_STATUS } from '../constants/identityConstants.js'
 import { createOtpChallenge, validateOtpChallenge, deleteOtpChallengeDoc, isOtpBypassLast6Enabled } from '../services/otpService.js'
 import { signAccessToken } from '../services/tokenService.js'
@@ -337,7 +337,7 @@ export const loginRequestOtp = asyncHandler(async (req, res) => {
       code: 'ACCOUNT_DISABLED',
     })
   }
-  if (user.role === USER_ROLES.ADMIN) {
+  if (ADMIN_ROLES.includes(user.role)) {
     return sendError(res, {
       message: 'Admin accounts must use email login on the admin panel',
       statusCode: HTTP_STATUS.BAD_REQUEST,
@@ -394,6 +394,14 @@ export const loginVerify = asyncHandler(async (req, res) => {
       message: 'This mobile number is not registered as a Service Partner. Please register as a partner to continue.',
       statusCode: HTTP_STATUS.FORBIDDEN,
       code: 'WRONG_PORTAL',
+    })
+  }
+
+  if (user.role === USER_ROLES.SUB_ADMIN) {
+    return sendError(res, {
+      message: 'Admin accounts must use email login on the admin panel',
+      statusCode: HTTP_STATUS.BAD_REQUEST,
+      code: 'USE_ADMIN_LOGIN',
     })
   }
 
@@ -457,7 +465,7 @@ export const loginVerify = asyncHandler(async (req, res) => {
 /** POST /auth/admin/login — web admin panel */
 export const adminLogin = asyncHandler(async (req, res) => {
   const { email, password } = req.body
-  const user = await User.findOne({ email, role: USER_ROLES.ADMIN }).select('+passwordHash')
+  const user = await User.findOne({ email, role: { $in: ADMIN_ROLES } }).select('+passwordHash')
   if (!user || !user.passwordHash) {
     return sendError(res, {
       message: 'Invalid credentials',

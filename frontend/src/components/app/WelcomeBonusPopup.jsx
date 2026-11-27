@@ -139,7 +139,7 @@ export function WelcomeBonusPopup() {
 
   // 4. Check for newly registered customer user who hasn't seen the celebration popup yet
   useEffect(() => {
-    if (!user || user.role === USER_ROLES.LABOUR || user.role === USER_ROLES.ADMIN) return
+    if (!user || user.role === USER_ROLES.LABOUR || user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.SUB_ADMIN) return
 
     const userKey = user._id || user.phone
     if (!userKey) return

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   Bell,
@@ -18,10 +19,16 @@ import {
   User,
   Volume2,
   VolumeX,
+  Wallet,
+  X,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth.js'
 import { useSocket } from '../context/SocketContext.jsx'
-import { ADMIN_NAV_SECTIONS, getAdminTitle } from '../config/adminNavigation.js'
+import { getAdminTitle } from '../config/adminNavigation.js'
+import { canAccessAdminPath, firstAllowedAdminPath, getAdminNavSections } from '../config/adminPermissions.js'
+import { USER_ROLES } from '../constants/userRoles.js'
+import { fetchMe } from '../api/authApi.js'
+import { clearSession, setUser } from '../store/slices/authSlice.js'
 import { appSpring } from '../components/app/appMotion.js'
 import { GlassPanel } from '../components/ui/GlassPanel.jsx'
 import { adminInitials, formatLastLoginDisplay, formatLastLoginRelative } from '../lib/formatAdminLastLogin.js'
@@ -55,6 +62,27 @@ export function AdminLayout() {
   const [isAudioAlerting, setIsAudioAlerting] = useState(false)
   const [livePopupAlert, setLivePopupAlert] = useState(null)
   const [autoplayBlocked, setAutoplayBlocked] = useState(false)
+
+  const dispatch = useDispatch()
+  const isSubAdmin = user?.role === USER_ROLES.SUB_ADMIN
+  const navSections = getAdminNavSections(user)
+  const canOpenPage = canAccessAdminPath(user, pathname)
+
+  // Pick up access changes (or a blocked account) as the sub-admin moves around the panel
+  useEffect(() => {
+    if (!isSubAdmin) return undefined
+    let cancelled = false
+    fetchMe()
+      .then((res) => {
+        if (!cancelled && res.data?.user) dispatch(setUser(res.data.user))
+      })
+      .catch((err) => {
+        if (!cancelled && err?.status === 401) dispatch(clearSession())
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [pathname, isSubAdmin, dispatch])
 
   const profileRef = useRef(null)
   const notifRef = useRef(null)
@@ -431,7 +459,7 @@ export function AdminLayout() {
         className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-4 scrollbar-thin [scrollbar-color:rgba(148,163,184,0.5)_transparent]"
         aria-label="Admin navigation"
       >
-        {ADMIN_NAV_SECTIONS.map((section, si) => (
+        {navSections.map((section, si) => (
           <div
             key={section.title ?? 'main'}
             className={`${si > 0 ? 'mt-5 border-t border-slate-100 pt-5' : ''} mb-1 last:mb-0`}
@@ -811,7 +839,21 @@ export function AdminLayout() {
             animate={{ opacity: 1, y: 0 }}
             transition={reduce ? { duration: 0 } : appSpring}
           >
-            <Outlet />
+            {canOpenPage ? (
+              <Outlet />
+            ) : pathname.replace(/\/+$/, '') === '/admin' ? (
+              <Navigate to={firstAllowedAdminPath(user)} replace />
+            ) : (
+              <div className="mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+                <p className="text-lg font-extrabold text-slate-900">No access to this page</p>
+                <p className="mt-2 text-sm text-slate-500">
+                  Your account has not been given this section. Ask the main admin if you need it.
+                </p>
+                <Link to={firstAllowedAdminPath(user)} className="mt-4 inline-block text-sm font-bold text-brand hover:underline">
+                  Go to my sections
+                </Link>
+              </div>
+            )}
           </motion.div>
         </main>
       </div>

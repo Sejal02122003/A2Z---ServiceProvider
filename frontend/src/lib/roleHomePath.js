@@ -4,6 +4,7 @@ import { USER_ROLES } from '../constants/userRoles.js'
 export function getRoleHomePath(role) {
   switch (role) {
     case USER_ROLES.ADMIN:
+    case USER_ROLES.SUB_ADMIN:
       return '/admin'
     case USER_ROLES.LABOUR:
       return '/serviceprovider'

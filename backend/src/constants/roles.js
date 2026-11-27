@@ -4,6 +4,8 @@ export const USER_ROLES = {
   CONTRACTOR: 'contractor',
   LABOUR: 'labour',
   ADMIN: 'admin',
+  /** Created by the main admin; limited to the admin panel sections granted to them */
+  SUB_ADMIN: 'sub_admin',
 }
 
 export const ROLE_LIST = Object.values(USER_ROLES)
@@ -16,6 +18,7 @@ export const APP_ROLES = [
 
 export const ADMIN_ROLES = [
   USER_ROLES.ADMIN,
+  USER_ROLES.SUB_ADMIN,
 ]
 
 export const KYC_STATUS = {
