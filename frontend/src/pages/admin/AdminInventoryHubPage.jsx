@@ -37,6 +37,15 @@ import {
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
 import { SearchableSelect } from '../../components/ui/SearchableSelect.jsx'
+import { ComboInput } from '../../components/ui/ComboInput.jsx'
+import {
+  PRICE_OPTIONS,
+  UNIT_OPTIONS,
+  getCategoryOptions,
+  getProductNameOptions,
+  getSkuOptions,
+  nextSku,
+} from '../../lib/productFormOptions.js'
 import {
   fetchProducts,
   fetchProductById,
@@ -678,6 +687,40 @@ function ProductFormModal({ product, categories, allProducts, onClose, onSaved }
 
   const availableAlternatives = allProducts.filter((p) => p._id !== product?._id)
 
+  // Every saved product (the table list may be filtered), so suggested SKUs and names are unused ones
+  const [savedProducts, setSavedProducts] = useState(allProducts)
+  useEffect(() => {
+    let cancelled = false
+    fetchProducts({ limit: 1000 })
+      .then((res) => {
+        if (!cancelled && res?.products) setSavedProducts(res.products)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  const otherProducts = savedProducts.filter((p) => p._id !== product?._id)
+  // An SKU we filled in follows the category; one typed or picked by the admin is left alone
+  const [skuIsAuto, setSkuIsAuto] = useState(false)
+
+  const handleSkuChange = (value) => {
+    setSku(value)
+    setSkuIsAuto(false)
+  }
+
+  const handleCategorySelect = (option) => {
+    if (skuIsAuto) setSku(nextSku(option.value, otherProducts))
+  }
+
+  const handleNameSelect = (option) => {
+    setCategory(option.category)
+    setUnit(option.unit)
+    if (!product && (!sku.trim() || skuIsAuto)) {
+      setSku(nextSku(option.category, otherProducts))
+      setSkuIsAuto(true)
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!name.trim() || !sku.trim()) {
@@ -753,22 +796,25 @@ function ProductFormModal({ product, categories, allProducts, onClose, onSaved }
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-bold text-slate-700">Product Name *</label>
-              <input
+              <ComboInput
                 type="text"
                 required
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={setName}
+                onSelect={handleNameSelect}
+                options={getProductNameOptions(category, otherProducts)}
                 placeholder="e.g. AC Cleaner Foam Spray"
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700">SKU Code *</label>
-              <input
+              <ComboInput
                 type="text"
                 required
                 value={sku}
-                onChange={(e) => setSku(e.target.value)}
+                onChange={handleSkuChange}
+                options={getSkuOptions(category, otherProducts)}
                 placeholder="e.g. PRD-ACC-01"
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-mono font-bold uppercase text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               />
@@ -778,31 +824,35 @@ function ProductFormModal({ product, categories, allProducts, onClose, onSaved }
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <label className="block text-xs font-bold text-slate-700">Category</label>
-              <input
+              <ComboInput
                 type="text"
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={setCategory}
+                onSelect={handleCategorySelect}
+                options={getCategoryOptions(categories)}
                 placeholder="e.g. AC Cleaning"
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700">Unit of Measure</label>
-              <input
+              <ComboInput
                 type="text"
                 value={unit}
-                onChange={(e) => setUnit(e.target.value)}
+                onChange={setUnit}
+                options={UNIT_OPTIONS}
                 placeholder="e.g. Bottle, Piece, Can, Kg"
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700">Price / Cost (₹)</label>
-              <input
+              <ComboInput
                 type="number"
                 min="0"
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                onChange={setPrice}
+                options={PRICE_OPTIONS}
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               />
             </div>
