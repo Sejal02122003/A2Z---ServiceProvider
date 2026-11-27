@@ -22,6 +22,11 @@ import {
 } from 'lucide-react';
 import { walletsApi } from '../../api/walletsApi';
 
+// The API still uses "labour" internally; the panel calls these accounts "Service Provider"
+const roleLabel = (role) => (role === 'labour' ? 'Service Provider' : role || 'customer');
+const providerWording = (text) =>
+  String(text).replace(/\blabou?r(?:er)?(s?)\b/gi, (_, plural) => `Service Provider${plural}`);
+
 export default function AdminWalletRewardsPage() {
   const [loading, setLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -326,7 +331,7 @@ export default function AdminWalletRewardsPage() {
       u.userId || u._id,
       u.userName || u.fullName || 'N/A',
       u.userPhone || u.phone || 'N/A',
-      u.role || 'customer',
+      roleLabel(u.role),
       u.balance || 0,
       u.reservedBalance || 0,
       availableOf(u),
@@ -527,7 +532,7 @@ export default function AdminWalletRewardsPage() {
                         </td>
                         <td className="px-6 py-4">
                           <span className="inline-flex rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 capitalize">
-                            {item.role || 'customer'}
+                            {roleLabel(item.role)}
                           </span>
                         </td>
                         <td className="px-6 py-4">
@@ -924,7 +929,7 @@ export default function AdminWalletRewardsPage() {
                               </span>
                             </td>
                             <td className="min-w-[220px] max-w-[360px] whitespace-normal break-words px-4 py-2.5 align-top leading-snug text-slate-700">
-                              {tx.description || tx.reason || '—'}
+                              {providerWording(tx.description || tx.reason || '—')}
                             </td>
                             <td className={`px-4 py-2.5 text-right font-bold ${tx.type === 'CREDIT' ? 'text-blue-600' : 'text-rose-600'}`}>
                               {tx.type === 'CREDIT' ? '+' : '-'} ₹{Number(tx.amount).toLocaleString('en-IN')}
