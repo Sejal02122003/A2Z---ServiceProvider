@@ -46,7 +46,6 @@ export const ADMIN_PERMISSION_GROUPS = [
       { key: 'wallet_recharge', label: 'Wallet Recharge Requests', description: 'Approve or reject recharges', paths: ['/admin/wallet-management'] },
       { key: 'payments', label: 'Payments, Billing & QR', description: 'Billing, invoices and QR payments', paths: ['/admin/billing', '/admin/qr-payments'] },
       { key: 'wallet_rewards', label: 'Customer Wallet & Eligibility', description: 'Customer balances and wallet rules', paths: ['/admin/wallet-rewards', '/admin/wallet-eligibility'] },
-      { key: 'provider_wallet', label: 'Service Provider Wallet', description: 'Provider balances and withdrawals', paths: ['/admin/labour-wallet', '/admin/cash-management'] },
       { key: 'fees', label: 'Platform & Commission Fees', description: 'Change fees and commission', paths: ['/admin/platform-fee', '/admin/commission-fee'] },
       { key: 'rewards', label: 'Rewards & Incentives', description: 'Provider reward campaigns', paths: ['/admin/rewards'] },
       { key: 'subscriptions', label: 'Provider Subscriptions', description: 'Plans and refunds', paths: ['/admin/labour-subscriptions'] },

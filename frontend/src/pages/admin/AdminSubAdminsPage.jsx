@@ -14,7 +14,9 @@ const labelClass = 'text-xs font-bold uppercase tracking-wider text-slate-500'
 const EMPTY_FORM = { fullName: '', email: '', password: '', permissions: [] }
 
 const permissionLabel = (key) => ADMIN_PERMISSIONS.find((p) => p.key === key)?.label || key
-const errorText = (err) => err?.errors?.[0]?.message || err?.message || 'Something went wrong'
+// Accounts may still hold keys of sections that have since been removed from the panel
+const knownPermissions = (keys = []) => keys.filter((key) => ADMIN_PERMISSIONS.some((p) => p.key === key))
+const errorText =(err) => err?.errors?.[0]?.message || err?.message || 'Something went wrong'
 
 export function AdminSubAdminsPage() {
   const [subAdmins, setSubAdmins] = useState([])
@@ -51,7 +53,7 @@ export function AdminSubAdminsPage() {
     setEditing({ id: subAdmin?._id || null })
     setForm(
       subAdmin
-        ? { fullName: subAdmin.fullName || '', email: subAdmin.email || '', password: '', permissions: subAdmin.permissions }
+        ? { fullName: subAdmin.fullName || '', email: subAdmin.email || '', password: '', permissions: knownPermissions(subAdmin.permissions) }
         : EMPTY_FORM,
     )
     setFormError('')
@@ -164,7 +166,7 @@ export function AdminSubAdminsPage() {
                     Last login: {s.lastLoginAt ? formatLastLoginDisplay(s.lastLoginAt) : 'Never'}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-1.5">
-                    {s.permissions.map((key) => (
+                    {knownPermissions(s.permissions).map((key) => (
                       <span key={key} className="rounded-lg border border-brand/20 bg-brand/5 px-2 py-0.5 text-[11px] font-bold text-brand">
                         {permissionLabel(key)}
                       </span>

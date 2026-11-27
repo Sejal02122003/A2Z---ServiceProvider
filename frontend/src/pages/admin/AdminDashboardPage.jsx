@@ -186,16 +186,6 @@ export function AdminDashboardPage() {
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
               )}
-              {canOpen('/admin/labour-wallet') && (
-              <Link
-                to="/admin/labour-wallet"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-2 text-sm font-bold text-brand hover:underline"
-              >
-                View withdrawal requests
-                <ArrowUpRight className="h-4 w-4" />
-              </Link>
-              )}
             </div>
           </GlassPanel>
           )}
