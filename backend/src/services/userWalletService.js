@@ -10,7 +10,8 @@ const DEFAULT_SETTINGS = {
   enabled: true,
   welcomeBonusEnabled: true,
   welcomeBonusAmount: 1000,
-  walletDiscountPercentage: 20,
+  walletDiscountPercentage: 5,
+  walletUsageBasis: 'BALANCE',
   minimumBookingAmount: 0,
   minimumLabourWalletBalance: 0,
   serviceCreditEnabled: true,
@@ -29,6 +30,15 @@ export async function getWalletSettings() {
     .populate('updatedBy', 'fullName email')
   if (!settings) {
     settings = await WalletSetting.create(DEFAULT_SETTINGS)
+  }
+  // One-time switch for settings saved when the percentage meant "share of the bill":
+  // start at 5% of the wallet balance. Admin changes made afterwards are kept.
+  if (settings.walletUsageBasis !== 'BALANCE') {
+    await WalletSetting.updateOne(
+      { _id: settings._id, walletUsageBasis: { $ne: 'BALANCE' } },
+      { $set: { walletUsageBasis: 'BALANCE', walletDiscountPercentage: 5 } },
+    )
+    settings = await WalletSetting.findById(settings._id).populate('updatedBy', 'fullName email')
   }
   return settings
 }
@@ -356,28 +366,14 @@ export async function ensureWelcomeBonus(userId) {
 }
 
 /**
- * Calculate maximum allowable wallet discount for a bill
- * 
+ * Calculate how much of the wallet can be used on a bill
+ *
  * Formula:
- * maximumWalletUsage = eligibleOrderAmount * percentage / 100
- * actualWalletDeduction = min(walletBalance, maximumWalletUsage)
- * remainingPayable = eligibleOrderAmount - actualWalletDeduction
+ * maximumWalletUsage = walletBalance * percentage / 100   (rounded down to whole rupees)
+ * actualWalletDeduction = min(maximumWalletUsage, eligibleOrderAmount)
+ * remainingPayable = eligibleOrderAmount - actualWalletDeduction   (paid by Cash / Online)
  */
 export async function calculateWalletDiscount(userId, eligibleBillAmount) {
-  const base = await calculateWalletDiscountCapped(userId, eligibleBillAmount)
-  // Paying the WHOLE bill from the wallet: needs the wallet enabled, the minimum order met and
-  // enough balance for the full amount (the % cap only limits partial discounts, not this).
-  const bill = Number(eligibleBillAmount) || 0
-  const canPayFullBill = Boolean(base.enabled && base.meetsMinimum !== false && bill > 0 && base.walletBalance >= bill)
-  return {
-    ...base,
-    canPayFullBill,
-    walletPayAmount: canPayFullBill ? bill : 0,
-    shortfall: base.enabled && bill > 0 ? Math.max(0, Math.round((bill - base.walletBalance) * 100) / 100) : 0,
-  }
-}
-
-async function calculateWalletDiscountCapped(userId, eligibleBillAmount) {
   if (eligibleBillAmount === null || eligibleBillAmount === undefined || typeof eligibleBillAmount === 'boolean') {
     throw new Error('Invalid order amount: amount must be a valid number')
   }
@@ -404,7 +400,7 @@ async function calculateWalletDiscountCapped(userId, eligibleBillAmount) {
     }
   }
 
-  const percentage = Number(settings.walletDiscountPercentage ?? 20)
+  const percentage = Number(settings.walletDiscountPercentage ?? 5)
 
   if (billAmount === 0) {
     return {
@@ -466,8 +462,9 @@ async function calculateWalletDiscountCapped(userId, eligibleBillAmount) {
     }
   }
 
-  const maxWalletUsage = Math.min(billAmount, Math.round((billAmount * percentage) / 100))
-  const actualWalletDeduction = Math.min(walletBalance, maxWalletUsage, billAmount)
+  // Rounded down so the limit is never exceeded
+  const maxWalletUsage = Math.floor((walletBalance * percentage) / 100)
+  const actualWalletDeduction = Math.min(maxWalletUsage, billAmount)
   const remainingPayable = Math.max(0, Math.round((billAmount - actualWalletDeduction) * 100) / 100)
 
   return {
@@ -526,7 +523,7 @@ export async function deductWalletForBooking({ userId, bookingId, eligibleBillAm
     deductionAmount = Number(frozenWalletDeduction)
     const settings = await getWalletSettings()
     calculation = {
-      walletUsagePercentage: Number(settings.walletDiscountPercentage ?? 20),
+      walletUsagePercentage: Number(settings.walletDiscountPercentage ?? 5),
       eligibleOrderAmount: eligibleBillAmount || deductionAmount,
       maxWalletUsage: deductionAmount,
       remainingPayable: Math.max(0, (eligibleBillAmount || deductionAmount) - deductionAmount),

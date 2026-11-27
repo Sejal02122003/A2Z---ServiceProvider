@@ -70,15 +70,16 @@ export function Checkout() {
   const [saveAddress, setSaveAddress] = useState(true)
   const [paymentMethod, setPaymentMethod] = useState('CASH')
   const [useWallet, setUseWallet] = useState(false)
-  // Wallet payment = the WHOLE bill from the wallet (no cash / online). Needs enough balance.
-  const walletPayFull = Boolean(bill?.walletInfo?.canPayFullBill)
-  const walletFullAmount = Number(bill?.walletInfo?.walletPayAmount || 0)
-  const walletActive = Boolean(useWallet && walletPayFull)
+  // Only a limited share of the wallet balance can be used; the rest is paid by Cash / Online
+  const walletUsable = Number(bill?.walletInfo?.walletDeduction || 0)
+  const walletPct = Number(bill?.walletInfo?.percentage || 0)
+  const walletActive = Boolean(useWallet && walletUsable > 0)
+  const walletCoversBill = walletActive && walletUsable >= Number(bill?.totalAmount || 0)
 
-  // If the bill changes so the wallet can no longer cover it, switch the wallet toggle off
+  // If the bill changes so the wallet can no longer be used, switch the wallet toggle off
   useEffect(() => {
-    if (bill && useWallet && !walletPayFull) setUseWallet(false)
-  }, [bill, useWallet, walletPayFull])
+    if (bill && useWallet && !(walletUsable > 0)) setUseWallet(false)
+  }, [bill, useWallet, walletUsable])
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [addressSheetOpen, setAddressSheetOpen] = useState(false)
@@ -293,15 +294,15 @@ export function Checkout() {
         lat,
         lng,
         saveAddress,
-        // Wallet on: the whole bill is paid from the wallet only
-        paymentMethod: walletActive ? 'WALLET' : paymentMethod,
+        // WALLET only when the allowed wallet share covers the whole bill
+        paymentMethod: walletCoversBill ? 'WALLET' : paymentMethod,
         useWallet: walletActive,
       })
 
       const booking = res.data?.booking
       if (!booking) throw new Error('Booking creation failed')
 
-      if (walletActive || paymentMethod === 'CASH') {
+      if (walletCoversBill || paymentMethod === 'CASH') {
         navigate(`/user/tracking/${booking._id}`, { replace: true })
         return
       }
@@ -357,7 +358,7 @@ export function Checkout() {
       setSubmitError(err instanceof ApiError ? err.message : err.message || 'Booking failed')
       setSubmitting(false)
     }
-  }, [address, lat, lng, paymentMethod, walletActive, subcategoryId, subcategoryName, navigate, isGuest, location, scheduledTime, type])
+  }, [address, lat, lng, paymentMethod, walletActive, walletCoversBill, subcategoryId, subcategoryName, navigate, isGuest, location, scheduledTime, type])
 
   return (
     <div className="space-y-4 pb-8">
@@ -430,7 +431,7 @@ export function Checkout() {
                       </p>
                     </div>
                   </div>
-                  {walletPayFull ? (
+                  {walletUsable > 0 ? (
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
                         type="checkbox"
@@ -442,7 +443,7 @@ export function Checkout() {
                     </label>
                   ) : (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200">
-                      {bill.walletInfo.meetsMinimum === false ? `Min bill ₹${bill.walletInfo.minimumBookingAmount}` : `Need ${formatInr(bill.walletInfo.shortfall || 0)} more`}
+                      {bill.walletInfo.meetsMinimum === false ? `Min bill ₹${bill.walletInfo.minimumBookingAmount}` : 'Balance too low'}
                     </span>
                   )}
                 </div>
@@ -455,11 +456,11 @@ export function Checkout() {
                   </div>
                   {walletActive ? (
                     <div className="flex justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400 pt-1 border-t border-amber-200/60">
-                      <span>Bill paid fully from wallet:</span>
-                      <span>-{formatInr(walletFullAmount)}</span>
+                      <span>Paid from wallet ({walletPct}% of balance):</span>
+                      <span>-{formatInr(walletUsable)}</span>
                     </div>
                   ) : (
-                    <p className="text-[11px] text-slate-500">Turn this on to pay the whole bill from your wallet (cash / online are then not used).</p>
+                    <p className="text-[11px] text-slate-500">You can use up to {walletPct}% of your wallet balance on a booking. Pay the rest by Cash or Online.</p>
                   )}
                 </div>
               </div>
@@ -468,7 +469,7 @@ export function Checkout() {
             <div className="flex justify-between border-t border-slate-200 pt-2 text-base">
               <span className="font-extrabold text-slate-900">Total Payable</span>
               <span className="font-extrabold text-brand">
-                {formatInr(walletActive ? 0 : bill.totalAmount)}
+                {formatInr(walletActive ? Math.max(0, bill.totalAmount - walletUsable) : bill.totalAmount)}
               </span>
             </div>
             {(bill.totalSavings > 0 || bill.serviceDiscount > 0) && (

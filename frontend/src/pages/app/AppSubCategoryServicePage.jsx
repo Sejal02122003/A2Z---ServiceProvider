@@ -46,7 +46,7 @@ export function AppSubCategoryServicePage() {
   const { user, isAuthenticated } = useAuth()
   const [walletSettings, setWalletSettings] = useState({
     enabled: true,
-    walletDiscountPercentage: 20,
+    walletDiscountPercentage: 5,
     welcomeBonusAmount: 1000,
     serviceCreditEnabled: true,
     serviceCreditPercentage: 15,
@@ -293,10 +293,10 @@ export function AppSubCategoryServicePage() {
                   Active Offers Available
                 </span>
               )}
-              {walletSettings?.enabled !== false && (
+              {walletSettings?.enabled !== false && Number(walletSettings?.walletDiscountPercentage) > 0 && (
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200/60 shadow-2xs">
                   <Wallet className="h-3 w-3 text-emerald-600" />
-                  Save upto 50% with Wallet
+                  Use {walletSettings.walletDiscountPercentage}% of your Wallet
                 </span>
               )}
             </div>
@@ -314,12 +314,14 @@ export function AppSubCategoryServicePage() {
                 const isExpanded = expandedServiceId === service._id;
                 const offer = getServiceOfferDetails(service);
                 const serviceRawPrice = Number(offer.discountedPrice || offer.originalPrice || service.price || 0);
-                const walletDiscountPct = Number(walletSettings?.walletDiscountPercentage || 20);
+                const walletDiscountPct = Number(walletSettings?.walletDiscountPercentage ?? 5);
+                // The limit is a share of the wallet balance, not of the price
+                const walletUsable = Math.floor((Number(userWallet?.balance || 0) * walletDiscountPct) / 100);
                 const serviceCreditPct = Number(walletSettings?.serviceCreditPercentage || 15);
-                const walletSavingsAmount = Math.round((serviceRawPrice * walletDiscountPct) / 100);
+                const walletSavingsAmount = Math.min(serviceRawPrice, walletUsable);
                 const effectiveWalletPrice = Math.max(0, serviceRawPrice - walletSavingsAmount);
                 const walletCashbackAmount = Math.round((serviceRawPrice * serviceCreditPct) / 100);
-                const hasWalletOffer = Boolean(walletSettings?.enabled !== false && walletDiscountPct > 0 && serviceRawPrice > 0);
+                const hasWalletOffer = Boolean(walletSettings?.enabled !== false && walletSavingsAmount > 0);
                 const serviceDuration = getServiceDisplayDuration(service);
 
                 return (
@@ -358,7 +360,7 @@ export function AppSubCategoryServicePage() {
                             <ServiceOfferBadge label={offer.offerBadge} variant="compact" />
                           )}
                           {hasWalletOffer && (
-                            <ServiceOfferBadge label="Save upto 50%" variant="wallet" />
+                            <ServiceOfferBadge label="Wallet savings" variant="wallet" />
                           )}
                           {Array.isArray(service.subServices) && service.subServices.length > 0 && (
                             <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-200/60">
@@ -621,7 +623,7 @@ export function AppSubCategoryServicePage() {
                                     hasSubOffer = finalPrice < origPrice
                                   }
 
-                                  const subWalletSavings = Math.round((finalPrice * walletDiscountPct) / 100);
+                                  const subWalletSavings = Math.min(finalPrice, walletUsable);
                                   const subPriceWithWallet = Math.max(0, finalPrice - subWalletSavings);
 
                                   return (

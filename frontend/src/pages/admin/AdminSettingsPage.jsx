@@ -153,7 +153,7 @@ export function AdminSettingsPage() {
   // Wallet Deduction & Welcome Bonus Settings
   const [walletSettings, setWalletSettings] = useState({
     enabled: true,
-    walletDiscountPercentage: 20,
+    walletDiscountPercentage: 5,
     welcomeBonusEnabled: true,
     welcomeBonusAmount: 1000,
     updatedAt: null,
@@ -176,7 +176,7 @@ export function AdminSettingsPage() {
         if (ws) {
           setWalletSettings({
             enabled: ws.enabled !== false,
-            walletDiscountPercentage: ws.walletDiscountPercentage ?? 20,
+            walletDiscountPercentage: ws.walletDiscountPercentage ?? 5,
             welcomeBonusEnabled: ws.welcomeBonusEnabled !== false,
             welcomeBonusAmount: ws.welcomeBonusAmount ?? 1000,
             updatedAt: ws.updatedAt,
@@ -1042,7 +1042,7 @@ export function AdminSettingsPage() {
         <SettingsSection
           icon={Wallet}
           title="Customer Wallet & Welcome Bonus Settings"
-          description="Control the customer registration welcome bonus and the maximum wallet deduction allowed at checkout."
+          description="Control the customer registration welcome bonus and the share of the wallet balance usable on each booking."
           accent="brand"
         >
           {/* 1. Welcome Bonus on Registration */}
@@ -1126,7 +1126,7 @@ export function AdminSettingsPage() {
           {/* 3. Max Wallet Deduction Limit */}
           <div>
             <div className="flex items-center justify-between">
-              <label className={labelClass}>Max Checkout Deduction Limit (%)</label>
+              <label className={labelClass}>Wallet Balance Usable Per Booking (%)</label>
               <span className="text-[11px] font-semibold text-slate-400">Accepts 0 - 100%</span>
             </div>
             <div className="relative mt-1.5">
@@ -1136,7 +1136,7 @@ export function AdminSettingsPage() {
                 min={0}
                 max={100}
                 step={1}
-                placeholder="20"
+                placeholder="5"
                 value={walletSettings.walletDiscountPercentage}
                 onChange={(e) => setWalletSettings({ ...walletSettings, walletDiscountPercentage: e.target.value === '' ? '' : Number(e.target.value) })}
               />
@@ -1145,7 +1145,7 @@ export function AdminSettingsPage() {
               </div>
             </div>
             <div className="flex flex-wrap gap-1.5 mt-2">
-              {[0, 10, 20, 30, 50, 100].map((preset) => (
+              {[0, 5, 10, 20, 50, 100].map((preset) => (
                 <button
                   key={preset}
                   type="button"

@@ -66,7 +66,7 @@ export function AdminLabourWalletPage() {
     minimumLabourWalletBalance: '',
     labourCashLimit: 500,
     welcomeBonusAmount: 100,
-    walletDiscountPercentage: 20,
+    walletDiscountPercentage: 5,
     minimumBookingAmount: 0,
   })
   const [savingSettings, setSavingSettings] = useState(false)

@@ -1067,15 +1067,16 @@ export function IndividualBookingFlowPage() {
     }
   }
 
-  // Wallet payment = the WHOLE bill from the wallet (no cash / online). Needs enough balance.
-  const walletPayFull = Boolean(calculatedBill?.walletInfo?.canPayFullBill)
-  const walletFullAmount = Number(calculatedBill?.walletInfo?.walletPayAmount || 0)
-  const walletActive = Boolean(useWallet && walletPayFull)
+  // Only a limited share of the wallet balance can be used; the rest is paid by Cash / Online
+  const walletUsable = Number(calculatedBill?.walletInfo?.walletDeduction || 0)
+  const walletPct = Number(calculatedBill?.walletInfo?.percentage || 0)
+  const walletActive = Boolean(useWallet && walletUsable > 0)
+  const walletCoversBill = walletActive && walletUsable >= Number(calculatedBill?.totalAmount || 0)
 
-  // If the bill changes so the wallet can no longer cover it, switch the wallet toggle off
+  // If the bill changes so the wallet can no longer be used, switch the wallet toggle off
   useEffect(() => {
-    if (calculatedBill && useWallet && !walletPayFull) setUseWallet(false)
-  }, [calculatedBill, useWallet, walletPayFull])
+    if (calculatedBill && useWallet && !(walletUsable > 0)) setUseWallet(false)
+  }, [calculatedBill, useWallet, walletUsable])
 
   // "Search again": restart the provider search for the SAME booking (no duplicate booking)
   const handleResearch = async () => {
@@ -1128,8 +1129,8 @@ export function IndividualBookingFlowPage() {
         locationText: draft.address.trim(),
         lat: draft.lat || 28.6139,
         lng: draft.lng || 77.2090,
-        // Wallet on: the whole bill is paid from the wallet only. Otherwise Cash / Online as chosen.
-        paymentMethod: walletActive
+        // WALLET only when the allowed wallet share covers the whole bill. Otherwise Cash / Online as chosen.
+        paymentMethod: walletCoversBill
           ? 'WALLET'
           : (realUser?.role === 'contractor'
             ? 'ONLINE'
@@ -2806,7 +2807,7 @@ export function IndividualBookingFlowPage() {
                   {(() => {
                     const walletInfo = calculatedBill.walletInfo;
                     const walletBalance = Number(walletInfo?.walletBalance ?? walletInfo?.availableBalance ?? 0);
-                    const canApplyWallet = walletPayFull;
+                    const canApplyWallet = walletUsable > 0;
 
                     if (walletBalance > 0) {
                       return (
@@ -2820,7 +2821,7 @@ export function IndividualBookingFlowPage() {
                                 <p className="text-xs font-bold text-slate-900">A2Z Customer Wallet</p>
                                 <p className="text-[11px] font-medium text-amber-900">
                                   Available: <span className="font-bold">{formatInr(walletBalance)}</span>
-                                  {walletPayFull ? ' • Enough to pay this bill' : ''}
+                                  {canApplyWallet ? ` • Usable now: ${formatInr(walletUsable)} (${walletPct}%)` : ''}
                                 </p>
                               </div>
                             </div>
@@ -2840,7 +2841,7 @@ export function IndividualBookingFlowPage() {
                                   ? 'Unavailable'
                                   : walletInfo?.meetsMinimum === false
                                     ? `Min order ${formatInr(walletInfo?.minimumBookingAmount || 0)}`
-                                    : `Need ${formatInr(walletInfo?.shortfall || 0)} more`}
+                                    : 'Balance too low'}
                               </span>
                             )}
                           </div>
@@ -2848,9 +2849,9 @@ export function IndividualBookingFlowPage() {
                             <div className="flex justify-between items-center text-xs font-bold text-emerald-700 pt-2 border-t border-amber-200/80">
                               <span className="flex items-center gap-1">
                                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                Bill paid fully from wallet:
+                                Paid from wallet:
                               </span>
-                              <span className="font-mono text-sm">-{formatInr(walletFullAmount)}</span>
+                              <span className="font-mono text-sm">-{formatInr(walletUsable)}</span>
                             </div>
                           )}
                         </div>
@@ -2887,7 +2888,7 @@ export function IndividualBookingFlowPage() {
                     </span>
                     {walletActive ? (
                       <span className="font-mono text-emerald-600 font-bold">
-                        -{formatInr(walletFullAmount)}
+                        -{formatInr(walletUsable)}
                       </span>
                     ) : (
                       <span className="font-mono text-slate-400 font-medium">₹0</span>
@@ -2898,9 +2899,7 @@ export function IndividualBookingFlowPage() {
                     <span>Total Payable</span>
                     <span>
                       {formatInr(
-                        walletActive
-                          ? 0
-                          : (calculatedBill.totalAmount || calculatedBill.subTotal || calculatedBill.basePrice || Number(draft.servicePrice || 0))
+                        Math.max(0, (calculatedBill.totalAmount || calculatedBill.subTotal || calculatedBill.basePrice || Number(draft.servicePrice || 0)) - (walletActive ? walletUsable : 0))
                       )}
                     </span>
                   </div>
@@ -2915,7 +2914,8 @@ export function IndividualBookingFlowPage() {
               <div className="lc-booking-flow-card space-y-3">
                 <p className="lc-booking-flow-label font-bold text-slate-800">Payment Method</p>
                 {(() => {
-                  const walletOn = walletActive;
+                  // Cash / Online stay selectable unless the wallet share covers the whole bill
+                  const walletOn = walletCoversBill;
                   const method = draft.paymentMethod === 'ONLINE' ? 'ONLINE' : 'CASH';
 
                   const showCash = calculatedBill?.paymentModes?.cashEnabled !== false && realUser?.role !== 'contractor';
@@ -2959,7 +2959,11 @@ export function IndividualBookingFlowPage() {
                       </div>
                       {walletOn ? (
                         <p className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800">
-                          The full bill of {formatInr(walletFullAmount)} will be paid from your A2Z Wallet. Turn the wallet off to pay by Cash or Online.
+                          Your A2Z Wallet covers this whole bill. Turn the wallet off to pay by Cash or Online.
+                        </p>
+                      ) : walletActive ? (
+                        <p className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800">
+                          {formatInr(walletUsable)} comes from your wallet. Pay the remaining {formatInr(Math.max(0, calculatedBill.totalAmount - walletUsable))} by {method === 'ONLINE' ? 'Online' : 'Cash'}.
                         </p>
                       ) : null}
                     </>

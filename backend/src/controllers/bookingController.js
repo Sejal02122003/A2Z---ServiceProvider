@@ -923,18 +923,18 @@ export const createBooking = asyncHandler(async (req, res) => {
   let finalPayableAmount = rawTotalAmount
   let walletDiscountData = { applied: false, amount: 0, percentage: 0, eligibleAmount: 0, walletTransactionId: null }
 
-  // Wallet payment: the WHOLE bill is paid from the wallet and nothing else (no cash / online).
-  // If the wallet cannot cover it, the booking is rejected instead of silently charging the rest elsewhere.
+  // Wallet: only a limited share of the customer's wallet balance (admin %, 5% by default) can be used
+  // on a booking. Whatever is left of the bill is paid by Cash / Online.
   const wantsWalletPayment = Boolean(req.body.useWallet) || String(req.body.paymentMethod || '').toUpperCase() === 'WALLET'
   if (wantsWalletPayment && req.user?._id) {
     const { calculateWalletDiscount, deductWalletForBooking } = await import('../services/userWalletService.js')
     const walletCalc = await calculateWalletDiscount(req.user._id, rawTotalAmount)
-    if (!walletCalc.canPayFullBill) {
+    if (!(walletCalc.walletDeduction > 0)) {
       const why = !walletCalc.enabled
         ? 'Wallet payment is currently unavailable.'
         : walletCalc.meetsMinimum === false
           ? `Wallet payment needs a minimum order of ₹${walletCalc.minimumBookingAmount}.`
-          : `Insufficient wallet balance. You need ₹${Math.ceil(walletCalc.shortfall)} more to pay this bill from your wallet.`
+          : 'Your wallet balance is too low to be used on this booking.'
       return sendError(res, { message: why, statusCode: HTTP_STATUS.BAD_REQUEST, code: 'WALLET_INSUFFICIENT' })
     }
     try {
@@ -943,11 +943,11 @@ export const createBooking = asyncHandler(async (req, res) => {
         bookingId: null,
         eligibleBillAmount: rawTotalAmount,
         requestedUseWallet: true,
-        frozenWalletDeduction: rawTotalAmount, // the full bill
+        frozenWalletDeduction: walletCalc.walletDeduction,
       })
       if (!deductionRes.applied || !(deductionRes.amount > 0)) {
         return sendError(res, {
-          message: 'Insufficient wallet balance to pay this bill from your wallet.',
+          message: 'Insufficient wallet balance.',
           statusCode: HTTP_STATUS.BAD_REQUEST,
           code: 'WALLET_INSUFFICIENT',
         })
@@ -955,13 +955,13 @@ export const createBooking = asyncHandler(async (req, res) => {
       walletDiscountData = {
         applied: true,
         amount: deductionRes.amount,
-        percentage: 100,
+        percentage: walletCalc.percentage,
         eligibleAmount: rawTotalAmount,
         walletTransactionId: deductionRes.walletTransactionId,
       }
-      finalPayableAmount = 0
+      finalPayableAmount = Math.max(0, Math.round((rawTotalAmount - deductionRes.amount) * 100) / 100)
     } catch (err) {
-      console.error('[WALLET_ERROR] Error paying booking from wallet:', err)
+      console.error('[WALLET_ERROR] Error applying wallet to booking:', err)
       return sendError(res, { message: 'Could not process the wallet payment. Please try again.', statusCode: HTTP_STATUS.SERVER_ERROR })
     }
   }
@@ -1057,7 +1057,7 @@ export const createBooking = asyncHandler(async (req, res) => {
       WalletTransaction.findByIdAndUpdate(walletDiscountData.walletTransactionId, {
         bookingId: booking._id,
         referenceId: booking._id,
-        description: `Wallet deduction of ₹${walletDiscountData.amount} (${walletDiscountData.percentage}%) applied on booking #${String(booking._id).slice(-6).toUpperCase()}`,
+        description: `Wallet deduction of ₹${walletDiscountData.amount} (${walletDiscountData.percentage}% of balance) applied on booking #${String(booking._id).slice(-6).toUpperCase()}`,
       }).catch(err => console.error('Error linking wallet tx reference:', err))
     })
   }
@@ -2098,7 +2098,9 @@ export const addExtraTime = asyncHandler(async (req, res) => {
   booking.basePrice = newBasePrice
   booking.platformFee = platformFee
   booking.taxes = taxes
-  booking.totalAmount = newTotalAmount
+  // Keep the amount already paid from the wallet off the customer's payable total
+  const walletPaid = booking.walletDiscount?.applied ? Number(booking.walletDiscount.amount) || 0 : 0
+  booking.totalAmount = Math.max(0, newTotalAmount - walletPaid)
   booking.commissionAmount = commissionAmount
   booking.laborShare = laborShare
 

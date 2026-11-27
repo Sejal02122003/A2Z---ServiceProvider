@@ -34,7 +34,7 @@ export default function AdminWalletRewardsPage() {
     enabled: true,
     welcomeBonusEnabled: true,
     welcomeBonusAmount: 1000,
-    walletDiscountPercentage: 20,
+    walletDiscountPercentage: 5,
     minimumBookingAmount: 0,
     serviceCreditEnabled: true,
     serviceCreditPercentage: 15,
@@ -74,7 +74,7 @@ export default function AdminWalletRewardsPage() {
   // Form edit temporary states
   const [editForm, setEditForm] = useState({
     enabled: true,
-    walletDiscountPercentage: 20,
+    walletDiscountPercentage: 5,
     minimumBookingAmount: 0,
     welcomeBonusEnabled: true,
     welcomeBonusAmount: 1000,
@@ -93,7 +93,7 @@ export default function AdminWalletRewardsPage() {
           enabled: s.enabled !== undefined ? s.enabled : true,
           welcomeBonusEnabled: s.welcomeBonusEnabled !== undefined ? s.welcomeBonusEnabled : true,
           welcomeBonusAmount: s.welcomeBonusAmount ?? 1000,
-          walletDiscountPercentage: s.walletDiscountPercentage ?? 20,
+          walletDiscountPercentage: s.walletDiscountPercentage ?? 5,
           minimumBookingAmount: s.minimumBookingAmount ?? 0,
           serviceCreditEnabled: s.serviceCreditEnabled !== undefined ? s.serviceCreditEnabled : true,
           serviceCreditPercentage: s.serviceCreditPercentage ?? 15,
@@ -650,7 +650,7 @@ export default function AdminWalletRewardsPage() {
               {/* 2. Dynamic Deduction Percentage */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-sm font-bold text-slate-700">Max Wallet Deduction (%)</label>
+                  <label className="text-sm font-bold text-slate-700">Wallet Balance Usable Per Booking (%)</label>
                   <span className="text-xs font-bold text-blue-600">{editForm.walletDiscountPercentage}% max</span>
                 </div>
                 <input
@@ -661,10 +661,10 @@ export default function AdminWalletRewardsPage() {
                   value={editForm.walletDiscountPercentage}
                   onChange={(e) => setEditForm((prev) => ({ ...prev, walletDiscountPercentage: e.target.value }))}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none transition focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-600/10 font-mono font-bold"
-                  placeholder="20"
+                  placeholder="5"
                 />
                 <div className="flex gap-1.5 mt-2">
-                  {[0, 10, 15, 20, 25, 30, 50].map((preset) => (
+                  {[0, 5, 10, 15, 20, 30, 50].map((preset) => (
                     <button
                       key={preset}
                       type="button"

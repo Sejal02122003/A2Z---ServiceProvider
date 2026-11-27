@@ -169,9 +169,10 @@ export function MultiServiceCartPage() {
   // Wallet discount calculations
   const walletInfo = billData?.walletInfo
   const walletAvailable = Number(walletInfo?.walletBalance ?? walletInfo?.availableBalance ?? 0)
-  // Wallet payment = the WHOLE bill from the wallet (no cash / online). Needs enough balance.
-  const canUseWallet = Boolean(walletInfo?.canPayFullBill)
-  const walletFullAmount = Number(walletInfo?.walletPayAmount || 0)
+  // Only a limited share of the wallet balance can be used; the rest is paid by Cash / Online
+  const walletUsable = Number(walletInfo?.walletDeduction || 0)
+  const walletPct = Number(walletInfo?.percentage || 0)
+  const canUseWallet = walletUsable > 0
 
   const subTotal = billData?.subTotal ?? 0
   const originalSubTotal = billData?.originalSubTotal ?? subTotal
@@ -180,10 +181,12 @@ export function MultiServiceCartPage() {
   const platformFee = billData?.platformFee ?? 0
 
   const walletActive = Boolean(useWallet && canUseWallet)
-  const walletDiscountApplied = walletActive ? walletFullAmount : 0
-  const totalAmount = walletActive ? 0 : Math.max(0, billData?.totalAmount ?? subTotal + platformFee + taxes)
+  const walletDiscountApplied = walletActive ? walletUsable : 0
+  const billTotal = Math.max(0, billData?.totalAmount ?? subTotal + platformFee + taxes)
+  const totalAmount = Math.max(0, billTotal - walletDiscountApplied)
+  const walletCoversBill = walletActive && walletUsable >= billTotal
 
-  // If the bill changes so the wallet can no longer cover it, switch the wallet toggle off
+  // If the bill changes so the wallet can no longer be used, switch the wallet toggle off
   useEffect(() => {
     if (billData && useWallet && !canUseWallet) setUseWallet(false)
   }, [billData, useWallet, canUseWallet])
@@ -238,8 +241,8 @@ export function MultiServiceCartPage() {
         locationText: locationText.trim(),
         lat: coordinates.lat || 28.6139,
         lng: coordinates.lng || 77.2090,
-        // Wallet on: the whole bill is paid from the wallet only. Otherwise Cash / Online as chosen.
-        paymentMethod: walletActive ? 'WALLET' : (paymentMethod === 'WALLET' ? 'CASH' : paymentMethod),
+        // WALLET only when the allowed wallet share covers the whole bill. Otherwise Cash / Online as chosen.
+        paymentMethod: walletCoversBill ? 'WALLET' : (paymentMethod === 'WALLET' ? 'CASH' : paymentMethod),
         useWallet: walletActive,
         notes: notes.trim() || undefined,
       }
@@ -252,7 +255,7 @@ export function MultiServiceCartPage() {
       }
 
       // If payment is ONLINE, trigger Razorpay
-      if (!walletActive && paymentMethod === 'ONLINE' && createdBooking.totalAmount > 0) {
+      if (!walletCoversBill && paymentMethod === 'ONLINE' && createdBooking.totalAmount > 0) {
         try {
           const payRes = await paymentsApi.initPayment({
             amount: createdBooking.totalAmount,
@@ -699,7 +702,7 @@ export function MultiServiceCartPage() {
                 <div>
                   <h3 className="text-xs font-bold text-amber-950">A2Z Customer Wallet</h3>
                   <p className="text-[11px] font-medium text-amber-800">
-                    Balance: ₹{walletAvailable}{canUseWallet ? ' • Enough to pay this bill' : ''}
+                    Balance: ₹{walletAvailable}{canUseWallet ? ` • Usable now: ₹${walletUsable} (${walletPct}%)` : ''}
                   </p>
                 </div>
               </div>
@@ -719,13 +722,13 @@ export function MultiServiceCartPage() {
                     ? 'Unavailable'
                     : walletInfo?.meetsMinimum === false
                       ? `Min order ₹${walletInfo?.minimumBookingAmount || 0}`
-                      : `Need ₹${Math.ceil(walletInfo?.shortfall || 0)} more`}
+                      : 'Balance too low'}
                 </span>
               )}
             </div>
             {useWallet && canUseWallet && (
               <div className="mt-2.5 pt-2 border-t border-amber-200/80 flex justify-between items-center text-xs font-bold text-emerald-800">
-                <span>✓ Bill paid fully from wallet</span>
+                <span>✓ Paid from wallet</span>
                 <span className="font-mono text-sm">-₹{walletDiscountApplied}</span>
               </div>
             )}
@@ -760,11 +763,11 @@ export function MultiServiceCartPage() {
           <div className="grid gap-2 grid-cols-2">
             <button
               type="button"
-              disabled={walletActive}
-              aria-disabled={walletActive}
+              disabled={walletCoversBill}
+              aria-disabled={walletCoversBill}
               onClick={() => setPaymentMethod('CASH')}
               className={`p-3 rounded-2xl border flex items-center gap-2 text-left transition ${
-                walletActive
+                walletCoversBill
                   ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300 opacity-60'
                   : paymentMethod !== 'ONLINE'
                     ? 'border-brand bg-brand/5 text-slate-900 ring-1 ring-brand/30 shadow-xs'
@@ -780,11 +783,11 @@ export function MultiServiceCartPage() {
 
             <button
               type="button"
-              disabled={walletActive}
-              aria-disabled={walletActive}
+              disabled={walletCoversBill}
+              aria-disabled={walletCoversBill}
               onClick={() => setPaymentMethod('ONLINE')}
               className={`p-3 rounded-2xl border flex items-center gap-2 text-left transition ${
-                walletActive
+                walletCoversBill
                   ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-300 opacity-60'
                   : paymentMethod === 'ONLINE'
                     ? 'border-brand bg-brand/5 text-slate-900 ring-1 ring-brand/30 shadow-xs'
@@ -798,9 +801,13 @@ export function MultiServiceCartPage() {
               </div>
             </button>
           </div>
-          {walletActive ? (
+          {walletCoversBill ? (
             <p className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
-              The full bill of ₹{walletFullAmount.toLocaleString('en-IN')} will be paid from your A2Z Wallet. Turn the wallet off to pay by Cash or Online.
+              Your A2Z Wallet covers this whole bill. Turn the wallet off to pay by Cash or Online.
+            </p>
+          ) : walletActive ? (
+            <p className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+              ₹{walletUsable.toLocaleString('en-IN')} comes from your wallet. Pay the remaining ₹{totalAmount.toLocaleString('en-IN')} by {paymentMethod === 'ONLINE' ? 'Online' : 'Cash'}.
             </p>
           ) : null}
         </section>

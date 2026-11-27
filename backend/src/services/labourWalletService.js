@@ -229,17 +229,28 @@ async function settleSingleWorkerCashShare({ booking, workerId, ratio, session }
   const gst = Math.round(Number(booking.taxes || 0) * ratio)
   const totalCharges = commission + platformFee + gst
 
+  // Part of the bill the customer paid from their wallet: the platform holds that money, so the
+  // provider collected that much less cash. It is offset against the charges recovered here.
+  const walletPaid = booking.walletDiscount?.applied ? Number(booking.walletDiscount.amount) || 0 : 0
+  const fullBill = Number(booking.basePrice || 0) + Number(booking.platformFee || 0) + Number(booking.taxes || 0)
+  const collectedLess = walletPaid > 0 && Math.abs(Number(booking.totalAmount || 0) + walletPaid - fullBill) < 1
+  const walletShare = collectedLess ? Math.round(walletPaid * ratio) : 0
+  const walletOffset = Math.min(walletShare, totalCharges)
+  const chargesDue = totalCharges - walletOffset
+  const walletSurplus = walletShare - walletOffset // owed to the provider
+
   const wallet = await getOrCreateLabourWallet(workerId, session)
   const balanceBefore = Number(wallet.selfBalance !== undefined ? wallet.selfBalance : (wallet.balance || 0))
-  let deductionAmount = totalCharges
+  let deductionAmount = chargesDue
   let unpaidDues = 0
 
-  if (balanceBefore < totalCharges) {
+  if (balanceBefore < chargesDue) {
     deductionAmount = Math.max(0, balanceBefore)
-    unpaidDues = totalCharges - deductionAmount
+    unpaidDues = chargesDue - deductionAmount
   }
 
-  const balanceAfter = Math.max(0, balanceBefore - deductionAmount)
+  const balanceAfterCharges = Math.max(0, balanceBefore - deductionAmount)
+  const balanceAfter = balanceAfterCharges + walletSurplus
   const newReservedBalance = Math.max(0, (wallet.reservedBalance || 0) - totalCharges)
 
   wallet.selfBalance = balanceAfter
@@ -259,12 +270,12 @@ async function settleSingleWorkerCashShare({ booking, workerId, ratio, session }
         labourId: workerId,
         bookingId: booking._id,
         transactionId: txNumber,
-        amount: totalCharges,
+        amount: chargesDue,
         type: 'DEBIT',
         targetWallet: 'ADMIN',
         context: 'CASH_BOOKING_SETTLEMENT',
         balanceBefore,
-        balanceAfter,
+        balanceAfter: balanceAfterCharges,
         chargesBreakdown: {
           commission,
           platformFee,
@@ -274,12 +285,37 @@ async function settleSingleWorkerCashShare({ booking, workerId, ratio, session }
         referenceType: 'BOOKING',
         referenceId: booking._id,
         idempotencyKey,
-        description: `Platform fee (₹${platformFee}), Commission (₹${commission}) & GST (₹${gst}) recovered for Cash Booking #${String(booking._id).slice(-6).toUpperCase()}${unpaidDues > 0 ? ` (₹${unpaidDues} added to outstanding dues)` : ''}`,
+        description: `Platform fee (₹${platformFee}), Commission (₹${commission}) & GST (₹${gst}) recovered for Cash Booking #${String(booking._id).slice(-6).toUpperCase()}${unpaidDues > 0 ? ` (₹${unpaidDues} added to outstanding dues)` : ''}${walletOffset > 0 ? `. ₹${walletOffset} adjusted against the customer's wallet payment` : ''}`,
         status: unpaidDues > 0 ? 'PARTIAL' : 'COMPLETED',
       },
     ],
     { session }
   )
+
+  if (walletSurplus > 0) {
+    await WalletTransaction.create(
+      [
+        {
+          walletId: wallet._id,
+          userId: workerId,
+          labourId: workerId,
+          bookingId: booking._id,
+          amount: walletSurplus,
+          type: 'CREDIT',
+          targetWallet: 'SELF',
+          context: 'PAYOUT',
+          balanceBefore: balanceAfterCharges,
+          balanceAfter,
+          referenceType: 'BOOKING',
+          referenceId: booking._id,
+          idempotencyKey: `PAYOUT_WALLET_SHARE_${booking._id}_${workerId}`,
+          description: `Customer's wallet payment for Cash Booking #${String(booking._id).slice(-6).toUpperCase()}`,
+          status: 'COMPLETED',
+        },
+      ],
+      { session }
+    )
+  }
 
   return {
     settled: true,
@@ -290,6 +326,8 @@ async function settleSingleWorkerCashShare({ booking, workerId, ratio, session }
       platformFee,
       gst,
       totalCharges,
+      walletPaymentAdjusted: walletOffset,
+      walletPaymentCredited: walletSurplus,
       deductedFromWallet: deductionAmount,
       outstandingDuesAdded: unpaidDues,
     },

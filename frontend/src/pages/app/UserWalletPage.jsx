@@ -41,7 +41,7 @@ export default function UserWalletPage() {
   const [activeHistoryTab, setActiveHistoryTab] = useState('transactions'); // 'transactions' | 'recharges'
   const [rechargeModalOpen, setRechargeModalOpen] = useState(false);
   const [previewScreenshot, setPreviewScreenshot] = useState(null);
-  const [settings, setSettings] = useState({ enabled: true, welcomeBonusAmount: 1000, walletDiscountPercentage: 20 });
+  const [settings, setSettings] = useState({ enabled: true, welcomeBonusAmount: 1000, walletDiscountPercentage: 5 });
   const [error, setError] = useState('');
 
   const loadData = useCallback(async (isRefresh = false) => {
@@ -232,7 +232,7 @@ export default function UserWalletPage() {
               {Number(wallet.balance ?? wallet.selfBalance ?? 0).toLocaleString('en-IN')}
             </div>
             <p className="text-xs text-white/70 mt-1 font-medium">
-              Applicable up to {settings.walletDiscountPercentage}% on checkout
+              Use up to {settings.walletDiscountPercentage}% of balance per booking
             </p>
           </div>
 
@@ -287,7 +287,7 @@ export default function UserWalletPage() {
               <strong>{Number(settings.serviceCreditPercentage || 15)}% Automatic Service Credit:</strong> Receive {Number(settings.serviceCreditPercentage || 15)}% of the eligible service charge credited directly to your wallet every time a booking is completed.
             </li>
             <li>
-              <strong>Instant Checkout Discount:</strong> Toggle <strong>"Use Wallet Balance"</strong> during checkout to save up to <strong>{Number(settings.walletDiscountPercentage || 20)}%</strong> on your bill.
+              <strong>Instant Checkout Discount:</strong> Toggle <strong>"Use Wallet Balance"</strong> during checkout to use up to <strong>{Number(settings.walletDiscountPercentage ?? 5)}%</strong> of your wallet balance on a booking.
             </li>
           </ul>
         </div>

@@ -22,12 +22,15 @@ const walletSettingSchema = new mongoose.Schema(
       min: 500,
       max: 1500,
     },
+    // Max share of the customer's wallet BALANCE usable on one booking
     walletDiscountPercentage: {
       type: Number,
-      default: 20,
+      default: 5,
       min: 0,
       max: 100,
     },
+    // Marks what walletDiscountPercentage is a percentage of. Older records (share of the bill) lack it.
+    walletUsageBasis: { type: String },
     minimumBookingAmount: {
       type: Number,
       default: 0,
