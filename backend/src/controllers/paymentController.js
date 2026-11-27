@@ -35,6 +35,14 @@ export const initPayment = asyncHandler(async (req, res) => {
     return sendSuccess(res, { data: initRes })
   }
 
+  // Don't take an online payment for a bill that was already settled (fully or partly) in cash
+  if (purpose === 'BOOKING') {
+    const booking = await Booking.findById(bookingId).select('paymentStatus assignments.paymentStatus')
+    if (booking?.paymentStatus === 'PAID' || booking?.assignments?.some(a => a.paymentStatus === 'PAID')) {
+      return sendError(res, { message: 'Payment has already been recorded for this booking', statusCode: HTTP_STATUS.BAD_REQUEST })
+    }
+  }
+
   // Generate Razorpay Order
   const receiptId = `rcpt_${req.user._id.toString().slice(-4)}_${Date.now().toString().slice(-4)}`
   const order = await createOrder(amount, 'INR', receiptId)
@@ -79,7 +87,12 @@ export const verifyPayment = asyncHandler(async (req, res) => {
   // Handle side-effects based on purpose
   if (pTx.purpose === 'BOOKING' && pTx.bookingId) {
     const booking = await Booking.findById(pTx.bookingId)
-    if (booking) {
+    if (booking && booking.paymentMethod === 'CASH' && booking.paymentStatus === 'PAID') {
+      // Cash was confirmed while the online checkout was open, so the customer has paid twice
+      console.error(`[Duplicate Payment] Booking ${booking._id} already paid in cash; Razorpay payment ${razorpayPaymentId} needs a refund`)
+    } else if (booking) {
+      // The money arrived online, even if the customer toggled to cash while checkout was open
+      booking.paymentMethod = 'ONLINE'
       booking.paymentStatus = 'PAID'
       await booking.save()
       

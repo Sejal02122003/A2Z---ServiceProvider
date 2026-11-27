@@ -1412,15 +1412,78 @@ export const updatePaymentMethod = asyncHandler(async (req, res) => {
   if (!['CASH', 'ONLINE'].includes(paymentMethod)) {
     return sendError(res, { message: 'Payment method must be CASH or ONLINE', statusCode: HTTP_STATUS.BAD_REQUEST })
   }
-  if (booking.paymentMethod === 'WALLET' && booking.paymentStatus === 'PAID') {
-    return sendError(res, { message: 'This booking is already fully paid from your wallet', statusCode: HTTP_STATUS.BAD_REQUEST })
+  if (booking.paymentStatus === 'PAID') {
+    return sendError(res, { message: 'This booking is already paid', statusCode: HTTP_STATUS.BAD_REQUEST })
+  }
+  if (booking.status === 'CANCELLED') {
+    return sendError(res, { message: 'This booking is cancelled', statusCode: HTTP_STATUS.BAD_REQUEST })
+  }
+
+  if (booking.paymentMethod === paymentMethod) {
+    return res.json({ success: true, paymentMethod })
+  }
+
+  // Once a provider has confirmed receiving cash, the rest of the bill must stay on cash
+  if (booking.assignments?.some(a => a.paymentStatus === 'PAID')) {
+    return sendError(res, { message: 'Cash has already been collected for part of this booking', statusCode: HTTP_STATUS.BAD_REQUEST })
+  }
+  if (paymentMethod === 'CASH' && booking.contractorInfo?.services?.length > 0) {
+    return sendError(res, { message: 'Contractor bookings can only be paid online', statusCode: HTTP_STATUS.BAD_REQUEST })
+  }
+
+  const settings = await SystemSetting.findOne({ configKey: 'master_config' })
+  const isModeDisabled = paymentMethod === 'CASH'
+    ? settings?.paymentModes?.cashEnabled === false
+    : settings?.paymentModes?.onlineEnabled === false
+  if (isModeDisabled) {
+    return sendError(res, { message: `${paymentMethod === 'CASH' ? 'Cash' : 'Online'} payment is currently unavailable`, statusCode: HTTP_STATUS.BAD_REQUEST })
   }
 
   booking.paymentMethod = paymentMethod
   await booking.save()
 
+  // If the work is already done, tell the provider(s) whether they now need to collect cash
+  notifyProvidersOfPaymentMethodChange(booking).catch(err => console.warn('[Payment method change notification error]', err?.message))
+
   res.json({ success: true, paymentMethod })
 })
+
+async function notifyProvidersOfPaymentMethodChange(booking) {
+  const assignments = (booking.assignments || []).filter(a => a.status !== 'CANCELLED' && a.labourId)
+  const completedProviderIds = assignments.length > 0
+    ? assignments.filter(a => a.status === 'COMPLETED').map(a => a.labourId)
+    : (booking.status === 'COMPLETED' ? [booking.laborId || booking.acceptedLabourId] : [])
+  const providerIds = [...new Set(completedProviderIds.filter(Boolean).map(String))]
+  if (providerIds.length === 0) return
+
+  const { sendNotificationToUser } = await import('../utils/pushNotificationHelper.js')
+  const { InAppNotification } = await import('../models/InAppNotification.js')
+  const { emitToUser } = await import('../socket.js')
+
+  const shortBookingId = String(booking._id).slice(-6).toUpperCase()
+  const isCash = booking.paymentMethod === 'CASH'
+  const isTeam = assignments.length > 1
+  const title = isCash ? 'Collect Cash from Customer' : 'Customer Will Pay Online'
+  const body = isCash
+    ? `The customer chose to pay cash for job #${shortBookingId}. Please collect ${isTeam ? 'your share' : `₹${booking.totalAmount}`} and confirm it in the app.`
+    : `The customer switched to online payment for job #${shortBookingId}. Do not collect cash.`
+  const link = `/serviceprovider/active-job/${booking._id}`
+  const data = { type: 'JOB_STATUS_UPDATE', status: String(booking.status), bookingId: String(booking._id), link }
+
+  await Promise.all(providerIds.map(async (providerId) => {
+    const inApp = await InAppNotification.create({
+      userId: providerId,
+      title,
+      body,
+      type: 'BOOKING_STATUS',
+      bookingId: booking._id,
+      deliveryStatus: 'SENT',
+      metadata: { bookingId: booking._id, status: String(booking.status), link },
+    })
+    emitToUser(providerId, 'NEW_IN_APP_NOTIFICATION', inApp)
+    await sendNotificationToUser(providerId, { title, body, link, data })
+  }))
+}
 
 export const updateBookingStatus = asyncHandler(async (req, res) => {
   const { id } = req.params

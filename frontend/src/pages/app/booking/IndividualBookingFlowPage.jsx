@@ -55,6 +55,7 @@ import { BookingReviewModal } from '../../../components/app/booking/BookingRevie
 import { CancelBookingModal } from '../../../components/app/booking/CancelBookingModal.jsx'
 import { SelectAddressSheet } from '../../../components/app/address/SelectAddressSheet.jsx'
 import { useBookingSocket } from '../../../hooks/useBookingSocket.js'
+import { useBookingLiveSync } from '../../../hooks/useBookingLiveSync.js'
 import { useAuth } from '../../../hooks/useAuth.js'
 import { useBranding } from '../../../context/BrandingContext.jsx'
 import {
@@ -954,6 +955,41 @@ export function IndividualBookingFlowPage() {
 
   const [isPaying, setIsPaying] = useState(false)
   const completedBill = useMemo(() => calculateCompletedBookingBill(activeBooking), [activeBooking])
+
+  // Contractor bookings are online only; otherwise follow the admin's enabled payment modes
+  const isContractorPayer = realUser?.role === 'contractor' || completedBill.isContractorBooking
+  const showBillingCash = !isContractorPayer && paymentModes?.cashEnabled !== false
+  const showBillingOnline = isContractorPayer || paymentModes?.onlineEnabled !== false
+
+  const [isSwitchingMethod, setIsSwitchingMethod] = useState(false)
+
+  // Saved on the server straight away so the provider knows whether to collect cash
+  const handleSelectBillingMethod = async (method) => {
+    if (!activeBooking?._id || isSwitchingMethod || activeBooking.paymentMethod === method) return
+    setIsSwitchingMethod(true)
+    try {
+      await bookingsApi.updatePaymentMethod(activeBooking._id, method)
+      setActiveBooking(prev => prev ? { ...prev, paymentMethod: method } : prev)
+      syncDraft({ paymentMethod: method })
+    } catch (err) {
+      alert(err.message || 'Could not change the payment method. Please try again.')
+    } finally {
+      setIsSwitchingMethod(false)
+    }
+  }
+
+  // Picks up the provider's cash confirmation even if the socket event is missed
+  const syncBillingBooking = useCallback((b) => {
+    if (b.paymentStatus === 'PAID' && activeBooking?.paymentStatus !== 'PAID') {
+      handleOpenReview()
+    }
+    setActiveBooking(prev => (prev && JSON.stringify(prev) === JSON.stringify(b) ? prev : b))
+  }, [activeBooking?.paymentStatus, handleOpenReview])
+  useBookingLiveSync({
+    bookingId: activeBooking?._id,
+    enabled: step === 'billing' && !isSwitchingMethod && activeBooking?.paymentStatus !== 'PAID',
+    onBooking: syncBillingBooking,
+  })
 
   const handlePayNow = async () => {
     if (!activeBooking) return
@@ -1992,21 +2028,28 @@ export function IndividualBookingFlowPage() {
                 </div>
               </div>
             )}
-            {step === 'billing' && (
+            {step === 'billing' && booking && booking.paymentStatus !== 'PAID' && (
               <div className="lc-booking-flow-card space-y-3 mt-4">
                 <p className="lc-booking-flow-label font-bold text-slate-800">Payment Method</p>
-                <div className="grid grid-cols-1 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => syncDraft({ paymentMethod: 'ONLINE' })}
-                    className={`flex items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 font-bold transition-all ${(draft.paymentMethod || booking?.paymentMethod) === 'ONLINE'
-                        ? 'border-brand bg-brand/5 text-brand'
-                        : 'border-slate-200 text-slate-500 hover:border-brand/30 hover:bg-slate-50'
-                      }`}
-                  >
-                    <Zap className="h-5 w-5" />
-                    Online
-                  </button>
+                <div className={`grid gap-3 ${showBillingCash && showBillingOnline ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                  {[
+                    showBillingOnline ? { id: 'ONLINE', label: 'Online', Icon: Zap } : null,
+                    showBillingCash ? { id: 'CASH', label: 'Cash (COD)', Icon: IndianRupee } : null,
+                  ].filter(Boolean).map(({ id, label, Icon }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      disabled={isSwitchingMethod}
+                      onClick={() => handleSelectBillingMethod(id)}
+                      className={`flex items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 font-bold transition-all disabled:opacity-60 ${booking.paymentMethod === id
+                          ? 'border-brand bg-brand/5 text-brand'
+                          : 'border-slate-200 text-slate-500 hover:border-brand/30 hover:bg-slate-50'
+                        }`}
+                    >
+                      <Icon className="h-5 w-5" />
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
@@ -2023,7 +2066,7 @@ export function IndividualBookingFlowPage() {
                   type="button"
                   onClick={() => syncDraft({ paymentMethod: m.id })}
                   className="lc-booking-slot"
-                  data-active={draft.paymentMethod === m.id ? 'true' : 'false'}
+                  data-active={(draft.paymentMethod || activeBooking?.paymentMethod) === m.id ? 'true' : 'false'}
                 >
                   {m.label}
                 </button>
@@ -2065,9 +2108,10 @@ export function IndividualBookingFlowPage() {
               onClick={async () => {
                 if (activeBookingId) {
                   try {
-                    await bookingsApi.updatePaymentMethod(activeBookingId, draft.paymentMethod || 'CASH')
+                    await bookingsApi.updatePaymentMethod(activeBookingId, draft.paymentMethod || activeBooking?.paymentMethod || 'CASH')
                   } catch (e) {
-                    console.error('Failed to update payment method:', e)
+                    alert(e.message || 'Failed to update payment method')
+                    return
                   }
                 }
                 clearBookingDraft()
@@ -2081,8 +2125,8 @@ export function IndividualBookingFlowPage() {
         ) : (
           <div className="sticky bottom-2 z-10 space-y-2 pt-2">
             {activeBooking?.paymentStatus !== 'PAID' ? (
-              (draft.paymentMethod || activeBooking?.paymentMethod) === 'ONLINE' ? (
-                <BookingPrimaryButton type="button" onClick={handlePayNow} disabled={isPaying}>
+              activeBooking?.paymentMethod === 'ONLINE' ? (
+                <BookingPrimaryButton type="button" onClick={handlePayNow} disabled={isPaying || isSwitchingMethod}>
                   <IndianRupee className="h-4 w-4" aria-hidden />
                   {isPaying ? 'Processing...' : 'Proceed to pay'}
                 </BookingPrimaryButton>
@@ -2182,7 +2226,7 @@ export function IndividualBookingFlowPage() {
 
 
 
-        {activeBooking?.status === 'COMPLETED' && (draft.paymentMethod || activeBooking?.paymentMethod) === 'CASH' && activeBooking?.paymentStatus !== 'PAID' && (
+        {activeBooking?.status === 'COMPLETED' && activeBooking?.paymentMethod === 'CASH' && activeBooking?.paymentStatus !== 'PAID' && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -2219,6 +2263,16 @@ export function IndividualBookingFlowPage() {
               >
                 Paid
               </button>
+              {showBillingOnline && !activeBooking?.assignments?.some(a => a.paymentStatus === 'PAID') && (
+                <button
+                  type="button"
+                  disabled={isSwitchingMethod}
+                  onClick={() => handleSelectBillingMethod('ONLINE')}
+                  className="mt-3 w-full rounded-xl bg-slate-100 py-2.5 text-xs font-bold text-slate-600 transition hover:bg-slate-200 active:scale-95 disabled:opacity-60"
+                >
+                  Pay online instead
+                </button>
+              )}
             </motion.div>
           </div>
         )}
