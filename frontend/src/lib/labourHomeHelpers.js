@@ -2,9 +2,6 @@
 import { buildLabourEarningsSummary } from './labourEarningsFlow.js'
 import { readWalletState } from './labourWalletStorage.js'
 
-export const LABOUR_SUPPORT_PHONE = '+917610125193'
-export const LABOUR_EMERGENCY_PHONE = '+917610125193'
-
 export const SAFETY_BANNERS = [
   {
     id: 'helmet',
@@ -140,9 +137,4 @@ export function offerDistanceKm(offerId) {
   const s = String(offerId || '')
   for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) % 997
   return (h % 8) + 1
-}
-
-export function whatsAppSupportUrl(message = 'Hi A2Z, I need help with my service booking.') {
-  const phone = LABOUR_SUPPORT_PHONE.replace(/\D/g, '')
-  return `https://wa.me/91${phone.slice(-10)}?text=${encodeURIComponent(message)}`
 }

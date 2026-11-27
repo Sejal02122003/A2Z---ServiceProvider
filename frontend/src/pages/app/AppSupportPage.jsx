@@ -32,6 +32,7 @@ import { AppPrimaryButton } from '../../components/app/AppPrimaryButton.jsx'
 import { AppSectionHeader } from '../../components/app-ui/layout/AppSectionHeader.jsx'
 import { GlassPanel } from '../../components/ui/GlassPanel.jsx'
 import { complaintsApi } from '../../api/complaintsApi.js'
+import { useBranding } from '../../context/BrandingContext.jsx'
 
 const TOPICS_BY_ROLE = {
   [USER_ROLES.CUSTOMER]: [
@@ -276,6 +277,7 @@ export function AppSupportPage() {
   const { user } = useAuth()
   const role = user?.role ?? USER_ROLES.CUSTOMER
   const reduce = useReducedMotion()
+  const { supportContact } = useBranding()
 
   const kitReceived = Boolean(
     user?.welcomeKit?.isReceived ||
@@ -632,7 +634,7 @@ export function AppSupportPage() {
       <section>
         <AppSectionHeader title="Other ways to reach us" className="mb-3 px-0.5" />
         <div className="grid gap-3 sm:grid-cols-2">
-          <a href="tel:+917610125193" className="block transition hover:scale-[1.02] active:scale-[0.98]">
+          <a href={`tel:${supportContact.supportPhone}`}className="block transition hover:scale-[1.02] active:scale-[0.98]">
             <GlassPanel className="h-full border-slate-200/90 p-4 ring-1 ring-slate-100/90">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-700 ring-1 ring-sky-100">
                 <Phone className="h-5 w-5" aria-hidden />
@@ -643,7 +645,7 @@ export function AppSupportPage() {
               </p>
             </GlassPanel>
           </a>
-          <a href="mailto:rahulbairwa7610@gmail.com" className="block transition hover:scale-[1.02] active:scale-[0.98]">
+          <a href={`mailto:${supportContact.supportEmail}`}className="block transition hover:scale-[1.02] active:scale-[0.98]">
             <GlassPanel className="h-full border-slate-200/90 p-4 ring-1 ring-slate-100/90">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-700 ring-1 ring-violet-100">
                 <Mail className="h-5 w-5" aria-hidden />

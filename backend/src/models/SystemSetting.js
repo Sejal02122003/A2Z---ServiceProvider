@@ -1,5 +1,12 @@
 import mongoose from 'mongoose'
 
+export const DEFAULT_SUPPORT_CONTACT = {
+  supportPhone: '+917610125193',
+  emergencyPhone: '+917610125193',
+  whatsappNumber: '+917610125193',
+  supportEmail: 'rahulbairwa7610@gmail.com',
+}
+
 const platformFeeSchema = new mongoose.Schema(
   {
     type: {
@@ -97,6 +104,13 @@ const systemSettingSchema = new mongoose.Schema(
     branding: {
       logoUrl: { type: String, default: null },
       faviconUrl: { type: String, default: null },
+    },
+    // Contact details behind the app's support buttons (admin controlled)
+    supportContact: {
+      supportPhone: { type: String, trim: true, default: DEFAULT_SUPPORT_CONTACT.supportPhone },
+      emergencyPhone: { type: String, trim: true, default: DEFAULT_SUPPORT_CONTACT.emergencyPhone },
+      whatsappNumber: { type: String, trim: true, default: DEFAULT_SUPPORT_CONTACT.whatsappNumber },
+      supportEmail: { type: String, trim: true, default: DEFAULT_SUPPORT_CONTACT.supportEmail },
     },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,

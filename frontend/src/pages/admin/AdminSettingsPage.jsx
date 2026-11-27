@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import { Settings, Percent, IndianRupee, Wallet, Receipt, AlertTriangle, CheckCircle2, Loader2, Clock, Image as ImageIcon, Trash2, Radio, Search, ShieldCheck } from 'lucide-react'
+import { Settings, Percent, IndianRupee, Wallet, Receipt, AlertTriangle, CheckCircle2, Loader2, Clock, Image as ImageIcon, Trash2, Radio, Search, ShieldCheck, Phone } from 'lucide-react'
 import { adminSettingsApi } from '../../api/adminSettingsApi.js'
 import { walletsApi } from '../../api/walletsApi.js'
 import { fetchAdminLabourCategoryTree, updateAdminLabourCategoryGst } from '../../api/adminLabourCategoriesApi.js'
@@ -128,6 +128,14 @@ export function AdminSettingsPage() {
   // Welcome Kit fee (one price for every new service partner)
   const [welcomeKitFee, setWelcomeKitFee] = useState('')
 
+  // Support & emergency contact details shown in the app
+  const [supportContact, setSupportContact] = useState({
+    supportPhone: '',
+    emergencyPhone: '',
+    whatsappNumber: '',
+    supportEmail: '',
+  })
+
   // Simulated Opportunities Toggle
   const [simulatedOpportunitiesEnabled, setSimulatedOpportunitiesEnabled] = useState(true)
 
@@ -202,6 +210,11 @@ export function AdminSettingsPage() {
           }
         }).catch(console.error)
 
+        // Support Contact
+        if (s.supportContact) {
+          setSupportContact((prev) => ({ ...prev, ...s.supportContact }))
+        }
+
         // Cancellation Penalty
         setWelcomeKitFee(String(s.welcomeKitFee ?? 999))
         if (s.cancellationPenalty != null) {
@@ -240,7 +253,7 @@ export function AdminSettingsPage() {
       await apiFn(payload)
       showToast(`${section} updated successfully`)
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : `Failed to update ${section}`, 'error')
+      showToast(err instanceof ApiError ? err.errors?.[0]?.message || err.message : `Failed to update ${section}`, 'error')
     } finally {
       setSaving('')
     }
@@ -443,6 +456,40 @@ export function AdminSettingsPage() {
               </div>
             </div>
           </div>
+        </SettingsSection>
+
+        {/* Support & Emergency Contacts */}
+        <SettingsSection
+          icon={Phone}
+          title="Support & Emergency Contacts"
+          description="Numbers and email behind the support buttons in the app"
+        >
+          {[
+            { key: 'supportPhone', label: 'Call Support Number', type: 'tel', placeholder: 'e.g. +919876543210' },
+            { key: 'emergencyPhone', label: 'Emergency Number', type: 'tel', placeholder: 'e.g. +919876543210 or 112' },
+            { key: 'whatsappNumber', label: 'WhatsApp Number', type: 'tel', placeholder: 'e.g. +919876543210' },
+            { key: 'supportEmail', label: 'Support Email', type: 'email', placeholder: 'e.g. support@example.com' },
+          ].map((field) => (
+            <div key={field.key}>
+              <label className={labelClass} htmlFor={field.key}>{field.label}</label>
+              <input
+                id={field.key}
+                className={inputClass + ' mt-1.5'}
+                type={field.type}
+                placeholder={field.placeholder}
+                value={supportContact[field.key]}
+                onChange={(e) => setSupportContact((prev) => ({ ...prev, [field.key]: e.target.value }))}
+              />
+            </div>
+          ))}
+          <AppPrimaryButton
+            type="button"
+            loading={saving === 'Support Contacts'}
+            disabled={Object.values(supportContact).some((v) => !String(v).trim())}
+            onClick={() => handleSave('Support Contacts', adminSettingsApi.updateSupportContact, supportContact)}
+          >
+            Save Support Contacts
+          </AppPrimaryButton>
         </SettingsSection>
 
         {/* Platform Fee */}

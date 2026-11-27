@@ -80,6 +80,13 @@ export const adminSettingsApi = {
     })
   },
 
+  updateSupportContact: (payload) => {
+    return apiRequest('/admin/settings/support-contact', {
+      method: 'PATCH',
+      body: payload,
+    })
+  },
+
   updatePaymentModes: (payload) => {
     return apiRequest('/admin/settings/payment-modes', {
       method: 'PATCH',

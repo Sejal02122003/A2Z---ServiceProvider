@@ -1,18 +1,18 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { getPublicSettings } from '../api/adminSettingsApi.js'
+import { DEFAULT_SUPPORT_CONTACT } from '../lib/supportContact.js'
 
-const BrandingContext = createContext({
+const DEFAULTS = {
   logoUrl: '/logo-transparent.png',
   faviconUrl: '/favicon.ico',
   welcomeKitFee: 999,
-})
+  supportContact: DEFAULT_SUPPORT_CONTACT,
+}
+
+const BrandingContext = createContext(DEFAULTS)
 
 export function BrandingProvider({ children }) {
-  const [branding, setBranding] = useState({
-    logoUrl: '/logo-transparent.png',
-    faviconUrl: '/favicon.ico',
-    welcomeKitFee: 999,
-  })
+  const [branding, setBranding] = useState(DEFAULTS)
 
   useEffect(() => {
     let mounted = true
@@ -22,6 +22,10 @@ export function BrandingProvider({ children }) {
         const fee = Number(res.data?.welcomeKitFee)
         if (Number.isFinite(fee) && fee >= 0) {
           setBranding((prev) => ({ ...prev, welcomeKitFee: fee }))
+        }
+        const contact = res.data?.supportContact
+        if (contact) {
+          setBranding((prev) => ({ ...prev, supportContact: { ...DEFAULT_SUPPORT_CONTACT, ...contact } }))
         }
         const b = res.data?.branding
         if (b) {

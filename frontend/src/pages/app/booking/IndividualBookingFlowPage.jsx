@@ -56,6 +56,7 @@ import { CancelBookingModal } from '../../../components/app/booking/CancelBookin
 import { SelectAddressSheet } from '../../../components/app/address/SelectAddressSheet.jsx'
 import { useBookingSocket } from '../../../hooks/useBookingSocket.js'
 import { useAuth } from '../../../hooks/useAuth.js'
+import { useBranding } from '../../../context/BrandingContext.jsx'
 import {
   PAYMENT_METHODS,
   durationKindLabel,
@@ -152,6 +153,7 @@ export function IndividualBookingFlowPage() {
   const [currentReviewIndex, setCurrentReviewIndex] = useState(0)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [restrictionError, setRestrictionError] = useState(null)
+  const { supportContact } = useBranding()
   const [acceptedPartnerEvent, setAcceptedPartnerEvent] = useState(null)
 
   const lastHandledEventTimestampRef = useRef(0)
@@ -3032,7 +3034,7 @@ export function IndividualBookingFlowPage() {
                   Understood
                 </button>
                 <a
-                  href="tel:18001234567"
+                  href={`tel:${supportContact.supportPhone}`}
                   className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition flex items-center justify-center"
                 >
                   Support

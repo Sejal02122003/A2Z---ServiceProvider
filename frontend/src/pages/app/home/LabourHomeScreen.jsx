@@ -71,13 +71,12 @@ import {
   buildEarningsGlance,
   buildUpcomingSchedule,
   formatInrFromPaise,
-  LABOUR_EMERGENCY_PHONE,
-  LABOUR_SUPPORT_PHONE,
   offerDistanceKm,
   pickTodayAssignment,
   SAFETY_BANNERS,
-  whatsAppSupportUrl,
 } from '../../../lib/labourHomeHelpers.js'
+import { whatsAppSupportUrl } from '../../../lib/supportContact.js'
+import { useBranding } from '../../../context/BrandingContext.jsx'
 import {
   buildLabourNotifications,
   markNotificationRead,
@@ -142,6 +141,7 @@ export function LabourHomeScreen({ user }) {
   const reduce = useReducedMotion()
   const navigate = useNavigate()
   const location = useLocation()
+  const { supportContact } = useBranding()
   const [cancellationNotice, setCancellationNotice] = useState(
     location.state?.cancellationNotice || ''
   )
@@ -1536,21 +1536,21 @@ export function LabourHomeScreen({ user }) {
           <AppSectionHeader title="Support & emergency" className="mb-2 px-0.5" />
           <div className="grid gap-2 sm:grid-cols-3">
             <a
-              href={`tel:${LABOUR_SUPPORT_PHONE}`}
+              href={`tel:${supportContact.supportPhone}`}
               className="flex flex-col items-center gap-2 rounded-2xl border border-sky-200/80 bg-sky-50 px-3 py-4 text-center transition hover:bg-sky-100/80 active:scale-[0.98]"
             >
               <Phone className="h-6 w-6 text-sky-700" aria-hidden />
               <span className="text-xs font-extrabold text-sky-950">Call support</span>
             </a>
             <a
-              href={`tel:${LABOUR_EMERGENCY_PHONE}`}
+              href={`tel:${supportContact.emergencyPhone}`}
               className="flex flex-col items-center gap-2 rounded-2xl border border-rose-300/80 bg-rose-50 px-3 py-4 text-center transition hover:bg-rose-100/80 active:scale-[0.98]"
             >
               <AlertTriangle className="h-6 w-6 text-rose-700" aria-hidden />
               <span className="text-xs font-extrabold text-rose-950">Emergency</span>
             </a>
             <a
-              href={whatsAppSupportUrl()}
+              href={whatsAppSupportUrl(supportContact.whatsappNumber)}
               target="_blank"
               rel="noopener noreferrer"
               className="flex flex-col items-center gap-2 rounded-2xl border border-blue-300/80 bg-blue-50 px-3 py-4 text-center transition hover:bg-blue-100/80 active:scale-[0.98]"

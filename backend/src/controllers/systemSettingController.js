@@ -162,7 +162,20 @@ export const updateWelcomeKitFee = asyncHandler(async (req, res) => {
   return sendSuccess(res, { message: 'Welcome kit fee updated', data: { settings } })
 })
 
-export const updatePaymentModes = asyncHandler(async (req, res) => {
+export const updateSupportContact = asyncHandler(async (req, res) => {
+  let settings = await SystemSetting.findOne({ configKey: 'master_config' })
+  if (!settings) settings = new SystemSetting({ configKey: 'master_config' })
+
+  for (const field of ['supportPhone', 'emergencyPhone', 'whatsappNumber', 'supportEmail']) {
+    if (req.body[field] !== undefined) settings.supportContact[field] = req.body[field]
+  }
+  settings.updatedBy = req.user._id
+
+  await settings.save()
+  return sendSuccess(res, { message: 'Support contact updated', data: { settings } })
+})
+
+export const updatePaymentModes =asyncHandler(async (req, res) => {
   const { cashEnabled, onlineEnabled } = req.body
   let settings = await SystemSetting.findOne({ configKey: 'master_config' })
   if (!settings) settings = new SystemSetting({ configKey: 'master_config' })

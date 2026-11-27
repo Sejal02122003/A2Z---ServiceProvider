@@ -11,7 +11,7 @@ const router = Router()
 // Public route — returns only the time slots (no auth required)
 router.get('/public', async (req, res) => {
   try {
-    const { SystemSetting } = await import('../models/SystemSetting.js')
+    const { SystemSetting, DEFAULT_SUPPORT_CONTACT } = await import('../models/SystemSetting.js')
     const { sendSuccess } = await import('../utils/apiResponse.js')
     let settings = await SystemSetting.findOne({ configKey: 'master_config' })
     const timeSlots = settings?.timeSlots || ['08:00 AM', '10:00 AM', '12:00 PM', '02:00 PM', '04:00 PM', '06:00 PM']
@@ -19,7 +19,8 @@ router.get('/public', async (req, res) => {
     const paymentModes = settings?.paymentModes || { cashEnabled: true, onlineEnabled: true }
     const branding = settings?.branding || { logoUrl: null, faviconUrl: null }
     const welcomeKitFee = settings?.welcomeKitFee ?? 999
-    return sendSuccess(res, { data: { timeSlots, freeTrialMessage, paymentModes, branding, welcomeKitFee } })
+    const supportContact = settings?.supportContact || DEFAULT_SUPPORT_CONTACT
+    return sendSuccess(res, { data: { timeSlots, freeTrialMessage, paymentModes, branding, welcomeKitFee, supportContact } })
   } catch (e) {
     res.status(500).json({ success: false, message: 'Could not load public settings' })
   }
@@ -129,6 +130,27 @@ router.patch(
   ],
   validateRequest,
   settings.updateWelcomeKitFee,
+)
+
+// Spaces, dashes and brackets are allowed while typing; short codes like 112 are valid for calls
+const phoneField = (field, label, minDigits) =>
+  body(field)
+    .optional()
+    .isString()
+    .customSanitizer((v) => String(v).replace(/[\s\-()]/g, ''))
+    .matches(new RegExp(`^\\+?\\d{${minDigits},15}$`))
+    .withMessage(`${label} must be a valid phone number (${minDigits}-15 digits)`)
+
+router.patch(
+  '/support-contact',
+  [
+    phoneField('supportPhone', 'Call support number', 3),
+    phoneField('emergencyPhone', 'Emergency number', 3),
+    phoneField('whatsappNumber', 'WhatsApp number', 10),
+    body('supportEmail').optional().isString().trim().isEmail().withMessage('Support email must be a valid email address'),
+  ],
+  validateRequest,
+  settings.updateSupportContact,
 )
 
 router.patch(
