@@ -421,7 +421,10 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
       }
     }
     const msUpdate = {
-      $addToSet: { acceptedLabourIds: labour._id },
+      $addToSet: {
+        acceptedLabourIds: labour._id,
+        ...(req.body?.requestMaterials === false ? { materialOptOutVendors: labour._id } : {}),
+      },
       $push: { assignments: { $each: newAssignments } },
       $set: {
         ...setFields,
@@ -453,6 +456,9 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
           acceptedLabourIds: labour._id,
           assignments: newAssignments[0],
         },
+        ...(req.body?.requestMaterials === false
+          ? { $addToSet: { materialOptOutVendors: labour._id } }
+          : {}),
         $set: setFields,
       },
       { new: true }
@@ -484,14 +490,68 @@ export const acceptBroadcast = asyncHandler(async (req, res) => {
     }).catch(() => { })
   }
 
-  // Auto-generate material requirement if service has mapped products
-  import('../services/materialRequirementService.js')
-    .then(({ generateMaterialRequirementForBooking }) => {
-      generateMaterialRequirementForBooking(booking._id, labour._id).catch(err =>
-        console.error('[MaterialRequirement Error on Broadcast Accept]', err)
-      )
-    })
-    .catch(err => console.error('[Import Error]', err))
+  // Handle material request submission when service provider accepts a booking
+  const { requestMaterials, requestedItems, materialRemarks } = req.body || {}
+  if (requestMaterials !== false) {
+    try {
+      const { generateMaterialRequirementForBooking, resolveServiceIdsForBookingVendor } = await import('../services/materialRequirementService.js')
+      let matReq = await generateMaterialRequirementForBooking(booking._id, labour._id)
+      if (matReq) {
+        let modified = false
+        if (materialRemarks && String(materialRemarks).trim()) {
+          matReq.requestRemarks = String(materialRemarks).trim()
+          modified = true
+        }
+        if (Array.isArray(requestedItems) && requestedItems.length > 0) {
+          matReq.status = 'REQUESTED'
+          for (const sub of requestedItems) {
+            const it = matReq.items.find((i) => String(i.productId) === String(sub.productId))
+            if (it && sub.quantityRequested !== undefined) {
+              it.quantityRequested = Math.max(1, Number(sub.quantityRequested) || it.quantityRequired || 1)
+              modified = true
+            }
+          }
+        }
+        if (modified) await matReq.save()
+      } else if (requestMaterials === true && Array.isArray(requestedItems) && requestedItems.length > 0) {
+        const { MaterialRequest, generateRequestId } = await import('../models/MaterialRequest.js')
+        const { Product } = await import('../models/Product.js')
+        const pIds = requestedItems.map((i) => i.productId).filter(Boolean)
+        const prods = await Product.find({ _id: { $in: pIds } }).lean()
+        const pMap = new Map(prods.map((p) => [String(p._id), p]))
+        const itemsList = requestedItems
+          .filter((i) => pMap.has(String(i.productId)))
+          .map((i) => {
+            const prod = pMap.get(String(i.productId))
+            const qty = Math.max(1, Number(i.quantityRequested) || 1)
+            const stock = prod.currentStock ?? 0
+            return {
+              productId: prod._id,
+              quantityRequired: qty,
+              quantityRequested: qty,
+              unit: prod.unit || 'Piece',
+              isAdditional: true,
+              itemStatus: stock <= 0 ? 'OUT_OF_STOCK' : stock < qty ? 'PARTIALLY_AVAILABLE' : 'AVAILABLE',
+              shortageQuantity: Math.max(0, qty - Math.max(0, stock)),
+            }
+          })
+        if (itemsList.length > 0) {
+          const sIds = resolveServiceIdsForBookingVendor(booking, labour._id)
+          await MaterialRequest.create({
+            requestId: generateRequestId(),
+            bookingId: booking._id,
+            vendorId: labour._id,
+            serviceId: booking.serviceId || sIds[0] || undefined,
+            status: 'REQUESTED',
+            items: itemsList,
+            requestRemarks: String(materialRemarks || '').trim(),
+          })
+        }
+      }
+    } catch (err) {
+      console.error('[MaterialRequirement Error on Broadcast Accept]', err)
+    }
+  }
 
   // Count the accepted booking on the provider's active subscription. This works whether or not
   // subscriptions are enforced / the provider is in a trial, so the admin counts stay accurate.
@@ -809,6 +869,15 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
   const bookingHours = booking.duration || booking.hours || 1
   const remainingMs = Math.max(5000, BROADCAST_TIMEOUT_MS - (Date.now() - new Date(booking.broadcastStartedAt || booking.createdAt).getTime()))
 
+  const {
+    resolveServiceIdsForBookingVendor,
+    getMappedMaterialsByServiceIds,
+    collectUniqueMappedMaterials,
+  } = await import('../services/materialRequirementService.js')
+  const mappedMaterialsByService = await getMappedMaterialsByServiceIds(
+    resolveServiceIdsForBookingVendor(booking, null)
+  )
+
   let payload = null
 
   if (isMultiService) {
@@ -845,6 +914,10 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
     const totalBookingDuration = servicesPayload.reduce((acc, s) => acc + (Number(s.totalDurationMins) || 0), 0) || Math.round(bookingHours * 60)
     const formattedBookingDuration = formatDurationHuman(totalBookingDuration)
     const totalBookingQty = servicesPayload.reduce((acc, s) => acc + (Number(s.quantity) || 1), 0) || 1
+    const mappedMaterials = collectUniqueMappedMaterials(
+      mappedMaterialsByService,
+      servicesPayload.map((s) => s.serviceId)
+    )
 
     payload = {
       bookingId: booking._id,
@@ -853,6 +926,7 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       customerPhone: booking.userId?.phone || '',
       serviceName: servicesPayload.length === 1 ? servicesPayload[0].name : `Multi-Service (${servicesPayload.length} services)`,
       services: servicesPayload,
+      mappedMaterials,
       isMultiServiceBooking: true,
       requiresServiceSelection: false,
       quantity: totalBookingQty,
@@ -899,6 +973,10 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
     }
 
     const bestEarning = openServices.reduce((max, s) => Math.max(max, s.estimatedEarnings), 0)
+    const mappedMaterials = collectUniqueMappedMaterials(
+      mappedMaterialsByService,
+      openServices.map((s) => s.serviceId)
+    )
 
     payload = {
       bookingId: booking._id,
@@ -906,6 +984,7 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       customerName: booking.userId?.fullName || 'Customer',
       serviceName: openServices.length === 1 ? openServices[0].name : 'Multi-Skill Contractor Job',
       services: openServices,
+      mappedMaterials,
       isContractorBooking: true,
       requiresServiceSelection: openServices.length > 1,
       date: booking.scheduledAt || booking.createdAt,
@@ -988,6 +1067,10 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       }
     }
     const formattedSingleDuration = formatDurationHuman(singleDurationMins)
+    const mappedMaterials = collectUniqueMappedMaterials(
+      mappedMaterialsByService,
+      resolveServiceIdsForBookingVendor(booking, null)
+    )
 
     payload = {
       bookingId: booking._id,
@@ -998,6 +1081,7 @@ export const getActiveBroadcast = asyncHandler(async (req, res) => {
       serviceDetail: singleServiceDetail || booking.notes || '',
       categoryName: singleCategoryName,
       subServiceName: singleSubServiceName,
+      mappedMaterials,
       quantity: singleQty,
       totalQuantity: singleQty,
       totalDurationMins: singleDurationMins,

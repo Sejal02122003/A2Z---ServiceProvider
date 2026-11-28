@@ -52,6 +52,12 @@ const productSchema = new mongoose.Schema(
       default: 5,
       min: 0,
     },
+    // How many bookings/uses one assigned unit of this product supports before needing a fresh assignment
+    usesPerAssignment: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
     isActive: {
       type: Boolean,
       default: true,

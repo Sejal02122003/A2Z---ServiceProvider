@@ -4,20 +4,108 @@ import { MaterialRequest, generateRequestId } from '../models/MaterialRequest.js
 import { InventoryTransaction, generateTransactionId } from '../models/InventoryTransaction.js'
 import { Booking } from '../models/Booking.js'
 
+const idOf = (v) => String(v?._id || v || '')
+
 /**
- * Generate or retrieve material requirement for a booking and vendor
+ * Resolve all LabourService IDs relevant for a booking (and optional specific vendor),
+ * covering single-service, multi-service, contractor, and package bookings.
+ */
+export function resolveServiceIdsForBookingVendor(booking, vendorId = null) {
+  if (!booking) return []
+  const vid = idOf(vendorId)
+  const raw = []
+
+  const multiItems = Array.isArray(booking.multiServiceBooking?.items)
+    ? booking.multiServiceBooking.items.filter((it) => it.status !== 'CANCELLED')
+    : []
+  if ((booking.multiServiceBooking?.isMultiService || multiItems.length > 0) && multiItems.length > 0) {
+    const matched = vid ? multiItems.filter((it) => idOf(it.assignedLabourId) === vid) : multiItems
+    ;(matched.length > 0 ? matched : multiItems).forEach((it) => {
+      if (it.serviceId) raw.push(idOf(it.serviceId))
+    })
+  } else if (vid && Array.isArray(booking.assignments) && booking.assignments.some((a) => idOf(a.labourId) === vid && a.serviceId)) {
+    booking.assignments
+      .filter((a) => idOf(a.labourId) === vid && a.serviceId && a.status !== 'CANCELLED')
+      .forEach((a) => raw.push(idOf(a.serviceId)))
+  } else {
+    if (booking.serviceId) raw.push(idOf(booking.serviceId))
+    ;(booking.packageBooking?.inclusions || []).forEach((inc) => {
+      if (inc.serviceId) raw.push(idOf(inc.serviceId))
+    })
+    ;(booking.contractorInfo?.services || []).forEach((sv) => {
+      if (sv.serviceId) raw.push(idOf(sv.serviceId))
+    })
+  }
+
+  return raw.filter((v, i, arr) => v && arr.indexOf(v) === i)
+}
+
+/**
+ * Pre-fetch mapped products grouped by serviceId for broadcast previews & requirement checks.
+ */
+export async function getMappedMaterialsByServiceIds(serviceIds = []) {
+  const cleanIds = [...new Set((serviceIds || []).map(idOf).filter(Boolean))]
+  const byService = new Map()
+  if (cleanIds.length === 0) return byService
+
+  const mappings = await ServiceProduct.find({ serviceId: { $in: cleanIds }, isActive: true })
+    .populate('productId', 'name sku unit price currentStock minimumStock usesPerAssignment isActive')
+    .lean()
+
+  for (const m of mappings) {
+    if (!m.productId || m.productId.isActive === false) continue
+    const sid = idOf(m.serviceId)
+    if (!byService.has(sid)) byService.set(sid, [])
+    byService.get(sid).push({
+      productId: idOf(m.productId._id),
+      name: m.productId.name,
+      sku: m.productId.sku,
+      unit: m.unit || m.productId.unit || 'Piece',
+      quantityRequired: m.quantityRequired || 1,
+      usesPerAssignment: Math.max(1, Number(m.productId.usesPerAssignment) || 1),
+      currentStock: m.productId.currentStock ?? 0,
+      isMandatory: m.isMandatory ?? true,
+    })
+  }
+  return byService
+}
+
+/**
+ * Flatten & deduplicate mapped materials across a set of serviceIds using a pre-fetched map.
+ */
+export function collectUniqueMappedMaterials(byServiceMap, serviceIds = []) {
+  const byProd = new Map()
+  for (const rawSid of serviceIds || []) {
+    const sid = idOf(rawSid)
+    const list = byServiceMap?.get?.(sid) || []
+    for (const item of list) {
+      const pid = idOf(item.productId)
+      if (byProd.has(pid)) {
+        const existing = byProd.get(pid)
+        existing.quantityRequired += Number(item.quantityRequired) || 1
+        if (item.isMandatory) existing.isMandatory = true
+      } else {
+        byProd.set(pid, { ...item })
+      }
+    }
+  }
+  return [...byProd.values()]
+}
+
+/**
+ * Generate or retrieve material requirement for a booking and vendor.
  */
 export async function generateMaterialRequirementForBooking(bookingId, vendorId = null) {
   const booking = await Booking.findById(bookingId).lean()
   if (!booking) return null
 
   const targetVendorId = vendorId || booking.laborId || booking.acceptedLabourId
-  const serviceId = booking.serviceId
+  const serviceIds = resolveServiceIdsForBookingVendor(booking, targetVendorId)
 
-  if (!serviceId) return null
+  if (serviceIds.length === 0) return null
 
-  // Check if active ServiceProduct mappings exist
-  const mappings = await ServiceProduct.find({ serviceId, isActive: true })
+  // Check if active ServiceProduct mappings exist across the vendor's service(s)
+  const mappings = await ServiceProduct.find({ serviceId: { $in: serviceIds }, isActive: true })
     .populate('productId')
     .lean()
 
@@ -25,24 +113,38 @@ export async function generateMaterialRequirementForBooking(bookingId, vendorId 
     return null
   }
 
-  // Check if a MaterialRequest already exists for this booking
-  let existingRequest = await MaterialRequest.findOne({ bookingId })
+  // Check if a MaterialRequest already exists for this (bookingId, vendorId)
+  if (!targetVendorId) return null
+  let existingRequest = await MaterialRequest.findOne({ bookingId, vendorId: targetVendorId })
   if (existingRequest) {
-    if (targetVendorId && String(existingRequest.vendorId) !== String(targetVendorId)) {
-      existingRequest.vendorId = targetVendorId
-      await existingRequest.save()
-    }
     return existingRequest
   }
 
-  // If no vendor assigned yet, and no vendor passed, we can still prepare requirement if needed, or wait
-  if (!targetVendorId) return null
+  // Deduplicate products across services on the same booking (adding required quantities)
+  const productMap = new Map()
+  for (const m of mappings) {
+    const product = m.productId
+    if (!product || product.isActive === false) continue
+    const pid = idOf(product._id)
+    const qtyRequired = m.quantityRequired || 1
+    if (productMap.has(pid)) {
+      productMap.get(pid).qtyRequired += qtyRequired
+      if (m.isMandatory) productMap.get(pid).isMandatory = true
+    } else {
+      productMap.set(pid, {
+        product,
+        qtyRequired,
+        unit: m.unit || product.unit || 'Piece',
+        isMandatory: m.isMandatory ?? true,
+      })
+    }
+  }
+
+  if (productMap.size === 0) return null
 
   // Calculate items with real-time stock check
-  const items = mappings.map((m) => {
-    const product = m.productId
-    const qtyRequired = m.quantityRequired || 1
-    const currentStock = product ? product.currentStock : 0
+  const items = [...productMap.values()].map(({ product, qtyRequired, unit, isMandatory }) => {
+    const currentStock = product.currentStock ?? 0
 
     let itemStatus = 'AVAILABLE'
     let shortageQty = 0
@@ -58,15 +160,15 @@ export async function generateMaterialRequirementForBooking(bookingId, vendorId 
     }
 
     return {
-      productId: product?._id || m.productId,
+      productId: product._id,
       quantityRequired: qtyRequired,
       quantityRequested: qtyRequired,
       quantityApproved: 0,
       quantityIssued: 0,
       quantityUsed: 0,
       quantityReturned: 0,
-      unit: m.unit || product?.unit || 'Piece',
-      isMandatory: m.isMandatory ?? true,
+      unit,
+      isMandatory,
       isAdditional: false,
       itemStatus,
       shortageQuantity: shortageQty,
@@ -80,7 +182,7 @@ export async function generateMaterialRequirementForBooking(bookingId, vendorId 
     requestId: generateRequestId(),
     bookingId,
     vendorId: targetVendorId,
-    serviceId,
+    serviceId: booking.serviceId || serviceIds[0],
     status: initialStatus,
     items,
   })

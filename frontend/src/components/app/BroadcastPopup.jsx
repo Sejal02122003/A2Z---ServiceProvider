@@ -55,6 +55,7 @@ export function BroadcastPopup() {
   const [responding, setResponding] = useState(false)
   const [error, setError] = useState('')
   const [selectedServiceId, setSelectedServiceId] = useState(null)
+  const [requestMaterialsOnAccept, setRequestMaterialsOnAccept] = useState(true)
   const [eligibilityData, setEligibilityData] = useState(null)
   const [checkingEligibility, setCheckingEligibility] = useState(false)
   const [autoplayBlocked, setAutoplayBlocked] = useState(() => getAutoplayBlockedStatus())
@@ -113,6 +114,7 @@ export function BroadcastPopup() {
     setError('')
     setResponding(false)
     setSelectedServiceId(null)
+    setRequestMaterialsOnAccept(true)
 
     // Browser notification fallback if granted (OUT-OF-APP notification)
     if (window.Notification && Notification.permission === 'granted') {
@@ -356,9 +358,25 @@ export function BroadcastPopup() {
     setError('')
     try {
       const chosen = services.find(s => (s.itemId || s.serviceId) === selectedServiceId)
-      const payload = chosen
-        ? { serviceId: chosen.serviceId, itemId: chosen.itemId }
-        : (selectedServiceId ? { serviceId: selectedServiceId } : {})
+      const hasMapped = Array.isArray(incoming.mappedMaterials) && incoming.mappedMaterials.length > 0
+      const payload = {
+        ...(chosen
+          ? { serviceId: chosen.serviceId, itemId: chosen.itemId }
+          : (selectedServiceId ? { serviceId: selectedServiceId } : {})),
+        ...(hasMapped
+          ? {
+              requestMaterials: Boolean(requestMaterialsOnAccept),
+              ...(requestMaterialsOnAccept
+                ? {
+                    requestedItems: incoming.mappedMaterials.map((m) => ({
+                      productId: m.productId,
+                      quantityRequested: m.quantityRequired || 1,
+                    })),
+                  }
+                : {}),
+            }
+          : {}),
+      }
       await broadcastsApi.acceptBroadcast(currentBookingId, payload)
       setIncoming(null)
       navigate(`/serviceprovider/active-job/${currentBookingId}`)
@@ -391,7 +409,7 @@ export function BroadcastPopup() {
         }, 2500)
       }
     }
-  }, [incoming, navigate, selectedServiceId, services, eligibilityData, redirectToRecharge])
+  }, [incoming, navigate, selectedServiceId, services, eligibilityData, redirectToRecharge, requestMaterialsOnAccept])
 
   const handleReject = useCallback(async () => {
     if (!incoming) return
@@ -897,6 +915,45 @@ export function BroadcastPopup() {
                       </p>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Mapped Required Materials Option While Getting Booking */}
+              {Array.isArray(incoming.mappedMaterials) && incoming.mappedMaterials.length > 0 && (
+                <div className="mt-3 rounded-2xl border border-indigo-200 bg-indigo-50/70 p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-indigo-950">
+                      <Package className="h-3.5 w-3.5 text-indigo-600" />
+                      <span>Required Materials ({incoming.mappedMaterials.length})</span>
+                    </div>
+                    <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-900 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={requestMaterialsOnAccept}
+                        onChange={(e) => setRequestMaterialsOnAccept(e.target.checked)}
+                        className="rounded-sm text-indigo-600"
+                      />
+                      <span>Request from Admin</span>
+                    </label>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {incoming.mappedMaterials.map((m, i) => (
+                      <span
+                        key={m.productId || i}
+                        className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-[10px] font-bold text-slate-800 border border-indigo-100"
+                      >
+                        {m.name} × {m.quantityRequired} {m.unit}
+                        {m.usesPerAssignment > 1 && (
+                          <span className="text-indigo-600">({m.usesPerAssignment} uses/unit)</span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-indigo-800/80">
+                    {requestMaterialsOnAccept
+                      ? 'Material request will be sent to Admin automatically for approval when you accept.'
+                      : 'Unchecked — you will use your existing assigned stock.'}
+                  </p>
                 </div>
               )}
 

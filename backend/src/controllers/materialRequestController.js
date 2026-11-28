@@ -8,7 +8,9 @@ import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import {
   generateMaterialRequirementForBooking,
   createInventoryLog,
+  resolveServiceIdsForBookingVendor,
 } from '../services/materialRequirementService.js'
+import { attachUsageAnalyticsToRequests } from '../services/productUsageAnalyticsService.js'
 import { emitToUser } from '../socket.js'
 import { LabourService } from '../models/LabourService.js'
 import { LabourSubcategory } from '../models/LabourSubcategory.js'
@@ -24,11 +26,12 @@ export const getVendorMaterialRequests = asyncHandler(async (req, res) => {
   // 1. Check for assigned bookings of this vendor that might not have a MaterialRequest generated yet
   const assignedBookings = await Booking.find({
     $or: [{ laborId: vendorId }, { acceptedLabourId: vendorId }, { 'assignments.labourId': vendorId }],
+    materialOptOutVendors: { $ne: vendorId },
     status: { $in: ['ACCEPTED', 'ASSIGNED', 'EN_ROUTE', 'STARTED', 'COMPLETED'] },
   }).select('_id serviceId').lean()
 
   for (const b of assignedBookings) {
-    const existing = await MaterialRequest.findOne({ bookingId: b._id })
+    const existing = await MaterialRequest.findOne({ bookingId: b._id, vendorId })
     if (!existing) {
       await generateMaterialRequirementForBooking(b._id, vendorId)
     }
@@ -190,10 +193,12 @@ export const createVendorMaterialRequest = asyncHandler(async (req, res) => {
   }
 
   // Ensure vendor is assigned to this booking
+  const vIdStr = String(vendorId)
   const isAssigned =
-    String(booking.laborId) === String(vendorId) ||
-    String(booking.acceptedLabourId) === String(vendorId) ||
-    (booking.assignments && booking.assignments.some((a) => String(a.labourId) === String(vendorId)))
+    String(booking.laborId) === vIdStr ||
+    String(booking.acceptedLabourId) === vIdStr ||
+    (booking.assignments && booking.assignments.some((a) => String(a.labourId) === vIdStr)) ||
+    (booking.multiServiceBooking?.items && booking.multiServiceBooking.items.some((it) => String(it.assignedLabourId) === vIdStr))
 
   if (!isAssigned && req.user.role !== 'admin') {
     return sendError(res, {
@@ -202,7 +207,11 @@ export const createVendorMaterialRequest = asyncHandler(async (req, res) => {
     })
   }
 
-  let materialRequest = await MaterialRequest.findOne({ bookingId })
+  if (Array.isArray(booking.materialOptOutVendors) && booking.materialOptOutVendors.some((id) => String(id) === vIdStr)) {
+    await Booking.updateOne({ _id: bookingId }, { $pull: { materialOptOutVendors: vendorId } })
+  }
+
+  let materialRequest = await MaterialRequest.findOne({ bookingId, vendorId })
 
   if (!materialRequest) {
     materialRequest = await generateMaterialRequirementForBooking(bookingId, vendorId)
@@ -246,22 +255,31 @@ export const createVendorMaterialRequest = asyncHandler(async (req, res) => {
 
     await materialRequest.save()
   } else {
-    // If no service mapping existed, create an empty or custom requested requirement
-    const requestItems = Array.isArray(items)
-      ? items.map((i) => ({
-          productId: i.productId,
-          quantityRequired: Number(i.quantityRequested) || 1,
-          quantityRequested: Number(i.quantityRequested) || 1,
-          unit: i.unit || 'Piece',
-          isAdditional: true,
-        }))
-      : []
+    // If no service mapping existed, create a custom requested requirement with real stock check
+    const submittedIds = (Array.isArray(items) ? items : []).map((i) => i.productId).filter(Boolean)
+    const prodDocs = submittedIds.length ? await Product.find({ _id: { $in: submittedIds } }).lean() : []
+    const prodById = new Map(prodDocs.map((p) => [String(p._id), p]))
+    const requestItems = (Array.isArray(items) ? items : []).map((i) => {
+      const prod = prodById.get(String(i.productId))
+      const reqQty = Math.max(1, Number(i.quantityRequested) || 1)
+      const stock = prod?.currentStock ?? 0
+      return {
+        productId: i.productId,
+        quantityRequired: reqQty,
+        quantityRequested: reqQty,
+        unit: prod?.unit || i.unit || 'Piece',
+        isAdditional: true,
+        itemStatus: stock <= 0 ? 'OUT_OF_STOCK' : stock < reqQty ? 'PARTIALLY_AVAILABLE' : 'AVAILABLE',
+        shortageQuantity: Math.max(0, reqQty - Math.max(0, stock)),
+      }
+    })
+    const vendorServiceIds = resolveServiceIdsForBookingVendor(booking, vendorId)
 
     materialRequest = await MaterialRequest.create({
       requestId: generateRequestId(),
       bookingId,
       vendorId,
-      serviceId: booking.serviceId,
+      serviceId: booking.serviceId || vendorServiceIds[0] || undefined,
       status: 'REQUESTED',
       items: requestItems,
       requestRemarks: remarks?.trim() || '',
@@ -544,15 +562,17 @@ export const getAdminMaterialRequests = asyncHandler(async (req, res) => {
     .populate('serviceId', 'name basePrice iconUrl')
     .populate({
       path: 'items.productId',
-      populate: { path: 'alternativeProductIds', select: 'name sku currentStock unit price' },
+      populate: { path: 'alternativeProductIds', select: 'name sku currentStock unit price usesPerAssignment' },
     })
-    .populate('items.alternativeIssuedProductId', 'name sku unit price imageUrl currentStock')
+    .populate('items.alternativeIssuedProductId', 'name sku unit price imageUrl currentStock usesPerAssignment')
     .populate('approvedBy', 'fullName email')
     .populate('issuedBy', 'fullName email')
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(Number(limit))
     .lean()
+
+  await attachUsageAnalyticsToRequests(requests)
 
   return sendSuccess(res, {
     data: {
@@ -580,9 +600,9 @@ export const getAdminMaterialRequestById = asyncHandler(async (req, res) => {
     .populate('serviceId', 'name basePrice iconUrl')
     .populate({
       path: 'items.productId',
-      populate: { path: 'alternativeProductIds', select: 'name sku currentStock unit price' },
+      populate: { path: 'alternativeProductIds', select: 'name sku currentStock unit price usesPerAssignment' },
     })
-    .populate('items.alternativeIssuedProductId', 'name sku unit price imageUrl currentStock')
+    .populate('items.alternativeIssuedProductId', 'name sku unit price imageUrl currentStock usesPerAssignment')
     .populate('approvedBy', 'fullName email')
     .populate('issuedBy', 'fullName email')
     .lean()
@@ -590,6 +610,8 @@ export const getAdminMaterialRequestById = asyncHandler(async (req, res) => {
   if (!request) {
     return sendError(res, { message: 'Material request not found', statusCode: HTTP_STATUS.NOT_FOUND })
   }
+
+  await attachUsageAnalyticsToRequests([request])
 
   return sendSuccess(res, { data: { request } })
 })

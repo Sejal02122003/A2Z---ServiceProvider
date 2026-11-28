@@ -109,7 +109,7 @@ const materialRequestSchema = new mongoose.Schema(
     serviceId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'LabourService',
-      required: true,
+      required: false,
     },
     status: {
       type: String,

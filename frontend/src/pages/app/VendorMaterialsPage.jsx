@@ -520,7 +520,7 @@ function MaterialHistorySection({ requests }) {
           <div className="flex items-center justify-between">
             <div>
               <span className="font-mono font-bold text-slate-900">{req.requestId}</span>
-              <div className="text-[11px] font-semibold text-slate-600">{req.serviceId?.name}</div>
+              <div className="text-[11px] font-semibold text-slate-600">{req.serviceId?.name || 'Service Job'}</div>
             </div>
             <VendorStatusBadge status={req.status} />
           </div>
@@ -531,6 +531,11 @@ function MaterialHistorySection({ requests }) {
               </span>
             ))}
           </div>
+          {req.status === 'REJECTED' && req.adminRemarks && (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-medium text-rose-700">
+              Admin Reason: {req.adminRemarks}
+            </div>
+          )}
         </GlassPanel>
       ))}
     </div>

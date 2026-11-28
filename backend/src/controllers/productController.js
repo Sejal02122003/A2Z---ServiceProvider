@@ -17,6 +17,7 @@ export const createProduct = asyncHandler(async (req, res) => {
     price,
     currentStock = 0,
     minimumStock = 5,
+    usesPerAssignment = 1,
     alternativeProductIds = [],
   } = req.body
 
@@ -40,6 +41,7 @@ export const createProduct = asyncHandler(async (req, res) => {
     price: Math.max(0, Number(price) || 0),
     currentStock: initialStockNum,
     minimumStock: Math.max(0, Number(minimumStock) || 5),
+    usesPerAssignment: Math.max(1, Math.round(Number(usesPerAssignment) || 1)),
     alternativeProductIds: Array.isArray(alternativeProductIds) ? alternativeProductIds : [],
     createdBy: req.user._id,
   })
@@ -158,6 +160,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
     imageUrl,
     price,
     minimumStock,
+    usesPerAssignment,
     alternativeProductIds,
     isActive,
   } = req.body
@@ -182,6 +185,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
   if (imageUrl !== undefined) product.imageUrl = imageUrl.trim()
   if (price !== undefined) product.price = Math.max(0, Number(price) || 0)
   if (minimumStock !== undefined) product.minimumStock = Math.max(0, Number(minimumStock) || 0)
+  if (usesPerAssignment !== undefined) product.usesPerAssignment = Math.max(1, Math.round(Number(usesPerAssignment) || 1))
   if (Array.isArray(alternativeProductIds)) product.alternativeProductIds = alternativeProductIds
   if (isActive !== undefined) product.isActive = Boolean(isActive)
 

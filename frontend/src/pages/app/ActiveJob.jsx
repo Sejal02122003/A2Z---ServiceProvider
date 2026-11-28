@@ -1112,8 +1112,8 @@ export function ActiveJob() {
         </motion.p>
       )}
 
-      {/* Material Requirements & Stock Verification Section for ACCEPTED Jobs */}
-      {status === 'ACCEPTED' && !isCompleted && !isCancelled && (
+      {/* Material Requirements & Stock Verification Section */}
+      {(status === 'ACCEPTED' || (['EN_ROUTE', 'STARTED'].includes(status) && (materialRequest || hasRequiredMaterials))) && !isCompleted && !isCancelled && (
         <div className="space-y-3">
           {/* Real-time Flash Notification if Admin took action */}
           {materialActionMsg && (
@@ -1240,14 +1240,14 @@ export function ActiveJob() {
                   <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-800 space-y-1">
                     <div className="flex items-center gap-1.5 font-bold">
                       <ShieldAlert className="h-4 w-4 text-rose-600" />
-                      <span>Admin Status: Materials Not Available</span>
+                      <span>Material Request Rejected by Admin</span>
                     </div>
                     <p className="text-[11px] text-rose-700">
-                      Admin could not supply the requested materials. You can still start the job without them, or cancel the booking below if you cannot proceed.
+                      Admin declined supplying fresh materials for this booking. Review the note below or continue using your assigned stock.
                     </p>
                     {materialRequest?.adminRemarks && (
                       <p className="text-[11px] font-semibold text-rose-900 bg-white/70 p-1.5 rounded-lg border border-rose-200">
-                        Admin Note: &quot;{materialRequest.adminRemarks}&quot;
+                        Admin Reason: &quot;{materialRequest.adminRemarks}&quot;
                       </p>
                     )}
                   </div>

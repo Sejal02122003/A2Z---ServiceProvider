@@ -247,6 +247,7 @@ const bookingSchema = new mongoose.Schema(
     // Why each skill-matching provider did / did not receive this booking (written by the dispatcher)
     dispatchAudit: { type: mongoose.Schema.Types.Mixed },
     rejectedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    materialOptOutVendors: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     
     // Support for Bulk Bookings (Contractor)
     quantity: { type: Number, default: 1, min: 1 },

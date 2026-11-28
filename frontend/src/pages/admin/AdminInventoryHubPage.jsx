@@ -514,6 +514,7 @@ function ProductsTab({ onReloadStats, onToast }) {
                 <th className="px-4 py-3.5">Product & SKU</th>
                 <th className="px-4 py-3.5">Category</th>
                 <th className="px-4 py-3.5">Unit</th>
+                <th className="px-4 py-3.5 text-center">Uses / Assigned Unit</th>
                 <th className="px-4 py-3.5">Price / Cost</th>
                 <th className="px-4 py-3.5 text-center">Current Stock</th>
                 <th className="px-4 py-3.5 text-center">Min Stock</th>
@@ -524,14 +525,14 @@ function ProductsTab({ onReloadStats, onToast }) {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan="8" className="py-12 text-center text-slate-400">
+                  <td colSpan="9" className="py-12 text-center text-slate-400">
                     <RefreshCw className="mx-auto h-6 w-6 animate-spin text-slate-400" />
                     <p className="mt-2 text-xs">Loading products...</p>
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="py-12 text-center text-slate-400">
+                  <td colSpan="9" className="py-12 text-center text-slate-400">
                     <Package className="mx-auto h-8 w-8 text-slate-300" />
                     <p className="mt-2 font-semibold">No products found</p>
                     <p className="text-[11px]">Add products or adjust filters</p>
@@ -567,6 +568,11 @@ function ProductsTab({ onReloadStats, onToast }) {
                       </td>
                       <td className="px-4 py-3.5 font-medium text-slate-600">{p.category}</td>
                       <td className="px-4 py-3.5 font-medium text-slate-600">{p.unit}</td>
+                      <td className="px-4 py-3.5 text-center">
+                        <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200/70">
+                          {p.usesPerAssignment || 1} {(p.usesPerAssignment || 1) === 1 ? 'booking' : 'bookings'} / {p.unit}
+                        </span>
+                      </td>
                       <td className="px-4 py-3.5 font-bold text-slate-800">₹{p.price}</td>
                       <td className="px-4 py-3.5 text-center">
                         <span
@@ -739,6 +745,7 @@ function ProductFormModal({ product, categories, allProducts, onClose, onSaved, 
   const [price, setPrice] = useState(product?.price || 0)
   const [currentStock, setCurrentStock] = useState(product?.currentStock || 0)
   const [minimumStock, setMinimumStock] = useState(product?.minimumStock || 5)
+  const [usesPerAssignment, setUsesPerAssignment] = useState(product?.usesPerAssignment || 1)
   const [alternativeProductIds, setAlternativeProductIds] = useState(
     product?.alternativeProductIds?.map((a) => a._id || a) || []
   )
@@ -802,6 +809,7 @@ function ProductFormModal({ product, categories, allProducts, onClose, onSaved, 
         unit: unit.trim(),
         price: Number(price),
         minimumStock: Number(minimumStock),
+        usesPerAssignment: Math.max(1, Math.round(Number(usesPerAssignment) || 1)),
         alternativeProductIds,
         isActive,
       }
@@ -978,6 +986,29 @@ function ProductFormModal({ product, categories, allProducts, onClose, onSaved, 
             </div>
           </div>
 
+          <div className="rounded-2xl border border-indigo-200/80 bg-indigo-50/50 p-3.5">
+            <label className="block text-xs font-bold text-indigo-950">
+              How Many Times Can 1 Assigned {unit || 'Unit'} Be Used? (Bookings per Assignment) *
+            </label>
+            <p className="mt-0.5 text-[11px] text-indigo-800/80">
+              Number of customer bookings covered once 1 {unit || 'unit'} is assigned to a service provider (e.g. 1 = single job, 5 = 5 bookings).
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                type="number"
+                min="1"
+                step="1"
+                required
+                value={usesPerAssignment}
+                onChange={(e) => setUsesPerAssignment(e.target.value)}
+                className="w-32 rounded-xl border border-indigo-200 bg-white p-2.5 text-xs font-black text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+              />
+              <span className="text-xs font-semibold text-indigo-900">
+                booking(s) per 1 {unit || 'unit'} assigned
+              </span>
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-700">Description</label>
             <textarea
@@ -1097,7 +1128,7 @@ function ProductDetailsModal({ productId, onClose, onEdit, onDelete }) {
         ) : (
           <div className="mt-4 space-y-5">
             {/* Quick Stats */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
                 <div className="text-[11px] font-semibold text-slate-500">Current Stock</div>
                 <div className="mt-1 text-lg font-black text-slate-900">{p?.currentStock} {p?.unit}</div>
@@ -1105,6 +1136,10 @@ function ProductDetailsModal({ productId, onClose, onEdit, onDelete }) {
               <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
                 <div className="text-[11px] font-semibold text-slate-500">Min Threshold</div>
                 <div className="mt-1 text-lg font-black text-slate-900">{p?.minimumStock} {p?.unit}</div>
+              </div>
+              <div className="rounded-2xl border border-indigo-100 bg-indigo-50/70 p-3">
+                <div className="text-[11px] font-semibold text-indigo-700">Uses / Assigned</div>
+                <div className="mt-1 text-lg font-black text-indigo-900">{p?.usesPerAssignment || 1} jobs</div>
               </div>
               <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
                 <div className="text-[11px] font-semibold text-slate-500">Unit Price</div>
@@ -1620,6 +1655,7 @@ function MaterialRequestsTab({ onReloadStats, onToast }) {
 
   const [issueModalReq, setIssueModalReq] = useState(null)
   const [viewDetailReq, setViewDetailReq] = useState(null)
+  const [rejectModalReq, setRejectModalReq] = useState(null)
 
   const loadRequests = useCallback(async () => {
     try {
@@ -1637,10 +1673,12 @@ function MaterialRequestsTab({ onReloadStats, onToast }) {
     loadRequests()
   }, [loadRequests])
 
-  const handleApprove = async (id) => {
+  const handleApprove = async (id, remarks = '') => {
     try {
-      const res = await approveMaterialRequest(id)
+      const payload = remarks ? { adminRemarks: remarks } : {}
+      const res = await approveMaterialRequest(id, payload)
       onToast(res.message || 'Request approved')
+      setViewDetailReq(null)
       loadRequests()
       onReloadStats()
     } catch (err) {
@@ -1648,17 +1686,13 @@ function MaterialRequestsTab({ onReloadStats, onToast }) {
     }
   }
 
-  const handleReject = async (id) => {
-    const reason = prompt('Enter reason for rejection:', 'Not required for this booking')
-    if (reason === null) return
-    try {
-      await rejectMaterialRequest(id, { adminRemarks: reason })
-      onToast('Request rejected')
-      loadRequests()
-      onReloadStats()
-    } catch (err) {
-      alert(err.message || 'Failed to reject')
-    }
+  const handleConfirmReject = async (id, reason) => {
+    await rejectMaterialRequest(id, { adminRemarks: reason || 'Rejected by admin' })
+    onToast('Material request rejected')
+    setRejectModalReq(null)
+    setViewDetailReq(null)
+    loadRequests()
+    onReloadStats()
   }
 
   const handleWaitingStock = async (id) => {
@@ -1768,29 +1802,33 @@ function MaterialRequestsTab({ onReloadStats, onToast }) {
                         </div>
                       </td>
                       <td className="px-4 py-3.5">
-                        <div className="space-y-1">
+                        <div className="space-y-2">
                           {req.items?.map((item, idx) => {
                             const prod = item.productId
-                            const stock = prod?.currentStock ?? 0
                             return (
-                              <div key={idx} className="flex items-center gap-2 text-[11px]">
-                                <span className="font-medium text-slate-800">
-                                  {prod?.name || 'Material'} × <b className="text-slate-900">{item.quantityRequested}</b>
-                                </span>
-                                {item.alternativeIssuedProductId && (
-                                  <span className="rounded-md bg-purple-50 px-1.5 py-0.5 text-[10px] font-bold text-purple-700">
-                                    Alt: {item.alternativeIssuedProductId.name}
+                              <div key={idx} className="space-y-1">
+                                <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                                  <span className="font-medium text-slate-800">
+                                    {prod?.name || 'Material'} × <b className="text-slate-900">{item.quantityRequested}</b>
                                   </span>
-                                )}
-                                {item.itemStatus === 'OUT_OF_STOCK' && (
-                                  <span className="rounded-md bg-rose-100 px-1.5 py-0.2 text-[10px] font-black text-rose-700">
-                                    OUT OF STOCK
-                                  </span>
-                                )}
-                                {item.itemStatus === 'PARTIALLY_AVAILABLE' && (
-                                  <span className="rounded-md bg-amber-100 px-1.5 py-0.2 text-[10px] font-black text-amber-800">
-                                    Shortage: {item.shortageQuantity}
-                                  </span>
+                                  {item.alternativeIssuedProductId && (
+                                    <span className="rounded-md bg-purple-50 px-1.5 py-0.5 text-[10px] font-bold text-purple-700">
+                                      Alt: {item.alternativeIssuedProductId.name}
+                                    </span>
+                                  )}
+                                  {item.itemStatus === 'OUT_OF_STOCK' && (
+                                    <span className="rounded-md bg-rose-100 px-1.5 py-0.2 text-[10px] font-black text-rose-700">
+                                      OUT OF STOCK
+                                    </span>
+                                  )}
+                                  {item.itemStatus === 'PARTIALLY_AVAILABLE' && (
+                                    <span className="rounded-md bg-amber-100 px-1.5 py-0.2 text-[10px] font-black text-amber-800">
+                                      Shortage: {item.shortageQuantity}
+                                    </span>
+                                  )}
+                                </div>
+                                {item.usageAnalysis && (
+                                  <UsageAnalysisSummaryBadge analysis={item.usageAnalysis} />
                                 )}
                               </div>
                             )
@@ -1805,10 +1843,11 @@ function MaterialRequestsTab({ onReloadStats, onToast }) {
                           <button
                             type="button"
                             onClick={() => setViewDetailReq(req)}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
-                            title="Inspect Details"
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-50"
+                            title="Analyze Real Bookings & Details"
                           >
-                            <Eye className="h-4 w-4" />
+                            <Eye className="h-3.5 w-3.5" />
+                            <span>Analyze</span>
                           </button>
 
                           {['REQUESTED', 'APPROVED', 'WAITING_FOR_STOCK', 'READY_FOR_ISSUE', 'PARTIALLY_ISSUED'].includes(req.status) && (
@@ -1844,11 +1883,12 @@ function MaterialRequestsTab({ onReloadStats, onToast }) {
 
                               <button
                                 type="button"
-                                onClick={() => handleReject(req._id)}
-                                className="rounded-lg p-1 text-rose-500 hover:bg-rose-50"
+                                onClick={() => setRejectModalReq(req)}
+                                className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100 border border-rose-200"
                                 title="Reject Request"
                               >
-                                <XCircle className="h-4 w-4" />
+                                <XCircle className="h-3.5 w-3.5" />
+                                <span>Reject</span>
                               </button>
                             </>
                           )}
@@ -1870,6 +1910,7 @@ function MaterialRequestsTab({ onReloadStats, onToast }) {
           onClose={() => setIssueModalReq(null)}
           onIssued={() => {
             setIssueModalReq(null)
+            setViewDetailReq(null)
             loadRequests()
             onReloadStats()
             onToast('Materials issued to vendor successfully')
@@ -1877,13 +1918,258 @@ function MaterialRequestsTab({ onReloadStats, onToast }) {
         />
       )}
 
-      {/* Details Modal */}
+      {/* Details & Real Booking Usage Analysis Modal */}
       {viewDetailReq && (
         <RequestDetailsModal
           request={viewDetailReq}
           onClose={() => setViewDetailReq(null)}
+          onApprove={(id, remarks) => handleApprove(id, remarks)}
+          onIssue={(r) => {
+            setViewDetailReq(null)
+            setIssueModalReq(r)
+          }}
+          onReject={(r) => {
+            setViewDetailReq(null)
+            setRejectModalReq(r)
+          }}
         />
       )}
+
+      {/* Reject Request Modal */}
+      {rejectModalReq && (
+        <RejectMaterialRequestModal
+          request={rejectModalReq}
+          onClose={() => setRejectModalReq(null)}
+          onConfirm={handleConfirmReject}
+        />
+      )}
+    </div>
+  )
+}
+
+function UsageAnalysisSummaryBadge({ analysis }) {
+  if (!analysis) return null
+  const status = analysis.recommendation?.status
+  const tone =
+    status === 'CAPACITY_REMAINING'
+      ? 'bg-amber-50 text-amber-900 border-amber-200'
+      : status === 'REFILL_NEEDED'
+        ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+        : 'bg-sky-50 text-sky-900 border-sky-200'
+
+  return (
+    <div className={`inline-flex flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] ${tone}`}>
+      <span className="font-black">
+        {analysis.recommendation?.verdictLabel || 'Usage Check'}
+      </span>
+      <span className="opacity-80 font-medium">
+        • Assigned: {analysis.netAssignedUnits} {analysis.unit} ({analysis.usesPerAssignment}/unit = {analysis.totalAllowedUses} uses)
+        • Real Bookings Done: <b>{analysis.bookingsDoneOnProduct}</b>
+        • Left: <b>{analysis.remainingUses}</b>
+      </span>
+    </div>
+  )
+}
+
+function UsageAnalysisDetailCard({ analysis }) {
+  if (!analysis) return null
+  const status = analysis.recommendation?.status
+  const bannerTone =
+    status === 'CAPACITY_REMAINING'
+      ? 'border-amber-200 bg-amber-50/80 text-amber-950'
+      : status === 'REFILL_NEEDED'
+        ? 'border-emerald-200 bg-emerald-50/80 text-emerald-950'
+        : 'border-sky-200 bg-sky-50/80 text-sky-950'
+
+  return (
+    <div className="mt-2 rounded-xl border border-slate-200 bg-white p-3 space-y-2.5 text-xs">
+      <div className={`rounded-lg border px-2.5 py-2 ${bannerTone}`}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="font-black text-[11px]">{analysis.recommendation?.verdictLabel}</span>
+          <span className="rounded-md bg-white/80 px-2 py-0.5 text-[10px] font-bold">
+            {analysis.usesPerAssignment} booking use(s) / {analysis.unit}
+          </span>
+        </div>
+        <p className="mt-1 text-[11px] leading-snug opacity-90">{analysis.recommendation?.summary}</p>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+        <div className="rounded-lg bg-slate-50 p-2 border border-slate-100">
+          <div className="text-[10px] font-semibold text-slate-500">Net Assigned Units</div>
+          <div className="font-black text-slate-900">
+            {analysis.netAssignedUnits} {analysis.unit}
+          </div>
+          <div className="text-[9px] text-slate-400">
+            Issued {analysis.totalIssuedUnits} • Ret {analysis.totalReturnedUnits}
+          </div>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-2 border border-slate-100">
+          <div className="text-[10px] font-semibold text-slate-500">Allowed Bookings</div>
+          <div className="font-black text-indigo-700">{analysis.totalAllowedUses} uses</div>
+          <div className="text-[9px] text-slate-400">{analysis.usesPerAssignment} per unit</div>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-2 border border-slate-100">
+          <div className="text-[10px] font-semibold text-slate-500">Real Bookings Done</div>
+          <div className="font-black text-slate-900">{analysis.bookingsDoneOnProduct} completed</div>
+          <div className="text-[9px] text-slate-400">
+            {analysis.activeBookingsOnProduct > 0 ? `${analysis.activeBookingsOnProduct} in progress` : `${analysis.lifetimeBookingsOnProduct} lifetime`}
+          </div>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-2 border border-slate-100">
+          <div className="text-[10px] font-semibold text-slate-500">Remaining Capacity</div>
+          <div className={`font-black ${analysis.remainingUses > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+            {analysis.remainingUses} uses left
+          </div>
+          <div className="text-[9px] text-slate-400">
+            {analysis.lastAssignedAt ? `Last issued ${new Date(analysis.lastAssignedAt).toLocaleDateString()}` : 'Never issued'}
+          </div>
+        </div>
+      </div>
+
+      {analysis.mappedServicesCount === 0 && (
+        <p className="text-[10px] font-semibold text-slate-500">
+          Note: This product has no active service mappings yet; booking count reflects only jobs where this material was previously issued.
+        </p>
+      )}
+
+      {Array.isArray(analysis.recentBookings) && analysis.recentBookings.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            Recent Real Bookings on This Product ({analysis.recentBookings.length})
+          </p>
+          <div className="max-h-32 overflow-y-auto divide-y divide-slate-100 rounded-lg border border-slate-200">
+            {analysis.recentBookings.map((rb) => (
+              <div key={rb.bookingId} className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-[10px]">
+                <div className="min-w-0">
+                  <span className="font-mono font-bold text-indigo-600">#{rb.shortCode}</span>
+                  <span className="ml-1.5 font-semibold text-slate-800">{rb.serviceName}</span>
+                  <span className="ml-1 text-slate-500">• {rb.customerName}</span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-slate-400">{new Date(rb.date).toLocaleDateString()}</span>
+                  <span className={`rounded px-1.5 py-0.5 font-bold uppercase ${rb.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
+                    {rb.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RejectMaterialRequestModal({ request, onClose, onConfirm }) {
+  const [reason, setReason] = useState(() => {
+    const hasRemaining = request?.items?.some((it) => it.usageAnalysis?.recommendation?.status === 'CAPACITY_REMAINING')
+    return hasRemaining
+      ? 'Assigned product still has remaining booking uses based on completed booking history.'
+      : 'Not required for this booking.'
+  })
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const PRESETS = [
+    'Assigned product still has remaining booking uses based on completed booking history.',
+    'Service provider already holds sufficient units from an earlier assignment.',
+    'Material not required for this specific service booking.',
+    'Product temporarily out of stock in central warehouse.',
+  ]
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!reason.trim()) {
+      setError('Please enter a reason for rejecting this request')
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      await onConfirm(request._id, reason.trim())
+    } catch (err) {
+      setError(err.message || 'Failed to reject request')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Reject Material Request</h3>
+            <p className="text-xs text-slate-500">
+              {request.requestId} • Provider: <b>{request.vendorId?.fullName || 'Technician'}</b>
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
+            <XCircle className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          {request.items?.map((item, idx) => (
+            <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs space-y-1">
+              <div className="font-bold text-slate-900">
+                {item.productId?.name || 'Material'} × {item.quantityRequested} {item.unit}
+              </div>
+              {item.usageAnalysis && <UsageAnalysisSummaryBadge analysis={item.usageAnalysis} />}
+            </div>
+          ))}
+        </div>
+
+        <form onSubmit={submit} className="space-y-3">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Quick Reasons</p>
+            <div className="flex flex-wrap gap-1.5">
+              {PRESETS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setReason(p)}
+                  className={`rounded-lg border px-2.5 py-1 text-[11px] text-left transition ${
+                    reason === p ? 'border-rose-300 bg-rose-50 text-rose-800 font-bold' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700">Rejection Reason / Admin Remarks *</label>
+            <textarea
+              rows="2"
+              required
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 focus:bg-white"
+            />
+          </div>
+
+          {error && <p className="text-xs font-bold text-rose-600">{error}</p>}
+
+          <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={busy}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-xl bg-rose-600 px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-rose-700 disabled:opacity-50"
+            >
+              {busy ? 'Rejecting...' : 'Confirm Reject'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }
@@ -1932,6 +2218,7 @@ function AdminIssueMaterialsModal({ request, onClose, onIssued }) {
         alternativeProductId: prod?.alternativeProductIds?.[0]?._id || '',
         alternativeReason: 'Original product out of stock',
         alternativesList: prod?.alternativeProductIds || [],
+        usageAnalysis: i.usageAnalysis || null,
       }
     })
   )
@@ -2016,6 +2303,10 @@ function AdminIssueMaterialsModal({ request, onClose, onIssued }) {
                       </span>
                     </div>
                   </div>
+
+                  {item.usageAnalysis && (
+                    <UsageAnalysisSummaryBadge analysis={item.usageAnalysis} />
+                  )}
 
                   {/* Shortage & Alternative Switcher */}
                   {hasShortage && (
@@ -2121,14 +2412,29 @@ function AdminIssueMaterialsModal({ request, onClose, onIssued }) {
   )
 }
 
-function RequestDetailsModal({ request, onClose }) {
+function RequestDetailsModal({ request: initialRequest, onClose, onApprove, onIssue, onReject }) {
+  const [request, setRequest] = useState(initialRequest)
+
+  useEffect(() => {
+    let cancelled = false
+    if (!initialRequest?._id) return
+    fetchAdminMaterialRequestById(initialRequest._id)
+      .then((res) => {
+        if (!cancelled && res?.request) setRequest(res.request)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [initialRequest?._id])
+
+  const isActionable = ['REQUESTED', 'APPROVED', 'WAITING_FOR_STOCK', 'READY_FOR_ISSUE', 'PARTIALLY_ISSUED'].includes(request.status)
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
       <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
             <span className="text-[10px] font-mono font-bold text-blue-600">ID: {request.requestId}</span>
-            <h3 className="text-base font-bold text-slate-900">Material Request Summary</h3>
+            <h3 className="text-base font-bold text-slate-900">Material Request & Real Booking Usage Analysis</h3>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
             <XCircle className="h-5 w-5" />
@@ -2158,11 +2464,11 @@ function RequestDetailsModal({ request, onClose }) {
           </div>
 
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Items Detail</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Items & Assigned Usage Analysis</h4>
             <div className="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-200">
               {request.items?.map((item, idx) => (
-                <div key={idx} className="p-3 text-xs space-y-1">
-                  <div className="flex items-center justify-between">
+                <div key={idx} className="p-3 text-xs space-y-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-bold text-slate-900">
                       {item.productId?.name || 'Item'}
                     </span>
@@ -2175,6 +2481,7 @@ function RequestDetailsModal({ request, onClose }) {
                       Substitute Issued: {item.alternativeIssuedProductId.name} ({item.alternativeIssuedProductId.sku})
                     </div>
                   )}
+                  {item.usageAnalysis && <UsageAnalysisDetailCard analysis={item.usageAnalysis} />}
                 </div>
               ))}
             </div>
@@ -2193,8 +2500,36 @@ function RequestDetailsModal({ request, onClose }) {
             </div>
           )}
 
-          <div className="flex justify-end border-t border-slate-100 pt-3">
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
+            {isActionable && onReject && (
+              <button
+                type="button"
+                onClick={() => onReject(request)}
+                className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100"
+              >
+                Reject Request
+              </button>
+            )}
+            {isActionable && request.status === 'REQUESTED' && onApprove && (
+              <button
+                type="button"
+                onClick={() => onApprove(request._id)}
+                className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700"
+              >
+                Approve
+              </button>
+            )}
+            {isActionable && onIssue && (
+              <button
+                type="button"
+                onClick={() => onIssue(request)}
+                className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700"
+              >
+                Issue Stock
+              </button>
+            )}
             <button
+              type="button"
               onClick={onClose}
               className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-xs"
             >
@@ -2740,25 +3075,74 @@ function VendorInventoryTab() {
                 </span>
               </div>
 
-              <div className="space-y-1.5 text-xs">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Held Material Items</div>
+              <div className="space-y-2 text-xs">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Assigned Products & Real Booking Usage</div>
                 {vi.heldItems?.length === 0 ? (
                   <p className="text-slate-400 text-[11px]">All materials used or returned</p>
                 ) : (
                   vi.heldItems.map((hi, i) => (
-                    <div key={i} className="flex items-center justify-between rounded-xl bg-slate-50 p-2 text-[11px]">
-                      <span className="font-bold text-slate-800">{hi.product?.name || 'Item'}</span>
-                      <div className="text-right">
-                        <span className="font-black text-blue-700">Held: {hi.currentHeld}</span>
-                        <div className="text-[9px] text-slate-400">
-                          Issued {hi.totalIssued} • Used {hi.totalUsed} • Ret {hi.totalReturned}
-                        </div>
-                      </div>
-                    </div>
+                    <VendorHeldProductRow key={i} hi={hi} />
                   ))
                 )}
               </div>
             </GlassPanel>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function VendorHeldProductRow({ hi }) {
+  const [showBookings, setShowBookings] = useState(false)
+  const ua = hi.usageAnalysis
+  const bookings = ua?.recentBookings || []
+
+  return (
+    <div className="rounded-xl bg-slate-50 border border-slate-100 p-2.5 text-[11px] space-y-1.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <span className="font-bold text-slate-900 block truncate">{hi.product?.name || 'Item'}</span>
+          <span className="text-[10px] text-slate-500">
+            Limit: {ua?.usesPerAssignment || hi.product?.usesPerAssignment || 1} booking(s) / {hi.product?.unit || 'unit'}
+          </span>
+        </div>
+        <div className="text-right shrink-0">
+          <span className="font-black text-blue-700">Held: {hi.currentHeld}</span>
+          <div className="text-[9px] text-slate-400">
+            Issued {hi.totalIssued} • Used {hi.totalUsed} • Ret {hi.totalReturned}
+          </div>
+        </div>
+      </div>
+
+      {ua && (
+        <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 border-t border-slate-200/70">
+          <span className="text-[10px] font-semibold text-slate-700">
+            Allowed: <b>{ua.totalAllowedUses}</b> • Bookings Done: <b>{ua.bookingsDoneOnProduct}</b> • Left: <b className={ua.remainingUses > 0 ? 'text-amber-700' : 'text-emerald-700'}>{ua.remainingUses}</b>
+          </span>
+          {bookings.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowBookings((v) => !v)}
+              className="text-[10px] font-bold text-indigo-600 hover:underline"
+            >
+              {showBookings ? 'Hide Bookings' : `View Bookings (${bookings.length})`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {showBookings && bookings.length > 0 && (
+        <div className="max-h-28 overflow-y-auto rounded-lg bg-white border border-slate-200 divide-y divide-slate-100">
+          {bookings.map((rb) => (
+            <div key={rb.bookingId} className="flex items-center justify-between gap-2 px-2 py-1 text-[10px]">
+              <span className="truncate font-medium text-slate-700">
+                <b className="font-mono text-indigo-600">#{rb.shortCode}</b> {rb.serviceName}
+              </span>
+              <span className="shrink-0 text-slate-400">
+                {new Date(rb.date).toLocaleDateString()} • {rb.status}
+              </span>
+            </div>
           ))}
         </div>
       )}

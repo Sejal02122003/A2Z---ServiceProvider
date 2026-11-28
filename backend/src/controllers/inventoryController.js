@@ -281,17 +281,20 @@ export const getVendorInventory = asyncHandler(async (req, res) => {
     .populate('vendorId', 'fullName phone email profileImageUrl')
     .populate('bookingId', 'status address')
     .populate('serviceId', 'name')
-    .populate('items.productId', 'name sku unit price imageUrl')
-    .populate('items.alternativeIssuedProductId', 'name sku unit price imageUrl')
+    .populate('items.productId', 'name sku unit price imageUrl usesPerAssignment')
+    .populate('items.alternativeIssuedProductId', 'name sku unit price imageUrl usesPerAssignment')
     .sort({ updatedAt: -1 })
     .lean()
 
   // Build aggregated held summary per vendor & product
   const vendorSummaryMap = {}
+  const vendorIdsSet = new Set()
+  const productIdsSet = new Set()
 
   requests.forEach((req) => {
     const vId = req.vendorId?._id?.toString()
     if (!vId) return
+    vendorIdsSet.add(vId)
 
     if (!vendorSummaryMap[vId]) {
       vendorSummaryMap[vId] = {
@@ -312,6 +315,7 @@ export const getVendorInventory = asyncHandler(async (req, res) => {
       const prod = item.alternativeIssuedProductId || item.productId
       if (!prod) return
       const pId = prod._id?.toString()
+      if (pId) productIdsSet.add(pId)
 
       if (!vendorSummaryMap[vId].heldItems[pId]) {
         vendorSummaryMap[vId].heldItems[pId] = {
@@ -335,12 +339,33 @@ export const getVendorInventory = asyncHandler(async (req, res) => {
     })
   })
 
-  const vendorInventories = Object.values(vendorSummaryMap).map((v) => ({
-    vendor: v.vendor,
-    activeRequestsCount: v.activeRequestsCount,
-    heldItems: Object.values(v.heldItems),
-    totalHeldQuantity: Object.values(v.heldItems).reduce((sum, item) => sum + item.currentHeld, 0),
-  }))
+  // Attach real booking usage analytics for each (vendor, assigned product) pair
+  const { getVendorProductUsageMap, getUsageKey } = await import('../services/productUsageAnalyticsService.js')
+  const usageMap = await getVendorProductUsageMap({
+    vendorIds: [...vendorIdsSet],
+    productIds: [...productIdsSet],
+  })
+
+  const vendorInventories = Object.values(vendorSummaryMap).map((v) => {
+    const vId = v.vendor?._id?.toString()
+    const heldItems = Object.values(v.heldItems).map((hi) => {
+      const pId = hi.product?._id?.toString()
+      const rawUsage = usageMap.get(getUsageKey(vId, pId))
+      const usageAnalysis = rawUsage
+        ? { ...rawUsage, _meta: undefined }
+        : null
+      return {
+        ...hi,
+        usageAnalysis,
+      }
+    })
+    return {
+      vendor: v.vendor,
+      activeRequestsCount: v.activeRequestsCount,
+      heldItems,
+      totalHeldQuantity: heldItems.reduce((sum, item) => sum + item.currentHeld, 0),
+    }
+  })
 
   return sendSuccess(res, {
     data: { vendorInventories },

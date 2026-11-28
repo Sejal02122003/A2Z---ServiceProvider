@@ -626,6 +626,12 @@ export async function startBroadcastCycle(bookingId) {
         })
       }
 
+      // Pre-fetch mapped inventory products for all service IDs on this booking
+      const { resolveServiceIdsForBookingVendor, getMappedMaterialsByServiceIds, collectUniqueMappedMaterials } =
+        await import('./materialRequirementService.js')
+      const allBookingServiceIds = resolveServiceIdsForBookingVendor(booking, null)
+      const mappedMaterialsByService = await getMappedMaterialsByServiceIds(allBookingServiceIds)
+
       eligibleLaborers.forEach(labor => {
         const laborServiceIds = labor.labourProfile?.serviceIds?.map(id => String(id)) || []
         const bookingHours = booking.duration || booking.hours || 1
@@ -671,6 +677,10 @@ export async function startBroadcastCycle(bookingId) {
           const totalBookingDuration = servicesPayload.reduce((acc, s) => acc + (Number(s.totalDurationMins) || 0), 0) || Math.round(bookingHours * 60)
           const formattedBookingDuration = formatDurationHuman(totalBookingDuration)
           const totalBookingQty = servicesPayload.reduce((acc, s) => acc + (Number(s.quantity) || 1), 0) || 1
+          const mappedMaterials = collectUniqueMappedMaterials(
+            mappedMaterialsByService,
+            servicesPayload.map((s) => s.serviceId)
+          )
 
           import('../socket.js').then(({ emitToUser }) => {
             console.log(`[BROADCAST] Emitting BOOKING_RECEIVED to labour ${labor.fullName || labor.phone} (${labor._id}) for multi-service booking ${booking._id}, earnings=₹${totalEarnings}`)
@@ -681,6 +691,7 @@ export async function startBroadcastCycle(bookingId) {
               customerPhone: booking.userId?.phone || '',
               serviceName: servicesPayload.length === 1 ? servicesPayload[0].name : `Multi-Service (${servicesPayload.length} services)`,
               services: servicesPayload,
+              mappedMaterials,
               isMultiServiceBooking: true,
               requiresServiceSelection: false,
               quantity: totalBookingQty,
@@ -782,6 +793,10 @@ export async function startBroadcastCycle(bookingId) {
 
           // Show highest earning as the headline earnings figure
           const bestEarning = servicesPayload.reduce((max, s) => Math.max(max, s.estimatedEarnings), 0)
+          const mappedMaterials = collectUniqueMappedMaterials(
+            mappedMaterialsByService,
+            servicesPayload.map((s) => s.serviceId)
+          )
 
           import('../socket.js').then(({ emitToUser }) => {
             console.log(`[BROADCAST] Emitting BOOKING_RECEIVED to labour ${labor.fullName || labor.phone} (${labor._id}) for contractor booking ${booking._id}, earnings=₹${bestEarning}`)
@@ -791,6 +806,7 @@ export async function startBroadcastCycle(bookingId) {
               customerName: booking.userId?.fullName || 'Customer',
               serviceName: servicesPayload.length === 1 ? servicesPayload[0].name : 'Multiple Services',
               services: servicesPayload,
+              mappedMaterials,
               isContractorBooking: true,
               requiresServiceSelection: servicesPayload.length > 1,
               date: booking.scheduledAt || booking.createdAt,
@@ -888,6 +904,7 @@ export async function startBroadcastCycle(bookingId) {
             ? resolvedSingleUnitDurationMins * singleQty
             : (booking.totalDurationMins || Math.round(bookingHours * 60))
           const formattedSingleDuration = formatDurationHuman(singleDurationMins)
+          const mappedMaterials = collectUniqueMappedMaterials(mappedMaterialsByService, allBookingServiceIds)
 
           import('../socket.js').then(({ emitToUser }) => {
             console.log(`[BROADCAST] Emitting BOOKING_RECEIVED to labour ${labor.fullName || labor.phone} (${labor._id}) for single-service booking ${booking._id}, service=${singleServiceName}, earnings=₹${singleShare}`)
@@ -900,6 +917,7 @@ export async function startBroadcastCycle(bookingId) {
               serviceDetail: singleServiceDetail || booking.notes || '',
               categoryName: singleCategoryName,
               subServiceName: singleSubServiceName,
+              mappedMaterials,
               quantity: singleQty,
               totalQuantity: singleQty,
               totalDurationMins: singleDurationMins,
