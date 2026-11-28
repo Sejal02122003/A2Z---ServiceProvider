@@ -62,7 +62,6 @@ import {
   deleteServiceProductMapping,
   fetchInventoryList,
   addInventoryStock,
-  adjustInventoryStock,
   fetchLowStockProducts,
   fetchInventoryTransactions,
   fetchVendorInventory,
@@ -2551,7 +2550,6 @@ function StockManagementTab({ onReloadStats, onToast }) {
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('updated_desc')
   const [restockModalProd, setRestockModalProd] = useState(null)
-  const [adjustModalProd, setAdjustModalProd] = useState(null)
   const [productToDelete, setProductToDelete] = useState(null)
   const [deletingProduct, setDeletingProduct] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -2726,13 +2724,6 @@ function StockManagementTab({ onReloadStats, onToast }) {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setAdjustModalProd(p)}
-                            className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-50"
-                          >
-                            Adjust
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => setProductToDelete(p)}
                             title="Delete from Inventory"
                             className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
@@ -2763,24 +2754,6 @@ function StockManagementTab({ onReloadStats, onToast }) {
               updatedProd
                 ? `Added stock to ${updatedProd.name} — New Stock: ${updatedProd.currentStock} ${updatedProd.unit}`
                 : 'Stock added successfully'
-            )
-          }}
-        />
-      )}
-
-      {/* Adjust Modal */}
-      {adjustModalProd && (
-        <AdjustStockModal
-          product={adjustModalProd}
-          onClose={() => setAdjustModalProd(null)}
-          onAdjusted={(updatedProd) => {
-            setAdjustModalProd(null)
-            applyLocalProductUpdate(updatedProd)
-            onReloadStats()
-            onToast(
-              updatedProd
-                ? `Adjusted stock for ${updatedProd.name} — New Stock: ${updatedProd.currentStock} ${updatedProd.unit}`
-                : 'Stock adjusted successfully'
             )
           }}
         />
@@ -2900,103 +2873,6 @@ function RestockModal({ product, onClose, onAdded }) {
               className="rounded-xl bg-emerald-600 px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-700 disabled:opacity-50"
             >
               {busy ? 'Adding Stock...' : 'Confirm Restock'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-function AdjustStockModal({ product, onClose, onAdjusted }) {
-  const [targetStock, setTargetStock] = useState(product.currentStock)
-  const [remarks, setRemarks] = useState('Manual stock reconciliation')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-
-  const handleAdjust = async (e) => {
-    e.preventDefault()
-    setError('')
-    setBusy(true)
-
-    try {
-      const res = await adjustInventoryStock({
-        productId: product._id,
-        targetStock: Number(targetStock),
-        remarks,
-      })
-      onAdjusted(res?.product)
-    } catch (err) {
-      setError(err.message || 'Failed to adjust stock')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div>
-            <h3 className="text-base font-bold text-slate-900">Manual Stock Adjustment</h3>
-            <p className="text-xs text-slate-500">{product.name} ({product.sku})</p>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
-            <XCircle className="h-5 w-5" />
-          </button>
-        </div>
-
-        {error && (
-          <div className="mt-3 flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleAdjust} className="mt-4 space-y-4">
-          <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs flex justify-between">
-            <span className="text-slate-500 font-semibold">Previous Stock:</span>
-            <span className="font-black text-slate-900">{product.currentStock} {product.unit}</span>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700">New Target Stock ({product.unit}) *</label>
-            <input
-              type="number"
-              min="0"
-              required
-              value={targetStock}
-              onChange={(e) => setTargetStock(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-900 focus:bg-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700">Audit Remarks / Reason *</label>
-            <input
-              type="text"
-              required
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-              placeholder="e.g. Physical inventory count correction"
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-900 focus:bg-white"
-            />
-          </div>
-
-          <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={busy}
-              className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-slate-800 disabled:opacity-50"
-            >
-              {busy ? 'Saving...' : 'Save Stock Adjustment'}
             </button>
           </div>
         </form>
