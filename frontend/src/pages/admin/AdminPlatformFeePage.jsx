@@ -21,6 +21,8 @@ export function AdminPlatformFeePage() {
   const [isEditingSettings, setIsEditingSettings] = useState(false)
   const [feeType, setFeeType] = useState('fixed')
   const [feeValue, setFeeValue] = useState(0)
+  const [feeApplyToUser, setFeeApplyToUser] = useState(true)
+  const [feeApplyToProvider, setFeeApplyToProvider] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
 
   useEffect(() => {
@@ -36,6 +38,12 @@ export function AdminPlatformFeePage() {
           setSettings(fetchedSettings)
           setFeeType(fetchedSettings.platformFee?.type || 'fixed')
           setFeeValue(fetchedSettings.platformFee?.value || 0)
+          setFeeApplyToUser(
+            fetchedSettings.platformFee?.applyToUser !== undefined
+              ? Boolean(fetchedSettings.platformFee.applyToUser)
+              : fetchedSettings.platformFee?.isActive !== false
+          )
+          setFeeApplyToProvider(Boolean(fetchedSettings.platformFee?.applyToProvider))
         }
       } catch (err) {
         console.error('Failed to fetch bookings:', err)
@@ -46,12 +54,14 @@ export function AdminPlatformFeePage() {
     fetchBookings()
   }, [])
 
+  const getBookingTotalPlatformFee = (b) => Number(b?.platformFee || 0) + Number(b?.providerPlatformFee || 0)
+
   // Filter Bookings based on Status, Search, and Date
   const filteredBookings = useMemo(() => {
     const now = new Date()
     return bookings.filter(b => {
       if (b.status !== 'COMPLETED') return false
-      if (!b.platformFee || b.platformFee <= 0) return false
+      if (getBookingTotalPlatformFee(b) <= 0) return false
 
       // Date Filter
       const bDate = new Date(b.createdAt)
@@ -98,8 +108,8 @@ export function AdminPlatformFeePage() {
     const now = new Date()
     
     bookings.forEach(b => {
-      if (b.status === 'COMPLETED' && b.platformFee > 0) {
-        const fee = b.platformFee || 0
+      const fee = getBookingTotalPlatformFee(b)
+      if (b.status === 'COMPLETED' && fee > 0) {
         allTime += fee
         
         const bDate = new Date(b.createdAt)
@@ -109,7 +119,7 @@ export function AdminPlatformFeePage() {
       }
     })
 
-    const filteredTotal = filteredBookings.reduce((sum, b) => sum + (b.platformFee || 0), 0)
+    const filteredTotal = filteredBookings.reduce((sum, b) => sum + getBookingTotalPlatformFee(b), 0)
 
     return { allTime, currentMonth, filteredTotal }
   }, [bookings, filteredBookings])
@@ -126,8 +136,8 @@ export function AdminPlatformFeePage() {
       b.labor?.name || b.provider?.name || 'N/A',
       b.service?.name || b.category?.name || b.workCategory || 'N/A',
       b.totalAmount || 0,
-      b.platformFee || 0,
-      b.commissionAmount || 0,
+      getBookingTotalPlatformFee(b),
+      (b.commissionAmount || 0) + (b.userCommissionAmount || 0),
       b.laborShare || 0
     ])
 
@@ -149,10 +159,24 @@ export function AdminPlatformFeePage() {
   const handleSaveSettings = async () => {
     setSavingSettings(true)
     try {
-      await adminSettingsApi.updatePlatformFees({ type: feeType, value: Number(feeValue), isActive: true })
+      const res = await adminSettingsApi.updatePlatformFees({
+        type: feeType,
+        value: Number(feeValue),
+        applyToUser: feeApplyToUser,
+        applyToProvider: feeApplyToProvider,
+        isActive: feeApplyToUser || feeApplyToProvider,
+      })
+      const updated = res?.data?.settings?.platformFee
       setSettings(prev => ({
         ...prev,
-        platformFee: { ...prev?.platformFee, type: feeType, value: Number(feeValue) }
+        platformFee: updated || {
+          ...prev?.platformFee,
+          type: feeType,
+          value: Number(feeValue),
+          applyToUser: feeApplyToUser,
+          applyToProvider: feeApplyToProvider,
+          isActive: feeApplyToUser || feeApplyToProvider,
+        }
       }))
       setIsEditingSettings(false)
     } catch (err) {
@@ -167,10 +191,13 @@ export function AdminPlatformFeePage() {
     <div className="space-y-6 relative">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 flex flex-wrap items-center gap-2">
             Platform Fee Ledger
             <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-800">
               {settings?.platformFee?.type === 'percentage' ? `${settings.platformFee.value}%` : `₹${settings?.platformFee?.value || 0}`}
+            </span>
+            <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+              User: {settings?.platformFee?.applyToUser !== false ? 'ON' : 'OFF'} • Provider: {settings?.platformFee?.applyToProvider ? 'ON' : 'OFF'}
             </span>
           </h1>
           <p className="text-sm text-slate-500">Analytics and history of platform fees collected.</p>
@@ -302,7 +329,7 @@ export function AdminPlatformFeePage() {
                         <p className="font-bold text-slate-900">₹{(b.totalAmount || 0).toLocaleString('en-IN')}</p>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <p className="font-bold text-blue-600">+ ₹{(b.platformFee || 0).toLocaleString('en-IN')}</p>
+                        <p className="font-bold text-blue-600">+ ₹{getBookingTotalPlatformFee(b).toLocaleString('en-IN')}</p>
                       </td>
                     </tr>
                   ))
@@ -409,9 +436,16 @@ export function AdminPlatformFeePage() {
                       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
                         <HandCoins className="h-4 w-4" />
                       </div>
-                      <span className="font-semibold text-slate-700">Platform Fee</span>
+                      <span className="font-semibold text-slate-700">Platform Fee (User / Provider)</span>
                     </div>
-                    <span className="font-bold text-blue-600">₹{(selectedBooking.platformFee || 0).toLocaleString('en-IN')}</span>
+                    <span className="font-bold text-blue-600">
+                      ₹{getBookingTotalPlatformFee(selectedBooking).toLocaleString('en-IN')}
+                      {(selectedBooking.providerPlatformFee > 0 || selectedBooking.platformFee > 0) && (
+                        <span className="ml-1.5 text-[11px] font-medium text-slate-500">
+                          (U: ₹{selectedBooking.platformFee || 0}, P: ₹{selectedBooking.providerPlatformFee || 0})
+                        </span>
+                      )}
+                    </span>
                   </div>
                   
                   <div className="flex items-center justify-between px-5 py-3.5">
@@ -421,7 +455,7 @@ export function AdminPlatformFeePage() {
                       </div>
                       <span className="font-semibold text-slate-700">Commission</span>
                     </div>
-                    <span className="font-bold text-blue-600">₹{(selectedBooking.commissionAmount || 0).toLocaleString('en-IN')}</span>
+                    <span className="font-bold text-blue-600">₹{((selectedBooking.commissionAmount || 0) + (selectedBooking.userCommissionAmount || 0)).toLocaleString('en-IN')}</span>
                   </div>
                   
                   <div className="flex items-center justify-between px-5 py-3.5">
@@ -498,6 +532,34 @@ export function AdminPlatformFeePage() {
                   onChange={(e) => setFeeValue(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none transition focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-600/10"
                 />
+              </div>
+
+              <div className="space-y-2.5 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Apply Platform Fee To</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-slate-700">User (Customer Bill)</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={feeApplyToUser}
+                    onClick={() => setFeeApplyToUser(v => !v)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${feeApplyToUser ? 'bg-blue-600' : 'bg-slate-300'}`}
+                  >
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${feeApplyToUser ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-slate-700">Service Provider (Deduction)</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={feeApplyToProvider}
+                    onClick={() => setFeeApplyToProvider(v => !v)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${feeApplyToProvider ? 'bg-blue-600' : 'bg-slate-300'}`}
+                  >
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${feeApplyToProvider ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
               </div>
             </div>
             

@@ -3,43 +3,90 @@ import { BookingCancellationSetting } from '../models/BookingCancellationSetting
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { uploadBufferToCloudinary } from '../services/cloudinaryService.js'
+import { resolveChargeConfig } from '../utils/chargeCalculator.js'
+
+function formatSettingsResponse(settingsDoc) {
+  const plain = settingsDoc?.toObject ? settingsDoc.toObject() : { ...(settingsDoc || {}) }
+  const normalized = resolveChargeConfig(plain)
+  return {
+    ...plain,
+    platformFee: normalized.platformFee,
+    gst: normalized.gst,
+    gstPercentage: normalized.gst.defaultPercentage,
+    commission: normalized.commission,
+  }
+}
 
 export const getSystemSettings = asyncHandler(async (req, res) => {
   let settings = await SystemSetting.findOne({ configKey: 'master_config' })
   if (!settings) {
     settings = await SystemSetting.create({ configKey: 'master_config' })
   }
-  return sendSuccess(res, { data: { settings } })
+  return sendSuccess(res, { data: { settings: formatSettingsResponse(settings) } })
 })
 
 export const updatePlatformFees = asyncHandler(async (req, res) => {
-  const { type, value, isActive } = req.body
+  const { type, value, isActive, applyToUser, applyToProvider } = req.body
   let settings = await SystemSetting.findOne({ configKey: 'master_config' })
   if (!settings) settings = new SystemSetting({ configKey: 'master_config' })
-  
-  const targetObj = settings.platformFee
-  
+
+  const current = resolveChargeConfig(settings).platformFee
+  const targetObj = settings.platformFee || (settings.platformFee = {})
+
   if (type) targetObj.type = type
-  if (value !== undefined) targetObj.value = Number(value)
-  if (isActive !== undefined) targetObj.isActive = Boolean(isActive)
-  
+  if (value !== undefined) targetObj.value = Math.max(0, Number(value) || 0)
+
+  let nextUser = applyToUser !== undefined ? Boolean(applyToUser) : current.applyToUser
+  let nextProvider = applyToProvider !== undefined ? Boolean(applyToProvider) : current.applyToProvider
+
+  if (isActive !== undefined && applyToUser === undefined && applyToProvider === undefined) {
+    if (!isActive) {
+      nextUser = false
+      nextProvider = false
+    } else if (!nextUser && !nextProvider) {
+      nextUser = true
+    }
+  }
+
+  targetObj.applyToUser = nextUser
+  targetObj.applyToProvider = nextProvider
+  targetObj.isActive = nextUser || nextProvider
+
   await settings.save()
-  return sendSuccess(res, { message: 'Platform fees updated', data: { settings } })
+  return sendSuccess(res, { message: 'Platform fees updated', data: { settings: formatSettingsResponse(settings) } })
 })
 
 export const updateCommission = asyncHandler(async (req, res) => {
-  const { type, globalPercentage, isActive, bookingType = 'B2C' } = req.body
+  const { type, globalPercentage, isActive, applyToUser, applyToProvider } = req.body
   let settings = await SystemSetting.findOne({ configKey: 'master_config' })
   if (!settings) settings = new SystemSetting({ configKey: 'master_config' })
-  
-  const targetObj = settings.commission
-  
+
+  const current = resolveChargeConfig(settings).commission
+  const targetObj = settings.commission || (settings.commission = {})
+
   if (type) targetObj.type = type
-  if (globalPercentage !== undefined) targetObj.globalPercentage = Number(globalPercentage)
-  if (isActive !== undefined) targetObj.isActive = Boolean(isActive)
-  
+  if (globalPercentage !== undefined) {
+    targetObj.globalPercentage = Math.max(0, Math.min(100, Number(globalPercentage) || 0))
+  }
+
+  let nextUser = applyToUser !== undefined ? Boolean(applyToUser) : current.applyToUser
+  let nextProvider = applyToProvider !== undefined ? Boolean(applyToProvider) : current.applyToProvider
+
+  if (isActive !== undefined && applyToUser === undefined && applyToProvider === undefined) {
+    if (!isActive) {
+      nextUser = false
+      nextProvider = false
+    } else if (!nextUser && !nextProvider) {
+      nextProvider = true
+    }
+  }
+
+  targetObj.applyToUser = nextUser
+  targetObj.applyToProvider = nextProvider
+  targetObj.isActive = nextUser || nextProvider
+
   await settings.save()
-  return sendSuccess(res, { message: 'Commission updated', data: { settings } })
+  return sendSuccess(res, { message: 'Commission updated', data: { settings: formatSettingsResponse(settings) } })
 })
 
 export const updateLabourCashLimit = asyncHandler(async (req, res) => {
@@ -50,20 +97,44 @@ export const updateLabourCashLimit = asyncHandler(async (req, res) => {
   if (labourCashLimit !== undefined) settings.labourCashLimit = Number(labourCashLimit)
   
   await settings.save()
-  return sendSuccess(res, { message: 'Labour cash limit updated', data: { settings } })
+  return sendSuccess(res, { message: 'Labour cash limit updated', data: { settings: formatSettingsResponse(settings) } })
 })
 
 
 
 export const updateGstPercentage = asyncHandler(async (req, res) => {
-  const { gstPercentage } = req.body
+  const { gstPercentage, defaultPercentage, isActive, applyToUser, applyToProvider } = req.body
   let settings = await SystemSetting.findOne({ configKey: 'master_config' })
   if (!settings) settings = new SystemSetting({ configKey: 'master_config' })
-  
-  if (gstPercentage !== undefined) settings.gstPercentage = Number(gstPercentage)
-  
+
+  const current = resolveChargeConfig(settings).gst
+  if (!settings.gst) settings.gst = {}
+
+  const nextPctRaw = defaultPercentage !== undefined ? defaultPercentage : gstPercentage
+  if (nextPctRaw !== undefined) {
+    const clampedPct = Math.max(0, Math.min(100, Number(nextPctRaw) || 0))
+    settings.gstPercentage = clampedPct
+    settings.gst.defaultPercentage = clampedPct
+  }
+
+  let nextUser = applyToUser !== undefined ? Boolean(applyToUser) : current.applyToUser
+  let nextProvider = applyToProvider !== undefined ? Boolean(applyToProvider) : current.applyToProvider
+
+  if (isActive !== undefined && applyToUser === undefined && applyToProvider === undefined) {
+    if (!isActive) {
+      nextUser = false
+      nextProvider = false
+    } else if (!nextUser && !nextProvider) {
+      nextUser = true
+    }
+  }
+
+  settings.gst.applyToUser = nextUser
+  settings.gst.applyToProvider = nextProvider
+  settings.gst.isActive = nextUser || nextProvider
+
   await settings.save()
-  return sendSuccess(res, { message: 'GST percentage updated', data: { settings } })
+  return sendSuccess(res, { message: 'GST settings updated', data: { settings: formatSettingsResponse(settings) } })
 })
 
 export const updateCancellationPenalty = asyncHandler(async (req, res) => {

@@ -43,7 +43,12 @@ import {
   fetchServiceProductMappings,
 } from '../../api/inventoryApi.js'
 import { LabourBounceCancelModal } from '../../components/labour/LabourBounceCancelModal.jsx'
-import { getLabourBookingShare, getBookingLabourRate, getLabourCashCollectAmount } from '../../lib/bookingLabourShare.js'
+import {
+  getLabourBookingShare,
+  getBookingLabourRate,
+  getLabourCashCollectAmount,
+  getLabourDeductionBreakdown,
+} from '../../lib/bookingLabourShare.js'
 
 function formatDateTime(val) {
   if (!val) return '—'
@@ -829,12 +834,30 @@ export function ActiveJob() {
 
           return (
             <>
-              {share > 0 && (
-                <div className="flex justify-between items-center py-0.5">
-                  <span className="text-slate-500">Your Earning</span>
-                  <span className="font-bold text-slate-900">₹{Math.round(share).toLocaleString('en-IN')}</span>
-                </div>
-              )}
+              {share > 0 && (() => {
+                const deductions = getLabourDeductionBreakdown(booking, user?._id);
+                return (
+                  <div className="py-0.5 space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">Your Earning</span>
+                      <span className="font-bold text-slate-900">₹{Math.round(share).toLocaleString('en-IN')}</span>
+                    </div>
+                    {deductions.total > 0 && (
+                      <div className="flex flex-wrap justify-end gap-1.5 text-[10px] text-slate-500">
+                        {deductions.commission > 0 && (
+                          <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium">Comm: -₹{deductions.commission}</span>
+                        )}
+                        {deductions.platformFee > 0 && (
+                          <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium">Fee: -₹{deductions.platformFee}</span>
+                        )}
+                        {deductions.gst > 0 && (
+                          <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium">GST: -₹{deductions.gst}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Booking Time */}
               <div className="flex justify-between items-center py-1 border-t border-slate-100 mt-2">

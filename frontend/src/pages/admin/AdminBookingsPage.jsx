@@ -659,19 +659,37 @@ function BookingDetailsModal({ booking, onClose }) {
               </div>
             )}
             <div className="flex justify-between text-xs text-slate-600 py-1">
-              <span>Platform Fee:</span>
+              <span>Platform Fee (User):</span>
               <span className="font-semibold text-slate-900">₹{completedBill.completedPlatformFee}</span>
             </div>
+            {Number(booking.providerPlatformFee || 0) > 0 && (
+              <div className="flex justify-between text-xs text-slate-600 py-1">
+                <span>Platform Fee (Provider Deduction):</span>
+                <span className="font-semibold text-slate-900">₹{Math.round(booking.providerPlatformFee)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-xs text-slate-600 py-1">
-              <span>Taxes:</span>
+              <span>Taxes (User GST):</span>
               <span className="font-semibold text-slate-900">₹{completedBill.completedTaxes}</span>
             </div>
+            {Number(booking.providerTaxes || 0) > 0 && (
+              <div className="flex justify-between text-xs text-slate-600 py-1">
+                <span>Taxes (Provider GST Deduction):</span>
+                <span className="font-semibold text-slate-900">₹{Math.round(booking.providerTaxes)}</span>
+              </div>
+            )}
+            {completedBill.completedUserCommission > 0 && (
+              <div className="flex justify-between text-xs text-slate-600 py-1">
+                <span>Commission (User Charge):</span>
+                <span className="font-semibold text-slate-900">₹{completedBill.completedUserCommission}</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm text-slate-900 py-1 font-bold border-t border-slate-200 mt-1 pt-2">
               <span>Total Amount:</span>
               <span className="text-base text-brand font-extrabold">₹{completedBill.completedTotalAmount}</span>
             </div>
             <div className="flex justify-between text-xs text-slate-600 py-1 mt-2">
-              <span>Commission (Admin):</span>
+              <span>Commission (Provider Deduction):</span>
               <span className="font-semibold text-brand">
                 ₹{Math.round(completedBill.isContractorBooking ? (completedBill.completedBasePrice * (1 - getBookingLabourRate(booking))) : (booking.commissionAmount || 0)).toLocaleString('en-IN')}
               </span>

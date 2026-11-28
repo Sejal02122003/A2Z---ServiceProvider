@@ -929,10 +929,12 @@ export function BroadcastPopup() {
                           <span className="text-slate-500">Minimum Baseline:</span>
                           <span className="font-bold text-slate-700 ml-1">₹{Number(eligibilityData.minimumBalance || 0).toLocaleString('en-IN')}</span>
                         </div>
-                        <div>
-                          <span className="text-slate-500">Est. Commission ({eligibilityData.commissionPercentage}%):</span>
-                          <span className="font-bold text-slate-700 ml-1">₹{Number(eligibilityData.estimatedCommission || 0).toLocaleString('en-IN')}</span>
-                        </div>
+                        {Number(eligibilityData.commissionPercentage || 0) > 0 && (
+                          <div>
+                            <span className="text-slate-500">Est. Commission ({eligibilityData.commissionPercentage}%):</span>
+                            <span className="font-bold text-slate-700 ml-1">₹{Number(eligibilityData.estimatedCommission || 0).toLocaleString('en-IN')}</span>
+                          </div>
+                        )}
                         <div>
                           <span className="text-slate-500">Required Balance:</span>
                           <span className="font-extrabold text-slate-900 ml-1">₹{Number(eligibilityData.requiredBalance || 0).toLocaleString('en-IN')}</span>

@@ -104,7 +104,10 @@ const bookingSchema = new mongoose.Schema(
     },
     basePrice: { type: Number, required: true },
     platformFee: { type: Number, required: true, default: 0 },
+    providerPlatformFee: { type: Number, default: 0 },
     taxes: { type: Number, default: 0 },
+    providerTaxes: { type: Number, default: 0 },
+    userCommissionAmount: { type: Number, default: 0 },
     walletDiscount: {
       applied: { type: Boolean, default: false },
       amount: { type: Number, default: 0 },
@@ -183,6 +186,7 @@ const bookingSchema = new mongoose.Schema(
     },
     totalAmount: { type: Number, required: true },
     commissionAmount: { type: Number, required: true, default: 0 },
+    chargeConfigSnapshot: { type: mongoose.Schema.Types.Mixed },
     commissionPercentageSnapshot: { type: Number },
     minimumBalanceSnapshot: { type: Number },
     commissionReservationId: { type: mongoose.Schema.Types.ObjectId, ref: 'WalletReservation' },

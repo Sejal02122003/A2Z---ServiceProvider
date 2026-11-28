@@ -179,10 +179,11 @@ export function MultiServiceCartPage() {
   const savings = billData?.totalSavings ?? Math.max(0, originalSubTotal - subTotal)
   const taxes = billData?.taxes ?? 0
   const platformFee = billData?.platformFee ?? 0
+  const userCommissionAmount = billData?.userCommissionAmount ?? 0
 
   const walletActive = Boolean(useWallet && canUseWallet)
   const walletDiscountApplied = walletActive ? walletUsable : 0
-  const billTotal = Math.max(0, billData?.totalAmount ?? subTotal + platformFee + taxes)
+  const billTotal = Math.max(0, billData?.totalAmount ?? subTotal + platformFee + taxes + userCommissionAmount)
   const totalAmount = Math.max(0, billTotal - walletDiscountApplied)
   const walletCoversBill = walletActive && walletUsable >= billTotal
 
@@ -872,6 +873,15 @@ export function MultiServiceCartPage() {
                 <span>Taxes & GST (Calculated per Category)</span>
                 <span className="font-semibold text-slate-900 font-mono">
                   +₹{Math.round(taxes).toLocaleString('en-IN')}
+                </span>
+              </div>
+            )}
+
+            {userCommissionAmount > 0 && (
+              <div className="flex justify-between text-slate-600 font-medium">
+                <span>Platform Commission</span>
+                <span className="font-semibold text-slate-900 font-mono">
+                  +₹{Math.round(userCommissionAmount).toLocaleString('en-IN')}
                 </span>
               </div>
             )}

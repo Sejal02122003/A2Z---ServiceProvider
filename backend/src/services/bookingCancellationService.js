@@ -13,6 +13,7 @@ import { InAppNotification } from '../models/InAppNotification.js'
 import { User } from '../models/User.js'
 import { sendNotificationToUser } from '../utils/pushNotificationHelper.js'
 import { parseISTDateTime } from '../utils/dateHelper.js'
+import { getBookingTotalAdminRecovery } from '../utils/chargeCalculator.js'
 import {
   calculatePenaltyAmount,
   hasProviderAccepted,
@@ -740,8 +741,7 @@ export async function processVendorCancellation({
 
   // Release cash booking charges reservation if cash booking
   if (booking.paymentMethod === 'CASH') {
-    const expectedCharges =
-      (booking.platformFee || 0) + (booking.taxes || 0) + (booking.commissionAmount || 0)
+    const expectedCharges = getBookingTotalAdminRecovery(booking)
     if (vendorId && expectedCharges > 0) {
       import('./labourWalletService.js')
         .then(({ releaseCashBookingCharges }) => {
@@ -1753,8 +1753,7 @@ export async function processCustomerCancellation({
 
   // Release held cash booking charges on assigned labourer
   if (booking.paymentMethod === 'CASH') {
-    const expectedCharges =
-      (booking.platformFee || 0) + (booking.taxes || 0) + (booking.commissionAmount || 0)
+    const expectedCharges = getBookingTotalAdminRecovery(booking)
     if (assignedVendorId && expectedCharges > 0) {
       import('./labourWalletService.js')
         .then(({ releaseCashBookingCharges }) => {

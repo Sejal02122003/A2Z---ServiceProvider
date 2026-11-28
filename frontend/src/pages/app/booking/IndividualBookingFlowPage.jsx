@@ -2017,10 +2017,18 @@ export function IndividualBookingFlowPage() {
                       <span>₹{completedBill.completedPlatformFee.toLocaleString('en-IN')}</span>
                     </div>
                   )}
-                  <div className="flex justify-between lc-booking-flow-muted">
-                    <span>Taxes (GST)</span>
-                    <span>₹{completedBill.completedTaxes.toLocaleString('en-IN')}</span>
-                  </div>
+                  {completedBill.completedTaxes > 0 && (
+                    <div className="flex justify-between lc-booking-flow-muted">
+                      <span>Taxes (GST)</span>
+                      <span>₹{completedBill.completedTaxes.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  {completedBill.completedUserCommission > 0 && (
+                    <div className="flex justify-between lc-booking-flow-muted">
+                      <span>Platform Commission</span>
+                      <span>₹{completedBill.completedUserCommission.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
                   <div className="mt-2 flex justify-between text-base font-extrabold text-black border-t border-slate-100 pt-2">
                     <span>Total</span>
                     <span>₹{completedBill.completedTotalAmount.toLocaleString('en-IN')}</span>
@@ -2094,10 +2102,18 @@ export function IndividualBookingFlowPage() {
                   <span>{formatInr(completedBill.completedPlatformFee)}</span>
                 </div>
               )}
-              <div className="mt-1 flex justify-between lc-booking-flow-muted">
-                <span>Taxes (GST)</span>
-                <span>{formatInr(completedBill.completedTaxes)}</span>
-              </div>
+              {completedBill.completedTaxes > 0 && (
+                <div className="mt-1 flex justify-between lc-booking-flow-muted">
+                  <span>Taxes (GST)</span>
+                  <span>{formatInr(completedBill.completedTaxes)}</span>
+                </div>
+              )}
+              {completedBill.completedUserCommission > 0 && (
+                <div className="mt-1 flex justify-between lc-booking-flow-muted">
+                  <span>Platform Commission</span>
+                  <span>{formatInr(completedBill.completedUserCommission)}</span>
+                </div>
+              )}
               <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 text-base font-extrabold text-black">
                 <span>Total</span>
                 <span>{formatInr(completedBill.completedTotalAmount)}</span>
@@ -2852,10 +2868,18 @@ export function IndividualBookingFlowPage() {
                       <span>{formatInr(calculatedBill.platformFee)}</span>
                     </div>
                   )}
-                  <div className="mt-1 flex justify-between lc-booking-flow-muted">
-                    <span>Taxes (GST)</span>
-                    <span>{formatInr(calculatedBill.taxes || 0)}</span>
-                  </div>
+                  {calculatedBill.taxes > 0 && (
+                    <div className="mt-1 flex justify-between lc-booking-flow-muted">
+                      <span>Taxes (GST)</span>
+                      <span>{formatInr(calculatedBill.taxes)}</span>
+                    </div>
+                  )}
+                  {calculatedBill.userCommissionAmount > 0 && (
+                    <div className="mt-1 flex justify-between lc-booking-flow-muted">
+                      <span>Platform Commission</span>
+                      <span>{formatInr(calculatedBill.userCommissionAmount)}</span>
+                    </div>
+                  )}
 
                   {/* Wallet Discount Section */}
                   {(() => {

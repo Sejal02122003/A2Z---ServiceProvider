@@ -71,7 +71,13 @@ export function AppEarningsPage() {
         if (b.paymentMethod !== 'CASH' || b.status !== 'COMPLETED' || b.adminSettlementStatus === 'SETTLED') return
         const mainLabId = typeof b.laborId === 'object' ? b.laborId?._id : b.laborId
         if (String(mainLabId) !== String(user?._id)) return
-        unsettledCash += Number(b.platformFee || 0) + Number(b.commissionAmount || 0) + Number(b.taxes || 0)
+        unsettledCash +=
+          Number(b.platformFee || 0) +
+          Number(b.providerPlatformFee || 0) +
+          Number(b.commissionAmount || 0) +
+          Number(b.userCommissionAmount || 0) +
+          Number(b.taxes || 0) +
+          Number(b.providerTaxes || 0)
       })
       setPendingCashDues(Math.round(unsettledCash * 100) / 100)
 

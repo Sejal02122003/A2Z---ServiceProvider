@@ -21,10 +21,10 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
   let totalCommissionsCollected = 0
 
   completedBookings.forEach(booking => {
-    totalRevenue += booking.platformFee || 0
-    totalTaxesCollected += booking.taxes || 0
+    totalRevenue += (booking.platformFee || 0) + (booking.providerPlatformFee || 0)
+    totalTaxesCollected += (booking.taxes || 0) + (booking.providerTaxes || 0)
     totalGrossVolume += booking.totalAmount || 0
-    totalCommissionsCollected += booking.commissionAmount || 0
+    totalCommissionsCollected += (booking.commissionAmount || 0) + (booking.userCommissionAmount || 0)
   })
 
   // User Counts

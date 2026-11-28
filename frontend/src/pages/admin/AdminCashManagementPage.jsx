@@ -255,7 +255,7 @@ export function AdminCashManagementPage() {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {bookings.map(booking => {
-                        const adminDues = (booking.platformFee || 0) + (booking.commissionAmount || 0) + (booking.taxes || 0)
+                        const adminDues = (booking.platformFee || 0) + (booking.providerPlatformFee || 0) + (booking.commissionAmount || 0) + (booking.userCommissionAmount || 0) + (booking.taxes || 0) + (booking.providerTaxes || 0)
                         return (
                           <tr key={booking._id} className="hover:bg-slate-50/50 transition-colors">
                             <td className="py-4 px-4 align-top">

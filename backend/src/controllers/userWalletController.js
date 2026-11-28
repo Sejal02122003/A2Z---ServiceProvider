@@ -166,16 +166,17 @@ export const calculateCheckoutWallet = asyncHandler(async (req, res) => {
       return sendError(res, { message: 'Selected package is not active or available', statusCode: HTTP_STATUS.BAD_REQUEST })
     }
     const packagePrice = Number(pkg.price) || 0
-    let gstPercentage = 0
+    const { SystemSetting } = await import('../models/SystemSetting.js')
+    const { computeBookingCharges, resolveCategoryGstPercentage } = await import('../utils/chargeCalculator.js')
+    const settings = await SystemSetting.findOne({ configKey: 'master_config' })
+    let category = null
     if (pkg.categoryId) {
       const { LabourCategory } = await import('../models/LabourCategory.js')
-      const category = await LabourCategory.findById(pkg.categoryId)
-      if (category && category.isGstActive) {
-        gstPercentage = category.gstPercentage || 0
-      }
+      category = await LabourCategory.findById(pkg.categoryId)
     }
-    const taxes = gstPercentage > 0 ? (packagePrice * gstPercentage) / 100 : 0
-    eligibleAmount = packagePrice + taxes
+    const gstPercentage = resolveCategoryGstPercentage(category, settings)
+    const charges = computeBookingCharges({ basePrice: packagePrice, settings, gstPercentage })
+    eligibleAmount = charges.totalAmount
   } else if (serviceId) {
     const { LabourService } = await import('../models/LabourService.js')
     const service = await LabourService.findById(serviceId).lean()
@@ -183,16 +184,17 @@ export const calculateCheckoutWallet = asyncHandler(async (req, res) => {
       return sendError(res, { message: 'Service not found', statusCode: HTTP_STATUS.NOT_FOUND })
     }
     const basePrice = Number(service.hourlyPrice || service.basePrice || service.pricePerUnit || 0)
-    let gstPercentage = 0
+    const { SystemSetting } = await import('../models/SystemSetting.js')
+    const { computeBookingCharges, resolveCategoryGstPercentage } = await import('../utils/chargeCalculator.js')
+    const settings = await SystemSetting.findOne({ configKey: 'master_config' })
+    let category = null
     if (service.categoryId) {
       const { LabourCategory } = await import('../models/LabourCategory.js')
-      const category = await LabourCategory.findById(service.categoryId)
-      if (category && category.isGstActive) {
-        gstPercentage = category.gstPercentage || 0
-      }
+      category = await LabourCategory.findById(service.categoryId)
     }
-    const taxes = gstPercentage > 0 ? (basePrice * gstPercentage) / 100 : 0
-    eligibleAmount = basePrice + taxes
+    const gstPercentage = resolveCategoryGstPercentage(category, settings)
+    const charges = computeBookingCharges({ basePrice, settings, gstPercentage })
+    eligibleAmount = charges.totalAmount
   } else if (eligibleOrderAmount !== undefined || eligibleBillAmount !== undefined) {
     const rawAmt = eligibleOrderAmount !== undefined ? eligibleOrderAmount : eligibleBillAmount
     if (rawAmt === null || typeof rawAmt === 'boolean' || isNaN(Number(rawAmt)) || Number(rawAmt) < 0) {

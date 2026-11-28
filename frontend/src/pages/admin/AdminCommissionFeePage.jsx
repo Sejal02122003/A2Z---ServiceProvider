@@ -20,6 +20,8 @@ export function AdminCommissionFeePage() {
   const [settings, setSettings] = useState(null)
   const [isEditingSettings, setIsEditingSettings] = useState(false)
   const [commissionValue, setCommissionValue] = useState(0)
+  const [commApplyToUser, setCommApplyToUser] = useState(false)
+  const [commApplyToProvider, setCommApplyToProvider] = useState(true)
   const [savingSettings, setSavingSettings] = useState(false)
   const [actualAmounts, setActualAmounts] = useState({ commissionAmount: 0, platformFeesAmount: 0, serviceAmount: 0 })
 
@@ -35,6 +37,12 @@ export function AdminCommissionFeePage() {
         if (fetchedSettings) {
           setSettings(fetchedSettings)
           setCommissionValue(fetchedSettings.commission?.globalPercentage || 0)
+          setCommApplyToUser(Boolean(fetchedSettings.commission?.applyToUser))
+          setCommApplyToProvider(
+            fetchedSettings.commission?.applyToProvider !== undefined
+              ? Boolean(fetchedSettings.commission.applyToProvider)
+              : fetchedSettings.commission?.isActive !== false
+          )
         }
 
         const amountsRes = await adminSettingsApi.getCommissionFeeAmounts()
@@ -49,12 +57,14 @@ export function AdminCommissionFeePage() {
     fetchBookings()
   }, [])
 
+  const getBookingTotalCommission = (b) => Number(b?.commissionAmount || 0) + Number(b?.userCommissionAmount || 0)
+
   // Filter Bookings based on Status, Search, and Date
   const filteredBookings = useMemo(() => {
     const now = new Date()
     return bookings.filter(b => {
       if (b.paymentMethod !== 'ONLINE' || b.status !== 'COMPLETED') return false
-      if (!b.commissionAmount) return false
+      if (getBookingTotalCommission(b) <= 0) return false
 
       // Date Filter
       const bDate = new Date(b.createdAt)
@@ -106,10 +116,10 @@ export function AdminCommissionFeePage() {
     const serviceMap = new Map()
     
     bookings.forEach(b => {
-      if (b.paymentMethod === 'ONLINE' && b.status === 'COMPLETED' && b.commissionAmount) {
-        const fee = b.commissionAmount
+      const fee = getBookingTotalCommission(b)
+      if (b.paymentMethod === 'ONLINE' && b.status === 'COMPLETED' && fee > 0) {
         allTime += fee
-        totalPlatformFees += (b.platformFee || 0)
+        totalPlatformFees += (b.platformFee || 0) + (b.providerPlatformFee || 0)
         totalServiceAmount += (b.basePrice || 0)
         validCount++
         
@@ -136,7 +146,7 @@ export function AdminCommissionFeePage() {
       }
     })
 
-    const filteredTotal = filteredBookings.reduce((sum, b) => sum + (b.commissionAmount || 0), 0)
+    const filteredTotal = filteredBookings.reduce((sum, b) => sum + getBookingTotalCommission(b), 0)
     const average = validCount > 0 ? Math.round(allTime / validCount) : 0
 
     const topLabourersArray = Array.from(labourMap.entries())
@@ -168,8 +178,8 @@ export function AdminCommissionFeePage() {
       b.laborId?.fullName || 'N/A',
       b.serviceId?.name || 'N/A',
       b.totalAmount || 0,
-      b.platformFee || 0,
-      b.commissionAmount || 0,
+      (b.platformFee || 0) + (b.providerPlatformFee || 0),
+      getBookingTotalCommission(b),
       b.laborShare || 0
     ])
 
@@ -191,10 +201,24 @@ export function AdminCommissionFeePage() {
   const handleSaveSettings = async () => {
     setSavingSettings(true)
     try {
-      await adminSettingsApi.updateCommission({ type: 'global', globalPercentage: Number(commissionValue), isActive: true })
+      const res = await adminSettingsApi.updateCommission({
+        type: 'global',
+        globalPercentage: Number(commissionValue),
+        applyToUser: commApplyToUser,
+        applyToProvider: commApplyToProvider,
+        isActive: commApplyToUser || commApplyToProvider,
+      })
+      const updated = res?.data?.settings?.commission
       setSettings(prev => ({
         ...prev,
-        commission: { ...prev?.commission, type: 'global', globalPercentage: Number(commissionValue) }
+        commission: updated || {
+          ...prev?.commission,
+          type: 'global',
+          globalPercentage: Number(commissionValue),
+          applyToUser: commApplyToUser,
+          applyToProvider: commApplyToProvider,
+          isActive: commApplyToUser || commApplyToProvider,
+        }
       }))
       setIsEditingSettings(false)
     } catch (err) {
@@ -209,10 +233,13 @@ export function AdminCommissionFeePage() {
     <div className="space-y-6 relative">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 flex flex-wrap items-center gap-2">
             Commission Ledger
             <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-800">
               {settings?.commission?.globalPercentage || 0}%
+            </span>
+            <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+              User: {settings?.commission?.applyToUser ? 'ON' : 'OFF'} • Provider: {settings?.commission?.applyToProvider !== false ? 'ON' : 'OFF'}
             </span>
           </h1>
           <p className="text-sm text-slate-500">Analytics and history of commission fees collected from jobs.</p>
@@ -402,7 +429,7 @@ export function AdminCommissionFeePage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <p className="font-bold text-blue-600">+ ₹{(b.commissionAmount || 0).toLocaleString('en-IN')}</p>
+                        <p className="font-bold text-blue-600">+ ₹{getBookingTotalCommission(b).toLocaleString('en-IN')}</p>
                       </td>
                     </tr>
                   ))
@@ -511,7 +538,7 @@ export function AdminCommissionFeePage() {
                       </div>
                       <span className="font-semibold text-slate-700">Platform Fee</span>
                     </div>
-                    <span className="font-bold text-blue-600">₹{(selectedBooking.platformFee || 0).toLocaleString('en-IN')}</span>
+                    <span className="font-bold text-blue-600">₹{((selectedBooking.platformFee || 0) + (selectedBooking.providerPlatformFee || 0)).toLocaleString('en-IN')}</span>
                   </div>
                   
                   <div className="flex items-center justify-between px-5 py-3.5">
@@ -519,9 +546,16 @@ export function AdminCommissionFeePage() {
                       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
                         <Percent className="h-4 w-4" />
                       </div>
-                      <span className="font-semibold text-slate-700">Commission</span>
+                      <span className="font-semibold text-slate-700">Commission (User / Provider)</span>
                     </div>
-                    <span className="font-bold text-blue-600">₹{(selectedBooking.commissionAmount || 0).toLocaleString('en-IN')}</span>
+                    <span className="font-bold text-blue-600">
+                      ₹{getBookingTotalCommission(selectedBooking).toLocaleString('en-IN')}
+                      {(selectedBooking.userCommissionAmount > 0 || selectedBooking.commissionAmount > 0) && (
+                        <span className="ml-1.5 text-[11px] font-medium text-slate-500">
+                          (U: ₹{selectedBooking.userCommissionAmount || 0}, P: ₹{selectedBooking.commissionAmount || 0})
+                        </span>
+                      )}
+                    </span>
                   </div>
                   
                   <div className="flex items-center justify-between px-5 py-3.5">
@@ -577,6 +611,34 @@ export function AdminCommissionFeePage() {
                   onChange={(e) => setCommissionValue(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
                 />
+              </div>
+
+              <div className="space-y-2.5 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Apply Commission To</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-slate-700">Service Provider (Deduction)</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={commApplyToProvider}
+                    onClick={() => setCommApplyToProvider(v => !v)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${commApplyToProvider ? 'bg-blue-600' : 'bg-slate-300'}`}
+                  >
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${commApplyToProvider ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-slate-700">User (Customer Bill)</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={commApplyToUser}
+                    onClick={() => setCommApplyToUser(v => !v)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${commApplyToUser ? 'bg-blue-600' : 'bg-slate-300'}`}
+                  >
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${commApplyToUser ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
               </div>
             </div>
             

@@ -116,26 +116,28 @@ export function getLabourBookingShare(booking, userId) {
  */
 export function getBookingLabourPool(booking) {
   const base = Number(booking?.basePrice) || 0
-  const platformFee = Number(booking?.platformFee) || 0
-  const gst = Number(booking?.taxes) || 0
-  const commission = Number(booking?.commissionAmount) || 0
+  const userPF = Number(booking?.platformFee) || 0
+  const userGst = Number(booking?.taxes) || 0
+  const userComm = Number(booking?.userCommissionAmount) || 0
+  const provComm = Number(booking?.commissionAmount) || 0
+  const provPF = Number(booking?.providerPlatformFee) || 0
+  const provGst = Number(booking?.providerTaxes) || 0
   const discount = Number(booking?.walletDiscount?.amount) || 0
   const net = Number(booking?.totalAmount) || 0
 
   // The bill total before any wallet discount (the wallet discount only lowers what the customer pays)
   let total = net
-  if (discount > 0 && base > 0 && Math.abs(net + discount - (base + platformFee + gst)) < 1) {
+  if (discount > 0 && base > 0 && Math.abs(net + discount - (base + userPF + userGst + userComm)) < 1) {
     total = net + discount
   }
 
   if (total > 0) {
-    // THE formula:  total amount − GST − platform fee − commission
-    return Math.max(0, total - gst - platformFee - commission)
+    return Math.max(0, total - userGst - userPF - userComm - provComm - provPF - provGst)
   }
-  // No usable total on the booking (very old data): fall back to the stored share
+  // No usable total on the booking (very old or 100%-wallet-paid): fall back to the stored share
   const stored = Number(booking?.laborShare)
   if (Number.isFinite(stored) && stored > 0) return stored
-  return Math.max(0, base - commission)
+  return Math.max(0, base - provComm - provPF - provGst)
 }
 
 /**
@@ -202,4 +204,21 @@ export function getLabourCashCollectAmount(booking, userId) {
   if (!booking) return 0
   const totalBill = Number(booking.totalAmount ?? booking.basePrice ?? 0)
   return Math.round(totalBill * getLabourShareRatio(booking, userId))
+}
+
+/**
+ * Provider-side charge deductions applied to a specific worker's share.
+ */
+export function getLabourDeductionBreakdown(booking, userId) {
+  if (!booking) return { commission: 0, platformFee: 0, gst: 0, total: 0 }
+  const ratio = getLabourShareRatio(booking, userId)
+  const commission = Math.round((Number(booking.commissionAmount) || 0) * ratio)
+  const platformFee = Math.round((Number(booking.providerPlatformFee) || 0) * ratio)
+  const gst = Math.round((Number(booking.providerTaxes) || 0) * ratio)
+  return {
+    commission,
+    platformFee,
+    gst,
+    total: commission + platformFee + gst,
+  }
 }

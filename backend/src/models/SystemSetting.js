@@ -22,6 +22,23 @@ const platformFeeSchema = new mongoose.Schema(
       default: 0,
     },
     isActive: { type: Boolean, default: true },
+    applyToUser: { type: Boolean },
+    applyToProvider: { type: Boolean },
+  },
+  { _id: false }
+)
+
+const gstSchema = new mongoose.Schema(
+  {
+    defaultPercentage: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 0,
+    },
+    isActive: { type: Boolean, default: true },
+    applyToUser: { type: Boolean },
+    applyToProvider: { type: Boolean },
   },
   { _id: false }
 )
@@ -42,6 +59,8 @@ const commissionSchema = new mongoose.Schema(
     },
     // Allows overriding commission per category if needed in future, currently just global is managed here
     isActive: { type: Boolean, default: true },
+    applyToUser: { type: Boolean },
+    applyToProvider: { type: Boolean },
   },
   { _id: false }
 )
@@ -58,6 +77,16 @@ const systemSettingSchema = new mongoose.Schema(
     platformFee: {
       type: platformFeeSchema,
       default: () => ({}),
+    },
+    gst: {
+      type: gstSchema,
+      default: () => ({}),
+    },
+    gstPercentage: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 0,
     },
 
     commission: {

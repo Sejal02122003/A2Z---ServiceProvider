@@ -74,8 +74,13 @@ const workforceRequestSchema = new mongoose.Schema(
     },
     totalAmount: { type: Number, default: 0 },
     platformFee: { type: Number, default: 0 },
+    providerPlatformFee: { type: Number, default: 0 },
     commissionAmount: { type: Number, default: 0 },
+    userCommissionAmount: { type: Number, default: 0 },
     taxAmount: { type: Number, default: 0 },
+    providerTaxes: { type: Number, default: 0 },
+    laborShare: { type: Number, default: 0 },
+    chargeConfigSnapshot: { type: mongoose.Schema.Types.Mixed },
   },
   { timestamps: true },
 )

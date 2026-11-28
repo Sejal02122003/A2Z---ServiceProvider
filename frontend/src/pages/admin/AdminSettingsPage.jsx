@@ -36,6 +36,43 @@ function SettingsSection({ icon: Icon, title, description, children, accent = 'b
   )
 }
 
+function RoleApplicabilityToggles({
+  title = 'Apply To',
+  userChecked,
+  onToggleUser,
+  userHint = 'Added to customer checkout bill & invoice',
+  providerChecked,
+  onToggleProvider,
+  providerHint = 'Deducted from service provider earnings',
+}) {
+  const rows = [
+    { key: 'user', label: 'User (Customer)', hint: userHint, checked: userChecked, onToggle: onToggleUser },
+    { key: 'provider', label: 'Service Provider', hint: providerHint, checked: providerChecked, onToggle: onToggleProvider },
+  ]
+  return (
+    <div className="space-y-2.5 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{title}</p>
+      {rows.map((row) => (
+        <div key={row.key} className="flex items-center justify-between gap-3">
+          <div className="min-w-0 cursor-pointer" onClick={() => row.onToggle(!row.checked)}>
+            <p className="text-sm font-semibold text-slate-800">{row.label}</p>
+            <p className="text-[11px] text-slate-500">{row.hint}</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={row.checked}
+            onClick={() => row.onToggle(!row.checked)}
+            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 ${row.checked ? 'bg-brand' : 'bg-slate-200'}`}
+          >
+            <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${row.checked ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function Toast({ message, variant = 'success' }) {
   if (!message) return null
   const styles = variant === 'error'
@@ -72,13 +109,22 @@ export function AdminSettingsPage() {
   const [feeType, setFeeType] = useState('percentage')
   const [feeValue, setFeeValue] = useState('')
   const [feeActive, setFeeActive] = useState(true)
+  const [feeApplyToUser, setFeeApplyToUser] = useState(true)
+  const [feeApplyToProvider, setFeeApplyToProvider] = useState(false)
+
+  // GST Global Settings
+  const [gstDefaultPercentage, setGstDefaultPercentage] = useState('0')
+  const [gstApplyToUser, setGstApplyToUser] = useState(true)
+  const [gstApplyToProvider, setGstApplyToProvider] = useState(false)
 
   // Commission
   const [commissionType, setCommissionType] = useState('global')
   const [commissionPercent, setCommissionPercent] = useState('')
   const [commissionActive, setCommissionActive] = useState(true)
+  const [commissionApplyToUser, setCommissionApplyToUser] = useState(false)
+  const [commissionApplyToProvider, setCommissionApplyToProvider] = useState(true)
 
-  // Sync Fee UI when booking type changes
+  // Sync Fee & GST UI when rawSettings loads
   useEffect(() => {
     if (!rawSettings) return
     const s = rawSettings.platformFee
@@ -86,10 +132,25 @@ export function AdminSettingsPage() {
       setFeeType(s.type || 'percentage')
       setFeeValue(String(s.value ?? ''))
       setFeeActive(s.isActive !== false)
+      setFeeApplyToUser(s.applyToUser !== undefined ? Boolean(s.applyToUser) : s.isActive !== false)
+      setFeeApplyToProvider(Boolean(s.applyToProvider))
     } else {
       setFeeType('percentage')
       setFeeValue('')
       setFeeActive(true)
+      setFeeApplyToUser(true)
+      setFeeApplyToProvider(false)
+    }
+
+    const g = rawSettings.gst
+    if (g) {
+      setGstDefaultPercentage(String(g.defaultPercentage ?? rawSettings.gstPercentage ?? 0))
+      setGstApplyToUser(g.applyToUser !== undefined ? Boolean(g.applyToUser) : g.isActive !== false)
+      setGstApplyToProvider(Boolean(g.applyToProvider))
+    } else {
+      setGstDefaultPercentage(String(rawSettings.gstPercentage ?? 0))
+      setGstApplyToUser(true)
+      setGstApplyToProvider(false)
     }
   }, [rawSettings])
 
@@ -101,10 +162,14 @@ export function AdminSettingsPage() {
       setCommissionType(s.type || 'global')
       setCommissionPercent(String(s.globalPercentage ?? ''))
       setCommissionActive(s.isActive !== false)
+      setCommissionApplyToUser(Boolean(s.applyToUser))
+      setCommissionApplyToProvider(s.applyToProvider !== undefined ? Boolean(s.applyToProvider) : s.isActive !== false)
     } else {
       setCommissionType('global')
       setCommissionPercent('')
       setCommissionActive(true)
+      setCommissionApplyToUser(false)
+      setCommissionApplyToProvider(true)
     }
   }, [rawSettings])
 
@@ -496,7 +561,7 @@ export function AdminSettingsPage() {
         <SettingsSection
           icon={Percent}
           title="Platform Fee"
-          description="Fee charged to service providers on each booking"
+          description="Configure platform fee and toggle whether it applies to User bill or Service Provider earnings"
         >
 
           <div>
@@ -522,25 +587,24 @@ export function AdminSettingsPage() {
               onChange={(e) => setFeeValue(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={feeActive}
-              onClick={() => setFeeActive(!feeActive)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 ${feeActive ? 'bg-brand' : 'bg-slate-200'}`}
-            >
-              <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${feeActive ? 'translate-x-5' : 'translate-x-0'}`} />
-            </button>
-            <label className="text-sm font-medium text-slate-700 cursor-pointer" onClick={() => setFeeActive(!feeActive)}>Active</label>
-          </div>
+          <RoleApplicabilityToggles
+            title="Apply Platform Fee To"
+            userChecked={feeApplyToUser}
+            onToggleUser={setFeeApplyToUser}
+            userHint="Added to customer's booking bill & invoice"
+            providerChecked={feeApplyToProvider}
+            onToggleProvider={setFeeApplyToProvider}
+            providerHint="Deducted from service provider's job earnings"
+          />
           <AppPrimaryButton
             type="button"
             loading={saving === 'Platform Fee'}
             onClick={() => handleSave('Platform Fee', adminSettingsApi.updatePlatformFees, {
               type: feeType,
               value: Number(feeValue),
-              isActive: feeActive,
+              applyToUser: feeApplyToUser,
+              applyToProvider: feeApplyToProvider,
+              isActive: feeApplyToUser || feeApplyToProvider,
             })}
           >
             Save Platform Fee
@@ -551,7 +615,7 @@ export function AdminSettingsPage() {
         <SettingsSection
           icon={IndianRupee}
           title="Commission"
-          description="Percentage the platform takes from workers/vendors"
+          description="Percentage commission and whether it applies to User bill, Service Provider earnings, or both"
         >
 
           <div>
@@ -566,25 +630,24 @@ export function AdminSettingsPage() {
               onChange={(e) => setCommissionPercent(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={commissionActive}
-              onClick={() => setCommissionActive(!commissionActive)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 ${commissionActive ? 'bg-brand' : 'bg-slate-200'}`}
-            >
-              <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${commissionActive ? 'translate-x-5' : 'translate-x-0'}`} />
-            </button>
-            <label className="text-sm font-medium text-slate-700 cursor-pointer" onClick={() => setCommissionActive(!commissionActive)}>Active</label>
-          </div>
+          <RoleApplicabilityToggles
+            title="Apply Commission To"
+            userChecked={commissionApplyToUser}
+            onToggleUser={setCommissionApplyToUser}
+            userHint="Added as a service commission charge to customer's bill"
+            providerChecked={commissionApplyToProvider}
+            onToggleProvider={setCommissionApplyToProvider}
+            providerHint="Deducted from service provider's payout & wallet holds"
+          />
           <AppPrimaryButton
             type="button"
             loading={saving === 'Commission'}
             onClick={() => handleSave('Commission', adminSettingsApi.updateCommission, {
               type: commissionType,
               globalPercentage: Number(commissionPercent),
-              isActive: commissionActive,
+              applyToUser: commissionApplyToUser,
+              applyToProvider: commissionApplyToProvider,
+              isActive: commissionApplyToUser || commissionApplyToProvider,
             })}
           >
             Save Commission
@@ -619,71 +682,129 @@ export function AdminSettingsPage() {
         {/* GST */}
         <SettingsSection
           icon={Receipt}
-          title="Category GST"
-          description="Tax applied on booking based on service category"
+          title="GST Settings & Category Rates"
+          description="Master User / Service Provider GST switches plus per-category GST percentages"
         >
-          <div>
-            <label className={labelClass}>Select Category</label>
-            <SearchableSelect
-              className="mt-1.5"
-              value={selectedGstCategory}
-              placeholder="-- Choose Category --"
-              options={categories.map(cat => ({ label: cat.name, value: cat._id }))}
-              onChange={(val) => {
-                 setSelectedGstCategory(val)
-                 const cat = categories.find(c => c._id === val)
-                 if (cat) {
-                   setGstPercentage(String(cat.gstPercentage || 0))
-                   setIsGstActive(cat.isGstActive !== false)
-                 } else {
-                   setGstPercentage('')
-                   setIsGstActive(true)
-                 }
-              }}
+          <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-black uppercase tracking-wider text-slate-800">
+                  Global GST Applicability
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  Master switches control whether GST is applied to Users and/or Service Providers
+                </p>
+              </div>
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-700">
+                User: {gstApplyToUser ? 'ON' : 'OFF'} • Provider: {gstApplyToProvider ? 'ON' : 'OFF'}
+              </span>
+            </div>
+
+            <div>
+              <label className={labelClass}>Default / Fallback GST (%)</label>
+              <input
+                className={inputClass + ' mt-1.5'}
+                type="number"
+                min={0}
+                max={100}
+                placeholder="e.g. 18 (used if a category has no GST rate set)"
+                value={gstDefaultPercentage}
+                onChange={(e) => setGstDefaultPercentage(e.target.value)}
+              />
+            </div>
+
+            <RoleApplicabilityToggles
+              title="Apply GST To"
+              userChecked={gstApplyToUser}
+              onToggleUser={setGstApplyToUser}
+              userHint="Added to customer's booking bill & invoice"
+              providerChecked={gstApplyToProvider}
+              onToggleProvider={setGstApplyToProvider}
+              providerHint="Deducted from service provider's job earnings"
             />
-          </div>
-          <div>
-            <label className={labelClass}>GST (%)</label>
-            <input
-              className={inputClass + ' mt-1.5'}
-              type="number"
-              min={0}
-              max={100}
-              placeholder="e.g. 18"
-              value={gstPercentage}
-              onChange={(e) => setGstPercentage(e.target.value)}
-              disabled={!selectedGstCategory}
-            />
-          </div>
-          <div className="flex items-center gap-3 mt-1.5">
-            <button
+
+            <AppPrimaryButton
               type="button"
-              role="switch"
-              aria-checked={isGstActive}
-              disabled={!selectedGstCategory}
-              onClick={() => setIsGstActive(!isGstActive)}
-              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 ${isGstActive ? 'bg-brand' : 'bg-slate-200'} ${!selectedGstCategory ? 'opacity-50 cursor-not-allowed' : ''}`}
+              loading={saving === 'Global GST'}
+              onClick={() => handleSave('Global GST', adminSettingsApi.updateGstPercentage, {
+                defaultPercentage: Number(gstDefaultPercentage || 0),
+                gstPercentage: Number(gstDefaultPercentage || 0),
+                applyToUser: gstApplyToUser,
+                applyToProvider: gstApplyToProvider,
+                isActive: gstApplyToUser || gstApplyToProvider,
+              })}
             >
-              <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isGstActive ? 'translate-x-5' : 'translate-x-0'}`} />
-            </button>
-            <label className={`text-sm font-medium text-slate-700 ${!selectedGstCategory ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} onClick={() => { if(selectedGstCategory) setIsGstActive(!isGstActive) }}>Active</label>
+              Save Global GST Settings
+            </AppPrimaryButton>
           </div>
-          <AppPrimaryButton
-            type="button"
-            loading={saving === 'GST'}
-            disabled={!selectedGstCategory}
-            onClick={() => {
-              handleSave('GST', (payload) => updateAdminLabourCategoryGst(selectedGstCategory, payload), {
-                gstPercentage: Number(gstPercentage),
-                isGstActive: isGstActive,
-              }).then(() => {
-                // Update local state so it stays correctly configured when switching
-                setCategories(prev => prev.map(c => c._id === selectedGstCategory ? { ...c, gstPercentage: Number(gstPercentage), isGstActive } : c))
-              })
-            }}
-          >
-            Save GST
-          </AppPrimaryButton>
+
+          <div className="pt-2 border-t border-slate-100 space-y-4">
+            <p className="text-xs font-black uppercase tracking-wider text-slate-800">
+              Category-wise GST Rate
+            </p>
+            <div>
+              <label className={labelClass}>Select Category</label>
+              <SearchableSelect
+                className="mt-1.5"
+                value={selectedGstCategory}
+                placeholder="-- Choose Category --"
+                options={categories.map(cat => ({ label: cat.name, value: cat._id }))}
+                onChange={(val) => {
+                   setSelectedGstCategory(val)
+                   const cat = categories.find(c => c._id === val)
+                   if (cat) {
+                     setGstPercentage(String(cat.gstPercentage || 0))
+                     setIsGstActive(cat.isGstActive !== false)
+                   } else {
+                     setGstPercentage('')
+                     setIsGstActive(true)
+                   }
+                }}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Category GST (%)</label>
+              <input
+                className={inputClass + ' mt-1.5'}
+                type="number"
+                min={0}
+                max={100}
+                placeholder="e.g. 18"
+                value={gstPercentage}
+                onChange={(e) => setGstPercentage(e.target.value)}
+                disabled={!selectedGstCategory}
+              />
+            </div>
+            <div className="flex items-center gap-3 mt-1.5">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isGstActive}
+                disabled={!selectedGstCategory}
+                onClick={() => setIsGstActive(!isGstActive)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 ${isGstActive ? 'bg-brand' : 'bg-slate-200'} ${!selectedGstCategory ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <span aria-hidden="true" className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isGstActive ? 'translate-x-5' : 'translate-x-0'}`} />
+              </button>
+              <label className={`text-sm font-medium text-slate-700 ${!selectedGstCategory ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`} onClick={() => { if(selectedGstCategory) setIsGstActive(!isGstActive) }}>Category GST Active</label>
+            </div>
+            <AppPrimaryButton
+              type="button"
+              loading={saving === 'GST'}
+              disabled={!selectedGstCategory}
+              onClick={() => {
+                handleSave('GST', (payload) => updateAdminLabourCategoryGst(selectedGstCategory, payload), {
+                  gstPercentage: Number(gstPercentage),
+                  isGstActive: isGstActive,
+                }).then(() => {
+                  // Update local state so it stays correctly configured when switching
+                  setCategories(prev => prev.map(c => c._id === selectedGstCategory ? { ...c, gstPercentage: Number(gstPercentage), isGstActive } : c))
+                })
+              }}
+            >
+              Save Category GST
+            </AppPrimaryButton>
+          </div>
 
           {/* Category GST Breakdown Overview */}
           <div className="pt-4 border-t border-slate-100 space-y-3">

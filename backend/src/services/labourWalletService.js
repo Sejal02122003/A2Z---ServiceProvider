@@ -6,6 +6,7 @@ import { AdminWallet } from '../models/AdminWallet.js'
 import { Booking } from '../models/Booking.js'
 import { getWalletSettings } from './userWalletService.js'
 import { getBookingLabourPool, getLabourShareRatio } from '../utils/labourShare.js'
+import { getBookingTotalAdminRecovery } from '../utils/chargeCalculator.js'
 
 /**
  * Get or create Labour Wallet
@@ -131,10 +132,7 @@ export async function reserveCashBookingCharges({ labourId, booking }) {
   }
 
   const bookingAmount = Number(booking.totalAmount || booking.basePrice || 0)
-  const expectedCharges = Math.max(
-    0,
-    Number((booking.platformFee || 0) + (booking.taxes || 0) + (booking.commissionAmount || 0))
-  )
+  const expectedCharges = getBookingTotalAdminRecovery(booking)
 
   // Ensure wallet document exists
   await getOrCreateLabourWallet(labourId)
@@ -224,15 +222,25 @@ async function settleSingleWorkerCashShare({ booking, workerId, ratio, session }
     }
   }
 
-  const commission = Math.round(Number(booking.commissionAmount || 0) * ratio)
-  const platformFee = Math.round(Number(booking.platformFee || 0) * ratio)
-  const gst = Math.round(Number(booking.taxes || 0) * ratio)
+  const commission = Math.round(
+    (Number(booking.commissionAmount || 0) + Number(booking.userCommissionAmount || 0)) * ratio
+  )
+  const platformFee = Math.round(
+    (Number(booking.platformFee || 0) + Number(booking.providerPlatformFee || 0)) * ratio
+  )
+  const gst = Math.round(
+    (Number(booking.taxes || 0) + Number(booking.providerTaxes || 0)) * ratio
+  )
   const totalCharges = commission + platformFee + gst
 
   // Part of the bill the customer paid from their wallet: the platform holds that money, so the
   // provider collected that much less cash. It is offset against the charges recovered here.
   const walletPaid = booking.walletDiscount?.applied ? Number(booking.walletDiscount.amount) || 0 : 0
-  const fullBill = Number(booking.basePrice || 0) + Number(booking.platformFee || 0) + Number(booking.taxes || 0)
+  const fullBill =
+    Number(booking.basePrice || 0) +
+    Number(booking.platformFee || 0) +
+    Number(booking.taxes || 0) +
+    Number(booking.userCommissionAmount || 0)
   const collectedLess = walletPaid > 0 && Math.abs(Number(booking.totalAmount || 0) + walletPaid - fullBill) < 1
   const walletShare = collectedLess ? Math.round(walletPaid * ratio) : 0
   const walletOffset = Math.min(walletShare, totalCharges)
@@ -392,9 +400,9 @@ export async function settleCashBookingPayment({ bookingId, labourId = null, ses
   // Record AdminWallet splits once per booking (when full booking is paid)
   const allAssignmentsPaid = liveAssignments.length === 0 || liveAssignments.every((a) => a.paymentStatus === 'PAID')
   if ((allAssignmentsPaid || booking.paymentStatus === 'PAID') && booking.adminSettlementStatus !== 'SETTLED') {
-    const commission = Number(booking.commissionAmount || 0)
-    const platformFee = Number(booking.platformFee || 0)
-    const gst = Number(booking.taxes || 0)
+    const commission = Number(booking.commissionAmount || 0) + Number(booking.userCommissionAmount || 0)
+    const platformFee = Number(booking.platformFee || 0) + Number(booking.providerPlatformFee || 0)
+    const gst = Number(booking.taxes || 0) + Number(booking.providerTaxes || 0)
     if (platformFee > 0 || commission > 0 || booking.basePrice > 0 || gst > 0) {
       let adminWallet = await AdminWallet.findOne().session(session)
       if (!adminWallet) {
@@ -521,12 +529,15 @@ export async function creditOnlineBookingPayout({ booking, session = null }) {
 
   // Record AdminWallet splits once when the full booking is completed
   if (booking.status === 'COMPLETED' && booking.adminSettlementStatus !== 'SETTLED') {
-    if (booking.platformFee > 0 || booking.commissionAmount > 0 || booking.basePrice > 0 || booking.taxes > 0) {
+    const commission = (booking.commissionAmount || 0) + (booking.userCommissionAmount || 0)
+    const platformFee = (booking.platformFee || 0) + (booking.providerPlatformFee || 0)
+    const gst = (booking.taxes || 0) + (booking.providerTaxes || 0)
+    if (platformFee > 0 || commission > 0 || booking.basePrice > 0 || gst > 0) {
       let adminWallet = await AdminWallet.findOne().session(session)
       if (!adminWallet) adminWallet = new AdminWallet()
-      adminWallet.totalPlatformFeesCollected += (booking.platformFee || 0)
-      adminWallet.totalCommissionsCollected += (booking.commissionAmount || 0)
-      adminWallet.totalTaxesCollected += (booking.taxes || 0)
+      adminWallet.totalPlatformFeesCollected += platformFee
+      adminWallet.totalCommissionsCollected += commission
+      adminWallet.totalTaxesCollected += gst
       adminWallet.totalServiceAmountCollected += (booking.basePrice || 0)
       await adminWallet.save({ session })
     }

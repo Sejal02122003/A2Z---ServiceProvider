@@ -10,6 +10,11 @@ import { Invoice } from '../models/Invoice.js'
 import { INVOICE_STATUS } from '../constants/workforceConstants.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { getBookingLabourPool } from '../utils/labourShare.js'
+import {
+  computeBookingCharges,
+  resolveCategoryGstPercentage,
+  getBookingTotalAdminRecovery,
+} from '../utils/chargeCalculator.js'
 import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { parseISTDateTime } from '../utils/dateHelper.js'
 import { recordLateFeeIncident, recordBounceIncident } from '../services/penaltyService.js'
@@ -96,34 +101,26 @@ export const calculateBill = asyncHandler(async (req, res) => {
     const basePrice = subTotal
     const maxHourDiscount = 0
 
-    let platformFee = 0
-    if (settings.platformFee.isActive) {
-      if (settings.platformFee.type === 'fixed') {
-        platformFee = settings.platformFee.value
-      } else if (settings.platformFee.type === 'percentage') {
-        platformFee = (basePrice * settings.platformFee.value) / 100
-      }
-    }
-
     let gstPercentage = 0
     if (pkg.categoryId) {
       const { LabourCategory } = await import('../models/LabourCategory.js')
       const category = await LabourCategory.findById(pkg.categoryId)
-      if (category && category.isGstActive) {
-        gstPercentage = category.gstPercentage || 0
-      }
-    } else if (settings.gstPercentage > 0) {
-      gstPercentage = settings.gstPercentage
+      gstPercentage = resolveCategoryGstPercentage(category, settings)
+    } else {
+      gstPercentage = resolveCategoryGstPercentage(null, settings)
     }
 
-    const taxes = gstPercentage > 0 ? (basePrice * gstPercentage) / 100 : 0
-    // Customer pays basePrice + platformFee + taxes (platform fee is part of the final bill)
-    const totalAmount = basePrice + platformFee + taxes
-
-    let commissionAmount = 0
-    if (settings.commission.isActive && settings.commission.type === 'global') {
-      commissionAmount = (basePrice * settings.commission.globalPercentage) / 100
-    }
+    const charges = computeBookingCharges({
+      basePrice,
+      settings,
+      gstPercentage,
+    })
+    const platformFee = charges.platformFee
+    const taxes = charges.taxes
+    const userCommissionAmount = charges.userCommissionAmount
+    const totalAmount = charges.totalAmount
+    const commissionAmount = charges.commissionAmount
+    const laborShare = charges.laborShare
 
     let walletInfo = {
       enabled: false,
@@ -180,14 +177,17 @@ export const calculateBill = asyncHandler(async (req, res) => {
         totalSavings: serviceDiscount,
         basePrice,
         platformFee,
+        providerPlatformFee: charges.providerPlatformFee,
         taxes,
+        providerTaxes: charges.providerTaxes,
+        userCommissionAmount,
         totalAmount,
         totalDurationMins: Number(pkg.estimatedDurationMins || 60) * (Number(quantity) || 1),
         formattedDuration: formatDurationHuman(Number(pkg.estimatedDurationMins || 60) * (Number(quantity) || 1)),
         estimatedDurationMins: Number(pkg.estimatedDurationMins || 60) * (Number(quantity) || 1),
         commissionAmount,
-        // Platform fee is billed to the customer, so it is not deducted from the provider's share
-        laborShare: Math.round(Math.max(0, basePrice - commissionAmount)),
+        laborShare,
+        chargeConfig: charges.config,
         paymentModes: settings.paymentModes || { cashEnabled: true, onlineEnabled: true },
         breakdown,
         walletInfo,
@@ -349,18 +349,13 @@ export const calculateBill = asyncHandler(async (req, res) => {
     subTotal += itemTotal
     serviceDiscount += itemDiscount
 
-    // Calculate category GST for this item
-    let itemGst = 0
+    // Calculate category GST for this item (with global default fallback; master toggle applied in computeBookingCharges)
+    let catDoc = null
     if (categoryId) {
       const { LabourCategory } = await import('../models/LabourCategory.js')
-      const catDoc = await LabourCategory.findById(categoryId)
-      if (catDoc && catDoc.isGstActive) {
-        itemGst = catDoc.gstPercentage || 0
-      }
+      catDoc = await LabourCategory.findById(categoryId)
     }
-    if (!itemGst && settings.gstPercentage > 0) {
-      itemGst = settings.gstPercentage
-    }
+    const itemGst = resolveCategoryGstPercentage(catDoc, settings)
     const itemTax = itemGst > 0 ? (itemTotal * itemGst) / 100 : 0
     itemTaxesTotal += itemTax
 
@@ -395,43 +390,35 @@ export const calculateBill = asyncHandler(async (req, res) => {
   }
 
   let basePrice = subTotal - maxHourDiscount
-  let platformFee = 0
 
-  if (settings.platformFee.isActive) {
-    if (settings.platformFee.type === 'fixed') {
-      platformFee = settings.platformFee.value
-    } else if (settings.platformFee.type === 'percentage') {
-      platformFee = (basePrice * settings.platformFee.value) / 100
-    }
-  }
-
-  let taxes = isMultiService ? itemTaxesTotal : 0
-
+  let gstPercentage = 0
   if (!isMultiService) {
-    let gstPercentage = 0
+    let category = null
     if (primaryCategoryId) {
       const { LabourCategory } = await import('../models/LabourCategory.js')
-      const category = await LabourCategory.findById(primaryCategoryId)
-      if (category && category.isGstActive) {
-        gstPercentage = category.gstPercentage || 0
-      }
-    } else if (settings.gstPercentage > 0) {
-      // Fallback to global if for some reason category is not resolved
-      gstPercentage = settings.gstPercentage
+      category = await LabourCategory.findById(primaryCategoryId)
     }
-
-    if (gstPercentage > 0) {
-      taxes = (basePrice * gstPercentage) / 100
-    }
+    gstPercentage = resolveCategoryGstPercentage(category, settings)
   }
 
-  // Customer pays basePrice + platformFee + taxes (platform fee is part of the final bill)
-  const totalAmount = basePrice + platformFee + taxes
+  const charges = computeBookingCharges({
+    basePrice,
+    settings,
+    gstPercentage,
+    rawGstAmount: isMultiService ? itemTaxesTotal : null,
+  })
+  const platformFee = charges.platformFee
+  const taxes = charges.taxes
+  const userCommissionAmount = charges.userCommissionAmount
+  const totalAmount = charges.totalAmount
+  const commissionAmount = charges.commissionAmount
+  const laborShare = charges.laborShare
 
-  // Also pre-calculate commission to show to admin internally, but user doesn't necessarily need to see it
-  let commissionAmount = 0
-  if (settings.commission.isActive && settings.commission.type === 'global') {
-    commissionAmount = (basePrice * settings.commission.globalPercentage) / 100
+  // Reflect global user GST toggle in multi-service breakdown rows as well
+  if (!charges.config.gst.applyToUser) {
+    breakdown.forEach((b) => {
+      b.taxes = 0
+    })
   }
 
   // Calculate wallet discount options if user is authenticated
@@ -463,15 +450,18 @@ export const calculateBill = asyncHandler(async (req, res) => {
       totalSavings: serviceDiscount + maxHourDiscount,
       basePrice,
       platformFee,
+      providerPlatformFee: charges.providerPlatformFee,
       taxes,
+      providerTaxes: charges.providerTaxes,
+      userCommissionAmount,
       totalAmount,
       totalDurationMins,
       formattedDuration: formatDurationHuman(totalDurationMins),
       estimatedDurationMins: totalDurationMins,
       totalQuantity: servicesToCalculate.reduce((acc, it) => acc + (Number(it.quantity) || 1), 0),
-      commissionAmount, // Internal calculation preview
-      // Platform fee is billed to the customer, so it is not deducted from the provider's share
-      laborShare: Math.round(Math.max(0, basePrice - commissionAmount)),
+      commissionAmount, // Provider-side commission preview
+      laborShare,
+      chargeConfig: charges.config,
       paymentModes: settings.paymentModes || { cashEnabled: true, onlineEnabled: true },
       breakdown,
       isMultiService,
@@ -652,12 +642,7 @@ export const createBooking = asyncHandler(async (req, res) => {
         }
       }
 
-      let itmGst = 0
-      if (catDoc && catDoc.isGstActive) {
-        itmGst = catDoc.gstPercentage || 0
-      } else if (settings?.gstPercentage > 0) {
-        itmGst = settings.gstPercentage
-      }
+      const itmGst = resolveCategoryGstPercentage(catDoc, settings)
       if (itmGst > 0) {
         multiServiceTaxes += (itemTotal * itmGst) / 100
       }
@@ -888,38 +873,32 @@ export const createBooking = asyncHandler(async (req, res) => {
   }
 
   const basePrice = subTotal - maxHourDiscount
-  let platformFee = 0
-  if (settings?.platformFee?.isActive) {
-    platformFee = settings.platformFee.type === 'fixed'
-      ? settings.platformFee.value
-      : (basePrice * settings.platformFee.value) / 100
-  }
 
-  let taxes = isMultiService ? multiServiceTaxes : 0
-
+  let gstPercentage = 0
   if (!isMultiService) {
-    let gstPercentage = 0
+    let category = null
     if (bookingSubcategoryId) {
       const subcategory = await LabourSubcategory.findById(bookingSubcategoryId)
       if (subcategory) {
         const { LabourCategory } = await import('../models/LabourCategory.js')
-        const category = await LabourCategory.findById(subcategory.categoryId)
-        if (category && category.isGstActive) {
-          gstPercentage = category.gstPercentage || 0
-        }
+        category = await LabourCategory.findById(subcategory.categoryId)
       }
     }
-    if (!gstPercentage && settings?.gstPercentage > 0) {
-      gstPercentage = settings.gstPercentage
-    }
-
-    if (gstPercentage > 0) {
-      taxes = (basePrice * gstPercentage) / 100
-    }
+    gstPercentage = resolveCategoryGstPercentage(category, settings)
   }
 
-  // Customer pays basePrice + platformFee + taxes (platform fee is part of the final bill)
-  const rawTotalAmount = basePrice + platformFee + taxes
+  const charges = computeBookingCharges({
+    basePrice,
+    settings,
+    gstPercentage,
+    rawGstAmount: isMultiService ? multiServiceTaxes : null,
+  })
+  const platformFee = charges.platformFee
+  const taxes = charges.taxes
+  const userCommissionAmount = charges.userCommissionAmount
+
+  // Customer pays basePrice + platformFee + taxes + userCommissionAmount
+  const rawTotalAmount = charges.totalAmount
   let finalPayableAmount = rawTotalAmount
   let walletDiscountData = { applied: false, amount: 0, percentage: 0, eligibleAmount: 0, walletTransactionId: null }
 
@@ -966,13 +945,8 @@ export const createBooking = asyncHandler(async (req, res) => {
     }
   }
 
-  let commissionAmount = 0
-  if (settings?.commission?.isActive && settings.commission.type === 'global') {
-    commissionAmount = (basePrice * settings.commission.globalPercentage) / 100
-  }
-
-  // Platform fee is billed to the customer, so it is not deducted from the provider's share
-  const laborShare = Math.round(Math.max(0, basePrice - commissionAmount))
+  const commissionAmount = charges.commissionAmount
+  const laborShare = charges.laborShare
 
   const startOtp = Math.floor(1000 + Math.random() * 9000).toString()
   const completionOtp = Math.floor(1000 + Math.random() * 9000).toString()
@@ -1011,11 +985,15 @@ export const createBooking = asyncHandler(async (req, res) => {
       },
       basePrice,
       platformFee,
+      providerPlatformFee: charges.providerPlatformFee,
       taxes,
+      providerTaxes: charges.providerTaxes,
       walletDiscount: walletDiscountData,
       totalAmount: finalPayableAmount,
       commissionAmount,
+      userCommissionAmount,
       laborShare,
+      chargeConfigSnapshot: charges.chargeConfigSnapshot,
       // The wallet only covers part of a bill (admin % limit). WALLET is a valid method only when it pays
       // everything; if anything is left to pay it must be collected as Cash (or Online) - never as 'WALLET'.
       paymentMethod: finalPayableAmount === 0 && (walletDiscountData.applied || paymentMethod === 'WALLET')
@@ -1355,7 +1333,7 @@ export const getMyBookings = asyncHandler(async (req, res) => {
           }
         }
         b.basePrice = discounted * (b.hours || 1) * (b.quantity || 1)
-        b.totalAmount = b.basePrice + Number(b.platformFee || 0) + Number(b.taxes || 0)
+        b.totalAmount = b.basePrice + Number(b.platformFee || 0) + Number(b.taxes || 0) + Number(b.userCommissionAmount || 0)
       }
     }
   })
@@ -1659,17 +1637,17 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
       // ONLY payout if the customer has actually completed the online payment.
       // If they haven't paid yet, the paymentController will handle this payout later once they pay.
       if (booking.paymentStatus === 'PAID') {
-        // Settle booking commission reservation
-        import('../services/walletEligibilityService.js').then(({ settleBookingCommission }) => {
-          settleBookingCommission({ bookingId: booking._id }).catch(err => console.error('[Online Settlement Error]:', err))
-        }).catch(() => { })
-
         try {
           const { creditOnlineBookingPayout } = await import('../services/labourWalletService.js')
           await creditOnlineBookingPayout({ booking })
         } catch (payoutErr) {
           console.error('[Online Split Payout Error in updateBookingStatus]:', payoutErr)
         }
+
+        // Settle booking commission reservation after payout updates AdminWallet status
+        import('../services/walletEligibilityService.js').then(({ settleBookingCommission }) => {
+          settleBookingCommission({ bookingId: booking._id }).catch(err => console.error('[Online Settlement Error]:', err))
+        }).catch(() => { })
       }
 
       // Trigger Rewards & Incentives evaluation for participating vendors
@@ -1768,7 +1746,7 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
     // Release held cash charges reservation for labourer if cash booking
     if (booking.paymentMethod === 'CASH') {
       const labourIdToRelease = booking.laborId || booking.acceptedLabourId || (assignment ? assignment.labourId : null)
-      const expectedCharges = (booking.platformFee || 0) + (booking.taxes || 0) + (booking.commissionAmount || 0)
+      const expectedCharges = getBookingTotalAdminRecovery(booking)
       if (labourIdToRelease && expectedCharges > 0) {
         import('../services/labourWalletService.js').then(({ releaseCashBookingCharges }) => {
           releaseCashBookingCharges({ labourId: labourIdToRelease, bookingId: booking._id, amount: expectedCharges })
@@ -2109,43 +2087,25 @@ export const addExtraTime = asyncHandler(async (req, res) => {
 
   const settings = await SystemSetting.findOne({ configKey: 'master_config' })
 
-  let platformFee = booking.platformFee
-  if (settings?.platformFee?.isActive) {
-    platformFee = settings.platformFee.type === 'fixed'
-      ? settings.platformFee.value
-      : (newBasePrice * settings.platformFee.value) / 100
-  }
-
-  const baseAmount = newBasePrice + platformFee
-  let taxes = 0
-
   let gstPercentage = 0
   if (booking.subcategoryId) {
     const subcategory = await LabourSubcategory.findById(booking.subcategoryId)
     if (subcategory) {
       const { LabourCategory } = await import('../models/LabourCategory.js')
       const category = await LabourCategory.findById(subcategory.categoryId)
-      if (category && category.isGstActive) {
-        gstPercentage = category.gstPercentage || 0
-      }
+      gstPercentage = resolveCategoryGstPercentage(category, settings)
+    } else {
+      gstPercentage = resolveCategoryGstPercentage(null, settings)
     }
-  } else if (settings?.gstPercentage > 0) {
-    gstPercentage = settings.gstPercentage
+  } else {
+    gstPercentage = resolveCategoryGstPercentage(null, settings)
   }
 
-  if (gstPercentage > 0) {
-    taxes = (newBasePrice * gstPercentage) / 100
-  }
-
-
-  const newTotalAmount = baseAmount + taxes
-
-  let commissionAmount = booking.commissionAmount
-  if (settings?.commission?.isActive && settings.commission.type === 'global') {
-    commissionAmount = (newBasePrice * settings.commission.globalPercentage) / 100
-  }
-
-  const laborShare = Math.round(Math.max(0, newBasePrice - commissionAmount))
+  const charges = computeBookingCharges({
+    basePrice: newBasePrice,
+    settings,
+    gstPercentage,
+  })
 
   // Update specific assignment or the whole booking
   if (assignmentId && booking.assignments && booking.assignments.length > 0) {
@@ -2159,13 +2119,17 @@ export const addExtraTime = asyncHandler(async (req, res) => {
   }
 
   booking.basePrice = newBasePrice
-  booking.platformFee = platformFee
-  booking.taxes = taxes
+  booking.platformFee = charges.platformFee
+  booking.providerPlatformFee = charges.providerPlatformFee
+  booking.taxes = charges.taxes
+  booking.providerTaxes = charges.providerTaxes
   // Keep the amount already paid from the wallet off the customer's payable total
   const walletPaid = booking.walletDiscount?.applied ? Number(booking.walletDiscount.amount) || 0 : 0
-  booking.totalAmount = Math.max(0, newTotalAmount - walletPaid)
-  booking.commissionAmount = commissionAmount
-  booking.laborShare = laborShare
+  booking.totalAmount = Math.max(0, charges.totalAmount - walletPaid)
+  booking.commissionAmount = charges.commissionAmount
+  booking.userCommissionAmount = charges.userCommissionAmount
+  booking.laborShare = charges.laborShare
+  booking.chargeConfigSnapshot = charges.chargeConfigSnapshot
 
   await booking.save()
 
@@ -2203,22 +2167,31 @@ export const generateMyInvoice = asyncHandler(async (req, res) => {
 
   let invoice = await Invoice.findOne({ requestId: id }).lean()
 
-  // Repair invoices generated before the platform fee was stored on them.
+  // Repair invoices generated before platform fee or user commission was stored on them.
+  const repairSet = {}
   if (
     invoice &&
     !Number(invoice.platformFee) &&
     Number(booking.platformFee) > 0 &&
     !(booking.contractorInfo?.services?.length > 0)
   ) {
-    const fee = Number(booking.platformFee)
+    repairSet.platformFee = Number(booking.platformFee)
+  }
+  if (
+    invoice &&
+    !Number(invoice.userCommissionAmount) &&
+    Number(booking.userCommissionAmount) > 0 &&
+    !(booking.contractorInfo?.services?.length > 0)
+  ) {
+    repairSet.userCommissionAmount = Number(booking.userCommissionAmount)
+  }
+  if (Object.keys(repairSet).length > 0) {
+    const nextPf = repairSet.platformFee !== undefined ? repairSet.platformFee : (invoice.platformFee || 0)
+    const nextUc = repairSet.userCommissionAmount !== undefined ? repairSet.userCommissionAmount : (invoice.userCommissionAmount || 0)
+    repairSet.total = (invoice.subtotal || 0) + (invoice.gstTotal || 0) + nextPf + nextUc
     invoice = await Invoice.findByIdAndUpdate(
       invoice._id,
-      {
-        $set: {
-          platformFee: fee,
-          total: (invoice.subtotal || 0) + (invoice.gstTotal || 0) + fee,
-        },
-      },
+      { $set: repairSet },
       { new: true },
     ).lean()
   }
@@ -2263,7 +2236,8 @@ export const generateMyInvoice = asyncHandler(async (req, res) => {
       const ratio = originalBase > 0 ? subtotal / originalBase : 0
       const gstTotal = Math.round((booking.taxes || 0) * ratio)
       const platformFee = subtotal > 0 ? (booking.platformFee || 0) : 0
-      const total = subtotal + gstTotal + platformFee
+      const userCommissionAmount = subtotal > 0 ? Math.round((booking.userCommissionAmount || 0) * ratio) : 0
+      const total = subtotal + gstTotal + platformFee + userCommissionAmount
 
       invoice = await Invoice.create({
         invoiceNumber: generateInvoiceNumber(),
@@ -2276,6 +2250,7 @@ export const generateMyInvoice = asyncHandler(async (req, res) => {
         subtotal,
         gstTotal,
         platformFee,
+        userCommissionAmount,
         total,
         issuedAt: new Date(),
         dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
@@ -2292,9 +2267,10 @@ export const generateMyInvoice = asyncHandler(async (req, res) => {
         }
       ]
 
-      // Gross bill = base + platform fee + taxes. (booking.totalAmount is the amount still payable,
+      // Gross bill = base + platform fee + taxes + userCommission. (booking.totalAmount is the amount still payable,
       // which is 0 for wallet-paid bookings, so it can't be used as the invoice total.)
       const normalPlatformFee = Number(booking.platformFee || 0)
+      const normalUserComm = Number(booking.userCommissionAmount || 0)
       invoice = await Invoice.create({
         invoiceNumber: generateInvoiceNumber(),
         contractorId: undefined,
@@ -2306,7 +2282,8 @@ export const generateMyInvoice = asyncHandler(async (req, res) => {
         subtotal: booking.basePrice || 0,
         gstTotal: booking.taxes || 0,
         platformFee: normalPlatformFee,
-        total: (booking.basePrice || 0) + normalPlatformFee + (booking.taxes || 0),
+        userCommissionAmount: normalUserComm,
+        total: (booking.basePrice || 0) + normalPlatformFee + (booking.taxes || 0) + normalUserComm,
         issuedAt: new Date(),
         dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
       })

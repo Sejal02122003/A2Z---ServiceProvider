@@ -409,10 +409,16 @@ export function Checkout() {
                 <span className="font-bold text-slate-900">{formatInr(bill.platformFee)}</span>
               </div>
             )}
-            {bill.taxes != null && (
+            {bill.taxes > 0 && (
               <div className="flex justify-between">
                 <span className="text-slate-600">Taxes (GST)</span>
                 <span className="font-bold text-slate-900">{formatInr(bill.taxes)}</span>
+              </div>
+            )}
+            {bill.userCommissionAmount > 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-600">Platform Commission</span>
+                <span className="font-bold text-slate-900">{formatInr(bill.userCommissionAmount)}</span>
               </div>
             )}
 

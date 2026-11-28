@@ -138,8 +138,8 @@ export const createRequest = asyncHandler(async (req, res) => {
   }
 
   const SystemSetting = (await import('../models/SystemSetting.js')).SystemSetting
+  const { computeBookingCharges, resolveCategoryGstPercentage } = await import('../utils/chargeCalculator.js')
   const globalSettings = await SystemSetting.findOne({ configKey: 'master_config' }).lean()
-  const platformFeeConfig = globalSettings?.platformFee?.isActive ? globalSettings.platformFee : null
 
   let days = 1
   if (finalStartDate && endDate) {
@@ -154,21 +154,16 @@ export const createRequest = asyncHandler(async (req, res) => {
     return sum + ((line.adminPrice || 0) * (Number(line.quantity) || 1) * days)
   }, 0)
 
-  let platformFee = 0
-  if (platformFeeConfig) {
-    if (platformFeeConfig.type === 'fixed') {
-      platformFee = platformFeeConfig.value
-    } else if (platformFeeConfig.type === 'percentage') {
-      platformFee = (basePriceTotal * platformFeeConfig.value) / 100
-    }
-  }
-  
-  let commissionAmount = 0
-
-  const gstPercentage = globalSettings?.gstPercentage || 0
-  const taxAmount = ((platformFee + commissionAmount) * gstPercentage) / 100
-  
-  const totalAmount = basePriceTotal + platformFee + taxAmount
+  const defaultGstPct = resolveCategoryGstPercentage(null, globalSettings)
+  const charges = computeBookingCharges({
+    basePrice: basePriceTotal,
+    settings: globalSettings,
+    gstPercentage: defaultGstPct,
+  })
+  const platformFee = charges.platformFee
+  const commissionAmount = charges.commissionAmount
+  const taxAmount = charges.taxes
+  const totalAmount = charges.totalAmount
 
   const request = await WorkforceRequest.create({
     reference: generateRequestReference(sourceType === REQUEST_SOURCE.CONTRACTOR ? 'CR' : 'IR'),
@@ -193,8 +188,13 @@ export const createRequest = asyncHandler(async (req, res) => {
     paymentStatus: 'PENDING',
     totalAmount,
     platformFee,
+    providerPlatformFee: charges.providerPlatformFee,
     commissionAmount,
+    userCommissionAmount: charges.userCommissionAmount,
     taxAmount,
+    providerTaxes: charges.providerTaxes,
+    laborShare: charges.laborShare,
+    chargeConfigSnapshot: charges.chargeConfigSnapshot,
   })
 
   // Bypass admin and emit socket instantly if it's a direct request
@@ -381,57 +381,60 @@ export const getRequest = asyncHandler(async (req, res) => {
   const LabourSubcategoryModel = (await import('../models/LabourSubcategory.js')).LabourSubcategory
   const allSubcategories = await LabourSubcategoryModel.find({}).lean()
   
+  // Global settings for charges
+  const SystemSetting = (await import('../models/SystemSetting.js')).SystemSetting
+  const { computeBookingCharges, resolveCategoryGstPercentage, resolveChargeConfig } = await import('../utils/chargeCalculator.js')
+  const globalSettings = await SystemSetting.findOne({ configKey: 'master_config' }).lean()
+  const chargeConfig = resolveChargeConfig(globalSettings)
+  let platformFeeConfig = chargeConfig.platformFee.applyToUser ? chargeConfig.platformFee : null
+
   const categoryGstMap = new Map()
   allCategories.forEach(c => {
-    const gst = c.isGstActive ? (c.gstPercentage || 0) : 0
+    const gst = resolveCategoryGstPercentage(c, chargeConfig)
     categoryGstMap.set(c.name, gst)
     categoryGstMap.set(String(c._id), gst)
   })
   allSubcategories.forEach(sc => {
-    const parentGst = categoryGstMap.get(String(sc.categoryId)) || 0
+    const parentGst = categoryGstMap.get(String(sc.categoryId)) ?? chargeConfig.gst.defaultPercentage
     categoryGstMap.set(sc.name, parentGst)
   })
-
-  // Global settings for platform fee
-  const SystemSetting = (await import('../models/SystemSetting.js')).SystemSetting
-  const globalSettings = await SystemSetting.findOne({ configKey: 'master_config' }).lean()
-  let platformFeeConfig = globalSettings?.platformFee?.isActive ? globalSettings.platformFee : null
 
   // Calculate overall totals
   const perDayBaseTotal = serviceBreakdown.reduce((sum, item) => sum + item.totalPricePerDay, 0)
   const basePriceTotal = perDayBaseTotal * days
 
-  let platformFee = 0
-  if (platformFeeConfig?.isActive) {
-    if (platformFeeConfig.type === 'fixed') {
-      platformFee = Number(platformFeeConfig.value) || 0
-    } else {
-      platformFee = (basePriceTotal * (Number(platformFeeConfig.value) || 0)) / 100
-    }
-  } else {
-    platformFee = 100
-  }
-
-  const estimatedTotal = basePriceTotal + Math.round(platformFee)
-
   // Calculate GST per category for contractor requests
-  let taxAmount = 0
+  let rawTaxAmount = 0
   if (request.sourceType === REQUEST_SOURCE.CONTRACTOR) {
     serviceBreakdown.forEach(item => {
-      const gstPercent = categoryGstMap.get(item.categoryName) || 0
-      item.gstPercentage = gstPercent
-      item.gstAmount = (item.totalPriceForDuration * gstPercent) / 100
-      taxAmount += item.gstAmount
+      const gstPercent = categoryGstMap.has(item.categoryName) ? categoryGstMap.get(item.categoryName) : chargeConfig.gst.defaultPercentage
+      item.gstPercentage = chargeConfig.gst.applyToUser ? gstPercent : 0
+      item.gstAmount = chargeConfig.gst.applyToUser ? ((item.totalPriceForDuration * gstPercent) / 100) : 0
+      rawTaxAmount += (item.totalPriceForDuration * gstPercent) / 100
     })
+  } else {
+    const fallbackPct = resolveCategoryGstPercentage(null, chargeConfig)
+    rawTaxAmount = (basePriceTotal * fallbackPct) / 100
   }
+
+  const charges = computeBookingCharges({
+    basePrice: basePriceTotal,
+    settings: globalSettings,
+    rawGstAmount: rawTaxAmount,
+  })
 
   const pricingSummary = {
     days,
     perDayBaseTotal,
     basePriceTotal,
-    platformFee: Math.round(platformFee),
-    taxAmount: Math.round(taxAmount),
-    estimatedTotal: Math.round(estimatedTotal + taxAmount)
+    platformFee: Math.round(charges.platformFee),
+    providerPlatformFee: Math.round(charges.providerPlatformFee),
+    taxAmount: Math.round(charges.taxes),
+    providerTaxes: Math.round(charges.providerTaxes),
+    commissionAmount: Math.round(charges.commissionAmount),
+    userCommissionAmount: Math.round(charges.userCommissionAmount),
+    estimatedTotal: Math.round(charges.totalAmount),
+    chargeConfig: charges.config,
   }
 
   const allocation = await Allocation.findOne({ requestId: request._id })
@@ -549,7 +552,7 @@ export const mockPayRequest = asyncHandler(async (req, res) => {
   
   const existingInvoice = await Invoice.findOne({ requestId: request._id, contractorId: request.clientId });
   if (!existingInvoice) {
-    const baseAmount = request.totalAmount - (request.platformFee || 0) - (request.taxAmount || 0);
+    const baseAmount = request.totalAmount - (request.platformFee || 0) - (request.taxAmount || 0) - (request.userCommissionAmount || 0);
     await Invoice.create({
       invoiceNumber: generateInvoiceNumber(),
       contractorId: request.clientId,
@@ -560,6 +563,8 @@ export const mockPayRequest = asyncHandler(async (req, res) => {
       paidAt: new Date(),
       total: request.totalAmount || 0,
       subtotal: baseAmount || 0,
+      platformFee: request.platformFee || 0,
+      userCommissionAmount: request.userCommissionAmount || 0,
       gstTotal: request.taxAmount || 0,
       lines: (request.lines || []).map(l => ({
         description: `Booking for ${l.quantity || 1}x Labour`,

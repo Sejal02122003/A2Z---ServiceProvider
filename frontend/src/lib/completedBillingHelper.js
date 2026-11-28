@@ -19,6 +19,7 @@ export function calculateCompletedBookingBill(booking) {
       deductedBasePrice: 0,
       completedPlatformFee: 0,
       completedTaxes: 0,
+      completedUserCommission: 0,
       completedTotalAmount: 0,
       originalBasePrice: 0,
       originalTotalAmount: 0,
@@ -35,6 +36,7 @@ export function calculateCompletedBookingBill(booking) {
   const originalBasePrice = booking.basePrice || 0
   const originalPlatformFee = booking.platformFee || 0
   const originalTaxes = booking.taxes || 0
+  const originalUserCommission = booking.userCommissionAmount || 0
   const originalTotalAmount = booking.totalAmount || 0
 
   // For regular (non-contractor) bookings, retain original billing behavior
@@ -48,6 +50,7 @@ export function calculateCompletedBookingBill(booking) {
       deductedBasePrice: 0,
       completedPlatformFee: originalPlatformFee,
       completedTaxes: originalTaxes,
+      completedUserCommission: originalUserCommission,
       completedTotalAmount: originalTotalAmount,
       originalBasePrice,
       originalTotalAmount,
@@ -142,18 +145,21 @@ export function calculateCompletedBookingBill(booking) {
   // Platform fee is a fixed dynamic fee from admin settings/booking — do not scale down unless 0 work was completed
   let completedPlatformFee = originalPlatformFee
   let completedTaxes = originalTaxes
+  let completedUserCommission = originalUserCommission
 
   if (completionRatio === 0 && totalCompletedLabours === 0) {
     completedPlatformFee = 0
     completedTaxes = 0
+    completedUserCommission = 0
   } else if (completionRatio < 1) {
-    // Taxes are calculated on the completed base price / ratio
+    // Taxes & commission are calculated on the completed base price / ratio
     completedTaxes = Math.round(originalTaxes * completionRatio)
+    completedUserCommission = Math.round(originalUserCommission * completionRatio)
   }
 
-  // Platform fee is part of the customer's final bill (base + platform fee + taxes)
+  // Platform fee & optional user commission are part of the customer's final bill (base + platform fee + taxes + userCommission)
   const completedTotalAmount = Math.round(
-    completedBasePrice + completedPlatformFee + completedTaxes
+    completedBasePrice + completedPlatformFee + completedTaxes + completedUserCommission
   )
 
   return {
@@ -162,6 +168,7 @@ export function calculateCompletedBookingBill(booking) {
     deductedBasePrice,
     completedPlatformFee,
     completedTaxes,
+    completedUserCommission,
     completedTotalAmount,
     originalBasePrice,
     originalTotalAmount,

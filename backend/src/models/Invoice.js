@@ -31,6 +31,7 @@ const invoiceSchema = new mongoose.Schema(
     subtotal: { type: Number, default: 0 },
     gstTotal: { type: Number, default: 0 },
     platformFee: { type: Number, default: 0 },
+    userCommissionAmount: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
     dueDate: Date,
     paidAt: Date,

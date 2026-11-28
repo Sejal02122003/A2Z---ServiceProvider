@@ -152,6 +152,26 @@ export function calculateEligibility({ wallet, settings, bookingAmount = 0 }) {
 }
 
 /**
+ * Respect Admin SystemSetting Commission toggle for Service Provider.
+ */
+async function getEffectiveEligibilitySettings(settings, booking = null, session = null) {
+  let providerCommActive = booking?.chargeConfigSnapshot?.commission?.applyToProvider
+  if (providerCommActive === undefined) {
+    const { SystemSetting } = await import('../models/SystemSetting.js')
+    const { resolveChargeConfig } = await import('../utils/chargeCalculator.js')
+    let q = SystemSetting.findOne({ configKey: 'master_config' })
+    if (session) q = q.session(session)
+    const master = await q.lean()
+    providerCommActive = resolveChargeConfig(master).commission.applyToProvider
+  }
+  if (providerCommActive === false) {
+    const plain = settings?.toObject ? settings.toObject() : { ...(settings || {}) }
+    return { ...plain, commissionPercentage: 0, commissionReservationEnabled: false }
+  }
+  return settings
+}
+
+/**
  * Check provider booking eligibility for a specific booking or general wallet status
  */
 export async function checkProviderBookingEligibility({ providerId, bookingId = null, booking = null }) {
@@ -165,8 +185,9 @@ export async function checkProviderBookingEligibility({ providerId, bookingId = 
     getWalletEligibilitySettings(),
   ])
 
+  const effectiveSettings = await getEffectiveEligibilitySettings(settings, targetBooking)
   const bookingAmount = targetBooking ? Number(targetBooking.totalAmount || targetBooking.basePrice || 0) : 0
-  const calculation = calculateEligibility({ wallet, settings, bookingAmount })
+  const calculation = calculateEligibility({ wallet, settings: effectiveSettings, bookingAmount })
 
   return {
     ...calculation,
@@ -188,8 +209,9 @@ export async function reserveBookingCommission({ providerId, booking, session = 
   // Ensure wallet exists
   const wallet = await getOrCreateLabourWallet(providerId, session)
 
+  const effectiveSettings = await getEffectiveEligibilitySettings(settings, booking, session)
   const bookingAmount = Number(booking.totalAmount || booking.basePrice || 0)
-  const calculation = calculateEligibility({ wallet, settings, bookingAmount })
+  const calculation = calculateEligibility({ wallet, settings: effectiveSettings, bookingAmount })
 
   if (!calculation.eligible) {
     return {
@@ -362,17 +384,29 @@ export async function settleBookingCommission({ bookingId, session = null, actua
     }
   }
 
+  // Check if provider-side commission was disabled on this booking or in SystemSetting
+  let providerCommissionEnabled = booking.chargeConfigSnapshot?.commission?.applyToProvider
+  if (providerCommissionEnabled === undefined) {
+    const { SystemSetting } = await import('../models/SystemSetting.js')
+    const { resolveChargeConfig } = await import('../utils/chargeCalculator.js')
+    const master = await SystemSetting.findOne({ configKey: 'master_config' }).session(session).lean()
+    providerCommissionEnabled = resolveChargeConfig(master).commission.applyToProvider
+  }
+
   // Retrieve original snapshots from reservation or booking or fallback to active settings
-  const commPercent = Number(reservation?.commissionPercentageSnapshot ?? booking.commissionPercentageSnapshot ?? 25)
+  const commPercent =
+    providerCommissionEnabled === false || (Number(booking.commissionAmount) === 0 && !reservation?.commissionPercentageSnapshot)
+      ? 0
+      : Number(reservation?.commissionPercentageSnapshot ?? booking.commissionPercentageSnapshot ?? 25)
   const minBalSnapshot = Number(reservation?.minimumBalanceSnapshot ?? booking.minimumBalanceSnapshot ?? 300)
   const originalReserved = Number(reservation?.reservedAmount || 0)
 
-  // Calculate actual applicable commission
+  // Calculate actual applicable commission (respect explicit booking.commissionAmount when 0)
   const finalAmount = actualBookingAmount !== null && actualBookingAmount !== undefined
     ? Number(actualBookingAmount)
     : Number(booking.totalAmount || booking.basePrice || 0)
   const finalAmountPaise = Math.round(finalAmount * 100)
-  const actualCommissionPaise = Math.round((finalAmountPaise * commPercent) / 100)
+  const actualCommissionPaise = commPercent > 0 ? Math.round((finalAmountPaise * commPercent) / 100) : 0
   const actualCommission = actualCommissionPaise / 100
 
   const wallet = await getOrCreateLabourWallet(effectiveProviderId, session)
@@ -415,8 +449,8 @@ export async function settleBookingCommission({ bookingId, session = null, actua
     await reservation.save({ session })
   }
 
-  // Update Admin Wallet commissions collected
-  if (actualCommission > 0) {
+  // Update Admin Wallet commissions collected only if payout/settlement hasn't already settled AdminWallet
+  if (actualCommission > 0 && booking.adminSettlementStatus !== 'SETTLED') {
     let adminWallet = await AdminWallet.findOne().session(session)
     if (!adminWallet) adminWallet = new AdminWallet()
     adminWallet.totalCommissionsCollected += actualCommission
@@ -444,8 +478,8 @@ export async function settleBookingCommission({ bookingId, session = null, actua
         reservedAmount: originalReserved,
         chargesBreakdown: {
           commission: actualCommission,
-          platformFee: booking.platformFee || 0,
-          gst: booking.taxes || 0,
+          platformFee: (booking.platformFee || 0) + (booking.providerPlatformFee || 0),
+          gst: (booking.taxes || 0) + (booking.providerTaxes || 0),
           totalDeducted: deductionAmount,
         },
         referenceType: 'BOOKING',
@@ -459,7 +493,6 @@ export async function settleBookingCommission({ bookingId, session = null, actua
   )
 
   booking.walletReservationStatus = 'SETTLED'
-  booking.adminSettlementStatus = 'SETTLED'
   await booking.save({ session })
 
   return {

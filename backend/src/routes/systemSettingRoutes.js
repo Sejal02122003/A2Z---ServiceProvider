@@ -8,11 +8,12 @@ import * as settings from '../controllers/systemSettingController.js'
 
 const router = Router()
 
-// Public route — returns only the time slots (no auth required)
+// Public route — returns non-sensitive global settings (time slots, payment modes, branding, role charge toggles)
 router.get('/public', async (req, res) => {
   try {
     const { SystemSetting, DEFAULT_SUPPORT_CONTACT } = await import('../models/SystemSetting.js')
     const { sendSuccess } = await import('../utils/apiResponse.js')
+    const { resolveChargeConfig } = await import('../utils/chargeCalculator.js')
     let settings = await SystemSetting.findOne({ configKey: 'master_config' })
     const timeSlots = settings?.timeSlots || ['08:00 AM', '10:00 AM', '12:00 PM', '02:00 PM', '04:00 PM', '06:00 PM']
     const freeTrialMessage = settings?.freeTrialMessage || 'Welcome! Enjoy your free trial period.'
@@ -20,7 +21,21 @@ router.get('/public', async (req, res) => {
     const branding = settings?.branding || { logoUrl: null, faviconUrl: null }
     const welcomeKitFee = settings?.welcomeKitFee ?? 999
     const supportContact = settings?.supportContact || DEFAULT_SUPPORT_CONTACT
-    return sendSuccess(res, { data: { timeSlots, freeTrialMessage, paymentModes, branding, welcomeKitFee, supportContact } })
+    const chargeConfig = resolveChargeConfig(settings)
+    return sendSuccess(res, {
+      data: {
+        timeSlots,
+        freeTrialMessage,
+        paymentModes,
+        branding,
+        welcomeKitFee,
+        supportContact,
+        platformFee: chargeConfig.platformFee,
+        gst: chargeConfig.gst,
+        gstPercentage: chargeConfig.gst.defaultPercentage,
+        commission: chargeConfig.commission,
+      },
+    })
   } catch (e) {
     res.status(500).json({ success: false, message: 'Could not load public settings' })
   }
@@ -37,6 +52,8 @@ router.patch(
     body('type').optional().isIn(['fixed', 'percentage']),
     body('value').optional().isNumeric(),
     body('isActive').optional().isBoolean(),
+    body('applyToUser').optional().isBoolean(),
+    body('applyToProvider').optional().isBoolean(),
   ],
   validateRequest,
   settings.updatePlatformFees,
@@ -48,6 +65,8 @@ router.patch(
     body('type').optional().isIn(['global', 'category', 'service']),
     body('globalPercentage').optional().isNumeric(),
     body('isActive').optional().isBoolean(),
+    body('applyToUser').optional().isBoolean(),
+    body('applyToProvider').optional().isBoolean(),
   ],
   validateRequest,
   settings.updateCommission,
@@ -67,7 +86,11 @@ router.patch(
 router.patch(
   '/gst',
   [
-    body('gstPercentage').isNumeric().withMessage('GST percentage is required'),
+    body('gstPercentage').optional().isNumeric().withMessage('GST percentage must be numeric'),
+    body('defaultPercentage').optional().isNumeric().withMessage('Default GST percentage must be numeric'),
+    body('isActive').optional().isBoolean(),
+    body('applyToUser').optional().isBoolean(),
+    body('applyToProvider').optional().isBoolean(),
   ],
   validateRequest,
   settings.updateGstPercentage,

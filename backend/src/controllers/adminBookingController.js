@@ -321,11 +321,17 @@ export const deleteBookingAdmin = asyncHandler(async (req, res) => {
     import('../models/AdminWallet.js').then(async ({ AdminWallet }) => {
       const adminWallet = await AdminWallet.findOne()
       if (adminWallet) {
-        if (booking.commissionAmount) {
-          adminWallet.totalCommissionsCollected = Math.max(0, adminWallet.totalCommissionsCollected - booking.commissionAmount)
+        const commTotal = (booking.commissionAmount || 0) + (booking.userCommissionAmount || 0)
+        const pfTotal = (booking.platformFee || 0) + (booking.providerPlatformFee || 0)
+        const taxTotal = (booking.taxes || 0) + (booking.providerTaxes || 0)
+        if (commTotal) {
+          adminWallet.totalCommissionsCollected = Math.max(0, adminWallet.totalCommissionsCollected - commTotal)
         }
-        if (booking.platformFee) {
-          adminWallet.totalPlatformFeesCollected = Math.max(0, adminWallet.totalPlatformFeesCollected - booking.platformFee)
+        if (pfTotal) {
+          adminWallet.totalPlatformFeesCollected = Math.max(0, adminWallet.totalPlatformFeesCollected - pfTotal)
+        }
+        if (taxTotal) {
+          adminWallet.totalTaxesCollected = Math.max(0, adminWallet.totalTaxesCollected - taxTotal)
         }
         if (booking.basePrice) {
           adminWallet.totalServiceAmountCollected = Math.max(0, adminWallet.totalServiceAmountCollected - booking.basePrice)
@@ -394,7 +400,8 @@ export const generateBookingInvoiceAdmin = asyncHandler(async (req, res) => {
     subtotal: booking.basePrice || 0,
     gstTotal: booking.taxes || 0,
     platformFee: booking.platformFee || 0,
-    total: booking.totalAmount || 0,
+    userCommissionAmount: booking.userCommissionAmount || 0,
+    total: booking.totalAmount || ((booking.basePrice || 0) + (booking.taxes || 0) + (booking.platformFee || 0) + (booking.userCommissionAmount || 0)),
     issuedAt: new Date(),
     dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
   })

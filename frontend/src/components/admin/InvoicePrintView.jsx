@@ -138,6 +138,12 @@ export default function InvoicePrintView({ data }) {
             <span>Platform Fee</span>
             <span>₹{(Number(invoice?.platformFee) || Number(booking?.platformFee) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
           </div>
+          {(Number(invoice?.userCommissionAmount) || Number(booking?.userCommissionAmount) || 0) > 0 && (
+            <div className="flex justify-between py-2 text-sm text-gray-600 border-b border-gray-100">
+              <span>Service Commission</span>
+              <span>₹{(Number(invoice?.userCommissionAmount) || Number(booking?.userCommissionAmount) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+            </div>
+          )}
           <div className="flex justify-between py-4 text-lg font-bold text-gray-900 border-b-2 border-gray-900">
             <span>Total Amount</span>
             <span>₹{(invoice?.total || booking?.totalAmount || 0).toLocaleString('en-IN')}</span>
