@@ -6,6 +6,19 @@ import { HTTP_STATUS, sendError, sendSuccess } from '../utils/apiResponse.js'
 import { createInventoryLog, recheckStockForPendingRequests } from '../services/materialRequirementService.js'
 export { deleteProduct } from './productController.js'
 
+function enrichProductStock(productDoc) {
+  const p = productDoc?.toObject ? productDoc.toObject() : { ...productDoc }
+  let stockStatus = 'IN_STOCK'
+  if ((p.currentStock || 0) <= 0) stockStatus = 'OUT_OF_STOCK'
+  else if ((p.currentStock || 0) <= (p.minimumStock || 0)) stockStatus = 'LOW_STOCK'
+
+  return {
+    ...p,
+    stockStatus,
+    stockValue: (p.currentStock || 0) * (p.price || 0),
+  }
+}
+
 export const addStock = asyncHandler(async (req, res) => {
   const { productId, quantity, remarks } = req.body
 
@@ -44,7 +57,7 @@ export const addStock = asyncHandler(async (req, res) => {
   return sendSuccess(res, {
     message: `Added ${addQty} ${product.unit}(s) to stock successfully`,
     data: {
-      product,
+      product: enrichProductStock(product),
       transaction: log,
     },
   })
@@ -104,14 +117,14 @@ export const adjustStock = asyncHandler(async (req, res) => {
   return sendSuccess(res, {
     message: 'Stock adjusted successfully',
     data: {
-      product,
+      product: enrichProductStock(product),
       transaction: log,
     },
   })
 })
 
 export const getInventoryList = asyncHandler(async (req, res) => {
-  const { search, category, status, page = 1, limit = 20 } = req.query
+  const { search, category, status, sortBy = 'updated_desc', page = 1, limit = 20 } = req.query
   const query = {}
 
   if (status === 'active') query.isActive = true
@@ -123,27 +136,26 @@ export const getInventoryList = asyncHandler(async (req, res) => {
     query.$or = [{ name: regex }, { sku: regex }, { category: regex }]
   }
 
+  const sortMap = {
+    updated_desc: { updatedAt: -1, createdAt: -1 },
+    stock_asc: { currentStock: 1, name: 1 },
+    stock_desc: { currentStock: -1, name: 1 },
+    name_asc: { name: 1, sku: 1 },
+    created_desc: { createdAt: -1 },
+  }
+  const sortOption = sortMap[sortBy] || sortMap.updated_desc
+
   const skip = (Number(page) - 1) * Number(limit)
   const total = await Product.countDocuments(query)
 
   const products = await Product.find(query)
     .populate('alternativeProductIds', 'name sku currentStock unit')
-    .sort({ currentStock: 1, name: 1 })
+    .sort(sortOption)
     .skip(skip)
     .limit(Number(limit))
     .lean()
 
-  const enrichedProducts = products.map((p) => {
-    let stockStatus = 'IN_STOCK'
-    if (p.currentStock <= 0) stockStatus = 'OUT_OF_STOCK'
-    else if (p.currentStock <= p.minimumStock) stockStatus = 'LOW_STOCK'
-
-    return {
-      ...p,
-      stockStatus,
-      stockValue: (p.currentStock || 0) * (p.price || 0),
-    }
-  })
+  const enrichedProducts = products.map(enrichProductStock)
 
   return sendSuccess(res, {
     data: {

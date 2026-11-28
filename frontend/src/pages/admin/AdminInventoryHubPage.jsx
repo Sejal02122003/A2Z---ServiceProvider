@@ -387,12 +387,18 @@ function ProductsTab({ onReloadStats, onToast }) {
   const [productToDelete, setProductToDelete] = useState(null)
   const [deletingProduct, setDeletingProduct] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [recentlyUpdatedId, setRecentlyUpdatedId] = useState(null)
 
-  const loadData = useCallback(async () => {
+  const markRecentlyUpdated = (id) => {
+    setRecentlyUpdatedId(id)
+    setTimeout(() => setRecentlyUpdatedId((curr) => (curr === id ? null : curr)), 6000)
+  }
+
+  const loadData = useCallback(async ({ silent = false } = {}) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       const [prodRes, cats] = await Promise.all([
-        fetchProducts({ search, category, status, stockStatus, limit: 100 }),
+        fetchProducts({ search, category, status, stockStatus, limit: 500 }),
         fetchProductCategories(),
       ])
       setProducts(prodRes?.products || [])
@@ -400,7 +406,7 @@ function ProductsTab({ onReloadStats, onToast }) {
     } catch (err) {
       console.error(err)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [search, category, status, stockStatus])
 
@@ -535,10 +541,21 @@ function ProductsTab({ onReloadStats, onToast }) {
                 products.map((p) => {
                   const isOut = p.currentStock <= 0
                   const isLow = !isOut && p.currentStock <= p.minimumStock
+                  const isJustUpdated = recentlyUpdatedId === p._id
                   return (
-                    <tr key={p._id} className="hover:bg-slate-50/60 transition">
+                    <tr
+                      key={p._id}
+                      className={`transition ${isJustUpdated ? 'bg-emerald-50/80 ring-1 ring-inset ring-emerald-300' : 'hover:bg-slate-50/60'}`}
+                    >
                       <td className="px-4 py-3.5">
-                        <div className="font-bold text-slate-900">{p.name}</div>
+                        <div className="flex items-center gap-2 font-bold text-slate-900">
+                          <span>{p.name}</span>
+                          {isJustUpdated && (
+                            <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-white">
+                              Updated
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600">
                           <span>SKU: {p.sku}</span>
                           {p.alternativeProductIds?.length > 0 && (
@@ -639,9 +656,17 @@ function ProductsTab({ onReloadStats, onToast }) {
             setModalOpen(false)
             setRestockProd(existing)
           }}
-          onSaved={() => {
+          onSaved={(savedProd) => {
             setModalOpen(false)
-            loadData()
+            if (savedProd?._id) {
+              setProducts((prev) => {
+                const exists = prev.some((item) => item._id === savedProd._id)
+                if (exists) return prev.map((item) => (item._id === savedProd._id ? { ...item, ...savedProd } : item))
+                return [savedProd, ...prev]
+              })
+              markRecentlyUpdated(savedProd._id)
+            }
+            loadData({ silent: true })
             onReloadStats()
             onToast(editingProduct ? 'Product updated successfully' : 'Product created successfully')
           }}
@@ -653,11 +678,19 @@ function ProductsTab({ onReloadStats, onToast }) {
         <RestockModal
           product={restockProd}
           onClose={() => setRestockProd(null)}
-          onAdded={() => {
+          onAdded={(updatedProd) => {
             setRestockProd(null)
-            loadData()
+            if (updatedProd?._id) {
+              setProducts((prev) => prev.map((item) => (item._id === updatedProd._id ? { ...item, ...updatedProd } : item)))
+              markRecentlyUpdated(updatedProd._id)
+            }
+            loadData({ silent: true })
             onReloadStats()
-            onToast('Stock added successfully')
+            onToast(
+              updatedProd
+                ? `Added stock to ${updatedProd.name} — New Stock: ${updatedProd.currentStock} ${updatedProd.unit}`
+                : 'Stock added successfully'
+            )
           }}
         />
       )}
@@ -773,13 +806,14 @@ function ProductFormModal({ product, categories, allProducts, onClose, onSaved, 
         isActive,
       }
 
+      let savedRes = null
       if (product) {
-        await updateProduct(product._id, payload)
+        savedRes = await updateProduct(product._id, payload)
       } else {
         payload.currentStock = Number(currentStock)
-        await createProduct(payload)
+        savedRes = await createProduct(payload)
       }
-      onSaved()
+      onSaved(savedRes?.product)
     } catch (err) {
       setError(err.message || 'Operation failed')
     } finally {
@@ -904,7 +938,7 @@ function ProductFormModal({ product, categories, allProducts, onClose, onSaved, 
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {!product && (
+            {!product ? (
               <div>
                 <label className="block text-xs font-bold text-slate-700">Initial Stock Quantity</label>
                 <input
@@ -914,6 +948,22 @@ function ProductFormModal({ product, categories, allProducts, onClose, onSaved, 
                   onChange={(e) => setCurrentStock(e.target.value)}
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-bold text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-bold text-slate-700">Current Stock ({unit})</label>
+                <div className="mt-1 flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+                  <span className="font-black text-slate-900">{product.currentStock ?? 0} {unit}</span>
+                  {onRestock && (
+                    <button
+                      type="button"
+                      onClick={() => onRestock(product)}
+                      className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs hover:bg-emerald-700"
+                    >
+                      + Add Stock
+                    </button>
+                  )}
+                </div>
               </div>
             )}
             <div>
@@ -2164,23 +2214,43 @@ function StockManagementTab({ onReloadStats, onToast }) {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState('updated_desc')
   const [restockModalProd, setRestockModalProd] = useState(null)
   const [adjustModalProd, setAdjustModalProd] = useState(null)
   const [productToDelete, setProductToDelete] = useState(null)
   const [deletingProduct, setDeletingProduct] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [recentlyUpdatedId, setRecentlyUpdatedId] = useState(null)
 
-  const loadStock = useCallback(async () => {
+  const markRecentlyUpdated = (id) => {
+    setRecentlyUpdatedId(id)
+    setTimeout(() => setRecentlyUpdatedId((curr) => (curr === id ? null : curr)), 6000)
+  }
+
+  const applyLocalProductUpdate = (updatedProd) => {
+    if (!updatedProd?._id) return
+    const stockValue = updatedProd.stockValue ?? (Number(updatedProd.currentStock || 0) * Number(updatedProd.price || 0))
+    setProducts((prev) =>
+      prev.map((item) =>
+        item._id === updatedProd._id
+          ? { ...item, ...updatedProd, stockValue }
+          : item
+      )
+    )
+    markRecentlyUpdated(updatedProd._id)
+  }
+
+  const loadStock = useCallback(async ({ silent = false } = {}) => {
     try {
-      setLoading(true)
-      const res = await fetchInventoryList({ search, limit: 100 })
+      if (!silent) setLoading(true)
+      const res = await fetchInventoryList({ search, sortBy, limit: 500 })
       setProducts(res?.products || [])
     } catch (err) {
       console.error(err)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
-  }, [search])
+  }, [search, sortBy])
 
   useEffect(() => {
     loadStock()
@@ -2207,18 +2277,33 @@ function StockManagementTab({ onReloadStats, onToast }) {
     <div className="space-y-4">
       <GlassPanel className="p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="relative min-w-[200px] flex-1 max-w-xs">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search product inventory..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs font-medium text-slate-800 focus:outline-hidden"
-            />
+          <div className="flex flex-1 flex-wrap items-center gap-2">
+            <div className="relative min-w-[200px] flex-1 max-w-xs">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search product inventory..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs font-medium text-slate-800 focus:outline-hidden"
+              />
+            </div>
+
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+            >
+              <option value="updated_desc">Recently Updated First</option>
+              <option value="stock_asc">Lowest Stock First</option>
+              <option value="stock_desc">Highest Stock First</option>
+              <option value="name_asc">Name (A–Z)</option>
+              <option value="created_desc">Newest Added First</option>
+            </select>
           </div>
+
           <button
-            onClick={loadStock}
+            onClick={() => loadStock()}
             className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -2260,11 +2345,22 @@ function StockManagementTab({ onReloadStats, onToast }) {
                 products.map((p) => {
                   const isOut = p.currentStock <= 0
                   const isLow = !isOut && p.currentStock <= p.minimumStock
+                  const isJustUpdated = recentlyUpdatedId === p._id
 
                   return (
-                    <tr key={p._id} className="hover:bg-slate-50/60 transition">
+                    <tr
+                      key={p._id}
+                      className={`transition ${isJustUpdated ? 'bg-emerald-50/80 ring-1 ring-inset ring-emerald-300' : 'hover:bg-slate-50/60'}`}
+                    >
                       <td className="px-4 py-3.5">
-                        <div className="font-bold text-slate-900">{p.name}</div>
+                        <div className="flex items-center gap-2 font-bold text-slate-900">
+                          <span>{p.name}</span>
+                          {isJustUpdated && (
+                            <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-white">
+                              Updated
+                            </span>
+                          )}
+                        </div>
                         <div className="font-mono text-[10px] text-indigo-600 font-bold">{p.sku}</div>
                       </td>
                       <td className="px-4 py-3.5 font-medium text-slate-600">{p.category}</td>
@@ -2324,11 +2420,15 @@ function StockManagementTab({ onReloadStats, onToast }) {
         <RestockModal
           product={restockModalProd}
           onClose={() => setRestockModalProd(null)}
-          onAdded={() => {
+          onAdded={(updatedProd) => {
             setRestockModalProd(null)
-            loadStock()
+            applyLocalProductUpdate(updatedProd)
             onReloadStats()
-            onToast('Stock added successfully')
+            onToast(
+              updatedProd
+                ? `Added stock to ${updatedProd.name} — New Stock: ${updatedProd.currentStock} ${updatedProd.unit}`
+                : 'Stock added successfully'
+            )
           }}
         />
       )}
@@ -2338,11 +2438,15 @@ function StockManagementTab({ onReloadStats, onToast }) {
         <AdjustStockModal
           product={adjustModalProd}
           onClose={() => setAdjustModalProd(null)}
-          onAdjusted={() => {
+          onAdjusted={(updatedProd) => {
             setAdjustModalProd(null)
-            loadStock()
+            applyLocalProductUpdate(updatedProd)
             onReloadStats()
-            onToast('Stock adjusted successfully')
+            onToast(
+              updatedProd
+                ? `Adjusted stock for ${updatedProd.name} — New Stock: ${updatedProd.currentStock} ${updatedProd.unit}`
+                : 'Stock adjusted successfully'
+            )
           }}
         />
       )}
@@ -2380,12 +2484,12 @@ function RestockModal({ product, onClose, onAdded }) {
     setBusy(true)
 
     try {
-      await addInventoryStock({
+      const res = await addInventoryStock({
         productId: product._id,
         quantity: Number(quantity),
         remarks,
       })
-      onAdded()
+      onAdded(res?.product)
     } catch (err) {
       setError(err.message || 'Failed to add stock')
     } finally {
@@ -2481,12 +2585,12 @@ function AdjustStockModal({ product, onClose, onAdjusted }) {
     setBusy(true)
 
     try {
-      await adjustInventoryStock({
+      const res = await adjustInventoryStock({
         productId: product._id,
         targetStock: Number(targetStock),
         remarks,
       })
-      onAdjusted()
+      onAdjusted(res?.product)
     } catch (err) {
       setError(err.message || 'Failed to adjust stock')
     } finally {
@@ -2967,11 +3071,15 @@ function LowStockTab({ onReloadStats, onToast, onSwitchToStock }) {
         <RestockModal
           product={restockProd}
           onClose={() => setRestockProd(null)}
-          onAdded={() => {
+          onAdded={(updatedProd) => {
             setRestockProd(null)
             loadLowStock()
             onReloadStats()
-            onToast('Stock replenished successfully')
+            onToast(
+              updatedProd
+                ? `Replenished ${updatedProd.name} — New Stock: ${updatedProd.currentStock} ${updatedProd.unit}`
+                : 'Stock replenished successfully'
+            )
           }}
         />
       )}
