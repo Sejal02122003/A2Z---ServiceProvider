@@ -41,6 +41,7 @@ import { ComboInput } from '../../components/ui/ComboInput.jsx'
 import {
   PRICE_OPTIONS,
   UNIT_OPTIONS,
+  findProductByName,
   getCategoryOptions,
   getProductNameOptions,
   getSkuOptions,
@@ -382,6 +383,7 @@ function ProductsTab({ onReloadStats, onToast }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [viewProduct, setViewProduct] = useState(null)
+  const [restockProd, setRestockProd] = useState(null)
   const [productToDelete, setProductToDelete] = useState(null)
   const [deletingProduct, setDeletingProduct] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -582,6 +584,14 @@ function ProductsTab({ onReloadStats, onToast }) {
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
+                            onClick={() => setRestockProd(p)}
+                            title="Add Stock"
+                            className="whitespace-nowrap rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs hover:bg-emerald-700"
+                          >
+                            + Add Stock
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => setViewProduct(p)}
                             title="View Details"
                             className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-indigo-600 transition"
@@ -625,11 +635,29 @@ function ProductsTab({ onReloadStats, onToast }) {
           categories={categories}
           allProducts={products}
           onClose={() => setModalOpen(false)}
+          onRestock={(existing) => {
+            setModalOpen(false)
+            setRestockProd(existing)
+          }}
           onSaved={() => {
             setModalOpen(false)
             loadData()
             onReloadStats()
             onToast(editingProduct ? 'Product updated successfully' : 'Product created successfully')
+          }}
+        />
+      )}
+
+      {/* Restock Modal */}
+      {restockProd && (
+        <RestockModal
+          product={restockProd}
+          onClose={() => setRestockProd(null)}
+          onAdded={() => {
+            setRestockProd(null)
+            loadData()
+            onReloadStats()
+            onToast('Stock added successfully')
           }}
         />
       )}
@@ -669,7 +697,7 @@ function ProductsTab({ onReloadStats, onToast }) {
   )
 }
 
-function ProductFormModal({ product, categories, allProducts, onClose, onSaved }) {
+function ProductFormModal({ product, categories, allProducts, onClose, onSaved, onRestock }) {
   const [name, setName] = useState(product?.name || '')
   const [sku, setSku] = useState(product?.sku || '')
   const [description, setDescription] = useState(product?.description || '')
@@ -700,6 +728,8 @@ function ProductFormModal({ product, categories, allProducts, onClose, onSaved }
   }, [])
 
   const otherProducts = savedProducts.filter((p) => p._id !== product?._id)
+  // While creating, a name that is already saved should be restocked rather than added again
+  const existingProduct = product ? null : findProductByName(name, otherProducts)
   // An SKU we filled in follows the category; one typed or picked by the admin is left alone
   const [skuIsAuto, setSkuIsAuto] = useState(false)
 
@@ -802,7 +832,7 @@ function ProductFormModal({ product, categories, allProducts, onClose, onSaved }
                 value={name}
                 onChange={setName}
                 onSelect={handleNameSelect}
-                options={getProductNameOptions(category, otherProducts)}
+                options={getProductNameOptions(category, otherProducts, { includeSaved: !product })}
                 placeholder="e.g. AC Cleaner Foam Spray"
                 className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               />
@@ -820,6 +850,21 @@ function ProductFormModal({ product, categories, allProducts, onClose, onSaved }
               />
             </div>
           </div>
+
+          {existingProduct && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
+              <span className="font-semibold">
+                {existingProduct.name} ({existingProduct.sku}) already exists with {existingProduct.currentStock ?? 0} {existingProduct.unit} in stock.
+              </span>
+              <button
+                type="button"
+                onClick={() => onRestock(existingProduct)}
+                className="whitespace-nowrap rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs hover:bg-emerald-700"
+              >
+                + Add Stock
+              </button>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>

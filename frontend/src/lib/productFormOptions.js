@@ -149,14 +149,37 @@ export function getCategoryOptions(savedCategories = []) {
   return names.map((value) => ({ value }))
 }
 
-/** Products of the chosen category (all of them for General or a custom category), minus ones already saved */
-export function getProductNameOptions(category, savedProducts = []) {
+export const findProductByName = (name, products = []) => products.find((p) => sameText(p.name, name))
+
+/**
+ * Product names of the chosen category: saved products first (if `includeSaved`), then preset ones not yet saved.
+ * General lists every category, and so does a custom category that has nothing to show of its own.
+ */
+export function getProductNameOptions(category, savedProducts = [], { includeSaved = false } = {}) {
   const group = findGroup(category)
-  return (group ? [group] : CATALOG).flatMap((g) =>
+  const showAll = !category?.trim() || sameText(category, 'General')
+
+  const saved = includeSaved
+    ? savedProducts
+        .filter((p) => showAll || sameText(p.category, category))
+        // One entry per name
+        .filter((p, i, list) => findProductByName(p.name, list) === p)
+        .map((p) => ({
+          value: p.name,
+          hint: `Added · ${p.currentStock ?? 0} ${p.unit}`,
+          unit: p.unit,
+          category: p.category,
+        }))
+    : []
+
+  if (!group && !showAll && saved.length) return saved
+
+  const presets = (group ? [group] : CATALOG).flatMap((g) =>
     g.products
-      .filter(([name]) => !savedProducts.some((p) => sameText(p.name, name)))
+      .filter(([name]) => !findProductByName(name, savedProducts))
       .map(([name, unit]) => ({ value: name, hint: group ? unit : g.category, unit, category: g.category })),
   )
+  return [...saved, ...presets]
 }
 
 const categoryCode = (category) =>
